@@ -255,3 +255,6 @@ desktop.ini
 
 # uv specific
 uv.lock
+
+# LangGraph runtime data
+.langgraph_api/
