@@ -477,8 +477,8 @@ def demonstrate_agent_capabilities():
     # else:
     #     model_provider = "openai"
     #     print("✅ 使用 OpenAI GPT 模型")
-    model_provider = "zhipu"
-    # model_provider = "qwen"
+    # model_provider = "zhipu"
+    model_provider = "qwen"
     # model_provider = "doubao"
     try:
         # 创建智能体
@@ -522,6 +522,6 @@ def main():
 
     demonstrate_agent_capabilities()
 
-agent = ModernLangChainAgent().agent
+agent = ModernLangChainAgent(model_provider="qwen").agent
 if __name__ == "__main__":
     main()

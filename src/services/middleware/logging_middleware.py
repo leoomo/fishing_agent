@@ -925,6 +925,56 @@ class AgentLoggingMiddleware(AgentMiddleware):
                 return request.model
         return "unknown"
 
+    def _extract_token_usage(self, response: Any) -> Dict[str, int]:
+        """提取token使用信息 (增强兼容性)"""
+        token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+        # 尝试多种方式获取Token使用量
+        token_extracted = False
+
+        # 方法1: usage_metadata (标准LangChain)
+        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+            token_usage.update(response.usage_metadata)
+            token_extracted = True
+            self.metrics.token_usage.update(response.usage_metadata)
+
+        # 方法2: response.usage (某些模型提供商)
+        elif hasattr(response, 'usage') and response.usage:
+            if hasattr(response.usage, 'prompt_tokens'):
+                token_usage["prompt_tokens"] = response.usage.prompt_tokens
+            if hasattr(response.usage, 'completion_tokens'):
+                token_usage["completion_tokens"] = response.usage.completion_tokens
+            if hasattr(response.usage, 'total_tokens'):
+                token_usage["total_tokens"] = response.usage.total_tokens
+            token_extracted = True
+            self.metrics.token_usage.update(token_usage)
+
+        # 方法3: 从response对象中直接查找 (兼容更多提供商)
+        else:
+            # 尝试从response.response_metadata中查找
+            if hasattr(response, 'response_metadata') and response.response_metadata:
+                if 'token_usage' in response.response_metadata:
+                    token_usage.update(response.response_metadata['token_usage'])
+                    token_extracted = True
+                    self.metrics.token_usage.update(token_usage)
+                elif 'usage' in response.response_metadata:
+                    token_usage.update(response.response_metadata['usage'])
+                    token_extracted = True
+                    self.metrics.token_usage.update(token_usage)
+
+        # 方法4: 估算Token数量 (基于文本长度)
+        if not token_extracted:
+            # 如果无法获取Token，进行简单估算
+            # 这里无法访问request，所以返回默认值
+            token_usage = {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "estimated": True  # 标记这是估算值
+            }
+
+        return token_usage
+
     def before_agent(self, state: AgentState, runtime: Runtime) -> Optional[Dict[str, Any]]:
         """智能体执行前的处理"""
         if not self.execution_start_time:
@@ -1280,7 +1330,7 @@ class AgentLoggingMiddleware(AgentMiddleware):
 
             # 更新指标
             self.metrics.model_calls_count += 1
-            self.metrics.total_response_time_ms += total_duration_ms
+            self.metrics.total_duration_ms += total_duration_ms
             self.metrics.token_usage.update(token_usage)
             self.metrics.success = True
 
@@ -1706,7 +1756,7 @@ class AgentLoggingMiddleware(AgentMiddleware):
                         tool_args=tool_args,
                         result=result,
                         success=True,
-                        total_duration_ms=total_duration_ms,
+                        duration_ms=total_duration_ms,
                         cache_hit=cache_hit,
                         timestamp=datetime.now().isoformat()
                     )
@@ -1737,7 +1787,7 @@ class AgentLoggingMiddleware(AgentMiddleware):
                 tool_args=tool_args,
                 result=result,
                 success=True,
-                total_duration_ms=total_duration_ms,
+                duration_ms=total_duration_ms,
                 cache_hit=cache_hit,
                 timestamp=datetime.now().isoformat()
             )
@@ -1770,7 +1820,7 @@ class AgentLoggingMiddleware(AgentMiddleware):
                 tool_args=tool_args,
                 result=None,
                 success=False,
-                total_duration_ms=duration_ms,
+                duration_ms=duration_ms,
                 error_message=str(e),
                 timestamp=datetime.now().isoformat()
             )

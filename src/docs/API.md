@@ -1209,7 +1209,7 @@ cache.clear()
 ```python
 from city_coordinate_db import CityCoordinateDB
 
-db = CityCoordinateDB("data/admin_divisions.db")
+db = CityCoordinateDB("src/data/admin_divisions.db")
 ```
 
 #### 方法

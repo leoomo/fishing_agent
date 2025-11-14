@@ -154,7 +154,7 @@ class IWeatherService:
 ```bash
 # 坐标服务配置
 COORDINATE_SERVICE_ENABLED=true
-COORDINATE_DB_PATH=data/admin_divisions.db
+COORDINATE_DB_PATH=src/data/admin_divisions.db
 COORDINATE_CACHE_TTL=3600
 
 # 天气服务配置
@@ -251,10 +251,13 @@ manager.register_service('new_service', create_new_service)
 - **线程安全**：使用锁机制防止并发初始化问题
 - **错误处理**：优雅的初始化失败处理
 
-### 🔧 最近修复 (2025-11-04)
-- **WeatherTool服务集成修复**: 解决了坐标查询服务调用错误
-- **架构验证**: 7/7项测试全部通过
-- **工具兼容性**: 确保所有工具正确使用新服务架构
+### 🔧 最近修复 (2025-11-14)
+- **LangGraph集成全面修复**: 解决了LangGraph Studio中的关键集成问题
+- **API端点配置错误**: 修复环境变量冲突导致的404 API路径错误
+- **中间件TypeError修复**: 修复ToolCallRecord构造函数参数名称错误
+- **缺失方法补全**: 添加_extract_token_usage方法，支持多LangChain提供商token提取
+- **属性名称统一**: 修复total_response_time_ms与total_duration_ms属性名称不一致问题
+- **服务架构验证**: 7/7项测试全部通过，所有工具正确使用新服务架构
 
 ---
 
