@@ -1,0 +1,27 @@
+{
+  "test_time": "2025-11-03 21:33:00",
+  "tests": {
+    "database": {
+      "name": "数据库连接测试",
+      "passed": true
+    },
+    "place_matcher": {
+      "name": "地名匹配器测试",
+      "passed": false
+    },
+    "weather_service": {
+      "name": "天气服务集成测试",
+      "passed": true
+    },
+    "agent_integration": {
+      "name": "智能体集成测试",
+      "passed": false
+    }
+  },
+  "summary": {
+    "total_tests": 4,
+    "passed_tests": 2,
+    "success_rate": 50.0,
+    "overall_success": false
+  }
+}

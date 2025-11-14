@@ -1,0 +1,225 @@
+# 测试目录结构说明
+
+本目录包含了 LangChain 智能体项目的完整测试套件，按照测试类型和功能进行了分类组织。
+
+## 目录结构
+
+```
+tests/
+├── README.md                 # 本说明文档
+├── test_national_coverage.py # 全国覆盖测试脚本
+├── unit/                     # 单元测试
+├── integration/              # 集成测试
+│   └── verify_national_integration.py  # 集成验证脚本
+├── demos/                    # 演示脚本
+└── weather/                  # 天气功能专项测试
+```
+
+## 各目录详细说明
+
+### unit/ - 单元测试
+
+单元测试针对单个模块或组件进行独立测试，确保各个部分的功能正确性。
+
+**文件列表：**
+- `test_weather_service.py` - 天气服务模块的单元测试（15个测试用例）
+- `test_agent_structure.py` - LangChain 智能体代码结构验证
+- `test_weather_component_only.py` - 天气组件独立功能测试
+- `final_weather_component_test.py` - 最终天气组件验证测试
+
+**运行方式：**
+```bash
+# 运行所有单元测试
+uv run python -m pytest tests/unit/ -v
+
+# 运行特定测试文件
+uv run python tests/unit/test_weather_service.py
+```
+
+### integration/ - 集成测试
+
+集成测试验证多个组件协同工作时的正确性，测试完整的业务流程。
+
+**文件列表：**
+- `test_integrated_weather_agent.py` - 智能体天气查询功能集成测试
+- `test_agent_conversation.py` - 智能体对话功能测试
+- `test_agent_weather_simulation.py` - 模拟智能体天气查询测试
+- `test_enhanced_weather_national_coverage.py` - 增强天气全国覆盖测试
+- `verify_national_integration.py` - 集成验证脚本
+
+**运行方式：**
+```bash
+# 运行所有集成测试
+uv run python -m pytest tests/integration/ -v
+
+# 运行特定集成测试
+uv run python tests/integration/test_integrated_weather_agent.py
+```
+
+### demos/ - 演示脚本
+
+演示脚本展示项目的各项功能，用于功能验证和演示。
+
+**文件列表：**
+- `demo_weather_agent.py` - 智能体天气查询演示
+- `weather_example.py` - 彩云天气 API 使用示例
+
+**运行方式：**
+```bash
+# 运行天气查询演示
+uv run python tests/demos/demo_weather_agent.py
+
+# 运行天气 API 示例
+uv run python tests/demos/weather_example.py
+```
+
+### weather/ - 天气功能专项测试
+
+专门针对天气功能的详细测试，包括真实 API 调用测试。
+
+**文件列表：**
+- `test_real_weather_api.py` - 彩云天气 API 真实场景测试
+
+**运行方式：**
+```bash
+# 运行天气 API 真实测试
+uv run python tests/weather/test_real_weather_api.py
+```
+
+## 环境配置
+
+运行测试前需要确保已正确配置环境变量：
+
+1. **复制环境变量模板：**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **配置必要的 API 密钥：**
+   - `CAIYUN_API_KEY` - 彩云天气 API 密钥（必需，用于真实天气数据）
+   - `ANTHROPIC_AUTH_TOKEN` - 智谱 AI API 密钥（智能体功能）
+   - `ANTHROPIC_API_KEY` - Anthropic Claude API 密钥（备选）
+   - `OPENAI_API_KEY` - OpenAI GPT API 密钥（备选）
+
+## 快速开始
+
+### 1. 运行所有测试
+```bash
+# 使用 pytest 运行所有测试
+uv run python -m pytest tests/ -v
+
+# 或者使用传统的 unittest 方式
+uv run python -m unittest discover tests/ -v
+```
+
+### 2. 运行特定类型的测试
+```bash
+# 只运行单元测试
+uv run python -m pytest tests/unit/ -v
+
+# 只运行集成测试
+uv run python -m pytest tests/integration/ -v
+
+# 运行天气相关测试
+uv run python -m pytest tests/weather/ tests/unit/test_weather_service.py -v
+```
+
+### 3. 运行功能演示
+```bash
+# 天气查询完整演示
+uv run python tests/demos/demo_weather_agent.py
+
+# 天气 API 使用示例
+uv run python tests/demos/weather_example.py
+```
+
+## 测试覆盖范围
+
+### ✅ 已覆盖的功能
+
+1. **天气服务模块**
+   - API 调用成功/失败场景
+   - 数据解析和格式化
+   - 错误处理和降级机制
+   - 城市坐标获取
+
+2. **智能体组件**
+   - 工具定义和注册
+   - 模型初始化
+   - 消息处理流程
+
+3. **集成功能**
+   - 智能体与天气工具的集成
+   - 完整的查询流程
+   - 并发调用处理
+
+4. **API 集成**
+   - 真实彩云天气 API 调用
+   - 数据准确性验证
+   - 性能测试
+
+### 📊 测试统计
+
+- **总测试文件数：** 10 个
+- **单元测试：** 4 个文件
+- **集成测试：** 3 个文件
+- **演示脚本：** 2 个文件
+- **专项测试：** 1 个文件
+
+## 注意事项
+
+1. **API 密钥配置：** 真实 API 测试需要有效的彩云天气 API 密钥
+2. **网络连接：** 部分测试需要互联网连接来调用天气 API
+3. **Python 路径：** 所有测试文件已自动配置项目根目录到 Python 路径
+4. **依赖管理：** 使用 `uv` 管理项目依赖，确保环境一致性
+
+## 故障排除
+
+### 常见问题
+
+1. **导入错误：**
+   ```bash
+   # 确保从项目根目录运行测试
+   uv run python tests/unit/test_weather_service.py
+   ```
+
+2. **API 密钥错误：**
+   ```bash
+   # 检查环境变量是否正确设置
+   uv run python -c "import os; from dotenv import load_dotenv; load_dotenv(); print(os.getenv('CAIYUN_API_KEY'))"
+   ```
+
+3. **网络连接问题：**
+   - 确保能够访问彩云天气 API (https://api.caiyunapp.com)
+   - 检查防火墙和网络配置
+
+### 调试建议
+
+1. **使用详细输出：**
+   ```bash
+   uv run python -m pytest tests/ -v -s
+   ```
+
+2. **运行单个测试：**
+   ```bash
+   uv run python -m pytest tests/unit/test_weather_service.py::TestWeatherService::test_get_coordinates_success -v
+   ```
+
+3. **查看测试覆盖率：**
+   ```bash
+   uv run python -m pytest tests/ --cov=. --cov-report=html
+   ```
+
+## 贡献指南
+
+添加新测试时，请遵循以下规范：
+
+1. **文件命名：** 使用 `test_` 前缀
+2. **测试分类：** 根据测试类型放置到对应目录
+3. **导入路径：** 使用标准的路径配置代码
+4. **文档说明：** 为复杂测试添加清晰的文档字符串
+
+---
+
+**更新时间：** 2025-11-03
+**维护者：** LangChain 学习项目

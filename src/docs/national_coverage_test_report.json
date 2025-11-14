@@ -1,0 +1,499 @@
+{
+  "test_time": "2025-11-03 21:32:33",
+  "database_coverage": {
+    "total_regions": 3053,
+    "by_level": {
+      "1": 19,
+      "2": 53,
+      "3": 2981
+    },
+    "with_coordinates": 3053,
+    "coordinate_coverage_rate": 100.0
+  },
+  "place_matching": {
+    "total_tests": 55,
+    "total_successes": 39,
+    "success_rate": 70.9090909090909,
+    "category_results": {
+      "省级地区": [
+        {
+          "query": "北京",
+          "success": true,
+          "result": "北京市",
+          "level": "省级",
+          "time": 0.002138853073120117
+        },
+        {
+          "query": "上海",
+          "success": true,
+          "result": "南通市",
+          "level": "地级",
+          "time": 3.123283386230469e-05
+        },
+        {
+          "query": "广州",
+          "success": true,
+          "result": "广州市",
+          "level": "地级",
+          "time": 0.0013022422790527344
+        },
+        {
+          "query": "深圳",
+          "success": true,
+          "result": "深圳市",
+          "level": "地级",
+          "time": 0.0012950897216796875
+        },
+        {
+          "query": "杭州",
+          "success": true,
+          "result": "杭州市",
+          "level": "地级",
+          "time": 0.0013039112091064453
+        },
+        {
+          "query": "成都",
+          "success": true,
+          "result": "成都市",
+          "level": "地级",
+          "time": 0.0013036727905273438
+        },
+        {
+          "query": "西安",
+          "success": true,
+          "result": "西安区",
+          "level": "县级",
+          "time": 0.0013110637664794922
+        },
+        {
+          "query": "京",
+          "success": true,
+          "result": "北京市",
+          "level": "省级",
+          "time": 1.71661376953125e-05
+        },
+        {
+          "query": "沪",
+          "success": true,
+          "result": "上海市",
+          "level": "省级",
+          "time": 1.2636184692382812e-05
+        },
+        {
+          "query": "粤",
+          "success": true,
+          "result": "广东省",
+          "level": "省级",
+          "time": 1.2159347534179688e-05
+        },
+        {
+          "query": "苏",
+          "success": true,
+          "result": "苏州市",
+          "level": "地级",
+          "time": 1.0013580322265625e-05
+        },
+        {
+          "query": "浙",
+          "success": true,
+          "result": "浙江省",
+          "level": "省级",
+          "time": 8.821487426757812e-06
+        },
+        {
+          "query": "川",
+          "success": true,
+          "result": "四川省",
+          "level": "省级",
+          "time": 1.2159347534179688e-05
+        },
+        {
+          "query": "鲁",
+          "success": true,
+          "result": "山东省",
+          "level": "省级",
+          "time": 1.0013580322265625e-05
+        },
+        {
+          "query": "燕京",
+          "success": true,
+          "result": "北京市",
+          "level": "省级",
+          "time": 1.1920928955078125e-05
+        },
+        {
+          "query": "金陵",
+          "success": true,
+          "result": "南京市",
+          "level": "地级",
+          "time": 1.0013580322265625e-05
+        },
+        {
+          "query": "鹏城",
+          "success": true,
+          "result": "深圳市",
+          "level": "地级",
+          "time": 9.059906005859375e-06
+        },
+        {
+          "query": "蓉城",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0029768943786621094
+        },
+        {
+          "query": "长安",
+          "success": true,
+          "result": "西安市",
+          "level": "地级",
+          "time": 1.3113021850585938e-05
+        }
+      ],
+      "地级市": [
+        {
+          "query": "苏州市",
+          "success": true,
+          "result": "苏州市",
+          "level": "地级",
+          "time": 6.9141387939453125e-06
+        },
+        {
+          "query": "无锡市",
+          "success": true,
+          "result": "无锡市",
+          "level": "地级",
+          "time": 6.198883056640625e-06
+        },
+        {
+          "query": "常州市",
+          "success": true,
+          "result": "常州市",
+          "level": "地级",
+          "time": 5.245208740234375e-06
+        },
+        {
+          "query": "南京市",
+          "success": true,
+          "result": "南京市",
+          "level": "地级",
+          "time": 5.0067901611328125e-06
+        },
+        {
+          "query": "武汉市",
+          "success": true,
+          "result": "武汉市",
+          "level": "地级",
+          "time": 4.76837158203125e-06
+        },
+        {
+          "query": "长沙市",
+          "success": true,
+          "result": "长沙市",
+          "level": "地级",
+          "time": 5.245208740234375e-06
+        },
+        {
+          "query": "珠海",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0026938915252685547
+        },
+        {
+          "query": "佛山",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.002735137939453125
+        },
+        {
+          "query": "东莞",
+          "success": true,
+          "result": "东莞市",
+          "level": "县级",
+          "time": 0.0013346672058105469
+        },
+        {
+          "query": "中山",
+          "success": true,
+          "result": "中山市",
+          "level": "县级",
+          "time": 0.001316070556640625
+        },
+        {
+          "query": "青岛",
+          "success": true,
+          "result": "青岛市",
+          "level": "地级",
+          "time": 0.0013492107391357422
+        },
+        {
+          "query": "宁波",
+          "success": true,
+          "result": "宁波市",
+          "level": "地级",
+          "time": 0.0013208389282226562
+        },
+        {
+          "query": "厦门",
+          "success": true,
+          "result": "厦门市",
+          "level": "地级",
+          "time": 0.001332998275756836
+        }
+      ],
+      "县区级": [
+        {
+          "query": "朝阳区",
+          "success": true,
+          "result": "朝阳区",
+          "level": "县级",
+          "time": 9.059906005859375e-06
+        },
+        {
+          "query": "天河区",
+          "success": true,
+          "result": "天河区",
+          "level": "县级",
+          "time": 5.7220458984375e-06
+        },
+        {
+          "query": "海淀区",
+          "success": true,
+          "result": "海淀区",
+          "level": "县级",
+          "time": 5.0067901611328125e-06
+        },
+        {
+          "query": "福田区",
+          "success": true,
+          "result": "福田区",
+          "level": "县级",
+          "time": 5.9604644775390625e-06
+        },
+        {
+          "query": "罗湖区",
+          "success": true,
+          "result": "罗湖区",
+          "level": "县级",
+          "time": 5.0067901611328125e-06
+        },
+        {
+          "query": "西湖区",
+          "success": true,
+          "result": "西湖区",
+          "level": "县级",
+          "time": 5.0067901611328125e-06
+        },
+        {
+          "query": "上城区",
+          "success": true,
+          "result": "上城区",
+          "level": "县级",
+          "time": 5.245208740234375e-06
+        },
+        {
+          "query": "锦江区",
+          "success": true,
+          "result": "锦江区",
+          "level": "县级",
+          "time": 4.76837158203125e-06
+        },
+        {
+          "query": "青羊区",
+          "success": true,
+          "result": "青羊区",
+          "level": "县级",
+          "time": 5.0067901611328125e-06
+        },
+        {
+          "query": "新城区",
+          "success": true,
+          "result": "新城区",
+          "level": "县级",
+          "time": 4.76837158203125e-06
+        }
+      ],
+      "乡镇级": [
+        {
+          "query": "沙河镇",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.002978086471557617
+        },
+        {
+          "query": "太平镇",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0029947757720947266
+        },
+        {
+          "query": "新塘镇",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0029821395874023438
+        },
+        {
+          "query": "永宁镇",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0029649734497070312
+        },
+        {
+          "query": "仙村镇",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0029439926147460938
+        },
+        {
+          "query": "河桥镇",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.003003835678100586
+        },
+        {
+          "query": "中新镇",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0030078887939453125
+        },
+        {
+          "query": "石楼镇",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.002960205078125
+        }
+      ],
+      "模糊查询": [
+        {
+          "query": "中山路",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.002973318099975586
+        },
+        {
+          "query": "人民路",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0029609203338623047
+        },
+        {
+          "query": "解放路",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0029768943786621094
+        },
+        {
+          "query": "建设路",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0030357837677001953
+        },
+        {
+          "query": "和平路",
+          "success": false,
+          "result": null,
+          "level": null,
+          "time": 0.0030269622802734375
+        }
+      ]
+    }
+  },
+  "weather_integration": {
+    "total_tests": 10,
+    "total_successes": 0,
+    "success_rate": 0.0,
+    "results": [
+      {
+        "location": "北京市",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 3.504753112792969e-05
+      },
+      {
+        "location": "上海市",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 1.5020370483398438e-05
+      },
+      {
+        "location": "广州市",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 1.3113021850585938e-05
+      },
+      {
+        "location": "深圳市",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 1.2874603271484375e-05
+      },
+      {
+        "location": "杭州市",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 1.0013580322265625e-05
+      },
+      {
+        "location": "朝阳区",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 1.0013580322265625e-05
+      },
+      {
+        "location": "天河区",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 1.0967254638671875e-05
+      },
+      {
+        "location": "海淀区",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 1.7881393432617188e-05
+      },
+      {
+        "location": "沙河镇",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 0.0009961128234863281
+      },
+      {
+        "location": "太平镇",
+        "success": false,
+        "error": "No weather data returned",
+        "query_time": 0.0007259845733642578
+      }
+    ]
+  },
+  "performance": {
+    "total_queries": 172,
+    "successful_matches": 172,
+    "total_time": 0.0008556842803955078,
+    "average_query_time": 4.9749086069506264e-06,
+    "queries_per_second": 201008.7177486765
+  },
+  "summary": {
+    "overall_success": false,
+    "key_metrics": {
+      "database_coverage_rate": 100.0,
+      "place_matching_success_rate": 70.9090909090909,
+      "weather_service_success_rate": 0.0,
+      "average_query_time_ms": 0.004974908606950626
+    },
+    "status": "NEEDS_IMPROVEMENT"
+  }
+}
