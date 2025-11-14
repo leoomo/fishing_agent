@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class EnhancedPlaceMatcher:
     """增强的地名匹配器"""
 
-    def __init__(self, db_path: str = "data/admin_divisions.db"):
+    def __init__(self, db_path: str = "src/data/admin_divisions.db"):
         self.db_path = db_path
         self.conn: Optional[sqlite3.Connection] = None
         self.cursor: Optional[sqlite3.Cursor] = None

@@ -33,7 +33,7 @@ class FallbackResult:
 class IntelligentFallbackMatcher:
     """智能降级地名匹配器"""
 
-    def __init__(self, db_path: str = "data/admin_divisions.db"):
+    def __init__(self, db_path: str = "src/data/admin_divisions.db"):
         """
         初始化智能降级匹配器
 

@@ -29,7 +29,7 @@ class PlaceInfo:
 class CityCoordinateDB:
     """中国行政区划坐标数据库查询类"""
 
-    def __init__(self, db_path: str = "data/admin_divisions.db"):
+    def __init__(self, db_path: str = "src/data/admin_divisions.db"):
         """
         初始化坐标数据库
 
@@ -379,7 +379,7 @@ class CityCoordinateDB:
 
 
 # 便捷函数
-def get_coordinates(place_name: str, db_path: str = "data/admin_divisions.db") -> Optional[Tuple[float, float]]:
+def get_coordinates(place_name: str, db_path: str = "src/data/admin_divisions.db") -> Optional[Tuple[float, float]]:
     """
     便捷函数：获取地名坐标
 
@@ -397,7 +397,7 @@ def get_coordinates(place_name: str, db_path: str = "data/admin_divisions.db") -
         db.close()
 
 
-def search_place(place_name: str, limit: int = 10, db_path: str = "data/admin_divisions.db") -> List[PlaceInfo]:
+def search_place(place_name: str, limit: int = 10, db_path: str = "src/data/admin_divisions.db") -> List[PlaceInfo]:
     """
     便捷函数：搜索地名
 

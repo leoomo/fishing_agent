@@ -112,6 +112,56 @@ class LangChainIntentMiddleware(AgentMiddleware):
             # 出错时直接调用原始处理器
             return handler(request)
 
+    async def awrap_model_call(self, request: ModelRequest, handler) -> ModelResponse:
+        """
+        异步包装模型调用，进行意图分析和增强
+
+        Args:
+            request: LangChain模型请求
+            handler: 原始处理器
+
+        Returns:
+            增强后的模型响应
+        """
+        start_time = time.time()
+
+        try:
+            # 分析用户意图
+            intent_analysis = self._analyze_intent(request)
+            self.intent_stats['total_calls'] += 1
+
+            # 记录意图分布
+            intent_category = intent_analysis['intent_category']
+            self.intent_stats['intent_distribution'][intent_category] = \
+                self.intent_stats['intent_distribution'].get(intent_category, 0) + 1
+
+            # 基于意图增强工具选择
+            enhanced_request = self._enhance_tool_selection(request, intent_analysis)
+
+            # 动态调整系统提示（如果需要）
+            if intent_analysis['intent_category'] in ['weather_fishing_query', 'fishing_advice_generation']:
+                enhanced_request = self._enhance_fishing_prompt(enhanced_request, intent_analysis)
+
+            # 异步调用原始处理器
+            response = await handler(enhanced_request)
+
+            # 记录意图分析结果
+            self._log_intent_analysis(intent_analysis, request, response, time.time() - start_time)
+
+            # 将意图分析结果添加到请求中，供其他中间件使用
+            if hasattr(request, 'metadata'):
+                request.metadata['intent_analysis'] = intent_analysis
+            else:
+                # 创建metadata属性
+                request.metadata = {'intent_analysis': intent_analysis}
+
+            return response
+
+        except Exception as e:
+            self.logger.error(f"意图中间件处理失败: {e}")
+            # 出错时直接调用原始处理器
+            return await handler(request)
+
     def _analyze_intent(self, request: ModelRequest) -> Dict[str, Any]:
         """
         分析用户意图

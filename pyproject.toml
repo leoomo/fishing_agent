@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "langchain>=1.0.5",
-    "langgraph-cli>=0.4.7",
+    "langgraph-cli[inmem]>=0.4.7",
     "langchain-anthropic>=1.0.0",
     "langchain-community>=0.3.0",
     "langchain-core>=0.3.0",

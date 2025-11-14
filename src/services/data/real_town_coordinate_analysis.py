@@ -152,7 +152,7 @@ class RealTownCoordinateAnalyzer:
             from pathlib import Path
 
             # 检查区县数据库
-            regions_db = Path("data/admin_divisions.db")
+            regions_db = Path("src/data/admin_divisions.db")
             if regions_db.exists():
                 with sqlite3.connect(regions_db) as conn:
                     # 省级
@@ -180,7 +180,7 @@ class RealTownCoordinateAnalyzer:
                     print(f"      有坐标的县: {counties_with_coords} 个")
 
             # 检查城镇数据库
-            towns_db = Path("data/town_coordinates.db")
+            towns_db = Path("src/data/town_coordinates.db")
             if towns_db.exists():
                 with sqlite3.connect(towns_db) as conn:
                     total_towns = conn.execute("SELECT COUNT(*) FROM town_coordinates").fetchone()[0]

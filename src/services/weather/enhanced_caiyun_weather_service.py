@@ -78,9 +78,12 @@ class EnhancedCaiyunWeatherService(IWeatherService):
         if not self.api_key:
             raise ValueError("未找到彩云天气API密钥，请在.env文件中配置CAIYUN_API_KEY")
 
-        # 初始化增强组件
-        self.coordinate_db = CityCoordinateDB()
-        self.place_matcher = EnhancedPlaceMatcher()
+        # 初始化增强组件 - 使用绝对路径确保在不同工作目录下都能找到数据库
+        from pathlib import Path
+        project_root = Path(__file__).parent.parent.parent.parent  # 从 src/services/weather/ 回到项目根目录
+        db_path = project_root / "src" / "data" / "admin_divisions.db"
+        self.coordinate_db = CityCoordinateDB(str(db_path))
+        self.place_matcher = EnhancedPlaceMatcher(str(db_path))
         self.cache = get_weather_cache()
 
         # 连接数据库

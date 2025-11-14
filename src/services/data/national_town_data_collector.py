@@ -41,7 +41,7 @@ class TownData:
 class NationalTownDataCollector:
     """全国城镇数据收集器"""
 
-    def __init__(self, db_path: str = "data/admin_divisions.db"):
+    def __init__(self, db_path: str = "src/data/admin_divisions.db"):
         """
         初始化数据收集器
 
@@ -359,7 +359,7 @@ class NationalTownDataCollector:
             logger.error(f"获取统计信息失败: {e}")
             return {}
 
-    def export_towns_to_json(self, output_file: str = "data/towns_export.json"):
+    def export_towns_to_json(self, output_file: str = "src/data/towns_export.json"):
         """导出城镇数据到JSON文件"""
         try:
             cursor = self.conn.execute("""

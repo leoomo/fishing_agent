@@ -43,7 +43,7 @@ class CoordinateData:
 class AmapCoordinateService:
     """高德地图坐标服务 - 智能缓存版"""
 
-    def __init__(self, db_path: str = "data/coordinates_cache.db"):
+    def __init__(self, db_path: str = "src/data/coordinates_cache.db"):
         """
         初始化坐标服务
 

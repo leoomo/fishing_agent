@@ -272,7 +272,7 @@ def main():
     print("=" * 60)
 
     # 确保数据目录存在
-    Path("data/cache").mkdir(parents=True, exist_ok=True)
+    Path("src/data/cache").mkdir(parents=True, exist_ok=True)
 
     try:
         # 运行各项演示

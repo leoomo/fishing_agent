@@ -27,7 +27,7 @@ class DailyWeatherService:
     
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self._cache = WeatherCache(default_ttl=7200, file_path="data/cache/weather_daily_cache.json")  # 2小时TTL
+        self._cache = WeatherCache(default_ttl=7200, file_path="src/data/cache/weather_daily_cache.json")  # 2小时TTL
         self._api_client = CaiyunApiClient()
         
         # 配置参数

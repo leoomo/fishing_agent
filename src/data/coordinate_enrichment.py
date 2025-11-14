@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class CoordinateEnrichment:
     """坐标信息丰富器"""
 
-    def __init__(self, db_path: str = "data/admin_divisions.db"):
+    def __init__(self, db_path: str = "src/data/admin_divisions.db"):
         self.db_path = db_path
         self.conn = None
         self.cursor = None

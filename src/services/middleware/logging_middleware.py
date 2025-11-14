@@ -19,12 +19,13 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 
 # LangChain imports
-if TYPE_CHECKING:
+try:
     from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse
     from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
     from langgraph.runtime import Runtime
     from langchain.agents import AgentState
-else:
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
     # 如果没有安装完整的LangChain，提供基础类型
     AgentMiddleware = object
     ModelRequest = object
@@ -32,6 +33,7 @@ else:
     BaseMessage = object
     AgentState = Dict[str, Any]  # Runtime fallback
     Runtime = Any  # Runtime fallback
+    LANGCHAIN_AVAILABLE = False
 
 from .config import MiddlewareConfig, default_config
 
@@ -656,8 +658,7 @@ class AgentLoggingMiddleware(AgentMiddleware):
         # 设置logger
         self.logger = logger or self._setup_logger()
 
-        # 中间件名称
-        self.name = "AgentLoggingMiddleware"
+        # 中间件名称（由基类处理）
 
         # 状态架构（LangChain中间件接口要求）
         self.state_schema = dict  # 使用内置的dict类作为状态架构
@@ -680,6 +681,10 @@ class AgentLoggingMiddleware(AgentMiddleware):
 
         # 工具调用记录
         self.tool_calls: List[ToolCallRecord] = []
+
+        # 模型调用记录
+        self.model_calls: List[ModelCallRecord] = []
+        self.model_calls_count = 0
 
         # 敏感数据过滤器
         self.sensitive_filter = SensitiveDataFilter() if self.config.enable_sensitive_filter else None
@@ -1244,6 +1249,179 @@ class AgentLoggingMiddleware(AgentMiddleware):
 
             raise
 
+    async def awrap_model_call(self, request: ModelRequest, handler: Callable) -> ModelResponse:
+        """异步包装模型调用，记录详细信息和调用目的分析"""
+        # 生成操作ID用于性能追踪
+        operation_id = f"model_call_{self.metrics.model_calls_count + 1}_{int(time.time() * 1000)}"
+
+        # 开始性能追踪
+        request_start_time = time.time()
+        self.performance_tracker.start_timing(operation_id, "model_call", {
+            "model_name": self._extract_model_name(request),
+            "call_position": self.metrics.model_calls_count + 1
+        })
+
+        # 记录模型调用开始
+        call_position = self.metrics.model_calls_count + 1
+        messages = getattr(request, 'messages', [])
+
+        try:
+            # 执行模型调用（异步）
+            response = await handler(request)
+
+            # 计算响应时间
+            total_duration_ms = (time.time() - request_start_time) * 1000
+
+            # 获取token使用情况
+            token_usage = self._extract_token_usage(response)
+
+            # 结束性能追踪
+            self.performance_tracker.end_timing(operation_id)
+
+            # 更新指标
+            self.metrics.model_calls_count += 1
+            self.metrics.total_response_time_ms += total_duration_ms
+            self.metrics.token_usage.update(token_usage)
+            self.metrics.success = True
+
+            # 估算推理时间（简单估算）
+            inference_duration_ms = total_duration_ms * 0.8  # 假设80%时间是推理
+
+            # 检查是否有工具调用
+            has_tool_calls = False
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                has_tool_calls = True
+
+            # 分析调用目的（如果启用）
+            purpose_analysis = {}
+            if self.config.enable_call_purpose_analysis:
+                # 首先检查是否已经有意图分析结果（来自意图中间件）
+                existing_intent_analysis = None
+                if hasattr(request, 'metadata') and request.metadata:
+                    existing_intent_analysis = request.metadata.get('intent_analysis')
+
+                if existing_intent_analysis:
+                    # 使用已有的意图分析结果，避免重复分析
+                    purpose_analysis = existing_intent_analysis
+                else:
+                    # 推断执行上下文
+                    execution_context = CallPurposeAnalyzer._infer_purpose_by_position(call_position, has_tool_calls)
+
+                    # 尝试从缓存获取分析结果
+                    messages_str = str([str(getattr(msg, 'content', '')) for msg in messages[-3:]])  # 只使用最近3条消息生成缓存键
+                    cache_key = self._get_purpose_analysis_cache_key(messages_str, call_position, has_tool_calls, execution_context)
+
+                    cached_analysis = self._get_cached_purpose_analysis(cache_key)
+                    if cached_analysis:
+                        purpose_analysis = cached_analysis
+                    else:
+                        # 执行分析并缓存结果
+                        purpose_analysis = CallPurposeAnalyzer.analyze_call_purpose(
+                            messages=messages,
+                            call_position=call_position,
+                            has_tool_calls=has_tool_calls,
+                            response=response,
+                            compiled_patterns=self._compiled_patterns,
+                            execution_context=execution_context
+                        )
+                        self._cache_purpose_analysis(cache_key, purpose_analysis)
+
+            # 创建增强的性能指标
+            performance_metrics = PerformanceMetrics(
+                request_duration_ms=total_duration_ms,
+                inference_duration_ms=inference_duration_ms,
+                response_duration_ms=total_duration_ms - inference_duration_ms
+            )
+
+            # 添加详细性能指标
+            performance_metrics.add_metric("messages_count", len(messages), "count")
+            performance_metrics.add_metric("tokens_per_second",
+                                          (total_duration_ms > 0) and (token_usage.get("total_tokens", 0) / total_duration_ms * 1000) or 0,
+                                          "rate", "tokens/sec")
+
+            # 创建模型调用记录
+            call_record = ModelCallRecord(
+                call_id=call_position,
+                timestamp=datetime.now().isoformat(),
+                model_name=self.metrics.model_name,
+                duration_ms=total_duration_ms,
+                token_usage=token_usage,
+                success=True,
+                call_purpose=purpose_analysis.get("call_purpose", "unknown"),
+                intent_category=purpose_analysis.get("intent_category", ""),
+                call_context_summary=purpose_analysis.get("context_summary", ""),
+                key_points=purpose_analysis.get("key_points"),
+                inference_method=purpose_analysis.get("inference_method", "position_and_content_analysis"),
+                performance_metrics=performance_metrics
+            )
+
+            # 添加到指标中
+            self.metrics.add_model_call(call_record)
+
+            # 记录增强的请求信息
+            self._log_enhanced_model_request(request, purpose_analysis)
+
+            # 记录增强的响应信息
+            self._log_enhanced_model_response(response, call_record, purpose_analysis)
+
+            return response
+
+        except Exception as e:
+            self.metrics.errors_count += 1
+            self.metrics.success = False
+            error_duration_ms = (time.time() - request_start_time) * 1000
+
+            # 结束性能追踪
+            self.performance_tracker.end_timing(operation_id)
+
+            # 即使失败也创建调用记录
+            purpose_analysis = {}
+            if self.config.enable_call_purpose_analysis:
+                purpose_analysis = CallPurposeAnalyzer.analyze_call_purpose(
+                    messages=messages,
+                    call_position=call_position,
+                    has_tool_calls=False,
+                    response=None,
+                    compiled_patterns=self._compiled_patterns
+                )
+
+            # 创建失败记录的性能指标
+            error_performance_metrics = PerformanceMetrics(
+                request_duration_ms=error_duration_ms,
+                inference_duration_ms=error_duration_ms  # 整个过程都算推理时间
+            )
+            error_performance_metrics.add_metric("error_type", type(e).__name__, "custom")
+            error_performance_metrics.add_metric("error_recovery", False, "boolean")
+
+            error_call_record = ModelCallRecord(
+                call_id=call_position,
+                timestamp=datetime.now().isoformat(),
+                model_name=self.metrics.model_name,
+                duration_ms=error_duration_ms,
+                token_usage=self.metrics.token_usage.copy(),
+                success=False,
+                call_purpose=purpose_analysis.get("call_purpose", "error_handling"),
+                intent_category=purpose_analysis.get("intent_category", "error_recovery"),
+                call_context_summary=purpose_analysis.get("context_summary", "模型调用失败"),
+                key_points=purpose_analysis.get("key_points", []),
+                inference_method=purpose_analysis.get("inference_method", "position_and_content_analysis"),
+                error_message=str(e),
+                performance_metrics=error_performance_metrics
+            )
+
+            self.metrics.add_model_call(error_call_record)
+
+            # 记录错误信息
+            self._log_with_context('ERROR', f"❌ 模型调用失败: {str(e)}", {
+                'duration_ms': round(error_duration_ms, 2),
+                'error_type': type(e).__name__,
+                'error_details': str(e),
+                'call_purpose': error_call_record.call_purpose,
+                'call_id': call_position
+            })
+
+            raise
+
     def _log_enhanced_model_request(self, request: ModelRequest, purpose_analysis: Dict[str, str]):
         """记录增强的模型请求信息"""
         messages = getattr(request, 'messages', [])
@@ -1612,87 +1790,7 @@ class AgentLoggingMiddleware(AgentMiddleware):
 
             raise
 
-    async def awrap_model_call(self, request, handler) -> Any:
-        """异步包装模型调用，记录模型调用详情（性能增强版）"""
-        if not self.config.enable_model_logging:
-            return await handler(request)
-
-        # 开始请求追踪
-        self.start_request_tracking()
-
-        # 生成操作ID用于性能追踪
-        operation_id = f"model_call_{self.metrics.model_calls_count + 1}_{int(time.time() * 1000)}"
-
-        # 开始性能追踪
-        request_start_time = time.time()
-        self.performance_tracker.start_timing(operation_id, "model_call", {
-            "model_name": self._extract_model_name(request),
-            "call_position": self.metrics.model_calls_count + 1
-        })
-
-        try:
-            # 实际调用处理程序（异步）
-            if asyncio.iscoroutinefunction(handler):
-                response = await handler(request)
-            else:
-                response = handler(request)
-
-            # 计算总耗时
-            request_duration = (time.time() - request_start_time) * 1000
-
-            # 记录模型调用成功
-            model_call_record = ModelCallRecord(
-                model_name=self._extract_model_name(request),
-                request=request,
-                response=response,
-                success=True,
-                total_duration_ms=request_duration,
-                timestamp=datetime.now().isoformat()
-            )
-            self.model_calls.append(model_call_record)
-
-            # 结束性能追踪
-            self.performance_tracker.end_timing(operation_id)
-            self.performance_tracker.increment_counter("model_calls_success")
-
-            # 记录详细信息
-            self._log_with_context('INFO', f"✅ 模型调用完成: {model_call_record.model_name}", {
-                'model_name': model_call_record.model_name,
-                'duration_ms': round(request_duration, 2),
-                'call_position': self.metrics.model_calls_count
-            })
-
-            return response
-
-        except Exception as e:
-            request_duration = (time.time() - request_start_time) * 1000
-
-            # 记录模型调用失败
-            model_call_record = ModelCallRecord(
-                model_name=self._extract_model_name(request),
-                request=request,
-                response=None,
-                success=False,
-                total_duration_ms=request_duration,
-                error_message=str(e),
-                timestamp=datetime.now().isoformat()
-            )
-            self.model_calls.append(model_call_record)
-
-            # 结束性能追踪
-            self.performance_tracker.end_timing(operation_id)
-            self.performance_tracker.increment_counter("model_calls_error")
-
-            # 记录错误信息
-            self._log_with_context('ERROR', f"❌ 模型调用失败: {model_call_record.model_name}", {
-                'model_name': model_call_record.model_name,
-                'duration_ms': round(request_duration, 2),
-                'error_type': type(e).__name__,
-                'error_message': str(e)
-            })
-
-            raise
-
+  
     def _detect_cache_hit(self, tool_name: str, tool_args: Dict[str, Any], result: Any) -> Optional[bool]:
         """
         检测工具调用是否命中缓存

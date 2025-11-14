@@ -42,8 +42,8 @@ class RealCoordinateService:
     def __init__(self):
         """初始化服务"""
         # 数据库路径
-        self.coords_db_path = Path("data/admin_divisions.db")
-        self.cache_db_path = Path("data/coordinates_cache.db")
+        self.coords_db_path = Path("src/data/admin_divisions.db")
+        self.cache_db_path = Path("src/data/coordinates_cache.db")
 
         # 确保目录存在
         self.coords_db_path.parent.mkdir(parents=True, exist_ok=True)

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class NationalRegionDatabase:
     """全国行政区划数据库管理器"""
 
-    def __init__(self, db_path: str = "data/admin_divisions.db"):
+    def __init__(self, db_path: str = "src/data/admin_divisions.db"):
         self.db_path = db_path
         self.ensure_data_directory()
         self.conn = None

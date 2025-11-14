@@ -21,7 +21,7 @@ def test_database_connectivity():
     """测试数据库连接"""
     print("🔍 测试数据库连接...")
     try:
-        conn = sqlite3.connect("data/admin_divisions.db")
+        conn = sqlite3.connect("src/data/admin_divisions.db")
         cursor = conn.cursor()
 
         cursor.execute("SELECT COUNT(*) FROM regions")

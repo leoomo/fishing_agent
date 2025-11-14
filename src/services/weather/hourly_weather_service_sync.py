@@ -44,7 +44,7 @@ class HourlyWeatherService:
 
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self._cache = WeatherCache(default_ttl=1800, file_path="data/cache/weather_hourly_cache.json")  # 30分钟TTL
+        self._cache = WeatherCache(default_ttl=1800, file_path="src/data/cache/weather_hourly_cache.json")  # 30分钟TTL
         self._api_client = CaiyunApiClient()
         self.max_forecast_days = 3
         self.max_retry_attempts = 3

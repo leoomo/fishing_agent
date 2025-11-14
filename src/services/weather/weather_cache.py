@@ -129,7 +129,7 @@ class WeatherCache:
 
     def __init__(self,
                  memory_size: int = 1000,
-                 file_path: str = "data/cache/weather_cache.json",
+                 file_path: str = "src/data/cache/weather_cache.json",
                  default_ttl: int = 3600):
         """
         初始化缓存系统

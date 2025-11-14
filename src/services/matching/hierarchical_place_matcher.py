@@ -35,7 +35,7 @@ class MatchResult:
 class HierarchicalPlaceMatcher:
     """层级地名匹配器"""
 
-    def __init__(self, db_path: str = "data/admin_divisions.db"):
+    def __init__(self, db_path: str = "src/data/admin_divisions.db"):
         """
         初始化层级地名匹配器
 

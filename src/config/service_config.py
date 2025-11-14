@@ -13,7 +13,7 @@ from pathlib import Path
 @dataclass
 class DatabaseConfig:
     """数据库配置"""
-    path: str = "data/admin_divisions.db"
+    path: str = "src/data/admin_divisions.db"
     cache_enabled: bool = True
     cache_ttl: int = 3600  # 缓存过期时间（秒）
 

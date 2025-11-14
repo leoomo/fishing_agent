@@ -477,8 +477,8 @@ def demonstrate_agent_capabilities():
     # else:
     #     model_provider = "openai"
     #     print("✅ 使用 OpenAI GPT 模型")
-    # model_provider = "zhipu"
-    model_provider = "qwen"
+    model_provider = "zhipu"
+    # model_provider = "qwen"
     # model_provider = "doubao"
     try:
         # 创建智能体

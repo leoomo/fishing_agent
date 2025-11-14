@@ -36,7 +36,7 @@ class TownCoordinate:
 class TownCoordinateCollector:
     """城镇坐标数据收集器"""
 
-    def __init__(self, db_path: str = "data/town_coordinates.db"):
+    def __init__(self, db_path: str = "src/data/town_coordinates.db"):
         """
         初始化收集器
 
@@ -106,7 +106,7 @@ class TownCoordinateCollector:
 
         try:
             # 读取现有区县数据
-            regions_db = Path("data/admin_divisions.db")
+            regions_db = Path("src/data/admin_divisions.db")
             if not regions_db.exists():
                 logger.error("区县数据库不存在")
                 return 0
@@ -360,7 +360,7 @@ class TownCoordinateCollector:
             logger.error(f"获取统计信息失败: {e}")
             return {}
 
-    def export_to_json(self, output_file: str = "data/town_coordinates_export.json") -> int:
+    def export_to_json(self, output_file: str = "src/data/town_coordinates_export.json") -> int:
         """导出城镇坐标数据到JSON文件"""
         try:
             with sqlite3.connect(self.db_path) as conn:

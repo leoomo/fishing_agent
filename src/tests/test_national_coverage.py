@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class NationalCoverageTester:
     """全国覆盖功能测试器"""
 
-    def __init__(self, db_path: str = "data/admin_divisions.db"):
+    def __init__(self, db_path: str = "src/data/admin_divisions.db"):
         self.db_path = db_path
         self.place_matcher = EnhancedPlaceMatcher(db_path)
         self.weather_service = None
