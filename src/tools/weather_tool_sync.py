@@ -6,9 +6,11 @@ LangChain Learning - Weather Tool (同步版本)
 """
 
 import os
+import sys
 import requests
 import json
 import time
+import argparse
 from typing import Optional, Any, Dict, Union, List, Tuple
 import logging
 from dataclasses import dataclass, asdict
@@ -654,3 +656,223 @@ class WeatherTool:
             self._logger.info(f"工具 {self.name} 已关闭")
         except Exception as e:
             self._logger.error(f"关闭工具时出错: {e}")
+
+
+def format_weather_output(result: ToolResult, city: str, operation: str, debug: bool = False) -> None:
+    """格式化天气输出"""
+    if not result.success:
+        print(f"❌ 查询 {city} 天气失败: {result.error}")
+        if result.metadata:
+            print(f"   元数据: {result.metadata}")
+        return
+
+    data = result.data or {}
+    metadata = result.metadata or {}
+
+    print(f"\n🌤️  {city} 天气信息")
+    print("=" * 50)
+
+    if operation == "current_weather":
+        # 当前天气信息
+        print(f"📍 地点: {data.get('location', city)}")
+        print(f"🌡️  温度: {data.get('temperature', 'N/A')}°C (体感: {data.get('apparent_temperature', 'N/A')}°C)")
+        print(f"💧 湿度: {data.get('humidity', 'N/A')}%")
+        print(f"🌪️  风速: {data.get('wind_speed', 'N/A')} km/h")
+        print(f"🧭 风向: {data.get('wind_direction', 'N/A')}")
+        print(f"📊 气压: {data.get('pressure', 'N/A')} hPa")
+        print(f"☁️  天气: {data.get('condition', 'N/A')}")
+        print(f"📝 描述: {data.get('description', 'N/A')}")
+
+        if debug:
+            print(f"\n🔍 调试信息:")
+            print(f"   数据源: {data.get('source', 'N/A')}")
+            print(f"   服务耗时: {metadata.get('service_time_ms', 'N/A')}ms")
+            cache_hit_rate = metadata.get('cache_hit_rate')
+            if cache_hit_rate is not None:
+                print(f"   缓存命中率: {cache_hit_rate:.1%}")
+
+    elif operation == "weather_by_date":
+        # 指定日期天气
+        print(f"📍 地点: {data.get('location', city)}")
+        print(f"📅 日期: {data.get('date', 'N/A')}")
+        print(f"🌡️  温度: {data.get('temperature', 'N/A')}°C")
+        print(f"💧 湿度: {data.get('humidity', 'N/A')}%")
+        print(f"☁️  天气: {data.get('condition', 'N/A')}")
+        print(f"📝 描述: {data.get('description', 'N/A')}")
+
+        if debug:
+            print(f"\n🔍 调试信息:")
+            print(f"   数据源: {data.get('source', 'N/A')}")
+            print(f"   状态码: {metadata.get('status_code', 'N/A')}")
+
+    elif operation == "hourly_forecast":
+        # 小时级预报
+        print(f"📍 地点: {data.get('location', city)}")
+        print(f"📅 日期: {data.get('date', 'N/A')}")
+        print(f"📊 预报小时数: {len(data.get('hourly_forecast', []))}")
+        print(f"🎯 置信度: {data.get('confidence', 'N/A')}")
+
+        hourly_data = data.get('hourly_forecast', [])[:6]  # 显示前6小时
+        if hourly_data:
+            print(f"\n⏰ 小时预报 (前6小时):")
+            for i, hour in enumerate(hourly_data):
+                time_str = hour.get('datetime', '')[-8:-3] if hour.get('datetime') else 'N/A'
+                temp = hour.get('temperature', 'N/A')
+                condition = hour.get('condition', 'N/A')
+                print(f"   {time_str} | {temp}°C | {condition}")
+
+        if debug:
+            print(f"\n🔍 调试信息:")
+            print(f"   数据源: {data.get('source', 'N/A')}")
+            print(f"   预报要点: {data.get('forecast_keypoint', 'N/A')}")
+            print(f"   总描述: {data.get('description', 'N/A')}")
+
+    elif operation == "weather_by_datetime":
+        # 指定时间段天气
+        print(f"📍 地点: {data.get('location', city)}")
+        print(f"📅 日期: {data.get('date', 'N/A')}")
+        print(f"⏰ 时间段: {data.get('time_period', 'N/A')}")
+        print(f"🌡️  平均温度: {data.get('temperature', 'N/A')}°C")
+        print(f"💧 湿度: {data.get('humidity', 'N/A')}%")
+        print(f"🌪️  风速: {data.get('wind_speed', 'N/A')} km/h")
+        print(f"☁️  主要天气: {data.get('condition', 'N/A')}")
+        print(f"📝 描述: {data.get('description', 'N/A')}")
+
+        if debug:
+            print(f"\n🔍 调试信息:")
+            print(f"   数据源: {data.get('source', 'N/A')}")
+            print(f"   置信度: {data.get('confidence', 'N/A')}")
+            print(f"   数据点数量: {data.get('hourly_count', 'N/A')}")
+
+    print(f"\n⏰ 查询时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+
+def check_environment():
+    """检查环境变量"""
+    missing_vars = []
+    if not os.getenv("CAIYUN_API_KEY"):
+        missing_vars.append("CAIYUN_API_KEY")
+    if not os.getenv("AMAP_API_KEY"):
+        missing_vars.append("AMAP_API_KEY")
+
+    if missing_vars:
+        print("⚠️  警告: 以下环境变量未设置:")
+        for var in missing_vars:
+            print(f"   - {var}")
+        print("   某些功能可能无法正常工作")
+        print("   请在 .env 文件中设置这些环境变量")
+        return False
+    return True
+
+
+def main():
+    """主函数"""
+    parser = argparse.ArgumentParser(
+        description="天气工具测试程序",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+使用示例:
+  python weather_tool_sync.py                           # 查询北京当前天气
+  python weather_tool_sync.py --city 上海               # 查询上海当前天气
+  python weather_tool_sync.py --city 广州 --debug        # 查询广州天气(调试模式)
+  python weather_tool_sync.py --city 深圳 --date tomorrow  # 查询深圳明天天气
+  python weather_tool_sync.py --operation hourly_forecast  # 查询小时级预报
+  python weather_tool_sync.py --operation weather_by_datetime --datetime "明天上午"  # 查询明天上午天气
+        """
+    )
+
+    parser.add_argument(
+        "--city",
+        type=str,
+        default="北京",
+        help="城市名称 (默认: 北京)"
+    )
+
+    parser.add_argument(
+        "--operation",
+        type=str,
+        default="current_weather",
+        choices=["current_weather", "weather_by_date", "hourly_forecast", "weather_by_datetime"],
+        help="操作类型 (默认: current_weather)"
+    )
+
+    parser.add_argument(
+        "--date",
+        type=str,
+        help="日期参数 (如: today, tomorrow, 2024-12-25)"
+    )
+
+    parser.add_argument(
+        "--datetime",
+        type=str,
+        help="日期时间参数 (如: 明天上午, 今天下午)"
+    )
+
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="启用调试模式"
+    )
+
+    args = parser.parse_args()
+
+    print("🚀 天气工具测试程序")
+    print("=" * 50)
+
+    # 检查环境变量
+    if not check_environment():
+        print()
+
+    # 设置日志级别
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+        print("🐛 调试模式已启用")
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    try:
+        # 初始化天气工具
+        print(f"🔧 正在初始化天气工具...")
+        tool = WeatherTool("test_tool")
+
+        print(f"🎯 开始执行操作: {args.operation}")
+        print(f"📍 目标城市: {args.city}")
+
+        # 执行相应的操作
+        if args.operation == "current_weather":
+            result = tool.execute("current_weather", location=args.city)
+
+        elif args.operation == "weather_by_date":
+            date = args.date if args.date else "today"
+            result = tool.execute("weather_by_date", location=args.city, date=date)
+
+        elif args.operation == "hourly_forecast":
+            result = tool.execute("hourly_forecast", location=args.city, hours=24)
+
+        elif args.operation == "weather_by_datetime":
+            datetime_str = args.datetime if args.datetime else "今天"
+            result = tool.execute("weather_by_datetime", location=args.city, datetime_str=datetime_str)
+
+        else:
+            print(f"❌ 不支持的操作: {args.operation}")
+            return
+
+        # 格式化输出结果
+        format_weather_output(result, args.city, args.operation, args.debug)
+
+        # 清理资源
+        tool.close()
+
+    except KeyboardInterrupt:
+        print("\n👋 程序被用户中断")
+    except Exception as e:
+        print(f"\n❌ 程序执行出错: {str(e)}")
+        if args.debug:
+            import traceback
+            traceback.print_exc()
+    finally:
+        print("\n✨ 程序执行完毕")
+
+
+if __name__ == "__main__":
+    main()

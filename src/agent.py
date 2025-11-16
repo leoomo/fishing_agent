@@ -14,7 +14,6 @@ load_dotenv()
 
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.tools import tool
@@ -130,26 +129,7 @@ class ModernLangChainAgent:
 
     def _initialize_model(self):
         """初始化语言模型"""
-        if self.model_provider == "anthropic":
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            if not api_key:
-                raise ValueError("请设置 ANTHROPIC_API_KEY 环境变量")
-            # 使用 Claude Sonnet 4.5 最新模型
-            return ChatAnthropic(
-                model="claude-sonnet-4-5-20250929",
-                api_key=api_key
-            )
-
-        elif self.model_provider == "openai":
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("请设置 OPENAI_API_KEY 环境变量")
-            # 使用 GPT-4o-mini
-            return ChatOpenAI(
-                model="gpt-4o-mini",
-                api_key=api_key
-            )
-        elif self.model_provider == "zhipu":
+        if self.model_provider == "zhipu":
             api_key =  os.getenv("ANTHROPIC_AUTH_TOKEN")
             if not api_key:
                 raise ValueError("")
