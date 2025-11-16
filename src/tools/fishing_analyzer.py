@@ -713,10 +713,10 @@ class FishingAnalyzer:
                 hourly_data = self._generate_hourly_data_from_date(weather_data, date)
             elif operation == "hourly_forecast":
                 # hourly_forecast 返回的是标准小时数据
-                hourly_data = weather_data.get("hourly_data", [])
+                hourly_data = weather_data.get("hourly_forecast", [])
             else:
-                # 未知格式，尝试从hourly_data获取，如果失败则生成模拟数据
-                hourly_data = weather_data.get("hourly_data", [])
+                # 未知格式，尝试从hourly_forecast获取，如果失败则生成模拟数据
+                hourly_data = weather_data.get("hourly_forecast", [])
                 if not hourly_data:
                     self._logger.warning(f"未知数据格式，生成模拟数据: operation={operation}")
                     hourly_data = self._generate_fallback_hourly_data(date)

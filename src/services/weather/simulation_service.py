@@ -206,8 +206,8 @@ class SimulationService:
     
     async def get_forecast(self, location_info: dict, date_str: str) -> WeatherResult:
         """
-        获取指定日期的模拟天气数据
-        
+        模拟天气服务已禁用，直接返回错误信息
+
         Args:
             location_info: 地理位置信息
                 - name: 地点名称
@@ -215,78 +215,35 @@ class SimulationService:
                 - lat: 纬度
                 - adcode: 行政区划代码 (可选)
             date_str: 查询日期，格式为"YYYY-MM-DD"
-                通常为7天以上的日期
-        
+
         Returns:
-            WeatherResult: 统一格式的天气查询结果
+            WeatherResult: 包含错误信息的结果
         """
         self._stats['total_requests'] += 1
-        start_time = datetime.now()
-        
-        try:
-            # 1. 验证日期范围 (模拟服务应该可以处理任何日期)
-            days_from_now = calculate_days_from_now(date_str)
-            
-            # 2. 生成缓存键
-            cache_key = self._generate_cache_key(location_info, date_str)
-            
-            # 3. 检查缓存
-            cached_result = self._cache.get(cache_key)
-            if cached_result:
-                self._stats['cache_hits'] += 1
-                self._logger.debug(f"模拟数据缓存命中: {cache_key}")
-                cached_result.cached = True
-                return cached_result
-            
-            # 4. 生成模拟数据
-            self._stats['simulations'] += 1
-            target_date = datetime.strptime(date_str, "%Y-%m-%d")
-            month = target_date.month
-            
-            # 5. 查询历史统计数据
-            self._stats['historical_db_queries'] += 1
-            historical_data = self._historical_db.get_monthly_stats(
-                location_info['name'], month
-            )
-            
-            # 6. 生成24小时模拟数据
-            hourly_data = self._generate_simulation_hourly(
-                target_date, historical_data, days_from_now
-            )
-            
-            result = WeatherResult(
-                data_source=WeatherDataSource.SIMULATION.value,
-                hourly_data=hourly_data,
-                confidence=0.6,  # 模拟数据置信度较低
-                api_url="simulation",
-                error_code=0,
-                error_message="",
-                cached=False,
-                metadata={
-                    'simulation_method': 'historical_statistical',
-                    'historical_data': historical_data,
-                    'days_from_now': days_from_now,
-                    'season': historical_data['season'],
-                    'location_type': historical_data['location_type'],
-                    'simulation_quality': 'medium'
-                }
-            )
-            
-            # 7. 缓存结果
-            self._cache.set(cache_key, result)
-            
-            # 8. 记录性能日志
-            duration = (datetime.now() - start_time).total_seconds()
-            self._logger.info(f"模拟数据生成完成: {location_info['name']} {date_str} 耗时{duration:.2f}s")
-            
-            return result
-            
-        except Exception as e:
-            self._stats['errors'] += 1
-            self._logger.error(f"模拟数据生成失败: {location_info['name']} {date_str} 错误: {e}")
-            
-            # 紧急回退
-            return self._emergency_fallback(location_info, date_str, str(e))
+        self._stats['errors'] += 1
+
+        location_name = location_info.get('name', 'unknown')
+        self._logger.warning(f"模拟天气服务已禁用，拒绝生成模拟数据: {location_name} {date_str}")
+
+        # 直接返回错误，不再生成任何模拟数据
+        return WeatherResult(
+            data_source=WeatherDataSource.SIMULATION.value,
+            hourly_data=[],  # 空数据列表，不包含任何天气信息
+            confidence=0.0,  # 零置信度，明确表示数据不可用
+            api_url="simulation_disabled",
+            error_code=2,  # 使用错误代码2表示服务不可用
+            error_message="天气服务查询失败，请稍后再试",
+            cached=False,
+            metadata={
+                'location': location_name,
+                'date': date_str,
+                'service_status': 'disabled',
+                'reason': 'simulation_data_disabled_to_prevent_misleading_information'
+            }
+        )
+
+    def get_stats(self) -> Dict[str, Any]:
+        """获取服务统计信息"""
     
     def _generate_simulation_hourly(self, target_date: datetime, historical_data: Dict[str, Any], days_from_now: int) -> List[Dict[str, Any]]:
         """
@@ -609,59 +566,33 @@ class SimulationService:
         return f"simulation_{normalized_name}_{date_str}"
     
     def _emergency_fallback(self, location_info: dict, date_str: str, error_msg: str) -> WeatherResult:
-        """紧急回退数据"""
-        self._logger.error(f"模拟服务紧急回退: {error_msg}")
-        
-        try:
-            target_date = datetime.strptime(date_str, "%Y-%m-%d")
-        except ValueError:
-            target_date = datetime.now() + timedelta(days=10)
-        
-        # 生成最基础的24小时数据
-        hourly_data = []
-        base_temp = 20.0
-        
-        for hour in range(24):
-            hour_dt = target_date.replace(hour=hour, minute=0, second=0)
-            
-            # 最简单的温度模拟
-            temp_variation = 5 * (1 - abs(hour - 14) / 10)
-            temperature = base_temp + temp_variation
-            
-            hour_data = {
-                'time': hour_dt,
-                'temperature': round(temperature, 1),
-                'weather': '多云',
-                'wind_speed': 3.0,
-                'wind_direction': 180.0,
-                'humidity': 65.0,
-                'pressure': 1013.0,
-                'visibility': 10.0,
-                'precipitation': 0.0,
-                'ultraviolet': 3.0,
-                'air_quality': {'aqi': 70},
-                'hour_of_day': hour,
-                'data_source': WeatherDataSource.EMERGENCY.value,
-                'simulated': True,
-                'emergency_fallback': True,
-                'fishing_score': 42.0,
-                'error': f'模拟服务紧急回退: {error_msg}'
-            }
-            hourly_data.append(hour_data)
-        
+        """
+        紧急回退机制，当天气模拟服务不可用时返回明确的错误信息
+
+        Args:
+            location_info: 地理位置信息
+            date_str: 查询日期
+            error_msg: 原始错误信息
+
+        Returns:
+            WeatherResult: 包含明确错误信息的失败结果
+        """
+        self._logger.warning(f"天气模拟服务不可用，返回错误信息: {error_msg}")
+
+        # 不再生成任何模拟数据，直接返回错误
         return WeatherResult(
             data_source=WeatherDataSource.EMERGENCY.value,
-            hourly_data=hourly_data,
-            confidence=0.2,  # 紧急数据置信度极低
-            api_url="emergency_fallback",
-            error_code=2,
-            error_message=f"模拟服务紧急回退: {error_msg}",
+            hourly_data=[],  # 空数据列表，不包含任何天气信息
+            confidence=0.0,  # 零置信度，明确表示数据不可用
+            api_url="simulation_emergency_fallback",
+            error_code=2,  # 使用错误代码2表示服务不可用
+            error_message="天气服务查询失败，请稍后再试",
             cached=False,
             metadata={
-                'fallback_reason': 'simulation_service_failed',
+                'location': location_info.get('name', 'unknown'),
+                'date': date_str,
                 'original_error': error_msg,
-                'emergency_fallback': True,
-                'minimal_data': True
+                'fallback_reason': 'simulation_service_unavailable'
             }
         )
     

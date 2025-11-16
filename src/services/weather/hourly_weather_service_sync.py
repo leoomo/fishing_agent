@@ -191,7 +191,7 @@ class HourlyWeatherService:
             if api_data.get('status') != 'ok':
                 return False
 
-            # 检查是否有实时数据
+            # 检查是否有结果数据
             if 'result' not in api_data:
                 return False
 
@@ -202,21 +202,16 @@ class HourlyWeatherService:
                 return False
 
             hourly = result['hourly']
-            if 'temperature' not in hourly or 'time' not in hourly:
+            if 'temperature' not in hourly:
                 return False
 
             temperature_data = hourly['temperature']
-            time_data = hourly['time']
 
-            # 检查数据长度一致性
-            if not isinstance(temperature_data, list) or not isinstance(time_data, list):
+            # 检查温度数据是否为列表且有数据
+            if not isinstance(temperature_data, list):
                 return False
 
-            if len(temperature_data) != len(time_data):
-                return False
-
-            # 检查是否有有效数据点
-            if len(time_data) == 0:
+            if len(temperature_data) == 0:
                 return False
 
             return True
@@ -228,50 +223,100 @@ class HourlyWeatherService:
     def _process_hourly_data(self, api_data: Dict[str, Any], target_date: str) -> WeatherResult:
         """处理API返回的逐小时数据"""
         try:
+            self._logger.debug(f"处理API数据: {api_data}")
             result = api_data['result']
             hourly = result['hourly']
 
-            # 提取时间序列
-            time_series = hourly['time']
+            # 提取各参数序列 - 根据API文档，每个参数都是包含datetime和value的对象数组
             temp_series = hourly.get('temperature', [])
             humidity_series = hourly.get('humidity', [])
-            wind_speed_series = hourly.get('wind_speed', [])
+            wind_series = hourly.get('wind', [])
             weather_series = hourly.get('skycon', [])
             precipitation_series = hourly.get('precipitation', [])
 
-            # 解析目标日期
+            self._logger.debug(f"温度数据条数: {len(temp_series)}")
+            self._logger.debug(f"湿度数据条数: {len(humidity_series)}")
+            self._logger.debug(f"风速数据条数: {len(wind_series)}")
+            if temp_series:
+                self._logger.debug(f"第一条温度数据: {temp_series[0]}")
+
+            # 解析目标日期 - 创建带timezone的datetime对象
+            from datetime import timezone, timedelta
             target_dt = datetime.strptime(target_date, "%Y-%m-%d")
-            next_day = target_dt + timedelta(days=1)
+            # 创建目标日期的本地时间范围（考虑时区）
+            # 中国时区是UTC+8
+            china_tz = timezone(timedelta(hours=8))
+            target_dt_local = target_dt.replace(tzinfo=china_tz)
+            next_day_local = target_dt_local + timedelta(days=1)
 
             # 过滤目标日期的数据 (00:00 - 23:00)
             hourly_data = []
-            for i, time_str in enumerate(time_series):
+
+            # 使用温度数据的时间序列作为基准
+            self._logger.debug(f"开始处理 {len(temp_series)} 个时间点数据")
+            for i, temp_data in enumerate(temp_series):
                 try:
-                    # 彩云API返回的时间格式: "2023-12-25T00:00+08:00"
+                    if not isinstance(temp_data, dict) or 'datetime' not in temp_data:
+                        self._logger.warning(f"跳过无效的温度数据: index {i}")
+                        continue
+
+                    time_str = temp_data['datetime']
+                    # 彩云API返回的时间格式: "2022-05-26T16:00+08:00"
                     dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
-                    if target_dt <= dt < next_day:
+
+                    self._logger.debug(f"检查时间点 {i}: {time_str} -> {dt} | Target: {target_dt_local}-{next_day_local}")
+
+                    if target_dt_local <= dt < next_day_local:
+                        self._logger.debug(f"✅ 匹配时间点 {i}: {time_str}")
+
+                        # 提取对应时间的各参数值
+                        temp_value = temp_data.get('value', 0)
+
+                        # 安全获取湿度值
+                        humidity_value = 0
+                        if i < len(humidity_series) and isinstance(humidity_series[i], dict):
+                            humidity_value = humidity_series[i].get('value', 0)
+
+                        # 安全获取风速值
+                        wind_value = 0
+                        if i < len(wind_series) and isinstance(wind_series[i], dict):
+                            wind_value = wind_series[i].get('speed', 0)
+
+                        # 安全获取天气状况
+                        condition_value = 'UNKNOWN'
+                        if i < len(weather_series) and isinstance(weather_series[i], dict):
+                            condition_value = weather_series[i].get('value', 'UNKNOWN')
+
+                        # 安全获取降水量
+                        precip_value = 0
+                        if i < len(precipitation_series) and isinstance(precipitation_series[i], dict):
+                            precip_value = precipitation_series[i].get('value', 0)
+
                         hourly_data.append({
                             'datetime': time_str,
                             'hour': dt.hour,
-                            'temperature': temp_series[i] if i < len(temp_series) else None,
-                            'humidity': humidity_series[i] if i < len(humidity_series) else None,
-                            'wind_speed': wind_speed_series[i] if i < len(wind_speed_series) else None,
-                            'condition': weather_series[i] if i < len(weather_series) else 'unknown',
-                            'precipitation': precipitation_series[i] if i < len(precipitation_series) else 0.0
+                            'temperature': temp_value,
+                            'humidity': humidity_value,
+                            'wind_speed': wind_value,
+                            'condition': condition_value,
+                            'precipitation': precip_value
                         })
-                except (ValueError, IndexError) as e:
-                    self._logger.warning(f"跳过无效的时间点数据: {time_str} - {e}")
+                        self._logger.debug(f"添加小时数据: {dt.hour:02d}:00 - {condition_value} {temp_value}°C")
+                    else:
+                        self._logger.debug(f"❌ 不在目标时间范围内: {time_str}")
+
+                except Exception as e:
+                    self._logger.error(f"处理时间点数据时出错: index {i} - {e}")
+                    import traceback
+                    self._logger.error(f"Traceback: {traceback.format_exc()}")
                     continue
 
             if not hourly_data:
                 raise WeatherDataCorruptionException(f"没有找到{target_date}的有效逐小时数据")
 
-            # 获取实时数据作为补充
-            realtime = result.get('realtime', {})
-
             # 构建结果
             weather_result = WeatherResult(
-                data_source=WeatherDataSource.CAIYUN_API.value,
+                data_source=WeatherDataSource.HOURLY_API.value,
                 hourly_data=hourly_data,
                 confidence=0.9,  # API数据具有较高置信度
                 api_url=self._api_client._base_url,
@@ -281,9 +326,10 @@ class HourlyWeatherService:
                 metadata={
                     'forecast_hours': len(hourly_data),
                     'source': 'api',
-                    'realtime_temp': realtime.get('temperature'),
                     'target_date': target_date,
-                    'original_forecast_hours': len(time_series)
+                    'original_forecast_hours': len(temp_series),
+                    'description': hourly.get('description', ''),
+                    'forecast_keypoint': result.get('forecast_keypoint', '')
                 }
             )
 
@@ -291,6 +337,9 @@ class HourlyWeatherService:
 
         except Exception as e:
             self._logger.error(f"处理逐小时数据失败: {e}")
+            self._logger.error(f"API数据: {api_data}")
+            import traceback
+            self._logger.error(f"Traceback: {traceback.format_exc()}")
             raise WeatherDataCorruptionException(f"逐小时数据处理失败: {e}")
 
     def _generate_cache_key(self, location_info: dict, date_str: str) -> str:
@@ -500,19 +549,11 @@ class HourlyWeatherService:
             )
 
     def _fallback_to_simulation(self, location_info: dict, date_str: str, error_msg: str) -> WeatherResult:
-        """错误回退到模拟数据"""
-        self._logger.warning(f"逐小时服务回退到模拟数据: {error_msg}")
+        """错误回退处理 - 不再生成模拟数据"""
+        self._logger.warning(f"逐小时服务查询失败，不再生成模拟数据: {error_msg}")
 
-        try:
-            # 尝试从模拟服务获取数据
-            from .simulation_service import SimulationService
-            simulation_service = SimulationService()
-            return simulation_service.get_forecast(location_info, date_str)
-        except Exception as e:
-            self._logger.error(f"模拟服务也无法获取数据: {e}")
-
-            # 最后的紧急回退
-            return self._emergency_fallback(location_info, date_str, error_msg)
+        # 直接返回错误结果，不再使用模拟数据
+        return self._emergency_fallback(location_info, date_str, error_msg)
 
     def _get_season(self, month: int) -> str:
         """获取季节"""

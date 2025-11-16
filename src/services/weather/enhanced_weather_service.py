@@ -41,17 +41,30 @@ class EnhancedCaiyunWeatherService(CaiyunWeatherService):
         from pathlib import Path
         project_root = Path(__file__).parent.parent.parent.parent  # 从 src/services/weather/ 回到项目根目录
         db_path = project_root / "src" / "data" / "admin_divisions.db"
-        self.coordinate_db = CityCoordinateDB(str(db_path))
-        self.place_matcher = EnhancedPlaceMatcher(str(db_path))
+        self.db_path = str(db_path)
+
+        # 延迟初始化，避免线程问题
+        self.coordinate_db = None
+        self.place_matcher = None
+        self._db_initialized = False
+
         self.cache = get_weather_cache()
         self.amap_service = AmapCoordinateService()
 
-        # 连接数据库
-        self.place_matcher.connect()
+        logger.info("增强版天气服务初始化完成（延迟数据库连接）")
 
-        logger.info("增强版天气服务初始化完成")
-        logger.info(f"数据库统计: {self.coordinate_db.get_statistics()}")
-        logger.info(f"匹配器统计: {self.place_matcher.get_statistics()}")
+    def _ensure_db_initialized(self):
+        """确保数据库连接已初始化（线程安全）"""
+        if not self._db_initialized:
+            from ..matching.city_coordinate_db import CityCoordinateDB
+            from ..matching.enhanced_place_matcher import EnhancedPlaceMatcher
+
+            self.coordinate_db = CityCoordinateDB(self.db_path)
+            self.place_matcher = EnhancedPlaceMatcher(self.db_path)
+            self.place_matcher.connect()
+            self._db_initialized = True
+
+            logger.info("数据库连接已建立（线程安全）")
 
     def get_coordinates(self, place_name: str) -> Optional[Tuple[float, float]]:
         """
@@ -67,6 +80,14 @@ class EnhancedCaiyunWeatherService(CaiyunWeatherService):
         if not place_name or not place_name.strip():
             return None
 
+        # 确保数据库已初始化（线程安全）
+        try:
+            self._ensure_db_initialized()
+        except Exception as e:
+            logger.error(f"数据库初始化失败: {e}")
+            # 如果数据库初始化失败，跳过数据库查询，直接使用高德API
+            return self._fallback_to_amap(place_name)
+
         # 1. 检查缓存
         cache_key = self.cache._generate_key(place_name, {"type": "coordinates"})
         cached_coords = self.cache.get(place_name, extra_params={"type": "coordinates"})
@@ -78,18 +99,21 @@ class EnhancedCaiyunWeatherService(CaiyunWeatherService):
             return cached_coords
 
         # 2. 优先查询本地数据库（智能地名匹配）
-        match_result = self.place_matcher.match_place(place_name)
-        if match_result:
-            coords = (match_result['longitude'], match_result['latitude'])
+        try:
+            match_result = self.place_matcher.match_place(place_name)
+            if match_result:
+                coords = (match_result['longitude'], match_result['latitude'])
 
-            # 缓存结果（缓存1小时）
-            self.cache.set(place_name, coords, ttl=3600, extra_params={"type": "coordinates"})
+                # 缓存结果（缓存1小时）
+                self.cache.set(place_name, coords, ttl=3600, extra_params={"type": "coordinates"})
 
-            logger.info(f"本地数据库匹配成功: {place_name} -> {match_result['name']} "
-                       f"({coords[0]:.4f}, {coords[1]:.4f}) "
-                       f"级别: {match_result['level_name']}")
+                logger.info(f"本地数据库匹配成功: {place_name} -> {match_result['name']} "
+                           f"({coords[0]:.4f}, {coords[1]:.4f}) "
+                           f"级别: {match_result['level_name']}")
 
-            return coords
+                return coords
+        except Exception as e:
+            logger.error(f"本地数据库查询失败: {place_name}, error={e}")
 
         # 3. 本地数据库无匹配，查询高德API
         logger.info(f"本地数据库无匹配: {place_name}，尝试高德API查询")
@@ -125,6 +149,28 @@ class EnhancedCaiyunWeatherService(CaiyunWeatherService):
             logger.warning(f"所有查询方式都失败: {place_name}")
 
         return original_coords
+
+    def _fallback_to_amap(self, place_name: str) -> Optional[Tuple[float, float]]:
+        """直接回退到高德API查询（数据库失败时使用）"""
+        try:
+            amap_result = self.amap_service.get_coordinate(place_name)
+            if amap_result:
+                coords = (amap_result.longitude, amap_result.latitude)
+
+                # 缓存结果（缓存1小时）
+                self.cache.set(place_name, coords, ttl=3600, extra_params={"type": "coordinates"})
+
+                logger.info(f"高德API回退查询成功: {place_name} -> "
+                           f"({coords[0]:.4f}, {coords[1]:.4f}) "
+                           f"级别: {amap_result.level}")
+                return coords
+            else:
+                logger.warning(f"高德API回退查询失败: {place_name}")
+        except Exception as e:
+            logger.error(f"高德API回退查询异常: {place_name}, error={e}")
+
+        # 最后回退到原有逻辑
+        return super().get_coordinates(place_name)
 
     def get_weather(self, place_name: str) -> Tuple[WeatherData, str]:
         """
@@ -220,6 +266,31 @@ class EnhancedCaiyunWeatherService(CaiyunWeatherService):
             wind_direction=0.0,
             condition="错误",
             description=error_message
+        )
+
+    def get_fallback_weather(self, place_name: str) -> WeatherData:
+        """
+        重写父类的fallback方法，返回错误信息而非模拟数据
+        为避免误导用户，不再生成任何模拟天气数据
+
+        Args:
+            place_name: 地区名称
+
+        Returns:
+            错误状态的天气数据
+        """
+        logger.warning(f"增强版天气服务查询失败，不再生成模拟数据: {place_name}")
+
+        # 返回明确的错误信息，不生成任何模拟天气数据
+        return WeatherData(
+            temperature=0.0,
+            apparent_temperature=0.0,
+            humidity=0.0,
+            pressure=0.0,
+            wind_speed=0.0,
+            wind_direction=0.0,
+            condition="天气服务查询失败",
+            description="天气服务查询失败，请稍后再试"
         )
 
     def batch_get_weather(self, place_names: list) -> list:

@@ -81,7 +81,7 @@ class CaiyunApiClient:
             lng: 经度
             lat: 纬度
             **params: 其他参数
-                - hourlysteps: 预报步数 (默认72)
+                - hourlysteps: 预报步数 (默认72, 范围1-360)
                 - alert: 是否包含天气预警 (默认true)
 
         Returns:
@@ -90,7 +90,7 @@ class CaiyunApiClient:
         Raises:
             WeatherApiException: API调用相关异常
         """
-        return self._make_api_request("/weather", {
+        return self._make_api_request("/hourly", {
             'lng': lng,
             'lat': lat,
             'hourlysteps': params.get('hourlysteps', 72),
@@ -114,7 +114,7 @@ class CaiyunApiClient:
         Raises:
             WeatherApiException: API调用相关异常
         """
-        return self._make_api_request("/weather", {
+        return self._make_api_request("/daily", {
             'lng': lng,
             'lat': lat,
             'dailysteps': params.get('dailysteps', 15),
@@ -136,7 +136,7 @@ class CaiyunApiClient:
         Raises:
             WeatherApiException: API调用相关异常
         """
-        return self._make_api_request("/weather", {
+        return self._make_api_request("/realtime", {
             'lng': lng,
             'lat': lat,
             'alert': params.get('alert', True)

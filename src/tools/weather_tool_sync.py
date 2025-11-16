@@ -254,51 +254,123 @@ class WeatherTool:
             )
 
     def _weather_by_datetime(self, location: str, datetime_str: str, **kwargs) -> ToolResult:
-        """查询指定时间段天气"""
+        """查询指定时间段天气，基于缓存的hourly_forecast数据"""
         try:
-            # 简化实现，直接返回模拟数据
-            import random
-            import re
+            # 首先尝试从缓存的hourly_forecast数据中获取
+            hourly_result = self._hourly_forecast(location, hours=24, **kwargs)
 
-            # 解析时间段
-            time_period = "全天"
-            if "上午" in datetime_str:
-                time_period = "上午"
-            elif "下午" in datetime_str:
-                time_period = "下午"
-            elif "晚上" in datetime_str:
-                time_period = "晚上"
-            elif "早上" in datetime_str:
-                time_period = "早上"
-            elif "中午" in datetime_str:
-                time_period = "中午"
+            if hourly_result.success and hourly_result.data:
+                hourly_data = hourly_result.data.get('hourly_forecast', [])
 
-            base_temp = random.uniform(15, 25)
-            conditions = ['晴', '多云', '阴', '小雨']
+                if hourly_data:
+                    # 解析日期时间表达式
+                    from datetime import datetime, timedelta
+                    import re
 
+                    target_datetime = None
+                    time_period = None
+
+                    # 简单的日期时间解析
+                    if datetime_str:
+                        # 处理相对时间表达
+                        if "今天" in datetime_str:
+                            target_datetime = datetime.now()
+                        elif "明天" in datetime_str:
+                            target_datetime = datetime.now() + timedelta(days=1)
+                        elif "后天" in datetime_str:
+                            target_datetime = datetime.now() + timedelta(days=2)
+                        else:
+                            # 尝试解析具体日期时间
+                            try:
+                                # 简单格式解析
+                                if re.match(r'\d{4}-\d{2}-\d{2}', datetime_str):
+                                    target_datetime = datetime.strptime(datetime_str[:10], '%Y-%m-%d')
+                            except ValueError:
+                                pass
+
+                        # 解析时间段
+                        if "上午" in datetime_str:
+                            time_period = "morning"
+                        elif "下午" in datetime_str:
+                            time_period = "afternoon"
+                        elif "晚上" in datetime_str or "夜间" in datetime_str:
+                            time_period = "evening"
+                        elif "凌晨" in datetime_str:
+                            time_period = "early_morning"
+
+                    if target_datetime:
+                        # 从小时数据中筛选匹配的时间段
+                        filtered_data = []
+                        target_date = target_datetime.date()
+
+                        for hour_info in hourly_data:
+                            hour_dt = datetime.fromisoformat(hour_info.get('datetime', '').replace('Z', '+00:00'))
+                            if hour_dt.date() == target_date:
+                                # 根据时间段筛选
+                                hour = hour_dt.hour
+                                if time_period == "early_morning" and 0 <= hour < 6:
+                                    filtered_data.append(hour_info)
+                                elif time_period == "morning" and 6 <= hour < 12:
+                                    filtered_data.append(hour_info)
+                                elif time_period == "afternoon" and 12 <= hour < 18:
+                                    filtered_data.append(hour_info)
+                                elif time_period == "evening" and 18 <= hour < 24:
+                                    filtered_data.append(hour_info)
+                                elif time_period is None:
+                                    # 如果没有指定时间段，返回当天所有数据
+                                    filtered_data.append(hour_info)
+
+                        if filtered_data:
+                            # 计算聚合数据
+                            temps = [h.get('temperature', 0) for h in filtered_data if h.get('temperature') is not None]
+                            humidities = [h.get('humidity', 0) for h in filtered_data if h.get('humidity') is not None]
+                            wind_speeds = [h.get('wind_speed', 0) for h in filtered_data if h.get('wind_speed') is not None]
+                            conditions = [h.get('condition', '未知') for h in filtered_data]
+
+                            avg_temp = sum(temps) / len(temps) if temps else 0
+                            avg_humidity = sum(humidities) / len(humidities) if humidities else 0
+                            avg_wind_speed = sum(wind_speeds) / len(wind_speeds) if wind_speeds else 0
+                            primary_condition = max(set(conditions), key=conditions.count) if conditions else "未知"
+
+                            return ToolResult(
+                                success=True,
+                                data={
+                                    'location': location,
+                                    'datetime': datetime_str,
+                                    'date': target_datetime.strftime('%Y-%m-%d'),
+                                    'time_period': time_period or '全天',
+                                    'temperature': round(avg_temp, 1),
+                                    'humidity': round(avg_humidity, 1),
+                                    'wind_speed': round(avg_wind_speed, 1),
+                                    'condition': primary_condition,
+                                    'description': f"{primary_condition}，平均温度{avg_temp:.1f}°C",
+                                    'hourly_count': len(filtered_data),
+                                    'data_points': filtered_data[:3],  # 返回前3个数据点作为示例
+                                    'source': hourly_result.data.get('source', 'hourly_api'),
+                                    'confidence': hourly_result.data.get('confidence', 0.9)
+                                },
+                                metadata={
+                                    "operation": "weather_by_datetime",
+                                    "source": "cached_hourly_forecast",
+                                    "datetime": datetime_str,
+                                    "location": location,
+                                    "original_hours": len(hourly_data),
+                                    "filtered_hours": len(filtered_data)
+                                }
+                            )
+
+            # 如果没有找到数据，返回友好错误
+            self._logger.warning(f"无法从缓存数据中获取指定时间段天气: {location} {datetime_str}")
             return ToolResult(
-                success=True,
-                data={
-                    'temperature': round(base_temp, 1),
-                    'temperature_avg': round(base_temp, 1),
-                    'temperature_min': round(base_temp - 3, 1),
-                    'temperature_max': round(base_temp + 3, 1),
-                    'humidity': random.uniform(50, 70),
-                    'humidity_avg': random.uniform(50, 70),
-                    'condition': random.choice(conditions),
-                    'condition_primary': random.choice(conditions),
-                    'wind_speed': random.uniform(5, 15),
-                    'wind_speed_avg': random.uniform(5, 15),
-                    'description': f"{location}{datetime_str}模拟天气：{random.choice(conditions)}",
-                    'time_period': time_period,
-                    'date': datetime_str,
-                    'source': '模拟数据',
-                    'location': location
-                },
+                success=False,
+                error=f"无法获取 {location} {datetime_str} 的天气信息，请先查询小时级预报或检查日期时间格式",
                 metadata={
                     "operation": "weather_by_datetime",
-                    "source": "simulation",
-                    "datetime": datetime_str
+                    "source": "error",
+                    "datetime": datetime_str,
+                    "location": location,
+                    "reason": "no_cached_data",
+                    "suggestion": "请先使用 hourly_forecast 查询该地区的小时级天气预报"
                 }
             )
 
@@ -312,50 +384,71 @@ class WeatherTool:
     def _hourly_forecast(self, location: str, hours: int = 24, **kwargs) -> ToolResult:
         """查询小时级预报"""
         try:
-            # 简化实现，生成模拟的小时级预报数据
-            import random
+            # 使用小时级天气预报服务
+            from src.services.weather.enhanced_weather_service import get_enhanced_weather_service
+            enhanced_service = get_enhanced_weather_service()
+
+            # 获取坐标
+            coordinates = enhanced_service.get_coordinates(location)
+            if not coordinates:
+                return ToolResult(
+                    success=False,
+                    error=f"未找到地区 '{location}' 的坐标信息",
+                    metadata={"operation": "hourly_forecast", "location": location}
+                )
+
+            longitude, latitude = coordinates
+
+            # 调用小时级天气预报服务
+            from src.services.weather.hourly_weather_service_sync import HourlyWeatherService
+            hourly_service = HourlyWeatherService()
+
+            # 使用明天作为默认查询日期
             from datetime import datetime, timedelta
+            tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-            hourly_data = []
-            base_temp = random.uniform(15, 25)
+            location_info = {
+                'name': location,
+                'lng': longitude,
+                'lat': latitude
+            }
 
-            for i in range(min(hours, 24)):  # 最多24小时
-                hour_time = datetime.now() + timedelta(hours=i)
-                # 温度变化模式
-                temp_variation = 0
-                if 6 <= hour_time.hour <= 14:
-                    temp_variation = (hour_time.hour - 6) * 1.5
-                elif 14 < hour_time.hour <= 20:
-                    temp_variation = (20 - hour_time.hour) * 0.8
-                else:
-                    temp_variation = -5
+            weather_result = hourly_service.get_forecast(location_info, tomorrow)
 
-                hourly_temp = base_temp + temp_variation
+            if weather_result.error_code == 0 and weather_result.hourly_data:
+                # 成功获取数据
+                hourly_data = weather_result.hourly_data[:hours]  # 限制返回的小时数
 
-                hourly_data.append({
-                    'datetime': hour_time.strftime('%Y-%m-%dT%H:%M:%S+08:00'),
-                    'hour': hour_time.hour,
-                    'temperature': round(hourly_temp, 1),
-                    'humidity': random.uniform(40, 80),
-                    'condition': random.choice(['晴', '多云', '阴']),
-                    'precipitation': 0.0
-                })
-
-            return ToolResult(
-                success=True,
-                data={
-                    'hourly_data': hourly_data,
-                    'forecast_hours': len(hourly_data),
-                    'source': '模拟数据',
-                    'location': location,
-                    'confidence': 0.6
-                },
-                metadata={
-                    "operation": "hourly_forecast",
-                    "source": "simulation",
-                    "hours": hours
-                }
-            )
+                return ToolResult(
+                    success=True,
+                    data={
+                        'location': location,
+                        'date': tomorrow,
+                        'hourly_forecast': hourly_data,
+                        'source': weather_result.data_source,
+                        'confidence': weather_result.confidence,
+                        'description': weather_result.metadata.get('description', ''),
+                        'forecast_keypoint': weather_result.metadata.get('forecast_keypoint', '')
+                    },
+                    metadata={
+                        "operation": "hourly_forecast",
+                        "source": weather_result.data_source,
+                        "confidence": weather_result.confidence,
+                        "forecast_hours": len(hourly_data)
+                    }
+                )
+            else:
+                # API查询失败
+                return ToolResult(
+                    success=False,
+                    error=weather_result.error_message or "小时级预报查询失败",
+                    metadata={
+                        "operation": "hourly_forecast",
+                        "source": "api_error",
+                        "location": location,
+                        "error_code": weather_result.error_code
+                    }
+                )
 
         except Exception as e:
             self._logger.error(f"查询小时级预报失败: {str(e)}")
@@ -365,38 +458,27 @@ class WeatherTool:
             )
 
     def _time_period_weather(self, location: str, date: str, time_period: str, **kwargs) -> ToolResult:
-        """查询指定日期时间段天气"""
+        """查询指定日期时间段天气，基于缓存的hourly_forecast数据"""
         try:
-            # 简化实现，返回模拟数据
-            import random
+            # 首先尝试从缓存的hourly_forecast数据中获取
+            hourly_result = self._hourly_forecast(location, hours=48, **kwargs)
+            if hourly_result.success and hourly_result.data:
+                hourly_data = hourly_result.data.get('hourly_forecast', [])
+                if hourly_data:
+                    self._logger.info(f"✅ 从缓存获取到 {len(hourly_data)} 小时预报数据，用于时间段查询")
+                    return self._filter_hourly_data_for_time_period(location, date, time_period, hourly_data)
 
-            base_temp = random.uniform(15, 25)
-            conditions = ['晴', '多云', '阴', '小雨']
-
+            self._logger.warning(f"时间段天气服务查询失败，没有可用的缓存数据: {location} {date} {time_period}")
             return ToolResult(
-                success=True,
-                data={
-                    'temperature': round(base_temp, 1),
-                    'temperature_avg': round(base_temp, 1),
-                    'temperature_min': round(base_temp - 3, 1),
-                    'temperature_max': round(base_temp + 3, 1),
-                    'humidity': random.uniform(50, 70),
-                    'humidity_avg': random.uniform(50, 70),
-                    'condition': random.choice(conditions),
-                    'condition_primary': random.choice(conditions),
-                    'wind_speed': random.uniform(5, 15),
-                    'wind_speed_avg': random.uniform(5, 15),
-                    'description': f"{location}{date}{time_period}模拟天气：{random.choice(conditions)}",
-                    'time_period': time_period,
-                    'date': date,
-                    'source': '模拟数据',
-                    'location': location
-                },
+                success=False,
+                error="天气服务查询失败，没有可用的缓存数据，请先查询小时级预报",
                 metadata={
                     "operation": "time_period_weather",
-                    "source": "simulation",
+                    "source": "error",
+                    "location": location,
                     "date": date,
-                    "time_period": time_period
+                    "time_period": time_period,
+                    "reason": "no_cached_hourly_data"
                 }
             )
 
@@ -408,37 +490,156 @@ class WeatherTool:
             )
 
     def _create_fallback_weather(self, location: str):
-        """创建模拟天气数据"""
+        """创建错误天气数据，不再生成模拟数据"""
         from services.weather.weather_service import WeatherData
 
-        # 基于位置的简单模拟数据
-        import random
+        self._logger.warning(f"天气工具同步版本服务失败，不再生成模拟数据: {location}")
 
-        # 根据城市名称生成不同的温度范围
-        city_temps = {
-            '北京': (5, 15),
-            '上海': (10, 20),
-            '广州': (15, 25),
-            '深圳': (18, 28),
-            '杭州': (8, 18)
-        }
-
-        temp_range = city_temps.get(location, (10, 20))
-        base_temp = random.uniform(*temp_range)
-
-        conditions = ['晴', '多云', '阴', '小雨', '中雨']
-        condition = random.choice(conditions)
-
+        # 返回错误状态的数据，不再生成任何模拟天气信息
         return WeatherData(
-            temperature=round(base_temp, 1),
-            apparent_temperature=round(base_temp - 2, 1),
-            humidity=random.uniform(40, 80),
-            pressure=random.uniform(1000, 1020),
-            wind_speed=random.uniform(0, 15),
-            wind_direction=random.uniform(0, 360),
-            condition=condition,
-            description=f"{location}模拟天气：{condition}，温度{base_temp:.1f}°C"
+            temperature=0.0,
+            apparent_temperature=0.0,
+            humidity=0.0,
+            pressure=0.0,
+            wind_speed=0.0,
+            wind_direction=0.0,
+            condition="天气服务查询失败",
+            description="天气服务查询失败，请稍后再试"
         )
+
+    def _filter_hourly_data_for_time_period(self, location: str, date: str, time_period: str, hourly_data: list) -> ToolResult:
+        """从小时级数据中筛选指定日期和时间段的天气数据"""
+        try:
+            from datetime import datetime, timedelta
+            import re
+
+            # 解析日期
+            target_datetime = None
+            if date:
+                if date.lower() == "today" or date == "今天":
+                    target_datetime = datetime.now()
+                elif date.lower() == "tomorrow" or date == "明天":
+                    target_datetime = datetime.now() + timedelta(days=1)
+                elif date.lower() == "yesterday" or date == "昨天":
+                    target_datetime = datetime.now() - timedelta(days=1)
+                else:
+                    # 尝试解析具体日期
+                    try:
+                        if re.match(r'\d{4}-\d{2}-\d{2}', date):
+                            target_datetime = datetime.strptime(date[:10], '%Y-%m-%d')
+                        elif re.match(r'\d{1,2}-\d{1,2}', date):
+                            # 假设是月-日格式，使用当前年份
+                            current_year = datetime.now().year
+                            target_datetime = datetime.strptime(f"{current_year}-{date[:5]}", '%Y-%m-%d')
+                    except ValueError:
+                        pass
+
+            if not target_datetime:
+                return ToolResult(
+                    success=False,
+                    error=f"无法解析日期: {date}",
+                    metadata={"operation": "filter_time_period", "date": date}
+                )
+
+            # 解析时间段
+            time_period_code = None
+            if "早上" in time_period or "清晨" in time_period or "凌晨" in time_period:
+                time_period_code = "early_morning"
+            elif "上午" in time_period:
+                time_period_code = "morning"
+            elif "中午" in time_period:
+                time_period_code = "noon"
+            elif "下午" in time_period:
+                time_period_code = "afternoon"
+            elif "晚上" in time_period or "夜间" in time_period or "夜晚" in time_period:
+                time_period_code = "evening"
+            elif "全天" in time_period or time_period == "":
+                time_period_code = None
+
+            # 从小时数据中筛选匹配的时间段
+            filtered_data = []
+            target_date = target_datetime.date()
+
+            for hour_info in hourly_data:
+                try:
+                    hour_dt = datetime.fromisoformat(hour_info.get('datetime', '').replace('Z', '+00:00'))
+                    if hour_dt.date() == target_date:
+                        # 根据时间段筛选
+                        hour = hour_dt.hour
+                        if time_period_code == "early_morning" and 0 <= hour < 6:
+                            filtered_data.append(hour_info)
+                        elif time_period_code == "morning" and 6 <= hour < 12:
+                            filtered_data.append(hour_info)
+                        elif time_period_code == "noon" and 12 <= hour < 14:
+                            filtered_data.append(hour_info)
+                        elif time_period_code == "afternoon" and 14 <= hour < 18:
+                            filtered_data.append(hour_info)
+                        elif time_period_code == "evening" and 18 <= hour < 24:
+                            filtered_data.append(hour_info)
+                        elif time_period_code is None:
+                            # 如果没有指定时间段，返回当天所有数据
+                            filtered_data.append(hour_info)
+                except Exception as e:
+                    self._logger.debug(f"解析小时数据失败: {e}")
+                    continue
+
+            if filtered_data:
+                # 计算聚合数据
+                temps = [h.get('temperature', 0) for h in filtered_data if h.get('temperature') is not None]
+                humidities = [h.get('humidity', 0) for h in filtered_data if h.get('humidity') is not None]
+                wind_speeds = [h.get('wind_speed', 0) for h in filtered_data if h.get('wind_speed') is not None]
+                conditions = [h.get('condition', '未知') for h in filtered_data]
+
+                avg_temp = sum(temps) / len(temps) if temps else 0
+                avg_humidity = sum(humidities) / len(humidities) if humidities else 0
+                avg_wind_speed = sum(wind_speeds) / len(wind_speeds) if wind_speeds else 0
+                primary_condition = max(set(conditions), key=conditions.count) if conditions else "未知"
+
+                return ToolResult(
+                    success=True,
+                    data={
+                        'location': location,
+                        'date': target_datetime.strftime('%Y-%m-%d'),
+                        'time_period': time_period or '全天',
+                        'temperature': round(avg_temp, 1),
+                        'humidity': round(avg_humidity, 1),
+                        'wind_speed': round(avg_wind_speed, 1),
+                        'condition': primary_condition,
+                        'description': f"{primary_condition}，平均温度{avg_temp:.1f}°C",
+                        'hourly_count': len(filtered_data),
+                        'data_points': filtered_data[:3],  # 返回前3个数据点作为示例
+                        'source': 'cached_hourly_forecast',
+                        'confidence': 0.9
+                    },
+                    metadata={
+                        "operation": "time_period_weather",
+                        "source": "cached_hourly_forecast",
+                        "location": location,
+                        "date": date,
+                        "time_period": time_period,
+                        "original_hours": len(hourly_data),
+                        "filtered_hours": len(filtered_data)
+                    }
+                )
+            else:
+                return ToolResult(
+                    success=False,
+                    error=f"没有找到 {location} {date} {time_period} 的天气数据",
+                    metadata={
+                        "operation": "filter_time_period",
+                        "location": location,
+                        "date": date,
+                        "time_period": time_period,
+                        "reason": "no_matching_data"
+                    }
+                )
+
+        except Exception as e:
+            self._logger.error(f"筛选时间段天气数据失败: {str(e)}")
+            return ToolResult(
+                success=False,
+                error=f"筛选时间段天气数据失败: {str(e)}"
+            )
 
     def close(self):
         """关闭工具，清理资源"""

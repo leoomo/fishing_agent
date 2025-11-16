@@ -179,41 +179,26 @@ class CaiyunWeatherService:
 
     def get_fallback_weather(self, city: str) -> WeatherData:
         """
-        获取模拟天气数据（当 API 不可用时使用）
+        获取错误天气数据（当 API 不可用时使用，不再生成模拟数据）
 
         Args:
             city: 城市名称
 
         Returns:
-            模拟的天气数据
+            错误状态的天气数据
         """
-        import random
+        logger.warning(f"天气服务查询失败，不再生成模拟数据: {city}")
 
-        fallback_weather = {
-            "北京": {"temp": 25, "condition": "晴天", "humidity": 60},
-            "上海": {"temp": 28, "condition": "多云", "humidity": 70},
-            "广州": {"temp": 30, "condition": "阴天", "humidity": 80},
-            "深圳": {"temp": 29, "condition": "晴天", "humidity": 75},
-            "杭州": {"temp": 22, "condition": "小雨", "humidity": 85},
-            "成都": {"temp": 20, "condition": "雾", "humidity": 90},
-            "西安": {"temp": 18, "condition": "晴", "humidity": 50}
-        }
-
-        weather_info = fallback_weather.get(city.strip(), {
-            "temp": random.randint(15, 30),
-            "condition": random.choice(["晴天", "多云", "阴天"]),
-            "humidity": random.randint(40, 80)
-        })
-
+        # 返回错误状态的数据，不再生成任何模拟天气信息
         return WeatherData(
-            temperature=weather_info["temp"],
-            apparent_temperature=weather_info["temp"] + random.randint(-2, 2),
-            humidity=weather_info["humidity"],
-            pressure=random.randint(1000, 1020),
-            wind_speed=random.uniform(0, 20),
-            wind_direction=random.randint(0, 360),
-            condition=weather_info["condition"],
-            description=f"{weather_info['condition']}，{weather_info['temp']}°C"
+            temperature=0.0,
+            apparent_temperature=0.0,
+            humidity=0.0,
+            pressure=0.0,
+            wind_speed=0.0,
+            wind_direction=0.0,
+            condition="天气服务查询失败",
+            description="天气服务查询失败，请稍后再试"
         )
 
     def get_weather(self, city: str) -> tuple[WeatherData, str]:

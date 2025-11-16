@@ -76,21 +76,21 @@ class CaiyunApiClient:
     async def get_hourly_forecast(self, lng: float, lat: float, **params) -> Dict[str, Any]:
         """
         获取逐小时天气预报
-        
+
         Args:
             lng: 经度
             lat: 纬度
             **params: 其他参数
-                - hourlysteps: 预报步数 (默认72)
+                - hourlysteps: 预报步数 (默认72, 范围1-360)
                 - alert: 是否包含天气预警 (默认true)
-        
+
         Returns:
             Dict[str, Any]: API响应数据
-        
+
         Raises:
             WeatherApiException: API调用相关异常
         """
-        return await self._make_api_request("/weather", {
+        return await self._make_api_request("/hourly", {
             'lng': lng,
             'lat': lat,
             'hourlysteps': params.get('hourlysteps', 72),
@@ -100,21 +100,21 @@ class CaiyunApiClient:
     async def get_daily_forecast(self, lng: float, lat: float, **params) -> Dict[str, Any]:
         """
         获取逐天天气预报
-        
+
         Args:
             lng: 经度
             lat: 纬度
             **params: 其他参数
                 - dailysteps: 预报步数 (默认7)
                 - alert: 是否包含天气预警 (默认true)
-        
+
         Returns:
             Dict[str, Any]: API响应数据
-        
+
         Raises:
             WeatherApiException: API调用相关异常
         """
-        return await self._make_api_request("/weather", {
+        return await self._make_api_request("/daily", {
             'lng': lng,
             'lat': lat,
             'dailysteps': params.get('dailysteps', 7),
@@ -124,18 +124,18 @@ class CaiyunApiClient:
     async def get_realtime_weather(self, lng: float, lat: float) -> Dict[str, Any]:
         """
         获取实时天气
-        
+
         Args:
             lng: 经度
             lat: 纬度
-        
+
         Returns:
             Dict[str, Any]: API响应数据
-        
+
         Raises:
             WeatherApiException: API调用相关异常
         """
-        return await self._make_api_request("/weather", {
+        return await self._make_api_request("/realtime", {
             'lng': lng,
             'lat': lat,
             'alert': True
@@ -146,7 +146,7 @@ class CaiyunApiClient:
         发起API请求
 
         Args:
-            endpoint: API端点
+            endpoint: API端点 (如 "/realtime", "/hourly", "/daily")
             params: 请求参数
 
         Returns:
@@ -155,19 +155,19 @@ class CaiyunApiClient:
         Raises:
             WeatherApiException: API调用相关异常
         """
-  
+
         await self._ensure_session()
-        
+
         # 获取API密钥
         api_key = self._api_key or self._get_api_key_from_env()
         if not api_key:
             raise AuthenticationException("未设置彩云天气API密钥")
-        
+
         # 构建URL
         lng = params.pop('lng')
         lat = params.pop('lat')
         url = f"{self._base_url}/{api_key}/{lng},{lat}{endpoint}"
-        
+
         # 构建查询参数
         query_params = {}
         for key, value in params.items():

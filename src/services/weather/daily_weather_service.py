@@ -754,55 +754,33 @@ class DailyWeatherService:
             return self._emergency_fallback(location_info, date_str, error_msg)
     
     def _emergency_fallback(self, location_info: dict, date_str: str, error_msg: str) -> WeatherResult:
-        """紧急回退数据"""
-        try:
-            target_date = datetime.strptime(date_str, "%Y-%m-%d")
-        except ValueError:
-            target_date = datetime.now() + timedelta(days=5)
-        
-        # 生成基础的24小时数据
-        hourly_data = []
-        base_temp = 18.0  # 基础温度
-        
-        for hour in range(24):
-            hour_dt = target_date.replace(hour=hour, minute=0, second=0)
-            
-            # 简单的温度模拟
-            temp_variation = 8 * (1 - abs(hour - 14) / 10)  # 下午2点最热
-            temperature = base_temp + temp_variation
-            
-            hour_data = {
-                'time': hour_dt,
-                'temperature': round(temperature, 1),
-                'weather': '多云',
-                'wind_speed': 3.5,
-                'wind_direction': 180.0,
-                'humidity': 65.0,
-                'pressure': 1013.0,
-                'visibility': 10.0,
-                'precipitation': 0.0,
-                'ultraviolet': 3.0,
-                'air_quality': {'aqi': 60},
-                'hour_of_day': hour,
-                'data_source': WeatherDataSource.EMERGENCY.value,
-                'interpolated': True,
-                'fishing_score': 54.0,
-                'error': f'逐天服务紧急回退数据: {error_msg}'
-            }
-            hourly_data.append(hour_data)
-        
+        """
+        紧急回退机制，当逐天天气服务不可用时返回明确的错误信息
+
+        Args:
+            location_info: 地理位置信息
+            date_str: 查询日期
+            error_msg: 原始错误信息
+
+        Returns:
+            WeatherResult: 包含明确错误信息的失败结果
+        """
+        self._logger.warning(f"逐天天气服务不可用，返回错误信息: {error_msg}")
+
+        # 不再生成任何模拟数据，直接返回错误
         return WeatherResult(
             data_source=WeatherDataSource.EMERGENCY.value,
-            hourly_data=hourly_data,
-            confidence=0.3,  # 紧急数据置信度很低
-            api_url="emergency_fallback",
-            error_code=1,
-            error_message=f"逐天服务紧急回退: {error_msg}",
+            hourly_data=[],  # 空数据列表，不包含任何天气信息
+            confidence=0.0,  # 零置信度，明确表示数据不可用
+            api_url="daily_emergency_fallback",
+            error_code=2,  # 使用错误代码2表示服务不可用
+            error_message="天气服务查询失败，请稍后再试",
             cached=False,
             metadata={
-                'fallback_reason': 'daily_service_failed',
+                'location': location_info.get('name', 'unknown'),
+                'date': date_str,
                 'original_error': error_msg,
-                'emergency_fallback': True
+                'fallback_reason': 'daily_service_unavailable'
             }
         )
     
