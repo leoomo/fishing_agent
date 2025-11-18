@@ -545,7 +545,7 @@ WEATHER_TOOLS_SYNC = [
     query_weather_by_date,
     query_weather_by_datetime,
     query_hourly_forecast,
-    query_time_period_weather,
+    # query_time_period_weather,
     query_fishing_recommendation,  # 新增钓鱼推荐工具
 ]
 

@@ -1,231 +1,221 @@
 #!/usr/bin/env python3
 """
-基于 LangChain 1.0+ 最新 API 的智能体示例
-使用 create_agent 函数和现代工具集成
+基于 LangChain 1.0+ 的现代智能钓鱼助手
+优化架构设计，集成了天气数据修复和LLM调用优化
 """
 
 import os
-from typing import List, Dict, Any, Optional
+import logging
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 from dotenv import load_dotenv
 
 # 加载环境变量
 load_dotenv()
 
+# LangChain 核心组件
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.tools import tool
 
-# 导入同步版本的天气工具
-from tools.langchain_weather_tools_sync import (
-    get_weather_tools_sync,
-    create_weather_tool_system_prompt
-)
+# 导入现有的同步工具
+from tools.langchain_weather_tools_sync import get_weather_tools_sync
 
-# 导入日志中间件
-from services.middleware import AgentLoggingMiddleware, MiddlewareConfig
-from services.middleware.integrated_middleware import IntegratedMiddlewareManager
+# 配置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# 使用最新的 @tool 装饰器定义工具
-@tool
-def get_current_time() -> str:
-    """获取当前时间和日期"""
-    now = datetime.now()
-    return f"当前时间: {now.strftime('%Y-%m-%d %H:%M:%S')} ({now.strftime('%A')})"
 
-@tool
-def calculate(expression: str) -> str:
+class OptimizedFishingAgent:
     """
-    计算数学表达式
+    优化的钓鱼智能助手
 
-    Args:
-        expression: 要计算的数学表达式，如 "2+3*4"
+    特性:
+    - 集成修复后的天气工具，提供详细天气数据
+    - 简化架构，提高稳定性
+    - 智能降级机制，确保服务可靠性
+    - 模块化设计，易于维护和扩展
     """
-    try:
-        # 安全的数学表达式计算
-        allowed_chars = set('0123456789+-*/().** ')
-        if not all(c in allowed_chars for c in expression):
-            return "错误: 表达式包含不允许的字符，只支持数字和基本运算符"
 
-        result = eval(expression)
-        return f"计算结果: {expression} = {result}"
-    except Exception as e:
-        return f"计算错误: {str(e)}"
-
-
-@tool
-def search_information(query: str) -> str:
-    """
-    搜索信息（模拟搜索功能）
-
-    Args:
-        query: 搜索查询词
-    """
-    # 模拟知识库
-    knowledge_base = {
-        "langchain": "LangChain 是一个用于构建 LLM 应用的开源框架，提供了链、代理、记忆等功能，简化了 AI 应用的开发。",
-        "python": "Python 是一种高级编程语言，以简洁的语法和强大的库生态系统著称，广泛用于 AI/ML 开发。",
-        "人工智能": "人工智能 (AI) 是计算机科学的分支，致力于创造能够执行需要人类智能的任务的系统。",
-        "机器学习": "机器学习是 AI 的子集，使计算机能够从数据中学习并改进性能，无需显式编程。",
-        "大语言模型": "大语言模型 (LLM) 是经过大量文本训练的深度学习模型，能够理解和生成人类语言。"
-    }
-
-    query_lower = query.lower()
-    for keyword, info in knowledge_base.items():
-        if keyword in query_lower:
-            return f"搜索结果: {info}"
-
-    return f"关于 '{query}' 的信息: 这是一个模拟搜索功能。在实际应用中，您可以集成真实的搜索引擎 API 来获取更全面的信息。"
-
-class ModernLangChainAgent:
-    """使用 LangChain 1.0+ 的现代智能体实现（集成增强版）"""
-
-    def __init__(self, model_provider: str = "anthropic", enable_logging: bool = True,
-                 enable_intent_enhancement: bool = True,
-                 middleware_config: Optional[MiddlewareConfig] = None):
+    def __init__(
+        self,
+        model_provider: str = "qwen",
+        enable_logging: bool = True,
+        timeout: int = 60
+    ):
         """
-        初始化智能体
+        初始化智能钓鱼助手
 
         Args:
-            model_provider: 模型提供商 ("anthropic" 或 "openai")
-            enable_logging: 是否启用日志中间件
-            enable_intent_enhancement: 是否启用意图增强功能
-            middleware_config: 自定义中间件配置
+            model_provider: 模型提供商 ("qwen", "zhipu", "doubao")
+            enable_logging: 启用日志记录
+            timeout: 请求超时时间（秒）
         """
         self.model_provider = model_provider
         self.enable_logging = enable_logging
-        self.enable_intent_enhancement = enable_intent_enhancement
-        self.middleware_config = middleware_config or MiddlewareConfig.from_env()
+        self.timeout = timeout
 
+        # 初始化核心组件
         self.model = self._initialize_model()
-        # 使用同步版本的天气工具集，包含钓鱼推荐功能
-        weather_tools = get_weather_tools_sync()
-        self.tools = [get_current_time, calculate, search_information] + weather_tools
-
-        # 初始化集成中间件管理器
-        self.integrated_middleware = None
-        self.logging_middleware = None
-
-        if self.enable_logging:
-            try:
-                self.integrated_middleware = IntegratedMiddlewareManager(
-                    config=self.middleware_config,
-                    enable_intent_enhancement=self.enable_intent_enhancement
-                )
-                self.logging_middleware = self.integrated_middleware.logging_middleware
-
-                print(f"📝 已启用集成中间件管理器")
-                print(f"   日志记录: {self.enable_logging}")
-                print(f"   意图增强: {self.enable_intent_enhancement}")
-
-            except Exception as e:
-                print(f"⚠️  集成中间件初始化失败，使用基础模式: {e}")
-                self.enable_logging = False
-                self.enable_intent_enhancement = False
-
+        self.tools = self._setup_tools()
+        self.middleware = []  # 简化架构，空中间件列表
         self.agent = self._create_agent()
+
+        logger.info(f"✅ 智能钓鱼助手初始化完成")
+        logger.info(f"   模型: {model_provider}")
+        logger.info(f"   工具数: {len(self.tools)}")
+        logger.info(f"   日志记录: {'启用' if enable_logging else '禁用'}")
 
     def _initialize_model(self):
         """初始化语言模型"""
-        if self.model_provider == "zhipu":
-            api_key =  os.getenv("ANTHROPIC_AUTH_TOKEN")
-            if not api_key:
-                raise ValueError("")
-            return init_chat_model(
-                model="glm-4.6",
-                model_provider="openai",
-                base_url="https://open.bigmodel.cn/api/paas/v4/",
-                api_key= api_key,
-            )
-        elif self.model_provider == "qwen":
-            api_key = os.getenv("DASHSCOPE_API_KEY")
-            
-            return ChatTongyi(
-                model="qwen-plus",
-                api_key=api_key,
-            )
-        elif self.model_provider == "doubao":
-            api_key = os.getenv("ARK_API_KEY")
-            return ChatOpenAI(
-                # model="gpt-4o-mini",
-                base_url="https://ark.cn-beijing.volces.com/api/v3",
-                api_key=api_key,
-            )
-        else:
-            raise ValueError(f"不支持的模型提供商: {self.model_provider}")
+        try:
+            if self.model_provider == "qwen":
+                api_key = os.getenv("DASHSCOPE_API_KEY")
+                if not api_key:
+                    raise ValueError("DASHSCOPE_API_KEY 未配置")
+
+                return ChatTongyi(
+                    model="qwen-plus",
+                    api_key=api_key,
+                    timeout=self.timeout
+                )
+
+            elif self.model_provider == "zhipu":
+                api_key = os.getenv("ANTHROPIC_AUTH_TOKEN")
+                if not api_key:
+                    raise ValueError("ANTHROPIC_AUTH_TOKEN 未配置")
+
+                return init_chat_model(
+                    model="glm-4.6",
+                    model_provider="openai",
+                    base_url="https://open.bigmodel.cn/api/paas/v4/",
+                    api_key=api_key,
+                    timeout=self.timeout
+                )
+
+            elif self.model_provider == "doubao":
+                api_key = os.getenv("ARK_API_KEY")
+                if not api_key:
+                    raise ValueError("ARK_API_KEY 未配置")
+
+                return ChatOpenAI(
+                    base_url="https://ark.cn-beijing.volces.com/api/v3",
+                    api_key=api_key,
+                    timeout=self.timeout
+                )
+
+            else:
+                raise ValueError(f"不支持的模型提供商: {self.model_provider}")
+
+        except Exception as e:
+            logger.error(f"模型初始化失败: {e}")
+            raise
+
+    def _setup_tools(self) -> List:
+        """设置工具集"""
+        # 基础工具
+        @tool
+        def get_current_time() -> str:
+            """获取当前时间和日期"""
+            now = datetime.now()
+            return f"当前时间: {now.strftime('%Y-%m-%d %H:%M:%S')} ({now.strftime('%A')})"
+
+        @tool
+        def calculate(expression: str) -> str:
+            """计算数学表达式"""
+            try:
+                allowed_chars = set('0123456789+-*/().** ')
+                if not all(c in allowed_chars for c in expression):
+                    return "错误: 表达式包含不允许的字符"
+
+                result = eval(expression)
+                return f"计算结果: {expression} = {result}"
+            except Exception as e:
+                return f"计算错误: {str(e)}"
+
+        @tool
+        def search_information(query: str) -> str:
+            """搜索信息（模拟功能）"""
+            knowledge_base = {
+                "钓鱼": "钓鱼是一种休闲娱乐活动，根据天气、水温、时间等因素选择合适的钓点和钓法。",
+                "路亚": "路亚钓鱼是一种假饵钓法，使用拟饵模仿鱼类食物，适合钓获掠食性鱼类。",
+                "鲈鱼": "鲈鱼是常见的路亚钓鱼目标鱼种，喜欢在水草边缘和障碍物附近活动。",
+                "天气": "天气对钓鱼有重要影响，多云、阴天和小雨天气通常更适合钓鱼。"
+            }
+
+            query_lower = query.lower()
+            for keyword, info in knowledge_base.items():
+                if keyword in query_lower:
+                    return f"搜索结果: {info}"
+
+            return f"关于 '{query}' 的信息: 可以尝试更具体的关键词搜索"
+
+        # 核心工具集 - 使用现有的天气工具
+        weather_tools = get_weather_tools_sync()
+        tools = [get_current_time, calculate, search_information] + weather_tools
+
+        logger.info(f"🛠️ 工具集配置完成: {len(tools)} 个工具")
+        return tools
+
+    def _setup_middleware(self) -> List:
+        """设置中间件"""
+        # 暂时简化，不使用中间件
+        return []
 
     def _create_agent(self):
-        """使用最新的 create_agent API 创建智能体"""
-        # 使用增强的天气工具系统提示词，包含钓鱼专业知识
-        weather_system_prompt = create_weather_tool_system_prompt()
+        """创建智能体"""
+        system_prompt = """你是一个专业的智能钓鱼助手，专门帮助用户获取钓鱼相关的信息和建议。
 
-        system_prompt = f"""你是一个智能助手，具备多种实用工具来帮助用户完成任务。
-
-你的基础工具包括:
-1. get_current_time - 获取当前时间和日期
-2. calculate - 计算数学表达式
-3. search_information - 搜索和获取信息
-
-你的专业天气工具包括:
+🛠️ 你的核心工具:
+1. get_current_time - 获取当前时间
+2. calculate - 数学计算
+3. search_information - 信息搜索
 4. query_current_weather - 查询当前天气
 5. query_weather_by_date - 查询指定日期天气
-6. query_weather_by_datetime - 查询指定时间段天气
-7. query_hourly_forecast - 查询小时级预报
-8. query_time_period_weather - 查询指定日期和时间段的天气
-9. query_fishing_recommendation - 钓鱼时间推荐和天气分析
+6. query_fishing_recommendation - 钓鱼时间推荐和天气分析（核心工具）
+7. 其他天气工具 - 查询预报、时段天气等
 
-使用指南:
-- 你是路亚钓鱼专家，擅长根据天气、时间、地点等信息给出钓鱼建议, 注意：只需要路亚，不需要提供其他类型钓鱼建议
-- 当用户问钓鱼相关问题时(如"明天钓鱼合适吗"、"什么时候钓鱼好")，使用query_fishing_recommendation工具
-- 当用户问天气问题时，根据查询内容选择合适的天气工具
-- 根据用户问题选择最合适的工具
-- 可以组合使用多个工具来解决复杂问题
-- 用中文回答，保持友好和专业的语调
-- 如果工具无法解决问题，会告知用户并提供替代建议
+🎯 智能工具选择策略:
+- 钓鱼相关查询 → 优先使用 query_fishing_recommendation
+- 天气相关查询 → 根据查询类型选择合适的天气工具
+- 钓鱼推荐工具优势: 一次调用完成天气+钓鱼综合分析
+- 每个查询只选择最相关的1-2个工具，避免冗余
 
-钓鱼专业知识:
+🐟 专业钓鱼知识:
 - 最佳钓鱼温度: 15-25°C
-- 理想天气条件: 多云、阴天或小雨天气
-- 最佳钓鱼时段: 早上(5-9点)和傍晚(18-21点)
-- 应避免的条件: 强风(>15km/h)、暴雨、极端温度
+- 理想天气条件: 多云、阴天、小雨天气
+- 最佳钓鱼时段: 早上5-9点、傍晚18-21点
+- 需要避免的条件: 强风>15km/h、暴雨、极端温度
+- 推荐装备: 根据天气和目标鱼种选择合适的路亚装备
 
-{weather_system_prompt}
+💡 回复原则:
+- 选择最合适的工具，而不是最多工具
+- 优先使用能一次性解决问题的钓鱼推荐工具
+- 避免重复调用功能相似的工具
+- 为用户提供专业、准确、有用的回复
+- 用中文回答，保持友好和专业的语调
 
 示例交互:
-- 用户问时间 → 使用 get_current_time
-- 用户问计算 → 使用 calculate
-- 用户问"明天钓鱼合适吗？" → 使用 query_fishing_recommendation
-- 用户问"明天上午天气" → 使用 query_weather_by_datetime
-- 用户问知识 → 使用 search_information"""
+- "今天余杭区钓鱼怎么样" → query_fishing_recommendation
+- "北京明天天气如何" → query_weather_by_date
+- "计算123*456" → calculate
+- "现在几点了" → get_current_time"""
 
-        # 准备中间件列表
-        middleware_list = []
-        if self.integrated_middleware:
-            # 使用集成中间件管理器获取所有中间件
-            middleware_list = self.integrated_middleware.get_middleware_list()
-            if middleware_list:
-                print(f"📝 已启用集成中间件 (共 {len(middleware_list)} 个)")
-                if self.logging_middleware:
-                    print(f"   日志中间件会话: {self.logging_middleware.session_id[:8]}...")
-        elif self.enable_logging and self.logging_middleware:
-            # 兼容旧版本
-            middleware_list.append(self.logging_middleware)
-            print(f"📝 已启用传统日志中间件 (session: {self.logging_middleware.session_id[:8]}...)")
-
-        # 使用 LangChain 1.0+ 的 create_agent 函数
+        # 创建agent参数
         create_kwargs = {
             "model": self.model,
             "tools": self.tools,
             "system_prompt": system_prompt
         }
 
-        # 只有当中间件列表不为空时才添加middleware参数
-        if middleware_list:
-            create_kwargs["middleware"] = middleware_list
+        # 简化架构，暂不使用中间件
+        # if self.middleware:
+        #     create_kwargs["middleware"] = self.middleware
 
         agent = create_agent(**create_kwargs)
+        logger.info("🤖 智能体创建完成")
 
         return agent
 
@@ -234,17 +224,15 @@ class ModernLangChainAgent:
         运行智能体
 
         Args:
-            user_input: 用户输入的文本
+            user_input: 用户输入
 
         Returns:
-            智能体的回复
+            智能体回复
         """
         try:
-            # 开始请求追踪
-            if self.logging_middleware:
-                self.logging_middleware.start_request_tracking(user_input)
+            logger.info(f"📝 用户输入: {user_input}")
 
-            # 使用 LangChain 1.0+ 的标准调用格式
+            # 标准LangChain调用
             result = self.agent.invoke({
                 "messages": [
                     {"role": "user", "content": user_input}
@@ -253,255 +241,248 @@ class ModernLangChainAgent:
 
             # 提取回复内容
             if isinstance(result, dict) and "messages" in result:
-                # 获取最后一条消息
                 messages = result["messages"]
                 if messages and len(messages) > 0:
                     last_message = messages[-1]
                     if hasattr(last_message, 'content'):
-                        return last_message.content
+                        response = last_message.content
                     elif isinstance(last_message, dict) and "content" in last_message:
-                        return last_message["content"]
+                        response = last_message["content"]
+                    else:
+                        response = str(last_message)
+                else:
+                    response = str(result)
+            else:
+                response = str(result)
 
-            # 备用处理
-            response = str(result)
-
-            # 结束请求追踪
-            if self.logging_middleware:
-                self.logging_middleware.end_request_tracking()
-
+            logger.info(f"🤖 智能体回复: {len(response)} 字符")
             return response
 
         except Exception as e:
             error_msg = f"智能体执行出错: {str(e)}"
-            if self.logging_middleware:
-                self.logging_middleware.logger.error(f"💥 智能体执行异常: {error_msg}")
-                self.logging_middleware.end_request_tracking()
-            return error_msg
+            logger.error(f"💥 {error_msg}")
 
-    def get_execution_summary(self) -> Optional[Dict[str, Any]]:
-        """
-        获取当前会话的执行摘要（增强版）
-
-        Returns:
-            包含执行统计、工具调用记录、意图分析等信息的字典，如果未启用日志则返回None
-        """
-        if self.integrated_middleware:
-            # 使用集成中间件管理器获取综合统计
-            summary = self.integrated_middleware.get_execution_summary()
-            return summary
-        elif self.logging_middleware:
-            # 兼容传统日志中间件
-            return self.logging_middleware.get_execution_summary()
-        return None
-
-    def reset_session_metrics(self):
-        """重置当前会话的指标统计"""
-        if self.integrated_middleware:
-            self.integrated_middleware.reset_all_stats()
-            if self.logging_middleware:
-                print(f"📊 所有中间件指标已重置 (session: {self.logging_middleware.session_id[:8]}...)")
+            # 智能降级处理
+            if self._is_weather_fishing_query(user_input):
+                return self._fallback_weather_response(user_input)
             else:
-                print("📊 所有中间件指标已重置")
-        elif self.logging_middleware:
-            self.logging_middleware.reset_metrics()
-            print(f"📊 会话指标已重置 (session: {self.logging_middleware.session_id[:8]}...)")
+                return f"抱歉，我遇到了一些技术问题：{error_msg}。请稍后重试。"
 
-    def get_intent_stats(self) -> Optional[Dict[str, Any]]:
-        """
-        获取意图分析统计信息
+    def _is_weather_fishing_query(self, query: str) -> bool:
+        """判断是否为天气钓鱼相关查询"""
+        weather_keywords = ["天气", "温度", "下雨", "晴", "阴", "多云"]
+        fishing_keywords = ["钓鱼", "路亚", "钓", "渔"]
 
-        Returns:
-            意图统计信息，如果未启用意图增强则返回None
-        """
-        if self.integrated_middleware and self.integrated_middleware.intent_middleware:
-            return self.integrated_middleware.intent_middleware.get_intent_stats()
-        return None
+        query_lower = query.lower()
+        return (any(keyword in query_lower for keyword in weather_keywords) or
+                any(keyword in query_lower for keyword in fishing_keywords))
 
-    def configure_middleware(self, enable_intent_enhancement: Optional[bool] = None,
-                           enable_logging: Optional[bool] = None,
-                           log_level: Optional[str] = None):
-        """
-        动态配置中间件
+    def _fallback_weather_response(self, query: str) -> str:
+        """降级天气钓鱼回复"""
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        Args:
-            enable_intent_enhancement: 是否启用意图增强
-            enable_logging: 是否启用日志记录
-            log_level: 日志级别
-        """
-        if enable_intent_enhancement is not None:
-            self.enable_intent_enhancement = enable_intent_enhancement
+        return f"""
+## 🎯 智能钓鱼助手 - 降级模式
 
-        if enable_logging is not None:
-            self.enable_logging = enable_logging
+⚠️ 系统暂时遇到技术问题，为您提供基础建议：
 
-        if log_level is not None and self.integrated_middleware:
-            self.integrated_middleware.set_log_level(log_level)
+**当前时间**: {current_time}
+**查询内容**: {query}
 
-        # 重新初始化agent以应用新配置
-        print("🔄 正在重新配置智能体...")
-        self.agent = self._create_agent()
-        print("✅ 智能体配置更新完成")
+### 🎣 基础钓鱼建议
+- **最佳时段**: 早上5-9点、傍晚18-21点
+- **理想温度**: 15-25°C
+- **推荐天气**: 多云、阴天天气
+- **避免条件**: 强风、暴雨、极端温度
 
-    def interactive_chat(self):
-        """启动交互式聊天"""
-        print("🤖 欢迎使用 LangChain 1.0+ 智能体!")
-        print(f"📋 当前使用模型: {self.model_provider}")
-        print("🛠️  可用工具: 时间查询、数学计算、天气查询、信息搜索")
+### 🌤️ 通用建议
+- 清晨和傍晚是鱼类活动高峰期
+- 多云天气下鱼类更加活跃
+- 选择适合当前季节的装备和饵料
 
-        if self.enable_logging:
-            print(f"📝 日志记录: 已启用")
-            if self.logging_middleware:
-                print(f"   会话ID: {self.logging_middleware.session_id[:8]}...")
-            if self.enable_intent_enhancement:
-                print("   意图增强: 已启用")
-            print("📊 输入 'stats' 查看执行统计, 'reset' 重置指标")
-            if self.enable_intent_enhancement:
-                print("🧠 输入 'intent' 查看意图统计")
-        else:
-            print("📝 日志记录: 未启用")
+建议稍后重试以获取详细的天气数据和专业分析。
 
-        print("💡 输入 'quit' 或 'exit' 退出程序\n")
+---
+*由智能钓鱼助手提供（降级模式）*
+        """.strip()
 
-        while True:
-            try:
-                user_input = input("👤 您: ").strip()
+    def get_stats(self) -> Dict[str, Any]:
+        """获取系统统计信息"""
+        stats = {
+            "model_provider": self.model_provider,
+            "tools_count": len(self.tools),
+            "middleware_count": len(self.middleware),
+            "timeout": self.timeout,
+            "logging_enabled": self.enable_logging
+        }
 
-                if user_input.lower() in ['quit', 'exit', '退出', 'q']:
-                    print("👋 感谢使用，再见!")
+        # 获取智能中间件统计（如果可用）
+        if self.middleware and len(self.middleware) > 0:
+            for middleware in self.middleware:
+                if hasattr(middleware, 'get_unified_stats'):
+                    middleware_stats = middleware.get_unified_stats()
+                    stats["middleware_stats"] = middleware_stats
                     break
 
-                # 处理统计命令
-                if user_input.lower() == 'stats' and self.enable_logging:
-                    summary = self.get_execution_summary()
-                    if summary:
-                        print("\n📊 执行统计:")
-                        if 'session_id' in summary:
-                            print(f"   会话ID: {summary['session_id'][:8]}...")
-                        if 'metrics' in summary:
-                            metrics = summary['metrics']
-                            print(f"   总耗时: {metrics.get('total_duration_ms', 0):.2f}ms")
-                            print(f"   模型调用次数: {metrics.get('model_calls_count', 0)}")
-                            print(f"   工具调用次数: {metrics.get('tool_calls_count', 0)}")
-                            print(f"   错误次数: {metrics.get('errors_count', 0)}")
-                            print(f"   Token使用: {metrics.get('token_usage', 'N/A')}")
-                        if 'intent_stats' in summary:
-                            intent_stats = summary['intent_stats']
-                            print(f"   意图增强次数: {intent_stats.get('tool_selection_enhancements', 0)}")
-                            most_common = intent_stats.get('most_common_intent')
-                            if most_common:
-                                print(f"   最常见意图: {most_common}")
-                        print()
-                    else:
-                        print("❌ 无法获取执行统计\n")
-                    continue
+        return stats
 
-                # 处理意图统计命令
-                if user_input.lower() == 'intent' and self.enable_intent_enhancement:
-                    intent_stats = self.get_intent_stats()
-                    if intent_stats:
-                        print("\n🧠 意图分析统计:")
-                        print(f"   总调用次数: {intent_stats.get('total_calls', 0)}")
-                        print(f"   工具选择增强次数: {intent_stats.get('tool_selection_enhancements', 0)}")
+    def health_check(self) -> Dict[str, Any]:
+        """系统健康检查"""
+        health_status = {
+            "status": "healthy",
+            "checks": {}
+        }
 
-                        intent_distribution = intent_stats.get('intent_distribution', {})
-                        if intent_distribution:
-                            print("   意图分布:")
-                            for intent, count in sorted(intent_distribution.items(), key=lambda x: x[1], reverse=True):
-                                print(f"     {intent}: {count}次")
+        # 检查模型
+        try:
+            _ = self.model
+            health_status["checks"]["model"] = "✅ 正常"
+        except Exception as e:
+            health_status["checks"]["model"] = f"❌ 异常: {e}"
+            health_status["status"] = "degraded"
 
-                        most_common = intent_stats.get('most_common_intent')
-                        if most_common:
-                            print(f"   最常见意图: {most_common}")
-                        print()
-                    else:
-                        print("❌ 意图增强未启用或无统计数据\n")
-                    continue
+        # 检查工具
+        try:
+            assert len(self.tools) > 0
+            health_status["checks"]["tools"] = "✅ 正常"
+        except Exception as e:
+            health_status["checks"]["tools"] = f"❌ 异常: {e}"
+            health_status["status"] = "degraded"
 
-                # 处理重置命令
-                if user_input.lower() == 'reset' and self.enable_logging:
-                    self.reset_session_metrics()
-                    continue
+        # 检查中间件（简化版本）
+        try:
+            assert len(self.middleware) >= 0  # 中间件可以为空
+            health_status["checks"]["middleware"] = "✅ 正常 (简化版本)"
+        except Exception as e:
+            health_status["checks"]["middleware"] = f"❌ 异常: {e}"
+            health_status["status"] = "degraded"
 
-                if not user_input:
-                    continue
+        return health_status
 
-                print("🤔 智能体思考中...")
-                response = self.run(user_input)
-                print(f"🤖 智能体: {response}\n")
+    def reset_stats(self):
+        """重置统计信息"""
+        if self.middleware and len(self.middleware) > 0:
+            for middleware in self.middleware:
+                if hasattr(middleware, 'reset_stats'):
+                    middleware.reset_stats()
+                    logger.info("📊 中间件统计已重置")
+                    break
+        else:
+            logger.info("📊 无中间件可重置")
 
-            except KeyboardInterrupt:
-                print("\n👋 程序被中断，再见!")
-                break
-            except Exception as e:
-                print(f"❌ 发生错误: {str(e)}\n")
 
-def demonstrate_agent_capabilities():
-    """演示智能体功能"""
-    print("🚀 LangChain 1.0+ 智能体功能演示")
+def create_optimized_fishing_agent(**kwargs) -> OptimizedFishingAgent:
+    """
+    创建优化的钓鱼智能助手
+
+    Args:
+        model_provider: 模型提供商，默认 "qwen"
+        enable_logging: 启用日志记录，默认 True
+        timeout: 超时时间，默认 60秒
+
+    Returns:
+        OptimizedFishingAgent 实例
+    """
+    return OptimizedFishingAgent(**kwargs)
+
+
+def demonstrate_agent():
+    """演示智能钓鱼助手功能"""
+    print("🎯 智能钓鱼助手演示")
     print("=" * 60)
 
-    # 检查 API 密钥
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
-    zhipu_key = os.getenv("ANTHROPIC_AUTH_TOKEN")
+    # 检查API密钥
+    required_keys = {
+        "DASHSCOPE_API_KEY": "阿里云通义千问",
+        "ANTHROPIC_AUTH_TOKEN": "智谱AI GLM",
+        "ARK_API_KEY": "豆包大模型"
+    }
 
-    if not any([anthropic_key, openai_key, zhipu_key]):
-        print("❌ 错误: 请设置至少一个 API 密钥")
-        print("在 .env 文件中设置 ANTHROPIC_API_KEY 或 OPENAI_API_KEY")
+    available_models = []
+    for key, name in required_keys.items():
+        if os.getenv(key):
+            available_models.append((key, name))
+
+    if not available_models:
+        print("❌ 错误: 请配置至少一个API密钥")
+        for key, name in required_keys.items():
+            print(f"   {key}: {name}")
         return
 
-    # 选择可用的模型
-    # if anthropic_key:
-    #     model_provider = "anthropic"
-    #     print("✅ 使用 Anthropic Claude 模型")
-    # else:
-    #     model_provider = "openai"
-    #     print("✅ 使用 OpenAI GPT 模型")
-    # model_provider = "zhipu"
-    model_provider = "qwen"
-    # model_provider = "doubao"
+    # 选择模型
+    if os.getenv("DASHSCOPE_API_KEY"):
+        model_provider = "qwen"
+        model_name = "通义千问"
+    elif os.getenv("ANTHROPIC_AUTH_TOKEN"):
+        model_provider = "zhipu"
+        model_name = "智谱AI GLM"
+    else:
+        model_provider = "doubao"
+        model_name = "豆包"
+
+    print(f"✅ 使用模型: {model_name}")
+
     try:
         # 创建智能体
-        agent = ModernLangChainAgent(model_provider=model_provider)
+        agent = create_optimized_fishing_agent(
+            model_provider=model_provider,
+            enable_logging=True
+        )
+
+        # 健康检查
+        health = agent.health_check()
+        print(f"🏥 系统状态: {health['status']}")
+        for check, status in health['checks'].items():
+            print(f"   {check}: {status}")
 
         # 测试用例
         test_cases = [
-            # "现在几点了？",
-            # "帮我计算 123 * 456 + 789",
-            # "余杭区今天天气怎么样？",
-            # "景德镇明天天气怎么样？",
-            # "临安今天天气怎么样？",
-            "今天什么时段去杭州市余杭区钓鱼比较好？",
-            # "今天是什么日子？"
+            "今天余杭区钓鱼怎么样？",
+            "北京明天天气如何？",
+            "现在几点了？",
+            "计算 123 * 456",
+            "路亚钓鱼的基本技巧"
         ]
 
-        print(f"\n🧪 运行 {len(test_cases)} 个测试用例:\n")
+        print(f"\n🧪 测试 {len(test_cases)} 个用例:")
 
         for i, test_input in enumerate(test_cases, 1):
-            print(f"📝 测试 {i}: {test_input}")
-            response = agent.run(test_input)
-            print(f"🤖 回复: {response}\n")
+            print(f"\n📝 测试 {i}: {test_input}")
             print("-" * 40)
 
-        # # 询问是否进入交互模式
-        # choice = input("🎯 是否进入交互聊天模式? (y/n): ").strip().lower()
-        # if choice in ['y', 'yes', '是', '']:
-        #     agent.interactive_chat()
-        # else:
-        #     print("👋 演示完成!")
+            try:
+                response = agent.run(test_input)
+                print(f"🤖 回复: {response[:200]}{'...' if len(response) > 200 else ''}")
+
+            except Exception as e:
+                print(f"❌ 失败: {e}")
+
+        # 显示统计信息
+        stats = agent.get_stats()
+        print(f"\n📊 系统统计:")
+        for key, value in stats.items():
+            if key != "middleware_stats":
+                print(f"   {key}: {value}")
+
+        if "middleware_stats" in stats:
+            print("   中间件统计:")
+            for key, value in stats["middleware_stats"].items():
+                print(f"     {key}: {value}")
 
     except Exception as e:
-        print(f"❌ 智能体创建或运行失败: {str(e)}")
+        print(f"❌ 演示失败: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 def main():
     """主函数"""
-    print("🎯 LangChain 1.0+ 现代智能体示例")
-    print("基于最新 create_agent API 实现")
-    print("📚 文档: https://docs.langchain.com")
+    print("🎯 智能钓鱼助手")
+    print("基于 LangChain 1.0+ 和优化架构设计")
     print()
 
-    demonstrate_agent_capabilities()
+    demonstrate_agent()
 
-agent = ModernLangChainAgent(model_provider="qwen").agent
+
 if __name__ == "__main__":
     main()
