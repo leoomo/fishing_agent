@@ -1,14 +1,41 @@
 #!/usr/bin/env python3
 """
 基于 LangChain 1.0+ 的现代智能钓鱼助手
-优化架构设计，集成了天气数据修复和LLM调用优化
+纯LangChain架构，无需额外包装层，提供简洁高效的智能体实现
 """
 
 import os
+import sys
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from dotenv import load_dotenv
+
+# 智能导入系统 - 兼容不同执行上下文
+import sys
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+
+# 添加src目录到Python路径
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+try:
+    # 优先尝试相对导入（用于单独运行）
+    from tools import get_all_tools, get_basic_tools, get_fishing_tools
+    _import_method = "relative"
+except ImportError:
+    # 回退到绝对导入（用于其他执行环境）
+    try:
+        from src.tools import get_all_tools, get_basic_tools, get_fishing_tools
+        _import_method = "absolute"
+    except ImportError:
+        # 最后回退 - 直接从tools模块导入
+        sys.path.insert(0, current_dir)
+        from tools import get_all_tools, get_basic_tools, get_fishing_tools
+        _import_method = "fallback"
 
 # 加载环境变量
 load_dotenv()
@@ -354,6 +381,8 @@ def create_optimized_fishing_agent(**kwargs) -> OptimizedFishingAgent:
     return OptimizedFishingAgent(**kwargs)
 
 
+
+
 def demonstrate_agent():
     """演示智能钓鱼助手功能"""
     print("🎯 智能钓鱼助手演示")
@@ -441,6 +470,13 @@ def demonstrate_agent():
         print(f"❌ 演示失败: {e}")
         import traceback
         traceback.print_exc()
+
+
+# 创建基于LangChain 1.0+的智能体实例
+agent = create_optimized_fishing_agent(
+    model_provider="qwen",
+    enable_logging=True
+).agent
 
 
 def main():

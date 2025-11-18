@@ -18,14 +18,14 @@ from datetime import datetime
 from functools import wraps
 
 # 导入服务
-from services.weather.enhanced_weather_service import EnhancedCaiyunWeatherService
-from services.weather.datetime_weather_service import DateTimeWeatherService
-from services.weather.hourly_weather_service_sync import HourlyWeatherService
+from src.services.weather.enhanced_weather_service import EnhancedCaiyunWeatherService
+from src.services.weather.datetime_weather_service import DateTimeWeatherService
+from src.services.weather.hourly_weather_service_sync import HourlyWeatherService
 
 # 导入分层日志系统
 try:
-    from services.logging.hierarchical_logger import HierarchicalLogger, hierarchical_log_function
-    from services.logging.hierarchical_logger_config import LogMode, default_hierarchical_config
+    from src.services.logging.hierarchical_logger import HierarchicalLogger, hierarchical_log_function
+    from src.services.logging.hierarchical_logger_config import LogMode, default_hierarchical_config
 except ImportError:
     # 如果分层日志系统不可用，使用基础日志
     HierarchicalLogger = None

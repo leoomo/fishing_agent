@@ -1,6 +1,6 @@
 # Fishing Agent - 智能钓鱼助手
 
-基于 LangChain 1.0+ 和 LangGraph 的智能钓鱼助手项目，专注于钓鱼时间推荐和天气分析。
+基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐和天气分析。
 
 > 🎣 智能分析天气条件，推荐最佳钓鱼时间
 
@@ -20,7 +20,7 @@
 - **⚡ 多级缓存**: 内存+文件缓存，90%+命中率
 - **🛡️ 同步稳定**: 完全同步架构，消除事件循环问题
 - **🧠 智能匹配**: 智能地名匹配和坐标解析
-- **🚀 LangGraph集成**: 完整支持LangGraph Studio，实时监控和调试
+- **🚀 纯LangChain架构**: 简洁高效的LangChain 1.0+实现，无额外包装层
 - **📝 异步中间件**: 意图分析、性能监控、日志记录
 
 ### 已修复的技术问题
@@ -103,10 +103,10 @@ python main.py
 ### 基础使用
 ```python
 # 导入智能体
-from src.agent import create_agent
+from src.agent import create_optimized_fishing_agent
 
 # 创建智能体实例
-agent = create_agent(model_provider="zhipu")
+agent = create_optimized_fishing_agent(model_provider="zhipu")
 
 # 钓鱼推荐查询
 response = agent.run("明天什么时段去杭州钓鱼比较好？")
@@ -157,9 +157,9 @@ fishing-agent/
 │   │   ├── base_agent.py         # 🤖 智能体基类
 │   │   └── registry.py           # 📊 注册器
 │   ├── tools/                    # 🛠️ 工具模块
-│   │   ├── langchain_weather_tools_sync.py  # 天气工具
-│   │   ├── fishing_analyzer_sync.py         # 钓鱼分析器
-│   │   └── enhanced_fishing_scorer.py       # 增强评分器
+│   │   ├── basic/                 # 基础工具
+│   │   ├── weather/               # 天气工具
+│   │   └── fishing/               # 钓鱼工具
 │   ├── services/                 # 🌐 服务层
 │   │   ├── service_manager.py    # 🔄 服务管理器
 │   │   ├── coordinate/           # 📍 坐标服务
