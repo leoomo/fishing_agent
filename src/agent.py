@@ -22,6 +22,7 @@ from langchain_core.tools import tool
 
 # 导入现有的同步工具
 from tools.langchain_weather_tools_sync import get_weather_tools_sync
+from tools.basic_tools import get_basic_tools
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -114,49 +115,19 @@ class OptimizedFishingAgent:
             raise
 
     def _setup_tools(self) -> List:
-        """设置工具集"""
-        # 基础工具
-        @tool
-        def get_current_time() -> str:
-            """获取当前时间和日期"""
-            now = datetime.now()
-            return f"当前时间: {now.strftime('%Y-%m-%d %H:%M:%S')} ({now.strftime('%A')})"
+        """设置工具集 - 现在使用独立的工具模块"""
+        # 基础工具（从独立文件导入）
+        basic_tools = get_basic_tools()
 
-        @tool
-        def calculate(expression: str) -> str:
-            """计算数学表达式"""
-            try:
-                allowed_chars = set('0123456789+-*/().** ')
-                if not all(c in allowed_chars for c in expression):
-                    return "错误: 表达式包含不允许的字符"
-
-                result = eval(expression)
-                return f"计算结果: {expression} = {result}"
-            except Exception as e:
-                return f"计算错误: {str(e)}"
-
-        @tool
-        def search_information(query: str) -> str:
-            """搜索信息（模拟功能）"""
-            knowledge_base = {
-                "钓鱼": "钓鱼是一种休闲娱乐活动，根据天气、水温、时间等因素选择合适的钓点和钓法。",
-                "路亚": "路亚钓鱼是一种假饵钓法，使用拟饵模仿鱼类食物，适合钓获掠食性鱼类。",
-                "鲈鱼": "鲈鱼是常见的路亚钓鱼目标鱼种，喜欢在水草边缘和障碍物附近活动。",
-                "天气": "天气对钓鱼有重要影响，多云、阴天和小雨天气通常更适合钓鱼。"
-            }
-
-            query_lower = query.lower()
-            for keyword, info in knowledge_base.items():
-                if keyword in query_lower:
-                    return f"搜索结果: {info}"
-
-            return f"关于 '{query}' 的信息: 可以尝试更具体的关键词搜索"
-
-        # 核心工具集 - 使用现有的天气工具
+        # 天气工具（现有模块）
         weather_tools = get_weather_tools_sync()
-        tools = [get_current_time, calculate, search_information] + weather_tools
+
+        # 合并工具集
+        tools = basic_tools + weather_tools
 
         logger.info(f"🛠️ 工具集配置完成: {len(tools)} 个工具")
+        logger.info(f"   基础工具: {len(basic_tools)} 个")
+        logger.info(f"   天气工具: {len(weather_tools)} 个")
         return tools
 
     def _setup_middleware(self) -> List:

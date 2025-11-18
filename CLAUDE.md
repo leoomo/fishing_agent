@@ -14,8 +14,10 @@ This is "fishing-agent" - an intelligent fishing assistant built with LangChain 
 - **Configuration Management**: `src/config/service_config.py` - Centralized configuration system
 
 ### 🎯 Key Modules
-- **Agent**: `src/agent.py` - Main LangChain 1.0+ intelligent agent with multi-model support
-- **Tools**: `src/tools/` - Weather, fishing analysis, and utility tools (synchronous architecture)
+- **Agent**: `src/agent.py` - Modern LangChain 1.0+ intelligent agent with refactored architecture
+- **Tools**: `src/tools/` - Modular tool system with independent tool modules
+  - `basic_tools.py` - Independent basic utility tools (time, math, search)
+  - `langchain_weather_tools_sync.py` - Weather and fishing analysis tools
 - **Services**: `src/services/` - Weather, coordinate, matching, and middleware services
 - **Core**: `src/core/` - Base classes, interfaces, and registry systems
 
@@ -96,7 +98,8 @@ src/
 
 ### Critical Files for Development
 - `src/services/service_manager.py` - Central service management
-- `src/tools/langchain_weather_tools_sync.py` - Main weather tools
+- `src/tools/basic_tools.py` - Independent basic utility tools (time, math, search)
+- `src/tools/langchain_weather_tools_sync.py` - Weather and fishing analysis tools
 - `src/tools/fishing_analyzer_sync.py` - Fishing analysis engine
 - `src/services/coordinate/amap_coordinate_service.py` - Coordinate service
 - `src/services/weather/enhanced_caiyun_weather_service.py` - Weather service
@@ -134,14 +137,17 @@ src/
 ### Common Import Patterns
 ```python
 # Agent creation
-from src.agent import create_agent
+from src.agent import create_optimized_fishing_agent
 
 # Service access
 from src.services.service_manager import ServiceManager
 sm = ServiceManager()
 weather_service = sm.get_weather_service()
 
-# Tool usage
+# Tool usage - Basic tools
+from src.tools.basic_tools import get_basic_tools, get_current_time, calculate
+
+# Tool usage - Weather tools
 from src.tools.langchain_weather_tools_sync import query_current_weather
 ```
 
