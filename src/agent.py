@@ -20,9 +20,8 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.tools import tool
 
-# 导入现有的同步工具
-from tools.langchain_weather_tools_sync import get_weather_tools_sync
-from tools.basic_tools import get_basic_tools
+# 导入新架构的工具系统
+from tools import get_all_tools, get_basic_tools, get_fishing_tools
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -115,19 +114,17 @@ class OptimizedFishingAgent:
             raise
 
     def _setup_tools(self) -> List:
-        """设置工具集 - 现在使用独立的工具模块"""
-        # 基础工具（从独立文件导入）
+        """设置工具集 - 使用新架构的工具系统"""
+        # 使用新架构获取所有工具
+        tools = get_all_tools()
+
+        # 获取分类统计
         basic_tools = get_basic_tools()
+        fishing_tools = get_fishing_tools()
 
-        # 天气工具（现有模块）
-        weather_tools = get_weather_tools_sync()
-
-        # 合并工具集
-        tools = basic_tools + weather_tools
-
-        logger.info(f"🛠️ 工具集配置完成: {len(tools)} 个工具")
+        logger.info(f"🛠️ 新架构工具集配置完成: {len(tools)} 个工具")
         logger.info(f"   基础工具: {len(basic_tools)} 个")
-        logger.info(f"   天气工具: {len(weather_tools)} 个")
+        logger.info(f"   钓鱼工具: {len(fishing_tools)} 个")
         return tools
 
     def _setup_middleware(self) -> List:
