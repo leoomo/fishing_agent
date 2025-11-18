@@ -6,7 +6,7 @@
 
 try:
     # 复用现有的钓鱼推荐工具
-    from ....langchain_weather_tools_sync import query_fishing_recommendation
+    from tools.langchain_weather_tools_sync import query_fishing_recommendation
 
     def get_advice_tools():
         """获取钓鱼意见工具"""

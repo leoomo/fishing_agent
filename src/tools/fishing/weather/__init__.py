@@ -7,7 +7,7 @@
 # 从现有模块导入天气工具
 try:
     # 复用现有的天气工具，然后重新组织和导出
-    from ....langchain_weather_tools_sync import (
+    from tools.langchain_weather_tools_sync import (
         query_current_weather,
         query_weather_by_date,
         query_weather_by_datetime,
