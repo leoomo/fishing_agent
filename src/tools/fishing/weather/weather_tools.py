@@ -8,9 +8,9 @@ from typing import Optional, Dict, Any
 from langchain_core.tools import tool
 import logging
 
-# 修复导入路径
-from ...weather_tool_sync import WeatherTool
-from ...fishing_analyzer_sync import find_best_fishing_time
+# 修复导入路径 - 使用core层统一导入
+from core.tools.weather_tool_core import WeatherTool
+from core.tools.fishing_tool_core import find_best_fishing_time
 
 logger = logging.getLogger(__name__)
 

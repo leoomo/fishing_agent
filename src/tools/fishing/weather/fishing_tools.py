@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from langchain_core.tools import tool
 import logging
 
-from ...fishing_analyzer_sync import find_best_fishing_time
+from core.tools.fishing_tool_core import find_best_fishing_time
 
 logger = logging.getLogger(__name__)
 

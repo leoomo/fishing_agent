@@ -27,9 +27,9 @@ try:
 except ImportError as e:
     print(f"警告: 无法导入新模块化天气工具: {e}")
 
-    # 回退到原始文件
+    # 回退到core层
     try:
-        from tools.langchain_weather_tools_sync import (
+        from ..core.tools.weather_tool_core import (
             query_current_weather,
             query_weather_by_date,
             query_weather_by_datetime,
@@ -38,7 +38,7 @@ except ImportError as e:
         )
 
         def get_weather_tools():
-            """获取所有天气工具（回退版本）"""
+            """获取所有天气工具（core版本）"""
             return [
                 query_current_weather,
                 query_weather_by_date,
@@ -48,7 +48,7 @@ except ImportError as e:
             ]
 
     except ImportError as fallback_e:
-        print(f"警告: 无法导入回退天气工具: {fallback_e}")
+        print(f"警告: 无法导入core天气工具: {fallback_e}")
 
         def get_weather_tools():
             """返回空列表，如果无法导入所有工具"""

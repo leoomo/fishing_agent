@@ -20,16 +20,16 @@ try:
 except ImportError as e:
     print(f"警告: 无法导入新模块化钓鱼推荐工具: {e}")
 
-    # 回退到原始文件
+    # 回退到core层
     try:
-        from tools.langchain_weather_tools_sync import query_fishing_recommendation
+        from ..core.tools.fishing_tool_core import query_fishing_recommendation
 
         def get_advice_tools():
-            """获取钓鱼意见工具（回退版本）"""
+            """获取钓鱼意见工具（core版本）"""
             return [query_fishing_recommendation]
 
     except ImportError as fallback_e:
-        print(f"警告: 无法导入回退钓鱼推荐工具: {fallback_e}")
+        print(f"警告: 无法导入core钓鱼推荐工具: {fallback_e}")
 
         def get_advice_tools():
             """返回空列表，如果无法导入所有工具"""
