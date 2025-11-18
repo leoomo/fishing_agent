@@ -20,7 +20,7 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.tools import tool
 
-# 导入新架构的工具系统
+# 导入简化的工具系统
 from tools import get_all_tools, get_basic_tools, get_fishing_tools
 
 # 配置日志
@@ -114,15 +114,15 @@ class OptimizedFishingAgent:
             raise
 
     def _setup_tools(self) -> List:
-        """设置工具集 - 使用新架构的工具系统"""
-        # 使用新架构获取所有工具
+        """设置工具集 - 使用简化的工具系统"""
+        # 使用简化架构获取所有工具
         tools = get_all_tools()
 
         # 获取分类统计
         basic_tools = get_basic_tools()
         fishing_tools = get_fishing_tools()
 
-        logger.info(f"🛠️ 新架构工具集配置完成: {len(tools)} 个工具")
+        logger.info(f"🛠️ 简化架构工具集配置完成: {len(tools)} 个工具")
         logger.info(f"   基础工具: {len(basic_tools)} 个")
         logger.info(f"   钓鱼工具: {len(fishing_tools)} 个")
         return tools
