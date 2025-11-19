@@ -190,13 +190,16 @@ class DateTimeWeatherService(EnhancedCaiyunWeatherService):
                     source_message = "超出天气预报范围（仅支持未来15天)"
                     return self._create_error_enhanced_weather_data(place_name, source_message), f"错误: {source_message}", WeatherServiceErrorCode.DATA_OUT_OF_RANGE
 
-            # 如果API调用失败，使用模拟数据
+            # 如果API调用失败，直接抛出异常，绝不生成虚假数据
             if weather_data is None:
-                weather_data = self._create_fallback_enhanced_weather_data(place_name, date_obj)
+                error_message = f"天气API调用失败，无法获取{place_name}的天气数据"
                 if not source_message:
-                    source_message = "模拟数据（API 不可用)"
+                    source_message = "API调用失败"
                 else:
-                    source_message = f"模拟数据（{source_message}))"
+                    source_message = f"API调用失败: {source_message}"
+
+                # 创建错误数据而不是虚假数据
+                return None, f"错误: {error_message} ({source_message})", WeatherServiceErrorCode.API_ERROR
 
             # 设置日期相关字段
             weather_data.datetime = date_obj
@@ -721,7 +724,7 @@ class DateTimeWeatherService(EnhancedCaiyunWeatherService):
         if hours > max_hours:
             logger.warning(f"请求的小时数({hours})超过API限制({max_hours}小时)，将获取{actual_hours}小时数据")
 
-        url = f"{self.base_url}/{self.api_key}/{longitude},{latitude}/hourly?hourlysteps={actual_hours}"
+        url = f"https://api.caiyunapp.com/v2.6/{self.api_key}/{longitude},{latitude}/hourly?hourlysteps={actual_hours}"
 
         try:
             response = requests.get(url, timeout=self.timeout)
@@ -824,36 +827,6 @@ class DateTimeWeatherService(EnhancedCaiyunWeatherService):
             source="错误"
         )
 
-    def _create_fallback_enhanced_weather_data(self, place_name: str,
-                                               date: datetime) -> EnhancedWeatherData:
-        """创建模拟的增强天气数据"""
-        import random
-
-        # 根据日期调整温度（简单模拟)
-        days_diff = (date.date() - datetime.now().date()).days
-        base_temp = 25.0
-        temp_adjustment = days_diff * 2  # 每天变化2度
-        temp = base_temp + temp_adjustment + random.uniform(-5, 5)
-
-        conditions = ["晴天", "多云", "阴天", "小雨", "中雨"]
-        condition = random.choice(conditions)
-
-        return EnhancedWeatherData(
-            temperature=round(temp, 1),
-            apparent_temperature=round(temp + random.uniform(-2, 2), 1),
-            humidity=random.randint(40, 80),
-            pressure=random.randint(1000, 1020),
-            wind_speed=random.uniform(0, 20),
-            wind_direction=random.randint(0, 360),
-            condition=condition,
-            description=f"{condition}，{temp:.1f}°C",
-            location=place_name,
-            timestamp=date.timestamp(),
-            source="模拟数据",
-            datetime=date,
-            date_str=date.strftime('%Y-%m-%d'),
-            data_type=WeatherDataType.CURRENT.value
-        )
 
     def _create_error_time_period_data(self, place_name: str, query: str,
                                        error_message: str) -> TimePeriodWeatherData:

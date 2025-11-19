@@ -14,6 +14,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, date
 import time
+from dateutil import parser as dateparser
 
 # 导入接口和配置
 try:
@@ -73,7 +74,7 @@ class EnhancedCaiyunWeatherService(IWeatherService):
 
         self.api_key = api_key
         self.timeout = timeout
-        self.base_url = "https://api.caiyunapi.com/v2.6"
+        self.base_url = "https://api.caiyunapp.com/v2.6"
 
         if not self.api_key:
             raise ValueError("未找到彩云天气API密钥，请在.env文件中配置CAIYUN_API_KEY")
@@ -310,25 +311,17 @@ class EnhancedCaiyunWeatherService(IWeatherService):
         return None
 
     def _call_caiyun_api(self, longitude: float, latitude: float) -> Optional[Dict]:
-        """调用彩云天气API获取实时天气"""
+        """调用彩云天气API获取实时天气 - 使用官方URL格式"""
         try:
+            # 使用官方URL格式：/{api_key}/{longitude},{latitude}/realtime
+            url = f"{self.base_url}/{self.api_key}/{longitude},{latitude}/realtime"
             params = {
-                'lat': latitude,
-                'lon': longitude,
-                'alert': 'true',
-                'dailysteps': '1',
-                'hourlysteps': '24'
-            }
-
-            headers = {
-                'X-Caiyun-API-Key': self.api_key,
-                'Content-Type': 'application/json'
+                'alert': 'true'
             }
 
             response = requests.get(
-                self.base_url,
+                url,
                 params=params,
-                headers=headers,
                 timeout=self.timeout
             )
 
@@ -348,41 +341,68 @@ class EnhancedCaiyunWeatherService(IWeatherService):
             return None
 
     def _call_caiyun_api_forecast(self, longitude: float, latitude: float) -> Optional[Dict]:
-        """调用彩云天气API获取预报数据"""
+        """调用彩云天气API获取预报数据 - 增强容错版本，支持hourly/daily双API降级"""
         try:
-            params = {
-                'lat': latitude,
-                'lon': latitude,
+            # 优先尝试hourly预报（提供更详细的小时级数据）
+            hourly_url = f"{self.base_url}/{self.api_key}/{longitude},{latitude}/hourly"
+            params_hourly = {
                 'alert': 'true',
-                'dailysteps': '7',  # 获取7天预报
-                'hourlysteps': '168'  # 获取168小时预报
+                'hourlysteps': '72'  # 获取72小时预报，完整覆盖3天钓鱼规划需求
             }
 
-            headers = {
-                'X-Caiyun-API-Key': self.api_key,
-                'Content-Type': 'application/json'
-            }
-
+            logger.debug(f"尝试hourly预报API: {hourly_url}")
             response = requests.get(
-                self.base_url,
-                params=params,
-                headers=headers,
+                hourly_url,
+                params=params_hourly,
                 timeout=self.timeout
             )
 
             if response.status_code == 200:
                 data = response.json()
                 if data.get('status') == 'ok':
+                    logger.info(f"✅ hourly预报API成功，获取72小时数据")
+                    # 标记数据来源，便于后续处理
+                    data.setdefault('result', {})['_data_source'] = 'hourly'
                     return data
                 else:
-                    logger.error(f"彩云API返回错误: {data}")
-                    return None
-            else:
-                logger.error(f"彩云API请求失败: {response.status_code}")
-                return None
+                    logger.warning(f"⚠️ hourly预报API返回错误: {data}")
 
+            # 如果hourly失败，降级到daily预报（提供日级数据，容错性更强）
+            logger.info(f"🔄 hourly API失败，降级使用daily预报API")
+            daily_url = f"{self.base_url}/{self.api_key}/{longitude},{latitude}/daily"
+            params_daily = {
+                'alert': 'true',
+                'dailysteps': '7'  # 获取7天预报
+            }
+
+            logger.debug(f"尝试daily预报API: {daily_url}")
+            response = requests.get(
+                daily_url,
+                params=params_daily,
+                timeout=self.timeout
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status') == 'ok':
+                    logger.info(f"✅ daily预报API成功，获取7天数据作为备选")
+                    # 标记数据来源
+                    data.setdefault('result', {})['_data_source'] = 'daily'
+                    return data
+                else:
+                    logger.warning(f"⚠️ daily预报API返回错误: {data}")
+
+            logger.error(f"❌ 所有预报API均失败，无法获取天气数据")
+            return None
+
+        except requests.exceptions.Timeout:
+            logger.error(f"⏰ 预报API请求超时 ({self.timeout}s)")
+            return None
+        except requests.exceptions.ConnectionError:
+            logger.error(f"🔌 预报API网络连接失败")
+            return None
         except Exception as e:
-            logger.error(f"调用彩云天气API失败: {e}")
+            logger.error(f"💥 调用彩云天气预报API发生未知错误: {e}")
             return None
 
     def _convert_to_weather_condition(self, weather_data: Dict) -> WeatherCondition:
@@ -401,16 +421,148 @@ class EnhancedCaiyunWeatherService(IWeatherService):
         )
 
     def _convert_to_weather_forecast(self, weather_data: Dict, days: int) -> List[WeatherForecast]:
-        """将彩云天气API数据转换为WeatherForecast列表"""
+        """将彩云天气API数据转换为WeatherForecast列表 - 智能处理hourly/daily数据源"""
         forecasts = []
-        daily = weather_data.get('result', {}).get('daily', {})
+        result = weather_data.get('result', {})
+
+        # 检测数据来源并选择相应的处理策略
+        data_source = result.get('_data_source', 'unknown')
+        logger.debug(f"处理预报数据，来源: {data_source}")
+
+        if data_source == 'hourly':
+            forecasts = self._convert_hourly_to_forecast(result, days)
+        elif data_source == 'daily':
+            forecasts = self._convert_daily_to_forecast(result, days)
+        else:
+            # 尝试自动检测数据格式
+            if result.get('hourly'):
+                logger.debug("自动检测为hourly数据格式")
+                forecasts = self._convert_hourly_to_forecast(result, days)
+            elif result.get('daily'):
+                logger.debug("自动检测为daily数据格式")
+                forecasts = self._convert_daily_to_forecast(result, days)
+            else:
+                logger.warning(f"无法识别的预报数据格式: {list(result.keys())}")
+                return []
+
+        logger.info(f"✅ 成功转换{len(forecasts)}天的预报数据 (数据源: {data_source})")
+        return forecasts
+
+    def _convert_hourly_to_forecast(self, result: Dict, days: int) -> List[WeatherForecast]:
+        """将hourly数据转换为预报格式"""
+        forecasts = []
+        hourly = result.get('hourly', {})
+
+        if not hourly or not hourly.get('temperature'):
+            logger.warning("hourly数据不完整")
+            return forecasts
+
+        # 获取小时级数据
+        temperatures = hourly.get('temperature', [])
+        skycon = hourly.get('skycon', [])
+        humidity = hourly.get('humidity', [])
+        wind = hourly.get('wind', [])
+
+        # 按天聚合小时数据
+        daily_data = {}
+
+        for i, temp_data in enumerate(temperatures[:days * 24]):  # 取前N天的小时数据
+            try:
+                # 安全处理timestamp格式（支持ISO 8601和Unix时间戳）
+                timestamp = temp_data['datetime']
+                if isinstance(timestamp, str):
+                    # 解析ISO 8601格式 (如: '2025-11-19T01:00+08:00')
+                    hour_date = dateparser.parse(timestamp).date()
+                else:
+                    # 假设是Unix时间戳
+                    hour_date = datetime.fromtimestamp(timestamp).date()
+
+                if hour_date not in daily_data:
+                    daily_data[hour_date] = {
+                        'temps': [],
+                        'conditions': [],
+                        'humidity': [],
+                        'wind_speed': []
+                    }
+
+                # 收集当天数据
+                daily_data[hour_date]['temps'].append(temp_data['value'])
+
+                if i < len(skycon):
+                    daily_data[hour_date]['conditions'].append(skycon[i]['value'])
+
+                if i < len(humidity):
+                    daily_data[hour_date]['humidity'].append(humidity[i]['value'])
+
+                if i < len(wind):
+                    daily_data[hour_date]['wind_speed'].append(wind[i]['speed'])
+
+            except Exception as e:
+                logger.debug(f"处理小时数据失败: {e}")
+                continue
+
+        # 转换为预报格式
+        for forecast_date, day_data in list(daily_data.items())[:days]:
+            try:
+                temps = day_data['temps']
+                if not temps:
+                    continue
+
+                # 计算当日温度统计
+                daily_high = max(temps)
+                daily_low = min(temps)
+                avg_temp = sum(temps) / len(temps)
+
+                # 获取主要天气状况（选择出现频率最高的）
+                conditions = day_data['conditions']
+                main_condition = max(set(conditions), key=conditions.count) if conditions else 'unknown'
+
+                # 计算平均湿度
+                avg_humidity = sum(day_data['humidity']) / len(day_data['humidity']) if day_data['humidity'] else 50.0
+
+                # 计算平均风速
+                avg_wind_speed = sum(day_data['wind_speed']) / len(day_data['wind_speed']) if day_data['wind_speed'] else 0.0
+
+                condition = WeatherCondition(
+                    temperature=avg_temp,
+                    humidity=avg_humidity,
+                    pressure=1013.0,  # hourly API通常不提供气压预报
+                    wind_speed=avg_wind_speed,
+                    wind_direction=0.0,
+                    weather=main_condition,
+                    visibility=10.0,
+                    timestamp=datetime.combine(forecast_date, datetime.min.time())
+                )
+
+                forecast = WeatherForecast(
+                    date=forecast_date,
+                    conditions=[condition],
+                    daily_high=daily_high,
+                    daily_low=daily_low,
+                    weather_summary=main_condition
+                )
+
+                forecasts.append(forecast)
+
+            except Exception as e:
+                logger.error(f"转换day数据失败: {e}")
+                continue
+
+        return forecasts
+
+    def _convert_daily_to_forecast(self, result: Dict, days: int) -> List[WeatherForecast]:
+        """将daily数据转换为预报格式"""
+        forecasts = []
+        daily = result.get('daily', {})
 
         if not daily or not daily.get('temperature'):
+            logger.warning("daily数据不完整")
             return forecasts
 
         # 获取每日数据
         temperatures = daily.get('temperature', [])
         skycon = daily.get('skycon', [])
+        humidity = daily.get('humidity', [])
 
         for i in range(min(days, len(temperatures) - 1)):
             try:
@@ -420,11 +572,15 @@ class EnhancedCaiyunWeatherService(IWeatherService):
                 daily_temp = temperatures[i]
                 daily_weather = skycon[i] if i < len(skycon) else {'value': 'unknown'}
 
-                # 创建简化的天气条件（这里可以进一步扩展）
+                # 获取湿度信息（如果有的话）
+                avg_humidity = 50.0  # 默认值
+                if i < len(humidity):
+                    avg_humidity = humidity[i].get('value', 50.0)
+
                 condition = WeatherCondition(
                     temperature=(daily_temp['max'] + daily_temp['min']) / 2,
-                    humidity=50.0,  # 彩云API可能不提供湿度预报
-                    pressure=1013.0,
+                    humidity=avg_humidity,
+                    pressure=1013.0,  # daily API通常不提供气压预报
                     wind_speed=0.0,
                     wind_direction=0.0,
                     weather=daily_weather.get('value', 'unknown'),
@@ -443,7 +599,7 @@ class EnhancedCaiyunWeatherService(IWeatherService):
                 forecasts.append(forecast)
 
             except Exception as e:
-                logger.error(f"转换预报数据失败: {e}")
+                logger.error(f"转换daily预报数据失败: {e}")
                 continue
 
         return forecasts

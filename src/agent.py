@@ -87,7 +87,7 @@ class OptimizedFishingAgent:
         # 初始化核心组件
         self.model = self._initialize_model()
         self.tools = self._setup_tools()
-        self.middleware = []  # 简化架构，空中间件列表
+        self.middleware = self._setup_middleware()  # 设置中间件
         self.agent = self._create_agent()
 
         logger.info(f"✅ 智能钓鱼助手初始化完成")
@@ -156,8 +156,56 @@ class OptimizedFishingAgent:
 
     def _setup_middleware(self) -> List:
         """设置中间件"""
-        # 暂时简化，不使用中间件
-        return []
+        logger.info("🔧 开始设置中间件...")
+        try:
+            # 智能导入中间件 - 使用与tools相同的模式
+            middleware_imported = False
+            AgentLoggingMiddleware = None
+
+            # 尝试相对导入（用于模块内部使用）
+            try:
+                from .services.middleware.logging_middleware import AgentLoggingMiddleware
+                middleware_imported = True
+                import_method = "relative"
+            except ImportError:
+                pass
+
+            # 尝试绝对导入（用于外部调用）
+            if not middleware_imported:
+                try:
+                    from src.services.middleware.logging_middleware import AgentLoggingMiddleware
+                    middleware_imported = True
+                    import_method = "absolute"
+                except ImportError:
+                    pass
+
+            # 直接尝试导入（最后回退）
+            if not middleware_imported:
+                try:
+                    import sys
+                    # 使用类级别的current_dir变量
+                    sys.path.insert(0, current_dir)
+                    from services.middleware.logging_middleware import AgentLoggingMiddleware
+                    middleware_imported = True
+                    import_method = "fallback"
+                except ImportError:
+                    pass
+
+            if middleware_imported:
+                # 创建日志中间件实例
+                middleware = [AgentLoggingMiddleware()]
+                logger.info(f"✅ 日志中间件已激活 ({import_method}) - LLM请求调用将被追踪")
+                return middleware
+            else:
+                raise ImportError("无法通过任何方式导入AgentLoggingMiddleware")
+
+        except ImportError as e:
+            logger.warning(f"⚠️ 无法导入日志中间件: {e}")
+            logger.info("📝 将以简化模式运行，无详细调用统计")
+            return []
+        except Exception as e:
+            logger.error(f"❌ 日志中间件初始化失败: {e}")
+            return []
 
     def _create_agent(self):
         """创建智能体"""
@@ -205,9 +253,9 @@ class OptimizedFishingAgent:
             "system_prompt": system_prompt
         }
 
-        # 简化架构，暂不使用中间件
-        # if self.middleware:
-        #     create_kwargs["middleware"] = self.middleware
+        # 启用中间件来记录LLM调用
+        if self.middleware:
+            create_kwargs["middleware"] = self.middleware
 
         agent = create_agent(**create_kwargs)
         logger.info("🤖 智能体创建完成")
@@ -251,6 +299,10 @@ class OptimizedFishingAgent:
                 response = str(result)
 
             logger.info(f"🤖 智能体回复: {len(response)} 字符")
+
+            # 显示LLM调用次数汇总
+            self._log_llm_summary()
+
             return response
 
         except Exception as e:
@@ -314,9 +366,93 @@ class OptimizedFishingAgent:
         # 获取智能中间件统计（如果可用）
         if self.middleware and len(self.middleware) > 0:
             for middleware in self.middleware:
-                if hasattr(middleware, 'get_unified_stats'):
+                # 优先使用get_performance_summary方法
+                if hasattr(middleware, 'get_performance_summary'):
+                    middleware_stats = middleware.get_performance_summary()
+                    stats["middleware_stats"] = middleware_stats
+                    break
+                elif hasattr(middleware, 'get_unified_stats'):
                     middleware_stats = middleware.get_unified_stats()
                     stats["middleware_stats"] = middleware_stats
+                    break
+
+        return stats
+
+    def _log_llm_summary(self):
+        """记录LLM调用次数汇总到控制台"""
+        if self.middleware and len(self.middleware) > 0:
+            for middleware in self.middleware:
+                if hasattr(middleware, 'get_performance_summary'):
+                    stats = middleware.get_performance_summary()
+
+                    # 提取关键统计数据
+                    model_calls = stats.get('total_model_calls', 0)
+                    tool_calls = stats.get('total_tool_calls', 0)
+                    total_duration = stats.get('total_duration_ms', 0)
+
+                    # 计算Token使用（如果有的话）
+                    token_summary = ""
+                    if 'model_calls_summary' in stats:
+                        model_stats = stats['model_calls_summary']
+                        total_input_tokens = model_stats.get('total_input_tokens', 0)
+                        total_output_tokens = model_stats.get('total_output_tokens', 0)
+                        total_tokens = total_input_tokens + total_output_tokens
+
+                        if total_tokens > 0:
+                            avg_response_time = model_stats.get('avg_response_time_ms', 0)
+                            token_summary = f" | Tokens: {total_tokens:,} (输入:{total_input_tokens:,}/输出:{total_output_tokens:,}) | 平均响应: {avg_response_time:.1f}ms"
+
+                    # 显示汇总信息
+                    print("\n" + "="*60)
+                    print(f"🤖 LLM调用汇总: {model_calls}次 | 工具调用: {tool_calls}次 | 总耗时: {total_duration:.1f}ms{token_summary}")
+                    print("="*60)
+
+                    break
+
+    def get_llm_stats(self) -> Dict[str, Any]:
+        """
+        获取详细的LLM调用统计信息
+
+        Returns:
+            包含LLM调用详细统计的字典
+        """
+        stats = {
+            "enabled": bool(self.middleware),
+            "model_provider": self.model_provider
+        }
+
+        if self.middleware and len(self.middleware) > 0:
+            for middleware in self.middleware:
+                if hasattr(middleware, 'get_performance_summary'):
+                    detailed_stats = middleware.get_performance_summary()
+
+                    # 基础统计
+                    stats.update({
+                        "session_id": detailed_stats.get('session_id'),
+                        "total_model_calls": detailed_stats.get('total_model_calls', 0),
+                        "total_tool_calls": detailed_stats.get('total_tool_calls', 0),
+                        "total_duration_ms": detailed_stats.get('total_duration_ms', 0),
+                        "success_rate": detailed_stats.get('success_rate', 0),
+                        "total_errors": detailed_stats.get('total_errors', 0)
+                    })
+
+                    # 模型调用详细统计
+                    if 'model_calls_summary' in detailed_stats:
+                        model_stats = detailed_stats['model_calls_summary']
+                        stats["model_details"] = model_stats
+                        stats["total_input_tokens"] = model_stats.get('total_input_tokens', 0)
+                        stats["total_output_tokens"] = model_stats.get('total_output_tokens', 0)
+                        stats["avg_response_time_ms"] = model_stats.get('avg_response_time_ms', 0)
+                        stats["tokens_per_second"] = model_stats.get('tokens_per_second', 0)
+
+                    # 工具调用统计
+                    if 'tool_performance' in detailed_stats:
+                        stats["tool_performance"] = detailed_stats['tool_performance']
+
+                    # 性能追踪器统计
+                    if 'performance_tracker' in detailed_stats:
+                        stats["performance_metrics"] = detailed_stats['performance_tracker']
+
                     break
 
         return stats
