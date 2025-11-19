@@ -1,44 +1,34 @@
-# 配置管理模块
+# 智能钓鱼助手 - 环境变量配置指南
 
-提供统一的服务配置管理，支持环境变量配置和类型安全的配置访问。
+提供统一的环境变量配置管理，支持API密钥配置、伦理约束设置和类型安全的配置访问。
 
-## 📋 配置模块
+## 📋 配置说明
 
-### 核心配置类
-- **文件**: `service_config.py`
-- **功能**: 集中管理所有服务的配置参数
-- **特性**: 环境变量支持、类型注解、默认值、验证机制
+### 核心配置文件
+- **文件**: `.env` (项目根目录)
+- **功能**: 集中管理所有API密钥和配置参数
+- **特性**: 环境变量支持、安全存储、配置验证
+- **简化架构**: 无服务管理器复杂层，直接环境变量访问
 
-## 🏗️ 配置架构
+## 🏗️ 简化配置架构
 
-### 配置层次结构
+### 配置层次结构（简化版）
 
 ```
-ServiceConfig
-├── coordinate_service (CoordinateServiceConfig)
-│   ├── enabled: bool
-│   ├── auto_init: bool
-│   ├── health_check_interval: int
-│   ├── max_retries: int
-│   ├── timeout: int
-│   └── database (DatabaseConfig)
-│       ├── path: str
-│       ├── cache_enabled: bool
-│       └── cache_ttl: int
-├── weather_service (WeatherServiceConfig)
-│   ├── enabled: bool
-│   ├── api_key: Optional[str]
-│   ├── timeout: int
-│   ├── max_retries: int
-│   ├── cache_enabled: bool
-│   └── cache_ttl: int
-└── logging (LoggingConfig)
-    ├── level: str
-    ├── debug_logging: bool
-    ├── log_to_file: bool
-    ├── log_file_path: str
-    ├── max_log_size: int
-    └── backup_count: int
+.env 文件（根目录）
+├── LLM 提供商配置
+│   ├── ANTHROPIC_AUTH_TOKEN (智谱AI)
+│   ├── ANTHROPIC_API_KEY (Claude)
+│   └── OPENAI_API_KEY (OpenAI GPT)
+├── 外部API配置
+│   ├── CAIYUN_API_KEY (彩云天气)
+│   └── AMAP_API_KEY (高德地图)
+├── 伦理约束配置
+│   ├── FISHING_ENABLE_FAKE_DATA=false (禁用虚假数据)
+│   └── WEATHER_FALLBACK_ENABLED=true (降级机制)
+└── 应用配置
+    ├── DEBUG_LOGGING (调试日志)
+    └── LOG_LEVEL (日志级别)
 ```
 
 ## 🔧 环境变量配置

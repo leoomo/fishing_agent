@@ -1,537 +1,77 @@
-# API 文档
+# 智能钓鱼助手 - API 文档
 
-本文档描述了 LangChain 智能体项目中的主要 API 接口和使用方法。
+本文档描述了智能钓鱼助手简化架构后的主要 API 接口和使用方法，基于 LangChain 1.0+ 同步架构设计。
 
 ## 🔄 版本说明
 
-### 同步版本架构 (v2.1.0+) ⭐ **推荐**
+### 简化架构版本 (v2.2.0+) ⭐ **当前版本**
 
-项目已完全重构为**同步版本**，提供更好的稳定性和易用性：
+项目已完全重构为**极简架构**，从75+文件简化到5个核心文件，提供更好的开发体验：
 
-- ✅ **完全同步**: 移除所有 `async/await` 代码，消除事件循环复杂性
-- ✅ **稳定性提升**: 彻底解决 "Event loop is closed" 错误
-- ✅ **简化架构**: 标准Python函数调用，易于理解和维护
-- ✅ **同步API客户端**: 使用 `requests` 替代 `aiohttp`，性能稳定
-- ✅ **工具集成完善**: LangChain工具完全同步化，支持智能体调用
-
-### 异步版本 (已弃用)
-
-为保持向后兼容性，保留原有的异步版本文件，但不推荐在新项目中使用。
+- ✅ **架构简化**: 从75+文件简化到5个核心文件
+- ✅ **同步设计**: 全面采用同步架构，消除异步调用问题
+- ✅ **直接调用**: 统一API客户端，无中间层
+- ✅ **伦理约束**: 绝不编造虚假数据，诚实报告系统状态
+- ✅ **LangChain 1.0+**: 使用最新@tool装饰器和create_agent API
 
 ---
 
 ## 目录
 
-- [核心架构 API](#核心架构-api)
-  - [ITool 接口](#itool-接口)
-  - [BaseTool 基类](#basetool-基类)
-  - [ToolRegistry 注册器](#toolregistry-注册器)
-- [新工具模块 API](#新工具模块-api)
-  - [TimeTool 时间工具](#timetool-时间工具)
-  - [MathTool 数学工具](#mathtool-数学工具)
-  - [WeatherTool 天气工具](#weathertool-天气工具)
-  - [SearchTool 搜索工具](#searchtool-搜索工具)
-- [智能体 API](#智能体-api)
-- [天气服务 API](#天气服务-api)
-  - [EnhancedCaiyunWeatherService (增强版)](#enhancedcaiyunweatherservice-类-)
-  - [CaiyunWeatherService (基础版)](#caiyunweatherservice-类)
-- [地名匹配 API](#地名匹配-api)
-- [缓存系统 API](#缓存系统-api)
-- [数据库 API](#数据库-api)
-- [同步工具函数 API](#同步工具函数-api-)
-  - [LangChain 同步工具](#langchain-同步工具)
-  - [同步天气工具](#同步天气工具)
-  - [同步钓鱼分析工具](#同步钓鱼分析工具)
+- [核心 API](#核心-api)
+  - [create_optimized_fishing_agent](#create_optimized_fishing_agent)
+  - [OptimizedFishingAgent 类](#optimizedfishingagent-类)
+- [工具 API](#工具-api)
+  - [天气工具 (weather_tools.py)](#天气工具-weather_toolspy)
+  - [钓鱼工具 (fishing_tools.py)](#钓鱼工具-fishing_toolspy)
+  - [基础工具 (basic_tools.py)](#基础工具-basic_toolspy)
+- [工具类 API](#工具类-api)
+  - [API 客户端 (api_client.py)](#api-客户端-api_clientpy)
+  - [坐标工具 (coordinate_utils.py)](#坐标工具-coordinate_utilspy)
+  - [缓存系统 (cache.py)](#缓存系统-cachepy)
 - [环境配置](#环境配置)
 - [错误处理](#错误处理)
 - [使用示例](#使用示例)
 
-## 核心架构 API
+## 核心 API
 
-### ITool 接口
+### create_optimized_fishing_agent
 
-所有工具必须实现的核心接口，定义了工具的基本规范。
-
-```python
-from abc import ABC, abstractmethod
-from typing import Any, Dict
-from dataclasses import dataclass
-
-@dataclass
-class ToolMetadata:
-    """工具元数据"""
-    name: str
-    description: str
-    version: str
-    author: str
-    tags: List[str]
-    dependencies: List[str]
-
-@dataclass
-class ToolResult:
-    """工具执行结果"""
-    success: bool
-    data: Any = None
-    error: str = None
-    metadata: Dict[str, Any] = None
-
-class ITool(ABC):
-    """工具接口"""
-
-    @property
-    @abstractmethod
-    def metadata(self) -> ToolMetadata:
-        """工具元数据"""
-        pass
-
-    @abstractmethod
-    async def execute(self, **kwargs) -> ToolResult:
-        """执行工具操作"""
-        pass
-
-    @abstractmethod
-    def validate_input(self, **kwargs) -> bool:
-        """验证输入参数"""
-        pass
-
-### 同步工具接口 (Sync Version)
-
-**新增同步版本的工具接口**，提供更简单易用的API：
+创建优化的智能钓鱼助手，基于 LangChain 1.0+ 架构。
 
 ```python
-@dataclass
-class SyncToolResult:
-    """同步工具执行结果"""
-    success: bool
-    data: Any = None
-    error: str = None
-    metadata: Dict[str, Any] = None
+from agent import create_optimized_fishing_agent
 
-class ISyncTool(ABC):
-    """同步工具接口"""
+# 创建智能体（默认使用智谱AI）
+agent = create_optimized_fishing_agent()
 
-    @property
-    @abstractmethod
-    def metadata(self) -> ToolMetadata:
-        """工具元数据"""
-        pass
+# 指定模型提供商
+agent_zhipu = create_optimized_fishing_agent(model_provider="zhipu")
+agent_claude = create_optimized_fishing_agent(model_provider="anthropic")
+agent_openai = create_optimized_fishing_agent(model_provider="openai")
 
-    @abstractmethod
-    def execute(self, **kwargs) -> SyncToolResult:
-        """执行工具操作 (同步版本)"""
-        pass
-
-    @abstractmethod
-    def validate_input(self, **kwargs) -> bool:
-        """验证输入参数"""
-        pass
-```
-```
-
-### BaseTool 基类
-
-提供工具的基础实现，包含通用功能。
-
-```python
-from core.base_tool import BaseTool
-
-class MyTool(BaseTool):
-    def __init__(self, config: Optional[Dict] = None, logger: Optional[logging.Logger] = None):
-        super().__init__(config, logger)
-        # 初始化工具特定配置
-
-    @property
-    def metadata(self) -> ToolMetadata:
-        return ToolMetadata(
-            name="my_tool",
-            description="我的自定义工具",
-            version="1.0.0",
-            author="author",
-            tags=["custom"],
-            dependencies=[]
-        )
-
-    def validate_input(self, **kwargs) -> bool:
-        # 验证输入参数
-        return True
-
-    async def _execute(self, **kwargs) -> ToolResult:
-        # 实现具体功能
-        return ToolResult(success=True, data="result")
-```
-
-### ToolRegistry 注册器
-
-工具注册和管理系统，支持动态注册和发现。
-
-```python
-from core.registry import ToolRegistry
-
-# 创建注册器
-registry = ToolRegistry()
-
-# 注册工具实例
-registry.register("my_tool", MyTool())
-
-# 注册工具类（延迟实例化）
-registry.register_class(MyTool)
-
-# 获取工具
-tool = registry.get_tool("my_tool")
-result = await tool.execute(param="value")
-
-# 列出所有工具
-tools = registry.list_tools()
-print(tools)  # ["my_tool", ...]
-```
-
-## 新工具模块 API
-
-### TimeTool 时间工具
-
-提供时间查询、计算、格式化和时区转换功能。
-
-#### 初始化
-
-```python
-from tools import TimeTool
-
-# 使用默认配置
-time_tool = TimeTool()
-
-# 使用自定义配置
-config = {
-    "default_timezone": "Asia/Shanghai",
-    "precision": 10
-}
-time_tool = TimeTool(config)
-```
-
-#### 主要方法
-
-##### async execute(operation: str, **kwargs) -> ToolResult
-
-执行时间操作。
-
-**支持的操作：**
-- `current_time` - 获取当前时间
-- `add_time` - 时间加法
-- `subtract_time` - 时间减法
-- `format_time` - 时间格式化
-- `convert_timezone` - 时区转换
-
-**示例：**
-```python
-# 获取当前时间
-result = await time_tool.execute(operation='current_time')
-if result.success:
-    data = result.data
-    print(f"当前时间: {data['formatted']} ({data['timezone']})")
-
-# 时间加法
-result = await time_tool.execute(
-    operation='add_time',
-    base_time='2024-01-01T10:00:00',
-    days=1,
-    hours=2
+# 带配置的创建
+agent = create_optimized_fishing_agent(
+    model_provider="zhipu",
+    enable_logging=True,
+    timeout=60
 )
-print(f"新时间: {result.data['formatted']}")
-
-# 时间格式化
-result = await time_tool.execute(
-    operation='format_time',
-    time_input='2024-01-01T10:30:45',
-    format_type='full'
-)
-print(f"格式化: {result.data['formatted']}")
-```
-
-### MathTool 数学工具
-
-提供数学计算和统计功能。
-
-#### 初始化
-
-```python
-from tools import MathTool
-
-# 使用默认配置
-math_tool = MathTool()
-
-# 使用自定义配置
-config = {
-    "precision": 15,
-    "enable_cache": True
-}
-math_tool = MathTool(config)
-```
-
-#### 主要方法
-
-##### async execute(operation: str, **kwargs) -> ToolResult
-
-执行数学操作。
-
-**支持的操作：**
-- `add`, `subtract`, `multiply`, `divide` - 基本运算
-- `power`, `sqrt` - 幂运算和平方根
-- `sin`, `cos`, `tan` - 三角函数
-- `log` - 对数函数
-- `factorial` - 阶乘
-- `average`, `median`, `mode` - 统计函数
-- `std_dev` - 标准差
-- `random` - 随机数生成
-- `round` - 四舍五入
-
-**示例：**
-```python
-# 基本运算
-result = await math_tool.execute(operation='add', a=10, b=5)
-print(result.data['formatted'])  # 10 + 5 = 15
-
-# 高级函数
-result = await math_tool.execute(operation='sqrt', number=144)
-print(result.data['formatted'])  # √144 = 12.0
-
-# 三角函数
-result = await math_tool.execute(operation='sin', angle=30, degrees=True)
-print(result.data['formatted'])  # sin(30°) = 0.5
-
-# 统计计算
-numbers = [1, 2, 3, 4, 5]
-result = await math_tool.execute(operation='average', numbers=numbers)
-print(f"平均值: {result.data['result']}")
-
-# 随机数
-result = await math_tool.execute(operation='random', min_val=1, max_val=100)
-print(f"随机数: {result.data['result']}")
-```
-
-### WeatherTool 天气工具
-
-提供天气查询和预报功能。
-
-#### 初始化
-
-```python
-from tools import WeatherTool
-
-# 使用默认配置
-weather_tool = WeatherTool()
-
-# 使用自定义配置
-config = {
-    "api_key": "your-api-key",
-    "timeout": 15,
-    "cache_ttl": 1800,
-    "max_results": 10
-}
-weather_tool = WeatherTool(config)
-```
-
-#### 主要方法
-
-##### async execute(operation: str, **kwargs) -> ToolResult
-
-执行天气操作。
-
-**支持的操作：**
-- `current_weather` - 获取当前天气
-- `get_coordinates` - 获取位置坐标
-- `get_weather` - 获取天气信息（兼容方法）
-- `batch_weather` - 批量天气查询
-- `search_locations` - 位置搜索
-- `weather_forecast` - 天气预报
-- `weather_by_date` - 指定日期天气查询（带错误码）
-- `weather_by_datetime` - 时间段天气查询（带错误码）
-- `hourly_forecast` - 小时级天气预报（带错误码）
-
-**示例：**
-```python
-# 获取当前天气
-result = await weather_tool.execute(
-    operation='current_weather',
-    location='北京'
-)
-if result.success:
-    data = result.data
-    print(f"北京天气: {data['condition']}")
-    print(f"温度: {data['temperature']}°C")
-    print(f"湿度: {data['humidity']}%")
-
-# 批量查询
-cities = ['北京', '上海', '广州']
-result = await weather_tool.execute(
-    operation='batch_weather',
-    locations=cities
-)
-for item in result.data['results']:
-    if item['success']:
-        weather = item['data']
-        print(f"{item['location']}: {weather['condition']} {weather['temperature']}°C")
-
-# 位置搜索
-result = await weather_tool.execute(
-    operation='search_locations',
-    query='北',
-    limit=5
-)
-for match in result.data['matches']:
-    print(f"{match['name']}: ({match['longitude']}, {match['latitude']})")
-
-# 天气预报
-result = await weather_tool.execute(
-    operation='weather_forecast',
-    location='深圳',
-    days=3
-)
-for day in result.data['forecast']:
-    print(f"第{day['day']}天: {day['condition']} {day['temperature']}°C")
-
-# 错误码系统使用
-result = await weather_tool.execute(
-    operation='weather_by_date',
-    location='北京',
-    date='2024-12-25'
-)
-
-if result.success:
-    print("✅ 请求成功")
-    if result.data:
-        print(f"温度: {result.data.get('temperature', 'N/A')}°C")
-else:
-    print(f"❌ 请求失败: {result.error}")
-
-    # 获取详细错误信息
-    if result.metadata:
-        error_code = result.metadata.get("error_code")
-        status_message = result.metadata.get("status_message")
-        description = result.metadata.get("description")
-
-        print(f"错误码: {error_code}")
-        print(f"状态: {status_message}")
-        print(f"描述: {description}")
-```
-
-### SearchTool 搜索工具
-
-提供网络搜索和知识检索功能。
-
-#### 初始化
-
-```python
-from tools import SearchTool
-
-# 使用默认配置
-search_tool = SearchTool()
-
-# 使用自定义配置
-config = {
-    "max_results": 20,
-    "timeout": 10,
-    "cache_ttl": 3600
-}
-search_tool = SearchTool(config)
-```
-
-#### 主要方法
-
-##### async execute(operation: str, **kwargs) -> ToolResult
-
-执行搜索操作。
-
-**支持的操作：**
-- `web_search` - 网络搜索
-- `knowledge_search` - 知识库搜索
-- `search_by_category` - 按类别搜索
-- `get_definition` - 获取定义
-- `get_features` - 获取特性
-- `get_applications` - 获取应用
-- `search_similar` - 相似搜索
-- `advanced_search` - 高级搜索
-
-**示例：**
-```python
-# 知识库搜索
-result = await search_tool.execute(
-    operation='knowledge_search',
-    query='python'
-)
-if result.success:
-    data = result.data
-    print(f"找到 {data['total_results']} 个结果")
-    for item in data['results']:
-        print(f"- {item['topic']}: {item['description']}")
-
-# 网络搜索
-result = await search_tool.execute(
-    operation='web_search',
-    query='人工智能',
-    max_results=5
-)
-for item in result.data['results']:
-    print(f"- {item['title']}: {item['snippet']}")
-
-# 按类别搜索
-result = await search_tool.execute(
-    operation='search_by_category',
-    category='technology'
-)
-for item in result.data['results']:
-    print(f"- {item['topic']}: {item['description']}")
-
-# 获取定义
-result = await search_tool.execute(
-    operation='get_definition',
-    topic='langchain',
-    category='technology'
-)
-if result.success:
-    print(f"LangChain定义: {result.data['definition']}")
-
-# 相似搜索
-result = await search_tool.execute(
-    operation='search_similar',
-    query='ai',
-    threshold=0.3
-)
-for item in result.data['results']:
-    print(f"- {item['topic']} (相似度: {item['similarity']:.2f})")
-
-# 高级搜索
-filters = {
-    'max_results': 10,
-    'categories': ['technology', 'science'],
-    'include_web': True,
-    'include_knowledge': True
-}
-result = await search_tool.execute(
-    operation='advanced_search',
-    query='机器学习',
-    filters=filters
-)
-```
-
-## 智能体 API
-
-### ModernLangChainAgent 类
-
-主要的智能体类，提供基于 LangChain 1.0+ 的对话和工具调用功能。
-
-#### 初始化
-
-```python
-from modern_langchain_agent import ModernLangChainAgent
-
-# 创建智能体实例
-agent = ModernLangChainAgent(model_provider="zhipu")
 ```
 
 **参数：**
 - `model_provider` (str): 模型提供商，支持：
   - `"zhipu"` - 智谱AI GLM-4.6 (默认)
-  - `"anthropic"` - Anthropic Claude
-  - `"openai"` - OpenAI GPT
+  - `"anthropic"` - Anthropic Claude Sonnet 4.5
+  - `"openai"` - OpenAI GPT-4o-mini
+- `enable_logging` (bool, 可选): 启用详细日志记录
+- `timeout` (int, 可选): 超时时间（秒）
+
+**返回：**
+- `OptimizedFishingAgent`: 智能钓鱼助手实例
+
+### OptimizedFishingAgent 类
+
+简化的智能钓鱼助手类，提供核心功能。
 
 #### 方法
 
@@ -547,992 +87,771 @@ agent = ModernLangChainAgent(model_provider="zhipu")
 
 **示例：**
 ```python
-agent = ModernLangChainAgent("zhipu")
-response = agent.run("现在几点了？")
-print(response)  # 输出当前时间信息
+from agent import create_optimized_fishing_agent
+
+agent = create_optimized_fishing_agent()
+response = agent.run("明天余杭区钓鱼怎么样？")
+print(response)
 ```
 
-##### interactive_chat()
+##### health_check() -> dict
 
-启动交互式聊天模式，支持持续对话。
+执行系统健康检查，验证所有组件状态。
+
+**返回：**
+- `dict`: 健康检查结果，包含：
+  - `status`: 系统状态 ("healthy", "degraded", "unhealthy")
+  - `checks`: 各组件详细状态
+  - `timestamp`: 检查时间
 
 **示例：**
 ```python
-agent = ModernLangChainAgent("zhipu")
-agent.interactive_chat()
+health = agent.health_check()
+print(f"系统状态: {health['status']}")
+
+for check, status in health['checks'].items():
+    print(f"  {check}: {status}")
 ```
 
-## 天气服务 API
+##### get_llm_stats() -> dict
 
-### EnhancedCaiyunWeatherService 类 🌟
-
-**增强版彩云天气服务**，支持全国3,142+地区覆盖、智能地名匹配和高性能缓存。
-
-#### 初始化
-
-```python
-from enhanced_weather_service import EnhancedCaiyunWeatherService
-
-# 自动初始化所有组件
-service = EnhancedCaiyunWeatherService()
-
-# 手动指定组件
-from enhanced_place_matcher import EnhancedPlaceMatcher
-from weather_cache import WeatherCache
-matcher = EnhancedPlaceMatcher()
-cache = WeatherCache()
-service = EnhancedCaiyunWeatherService(matcher=matcher, cache=cache)
-```
-
-#### 方法
-
-##### get_weather(place_name: str) -> tuple[WeatherData, str]
-
-获取任意地区的天气信息，支持智能地名匹配。
-
-**参数：**
-- `place_name` (str): 地区名称，支持多种格式：
-  - 精确地名: "北京市"、"余杭区"、"景德镇"
-  - 别称简称: "京"、"沪"、"羊城"
-  - 模糊匹配: "杭州"、"余杭"
-  - 层级匹配: "浙江省杭州市"
+获取大语言模型调用统计信息。
 
 **返回：**
-- `tuple[WeatherData, str]`:
-  - `WeatherData`: 天气数据对象
-  - `str`: 数据来源和匹配信息
-
-**支持的地区类型：**
-- **省级**: 19个省级行政区 (100%覆盖)
-- **地级**: 290+个地级市 (主要城市全覆盖)
-- **县级**: 2,800+个县区 (95%+覆盖)
-- **乡镇级**: 部分重要乡镇
-
-**匹配策略优先级：**
-1. 精确匹配
-2. 别名匹配 (105+个常见别名)
-3. 层级匹配
-4. 模糊匹配
-5. 包含匹配
+- `dict`: 统计信息，包含：
+  - `total_model_calls`: 总调用次数
+  - `successful_calls`: 成功次数
+  - `failed_calls`: 失败次数
+  - `success_rate`: 成功率
 
 **示例：**
 ```python
-service = EnhancedCaiyunWeatherService()
-
-# 基础城市查询
-weather_data, source = service.get_weather("北京")
-print(f"温度: {weather_data.temperature}°C")
-
-# 智能别名匹配
-weather_data, source = service.get_weather("京")  # 自动匹配到北京市
-
-# 县级地区查询
-weather_data, source = service.get_weather("余杭区")
-print(f"余杭区天气: {weather_data.condition}")
-
-# 地级市查询
-weather_data, source = service.get_weather("景德镇")
-print(f"景德镇天气: {weather_data.temperature}°C")
-
-# 模糊匹配
-weather_data, source = service.get_weather("杭州")  # 可能匹配杭州市或相关地区
+stats = agent.get_llm_stats()
+print(f"模型调用统计: {stats['total_model_calls']}次")
+print(f"成功率: {stats['success_rate']:.1f}%")
 ```
 
-##### get_weather_batch(place_names: list[str]) -> list[tuple[WeatherData, str]]
+## 工具 API
 
-批量获取多个地区的天气信息。
+### 天气工具 (weather_tools.py)
 
-**参数：**
-- `place_names` (list[str]): 地区名称列表
-
-**返回：**
-- `list[tuple[WeatherData, str]]`: 天气数据列表
-
-**示例：**
-```python
-service = EnhancedCaiyunWeatherService()
-cities = ["北京", "上海", "广州", "深圳", "杭州"]
-weather_results = service.get_weather_batch(cities)
-
-for city, (weather_data, source) in zip(cities, weather_results):
-    print(f"{city}: {weather_data.temperature}°C, {weather_data.condition}")
-```
-
-#### 性能特性
-
-- **匹配成功率**: 82.1%
-- **平均查询时间**: 1.19ms
-- **缓存加速**: 2000倍性能提升（缓存命中时）
-- **坐标覆盖**: 100%（所有地区都有经纬度）
-
-### CaiyunWeatherService 类
-
-彩云天气 API 服务类，提供实时天气数据获取功能。
-
-#### 初始化
-
-```python
-from weather_service import CaiyunWeatherService
-
-# 自动从环境变量读取 API 密钥
-service = CaiyunWeatherService()
-
-# 手动指定 API 密钥
-service = CaiyunWeatherService(api_key="your-api-key")
-```
-
-#### 方法
-
-##### get_weather(city: str) -> tuple[WeatherData, str]
-
-获取指定城市的天气信息。
-
-**参数：**
-- `city` (str): 城市名称，支持中文城市名
-
-**返回：**
-- `tuple[WeatherData, str]`:
-  - `WeatherData`: 天气数据对象
-  - `str`: 数据来源说明
-
-**WeatherData 对象属性：**
-- `temperature` (float): 温度（摄氏度）
-- `apparent_temperature` (float): 体感温度（摄氏度）
-- `humidity` (int): 湿度（百分比）
-- `pressure` (float): 气压（hPa）
-- `wind_speed` (float): 风速（km/h）
-- `wind_direction` (float): 风向（度）
-- `condition` (str): 天气状况描述
-
-**示例：**
-```python
-service = CaiyunWeatherService()
-weather_data, source = service.get_weather("北京")
-
-print(f"温度: {weather_data.temperature}°C")
-print(f"天气: {weather_data.condition}")
-print(f"数据来源: {source}")
-```
-
-##### get_coordinates(city: str) -> tuple[float, float] | None
-
-获取城市的地理坐标。
-
-**参数：**
-- `city` (str): 城市名称
-
-**返回：**
-- `tuple[float, float] | None`: (经度, 纬度) 或 None（如果城市不存在）
-
-**支持的城市：**
-北京、上海、广州、深圳、杭州、成都、西安、武汉、南京、重庆、天津、苏州、青岛、大连、厦门
-
-### 便捷函数
-
-##### get_weather_info(city: str) -> str
-
-获取格式化的天气信息字符串。
-
-**参数：**
-- `city` (str): 城市名称
-
-**返回：**
-- `str`: 格式化的天气信息
-
-**示例：**
-```python
-from weather_service import get_weather_info
-
-weather_info = get_weather_info("上海")
-print(weather_info)
-# 输出: 上海天气: 多云，温度 25.0°C (体感 26.0°C)，湿度 65%，风速 8.5km/h
-# 数据来源: 实时数据（彩云天气 API）
-```
-
-## 工具函数 API
-
-### LangChain 工具装饰器
-
-项目中使用 `@tool` 装饰器定义了以下工具函数：
-
-#### get_current_time() -> str
-
-获取当前时间和日期。
-
-**返回：**
-- `str`: 格式化的时间信息
-
-**示例：**
-```python
-from modern_langchain_agent import get_current_time
-
-time_info = get_current_time.invoke({})
-print(time_info)
-# 输出: 当前时间: 2025-11-03 18:52:53 (星期日)
-```
-
-#### calculate(expression: str) -> str
-
-计算数学表达式。
-
-**参数：**
-- `expression` (str): 要计算的数学表达式
-
-**返回：**
-- `str`: 计算结果
-
-**支持的操作：**
-- 基本运算: `+`, `-`, `*`, `/`
-- 括号: `()`
-- 幂运算: `**`
-
-**示例：**
-```python
-from modern_langchain_agent import calculate
-
-result = calculate.invoke({"expression": "123 * 456 + 789"})
-print(result)
-# 输出: 计算结果: 123 * 456 + 789 = 56088
-```
-
-#### get_weather(city: str) -> str
-
-查询城市天气信息（LangChain 工具版本）。
-
-**参数：**
-- `city` (str): 城市名称
-
-**返回：**
-- `str`: 天气信息字符串
-
-**示例：**
-```python
-from modern_langchain_agent import get_weather
-
-weather = get_weather.invoke({"city": "北京"})
-print(weather)
-# 输出: 北京天气: 晴天，温度 15.2°C (体感 13.8°C)，湿度 45%，风速 12.3km/h
-```
-
-#### search_information(query: str) -> str
-
-搜索信息（模拟搜索功能）。
-
-**参数：**
-- `query` (str): 搜索查询词
-
-**返回：**
-- `str`: 搜索结果
-
-**知识库包含：**
-- LangChain 框架介绍
-- Python 编程语言
-- 人工智能相关概念
-- 机器学习基础
-- 大语言模型介绍
-
-## 环境配置
-
-### 必需的环境变量
-
-```bash
-# 智谱AI API 密钥（默认使用）
-ANTHROPIC_AUTH_TOKEN=your-zhipu-api-token-here
-
-# 彩云天气 API 密钥（用于真实天气数据）
-CAIYUN_API_KEY=your-caiyun-api-key-here
-```
-
-### 可选的环境变量
-
-```bash
-# Anthropic Claude API 密钥
-ANTHROPIC_API_KEY=your-anthropic-api-key-here
-
-# OpenAI GPT API 密钥
-OPENAI_API_KEY=your-openai-api-key-here
-
-# LangSmith 调试和追踪（可选）
-LANGSMITH_API_KEY=your-langsmith-api-key
-LANGSMITH_PROJECT=langchain-agent-demo
-LANGSMITH_TRACING=true
-```
-
-### 环境变量加载
-
-项目使用 `python-dotenv` 自动加载 `.env` 文件中的环境变量：
-
-```python
-from dotenv import load_dotenv
-load_dotenv()
-```
-
-## 错误处理
-
-### 智能体错误
-
-常见错误类型和处理方法：
-
-```python
-try:
-    agent = ModernLangChainAgent("zhipu")
-    response = agent.run("用户输入")
-except ValueError as e:
-    if "API 密钥" in str(e):
-        print("请检查 API 密钥配置")
-    else:
-        print(f"配置错误: {e}")
-except Exception as e:
-    print(f"智能体运行错误: {e}")
-```
-
-### 天气服务错误
-
-天气服务具有完善的错误处理机制：
-
-1. **API 密钥未配置**: 自动使用模拟数据
-2. **网络连接失败**: 自动降级到模拟数据
-3. **城市不存在**: 返回模拟数据并说明原因
-4. **API 响应异常**: 解析失败时使用备用数据
-
-#### 错误码系统
-
-WeatherTool 集成了完整的错误码系统，提供详细的请求状态反馈：
-
-```python
-from tools.weather_tool import WeatherTool
-
-weather_tool = WeatherTool()
-
-# 执行带错误码的查询
-result = await weather_tool.execute(
-    operation='hourly_forecast',
-    location='北京',
-    hours=24
-)
-
-# 检查结果和错误码
-if result.success:
-    print("✅ 请求成功")
-else:
-    print(f"❌ 请求失败: {result.error}")
-
-# 获取详细错误信息
-if result.metadata:
-    error_code = result.metadata.get("error_code")
-    status_message = result.metadata.get("status_message")
-    description = result.metadata.get("description")
-
-    print(f"错误码: {error_code}")
-    print(f"状态: {status_message}")
-    print(f"描述: {description}")
-
-    # 根据错误码采取不同策略
-    if error_code == 6:
-        print("💡 建议: 检查输入参数")
-    elif error_code == 7:
-        print("💡 建议: 检查日期格式")
-    elif error_code == 9:
-        print("💡 建议: 使用有效日期范围")
-```
-
-#### 错误码类型
-
-| 错误码 | 类型 | 描述 | 处理建议 |
-|--------|------|------|----------|
-| 0, 1 | 成功 | API成功或缓存命中 | 正常使用数据 |
-| 2, 4 | API问题 | API错误或网络超时 | 使用模拟数据 |
-| 3, 5, 9 | 数据问题 | 坐标未找到、解析失败、超出范围 | 使用模拟数据 |
-| 6, 7, 8 | 参数问题 | 参数错误、日期错误、时间段错误 | 检查输入参数 |
-
-```python
-from weather_service import get_weather_info
-
-# 即使 API 不可用也能正常工作
-weather_info = get_weather_info("不存在的城市")
-# 输出包含友好的错误提示和模拟数据
-```
-
-**详细文档**: 参见 [天气服务错误码系统指南](WEATHER_ERROR_CODES_GUIDE.md)
-
-## 使用示例
-
-### 完整的智能体对话示例
-
-```python
-import os
-from dotenv import load_dotenv
-from modern_langchain_agent import ModernLangChainAgent
-
-# 加载环境变量
-load_dotenv()
-
-def main():
-    # 创建智能体
-    agent = ModernLangChainAgent(model_provider="zhipu")
-
-    # 对话示例
-    conversations = [
-        "现在几点了？",
-        "帮我计算 123 * 456",
-        "北京天气怎么样？",
-        "介绍一下 LangChain",
-        "上海和北京哪个更暖和？"
-    ]
-
-    for user_input in conversations:
-        print(f"用户: {user_input}")
-        response = agent.run(user_input)
-        print(f"智能体: {response}\n")
-
-if __name__ == "__main__":
-    main()
-```
-
-### 天气服务独立使用示例
-
-```python
-from weather_service import CaiyunWeatherService, get_weather_info
-
-def demo_weather_service():
-    # 使用便捷函数
-    print("=== 便捷函数示例 ===")
-    cities = ["北京", "上海", "广州"]
-
-    for city in cities:
-        weather_info = get_weather_info(city)
-        print(weather_info)
-
-    # 使用服务类
-    print("\n=== 服务类示例 ===")
-    service = CaiyunWeatherService()
-
-    weather_data, source = service.get_weather("深圳")
-    print(f"深圳天气详情:")
-    print(f"  温度: {weather_data.temperature}°C")
-    print(f"  体感: {weather_data.apparent_temperature}°C")
-    print(f"  湿度: {weather_data.humidity}%")
-    print(f"  风速: {weather_data.wind_speed} km/h")
-    print(f"  天气: {weather_data.condition}")
-    print(f"  来源: {source}")
-
-if __name__ == "__main__":
-    demo_weather_service()
-```
-
-### 集成测试示例
-
-```python
-import os
-import sys
-from dotenv import load_dotenv
-
-# 添加项目路径
-sys.path.insert(0, os.path.dirname(__file__))
-
-from weather_service import get_weather_info
-from modern_langchain_agent import get_weather
-
-def test_integration():
-    """测试智能体与天气服务的集成"""
-
-    # 测试直接天气服务调用
-    print("1. 直接天气服务调用:")
-    direct_result = get_weather_info("北京")
-    print(f"   结果: {direct_result}")
-
-    # 测试通过 LangChain 工具调用
-    print("\n2. 通过 LangChain 工具调用:")
-    tool_result = get_weather.invoke({"city": "北京"})
-    print(f"   结果: {tool_result}")
-
-    # 验证结果一致性
-    print("\n3. 结果一致性验证:")
-    if "北京" in direct_result and "北京" in tool_result:
-        print("   ✅ 两种调用方式都返回了北京的天气信息")
-    else:
-        print("   ❌ 结果不一致")
-
-if __name__ == "__main__":
-    load_dotenv()
-    test_integration()
-```
-
-## API 限制和注意事项
-
-### 智谱AI API
-- 需要有效的 API Token
-- 有调用频率限制
-- 支持中文对话优化
-
-### 彩云天气 API
-- 免费版本有调用次数限制
-- 支持的天气数据类型：实时天气
-- 建议在生产环境中配置付费计划
-
-### 最佳实践
-1. **错误处理**: 始终使用 try-catch 包装 API 调用
-2. **环境变量**: 不要在代码中硬编码 API 密钥
-3. **降级策略**: 天气服务内置了模拟数据降级机制
-4. **性能考虑**: 避免频繁的 API 调用，考虑缓存机制
-
-## 地名匹配 API
-
-### EnhancedPlaceMatcher 类
-
-智能地名匹配系统，支持多种匹配策略和105+个常见别名。
-
-#### 初始化
-
-```python
-from enhanced_place_matcher import EnhancedPlaceMatcher
-
-matcher = EnhancedPlaceMatcher()
-matcher.connect()
-```
-
-#### 方法
-
-##### match_place(place_name: str) -> dict
-
-匹配地名并返回详细信息。
-
-**参数：**
-- `place_name` (str): 要匹配的地名
-
-**返回：**
-- `dict`: 匹配结果，包含以下字段：
-  - `code`: 地区代码
-  - `name`: 地区名称
-  - `level`: 行政级别 (1=省级, 2=地级, 3=县级)
-  - `level_name`: 级别名称
-  - `longitude`: 经度
-  - `latitude`: 纬度
-  - `province`: 省份
-  - `city`: 城市
-  - `district`: 区县
-
-**示例：**
-```python
-matcher = EnhancedPlaceMatcher()
-matcher.connect()
-
-# 精确匹配
-result = matcher.match_place("北京市")
-print(f"匹配结果: {result['name']} ({result['level_name']})")
-
-# 别名匹配
-result = matcher.match_place("京")  # 匹配到北京市
-print(f"别名匹配: {result['name']}")
-
-# 县级匹配
-result = matcher.match_place("余杭区")
-print(f"县级匹配: {result['province']} - {result['city']} - {result['district']}")
-```
-
-#### 匹配策略
-
-1. **精确匹配**: 完全匹配地名
-2. **别名匹配**: 使用预定义别名映射
-3. **模糊匹配**: 使用相似度算法
-4. **层级匹配**: 检查省-市-县层级关系
-5. **包含匹配**: 检查地名包含关系
-
-#### 性能指标
-
-- **匹配成功率**: 82.1%
-- **平均响应时间**: 1.19ms
-- **支持别名数**: 105+个
-- **覆盖地区数**: 3,142+个
-
-## 缓存系统 API
-
-### WeatherCache 类
-
-多级缓存系统，提供内存和文件持久化缓存。
-
-#### 初始化
-
-```python
-from weather_cache import WeatherCache
-
-# 使用默认配置
-cache = WeatherCache()
-
-# 自定义配置
-cache = WeatherCache(
-    memory_size=1000,      # 内存缓存大小
-    file_size=5000,        # 文件缓存大小
-    ttl=3600              # 生存时间（秒）
-)
-```
-
-#### 方法
-
-##### get(key: str) -> any
-
-从缓存中获取数据。
-
-##### set(key: str, value: any, ttl: int = None) -> None
-
-向缓存中存储数据。
-
-##### clear() -> None
-
-清空所有缓存。
-
-#### 示例
-
-```python
-cache = WeatherCache()
-
-# 存储天气数据
-cache.set("北京天气", weather_data, ttl=1800)  # 30分钟过期
-cached_data = cache.get("北京天气")
-
-# 批量操作
-cache.set("上海天气", shanghai_weather)
-cache.set("广州天气", guangzhou_weather)
-
-# 清空缓存
-cache.clear()
-```
-
-## 数据库 API
-
-### CityCoordinateDB 类
-
-城市坐标数据库查询类，支持中国行政区划坐标查询。
-
-#### 初始化
-
-```python
-from city_coordinate_db import CityCoordinateDB
-
-db = CityCoordinateDB("src/data/admin_divisions.db")
-```
-
-#### 方法
-
-##### get_coordinates(place_name: str) -> tuple[float, float]
-
-获取地区的经纬度坐标。
-
-**参数：**
-- `place_name` (str): 地区名称
-
-**返回：**
-- `tuple[float, float]`: (经度, 纬度)
-
-**示例：**
-```python
-db = CityCoordinateDB()
-
-# 获取北京坐标
-lng, lat = db.get_coordinates("北京")
-print(f"北京坐标: ({lng}, {lat})")
-
-# 获取余杭区坐标
-lng, lat = db.get_coordinates("余杭区")
-print(f"余杭区坐标: ({lng}, {lat})")
-```
-
-##### search_places(keyword: str) -> list[dict]
-
-搜索包含关键词的地区。
-
-**参数：**
-- `keyword` (str): 搜索关键词
-
-**返回：**
-- `list[dict]`: 匹配的地区列表
-
-## 工具函数 API
-
-### 快速开始函数
-
-```python
-# 快速天气查询（使用增强服务）
-from enhanced_weather_service import get_weather_info_quick
-
-weather_data, source = get_weather_info_quick("北京")
-print(f"天气: {weather_data.condition}, 温度: {weather_data.temperature}°C")
-
-# 初始化全国数据库
-from national_region_database import main
-main()  # 一键初始化全国地区数据库
-
-# 验证系统状态
-from verify_national_integration import main
-main()  # 验证所有组件集成状态
-```
-
-## 同步工具函数 API
-
-### LangChain 同步工具
-
-**推荐使用** - 同步版本的LangChain工具，稳定可靠，无异步问题。
-
-#### 导入和初始化
-
-```python
-from tools.langchain_weather_tools_sync import (
-    query_current_weather,
-    query_weather_by_date,
-    query_hourly_forecast,
-    query_fishing_recommendation,
-    get_weather_tools_sync,
-    create_weather_tool_system_prompt
-)
-
-# 直接使用工具（推荐）
-result = query_current_weather.invoke({'place': '北京'})
-print(result)
-
-# 或获取工具列表集成到智能体
-weather_tools = get_weather_tools_sync()
-system_prompt = create_weather_tool_system_prompt()
-```
+基于彩云天气API的真实天气数据工具。
 
 #### 主要工具函数
 
-##### query_current_weather(place: str) -> str
+##### get_current_weather(location: str) -> str
 
-查询当前天气信息（同步版本）。
+获取指定位置的当前天气信息。
 
 **参数：**
-- `place` (str): 地点名称
+- `location` (str): 位置名称
 
 **返回：**
 - `str`: 格式化的天气信息
 
 **示例：**
 ```python
-from tools.langchain_weather_tools_sync import query_current_weather
+from tools.weather_tools import get_current_weather
 
-# 稳定的同步调用，无事件循环问题
-result = query_current_weather.invoke({'place': '杭州'})
-print(result)
-# 输出: 📍 杭州当前天气:
-# 🌡️ 温度: 22.0°C
-# 🌤️ 天气: 多云
-# 💧 湿度: 65%
-# 🌬️ 风速: 8.5km/h
+weather = get_current_weather("北京")
+print(weather)
+# 输出: 🌤️ 北京当前天气: 晴朗，温度 12.5°C，湿度 65.8%，风速 3.2m/s
 ```
 
-##### query_fishing_recommendation(location: str, date: str) -> str
+##### get_weather_forecast(location: str, days: int) -> str
 
-智能钓鱼推荐（同步版本）。
+获取天气预报（1-7天）。
 
 **参数：**
-- `location` (str): 地点名称
-- `date` (str): 日期，支持多种格式：
-  - 标准格式: "2024-12-25"
-  - 相对日期: "tomorrow", "yesterday", "today"
-  - 中文相对日期: "明天", "昨天", "今天", "后天"
-  - 数字+时间: "2天后", "3天前"
+- `location` (str): 位置名称
+- `days` (int): 预报天数 (1-7)
 
 **返回：**
-- `str`: 钓鱼推荐分析结果
+- `str`: 格式化的天气预报信息
 
 **示例：**
 ```python
-from tools.langchain_weather_tools_sync import query_fishing_recommendation
+from tools.weather_tools import get_weather_forecast
 
-# 支持多种日期格式
-queries = [
-    {'location': '富阳区', 'date': '后天'},     # ✅ 相对日期
-    {'location': '余杭区', 'date': 'tomorrow'}, # ✅ 英文相对日期
-    {'location': '北京', 'date': '2024-12-25'}, # ✅ 标准日期格式
-]
-
-for query in queries:
-    result = query_fishing_recommendation.invoke(query)
-    print(result)
+forecast = get_weather_forecast("杭州", 3)
+print(forecast)
+# 输出详细的3天天气预报
 ```
 
-##### query_weather_by_date(place: str, date: str) -> str
+##### get_weather_by_date(location: str, date_str: str) -> str
 
-指定日期天气查询（同步版本）。
+获取指定日期的天气信息。
 
 **参数：**
-- `place` (str): 地点名称
-- `date` (str): 日期，支持同上多种格式
+- `location` (str): 位置名称
+- `date_str` (str): 日期字符串，支持多种格式：
+  - 标准格式: "2024-12-25"
+  - 相对日期: "tomorrow", "yesterday", "today"
+  - 中文相对日期: "明天", "后天", "昨天"
 
 **返回：**
 - `str`: 指定日期的天气信息
 
 **示例：**
 ```python
-from tools.langchain_weather_tools_sync import query_weather_by_date
+from tools.weather_tools import get_weather_by_date
 
-# 历史天气查询
-result = query_weather_by_date.invoke({
-    'place': '上海',
-    'date': '2024-11-01'
-})
+# 获取明天天气
+tomorrow_weather = get_weather_by_date("上海", "tomorrow")
+print(tomorrow_weather)
 
-# 未来天气查询
-result = query_weather_by_date.invoke({
-    'place': '广州',
-    'date': '后天'
-})
+# 获取指定日期天气
+christmas_weather = get_weather_by_date("北京", "2024-12-25")
+print(christmas_weather)
 ```
 
-##### query_hourly_forecast(place: str, hours: int = 24) -> str
+### 钓鱼工具 (fishing_tools.py)
 
-小时级天气预报（同步版本）。
+基于真实天气数据的智能钓鱼推荐工具，严格遵循伦理约束。
+
+#### 主要工具函数
+
+##### query_fishing_recommendation(location: str, date: str) -> str
+
+智能钓鱼推荐，基于7因子评分算法。
 
 **参数：**
-- `place` (str): 地点名称
-- `hours` (int): 预报小时数，默认24小时
+- `location` (str): 位置名称
+- `date` (str): 日期，支持多种格式（同天气工具）
 
 **返回：**
-- `str`: 小时级天气预报信息
+- `str`: 专业的钓鱼推荐分析结果
+
+**特性：**
+- 7因子评分算法（温度、天气、风力、气压、湿度、季节、时间）
+- 伦理约束：绝不编造虚假数据
+- 数据验证：严格验证天气数据完整性
 
 **示例：**
 ```python
-from tools.langchain_weather_tools_sync import query_hourly_forecast
+from tools.fishing_tools import query_fishing_recommendation
 
-# 查询未来12小时预报
-result = query_hourly_forecast.invoke({
-    'place': '深圳',
-    'hours': 12
-})
+# 基本查询
+recommendation = query_fishing_recommendation("余杭区", "明天")
+print(recommendation)
 
-print(result)
-# 输出详细的小时级预报数据，包括温度、天气、风速等
+# 输出示例:
+# 🎣 余杭区钓鱼推荐分析 (2024-12-25)
+#
+# 📊 综合评分: 78/100 (良好)
+#
+# ⏰ 推荐时段:
+#   - 早上 6:00-8:00 ⭐⭐⭐⭐⭐
+#   - 傍晚 18:00-20:00 ⭐⭐⭐⭐
+#
+# 🌤️ 天气条件:
+#   - 温度: 12°C ✅ 适宜
+#   - 天气: 多云转晴 ✅ 良好
+#   - 风力: 2级 ✅ 微风
+#   - 湿度: 65% ✅ 适中
 ```
 
-#### 工具集合
+##### analyze_fishing_conditions(weather_data: dict) -> str
 
-##### get_weather_tools_sync() -> List[BaseTool]
+分析钓鱼条件。
 
-获取所有同步天气工具的列表。
+**参数：**
+- `weather_data` (dict): 天气数据字典
 
 **返回：**
-- `List[BaseTool]`: LangChain工具对象列表
+- `str`: 钓鱼条件分析结果
 
 **示例：**
 ```python
-from tools.langchain_weather_tools_sync import get_weather_tools_sync
+from tools.fishing_tools import analyze_fishing_conditions
 
-# 获取所有同步工具
-tools = get_weather_tools_sync()
-
-# 集成到智能体
-from langchain.agents import create_agent
-
-agent = create_agent(
-    model="claude-sonnet-4-5-20250929",
-    tools=tools,
-    system_prompt="你是一个天气助手，可以帮助用户查询天气信息。"
-)
-```
-
-### 同步天气工具
-
-#### WeatherTool 同步版本
-
-```python
-from tools.weather_tool_sync import WeatherTool
-
-# 创建同步天气工具
-weather_tool = WeatherTool()
-
-# 执行操作（同步调用）
-result = weather_tool.execute(
-    operation='current_weather',
-    location='北京'
-)
-
-if result.success:
-    data = result.data
-    print(f"温度: {data.get('temperature', 'N/A')}°C")
-else:
-    print(f"查询失败: {result.error}")
-```
-
-**支持的操作：**
-- `current_weather` - 当前天气
-- `weather_by_date` - 指定日期天气
-- `hourly_forecast` - 小时级预报
-- `batch_weather` - 批量查询
-
-### 同步钓鱼分析工具
-
-#### FishingAnalyzer 同步版本
-
-```python
-from tools.fishing_analyzer_sync import find_best_fishing_time, parse_date_input
-
-# 日期解析（增强版）
-date_input = "后天"
-parsed_date = parse_date_input(date_input)
-print(f"解析结果: {parsed_date.strftime('%Y-%m-%d')}")
-
-# 钓鱼时间推荐
-result = find_best_fishing_time(
-    location='富阳区',
-    date='后天'  # 支持所有日期格式
-)
-
-print(result)  # 输出JSON格式的详细分析结果
-```
-
-#### Enhanced Fishing Scorer
-
-```python
-from tools.enhanced_fishing_scorer import EnhancedFishingScorer
-
-# 创建增强评分器
-scorer = EnhancedFishingScorer()
-
-# 分析钓鱼条件
-conditions = {
-    'datetime': '2024-11-06T14:00:00',
-    'temperature': 22.0,
-    'condition': '阴',
-    'wind_speed': 8.0,
-    'humidity': 75.0,
-    'pressure': 1008.0
+weather_data = {
+    "temperature": 15.0,
+    "condition": "多云",
+    "wind_speed": 2.5,
+    "humidity": 70.0,
+    "pressure": 1013.0
 }
 
-from datetime import datetime
-date = datetime(2024, 11, 6, 14, 0)
-score = scorer.calculate_comprehensive_score(conditions, historical_data, date)
-
-print(f"综合评分: {score.overall:.1f}/100")
-print(f"7因子评分: 温度{score.temperature:.1f}, 天气{score.weather:.1f}, 风力{score.wind:.1f}, 气压{score.pressure:.1f}, 湿度{score.humidity:.1f}, 季节{score.seasonal:.1f}, 月相{score.lunar:.1f}")
+analysis = analyze_fishing_conditions(weather_data)
+print(analysis)
 ```
 
-### 同步API客户端
+##### calculate_fish_activity(weather_data: dict) -> str
 
-#### CaiyunApiClient 同步版本
+计算鱼类活跃度。
+
+**参数：**
+- `weather_data` (dict): 天气数据字典
+
+**返回：**
+- `str`: 鱼类活跃度分析结果
+
+**示例：**
+```python
+from tools.fishing_tools import calculate_fish_activity
+
+activity = calculate_fish_activity(weather_data)
+print(activity)
+```
+
+### 基础工具 (basic_tools.py)
+
+提供基础功能的工具集。
+
+#### 主要工具函数
+
+##### get_current_time() -> str
+
+获取当前时间。
+
+**返回：**
+- `str`: 格式化的当前时间信息
+
+**示例：**
+```python
+from tools.basic_tools import get_current_time
+
+time_info = get_current_time()
+print(time_info)
+# 输出: 当前时间: 2025-11-19 20:30:15 (星期二)
+```
+
+##### calculate(expression: str) -> str
+
+计算数学表达式。
+
+**参数：**
+- `expression` (str): 数学表达式
+
+**返回：**
+- `str`: 计算结果
+
+**支持的操作：**
+- 基本运算: +, -, *, /
+- 括号: ()
+- 幂运算: **
+
+**示例：**
+```python
+from tools.basic_tools import calculate
+
+result = calculate("15 * 8 + 32")
+print(result)
+# 输出: 计算结果: 15 * 8 + 32 = 152
+```
+
+##### get_location_coordinates(location: str) -> str
+
+获取位置坐标。
+
+**参数：**
+- `location` (str): 位置名称
+
+**返回：**
+- `str`: 坐标信息
+
+**示例：**
+```python
+from tools.basic_tools import get_location_coordinates
+
+coords = get_location_coordinates("北京")
+print(coords)
+# 输出: 北京 的坐标: 经度 116.407394, 纬度 39.904211
+```
+
+##### get_fishing_season_advice(location: str) -> str
+
+获取季节性钓鱼建议。
+
+**参数：**
+- `location` (str): 位置名称
+
+**返回：**
+- `str`: 季节钓鱼建议
+
+**示例：**
+```python
+from tools.basic_tools import get_fishing_season_advice
+
+advice = get_fishing_season_advice("杭州")
+print(advice)
+```
+
+## 工具类 API
+
+### API 客户端 (api_client.py)
+
+统一的API客户端，提供天气和地理编码服务。
+
+#### WeatherAPIClient 类
+
+彩云天气API客户端。
+
+##### 主要方法
 
 ```python
-from services.weather.clients.caiyun_api_client_sync import CaiyunApiClient
+from utils.api_client import get_weather_client
 
-# 创建同步API客户端
-client = CaiyunApiClient(api_key="your-api-key")
+# 获取客户端实例
+client = get_weather_client()
 
-# 同步调用，无需await
-result = client.get_realtime_weather(116.4074, 39.9042)
+# 获取实时天气
+weather_data = client.get_realtime_weather(latitude=39.904211, longitude=116.407394)
 
-if result['success']:
-    print(f"温度: {result['result']['temperature']}°C")
-else:
-    print(f"错误: {result['error']}")
+# 获取72小时预报
+forecast_data = client.get_hourly_forecast(latitude=39.904211, longitude=116.407394, hours=72)
 ```
 
-**优势：**
-- 使用 `requests` 库替代 `aiohttp`
-- 内置重试机制和错误处理
-- 线程安全的会话管理
-- 无事件循环问题
+**WeatherAPIClient 方法：**
+
+##### get_realtime_weather(lat: float, lon: float) -> dict
+
+获取实时天气数据。
+
+**参数：**
+- `lat` (float): 纬度
+- `lon` (float): 经度
+
+**返回：**
+- `dict`: 天气数据，包含：
+  - `temperature`: 温度
+  - `condition`: 天气状况
+  - `humidity`: 湿度
+  - `wind_speed`: 风速
+  - `pressure`: 气压
+  - `data_quality`: 数据质量标识
+
+##### get_hourly_forecast(lat: float, lon: float, hours: int = 72) -> dict
+
+获取小时级天气预报。
+
+**参数：**
+- `lat` (float): 纬度
+- `lon` (float): 经度
+- `hours` (int): 预报小时数（默认72小时）
+
+**返回：**
+- `dict`: 预报数据，包含：
+  - `hourly_temperature`: 小时温度数组
+  - `hourly_condition`: 小时天气状况数组
+  - `forecast_hours`: 预报小时数
+
+#### GeocodingAPIClient 类
+
+高德地图API客户端。
+
+```python
+from utils.api_client import get_geocoding_client
+
+# 获取客户端实例
+client = get_geocoding_client()
+
+# 地理编码
+coords = client.geocode("北京市")
+print(f"坐标: {coords}")  # (纬度, 经度)
+```
+
+**GeocodingAPIClient 方法：**
+
+##### geocode(address: str) -> tuple[float, float] | None
+
+地理编码获取坐标。
+
+**参数：**
+- `address` (str): 地址
+
+**返回：**
+- `tuple[float, float] | None`: (纬度, 经度) 或 None
+
+### 坐标工具 (coordinate_utils.py)
+
+坐标处理工具。
+
+#### 主要函数
+
+```python
+from utils.coordinate_utils import get_coordinates, get_location_from_coordinates
+
+# 获取坐标
+coords = get_coordinates("杭州")
+print(f"杭州坐标: {coords}")
+
+# 逆地理编码
+location = get_location_from_coordinates(30.2741, 120.1551)
+print(f"位置: {location}")
+```
+
+##### get_coordinates(location: str) -> tuple[float, float]
+
+获取位置坐标。
+
+**参数：**
+- `location` (str): 位置名称
+
+**返回：**
+- `tuple[float, float]`: (纬度, 经度)
+
+##### get_location_from_coordinates(lat: float, lon: float) -> str | None
+
+从坐标获取位置名称。
+
+**参数：**
+- `lat` (float): 纬度
+- `lon` (float): 经度
+
+**返回：**
+- `str | None`: 位置名称
+
+### 缓存系统 (cache.py)
+
+简化的缓存系统，支持内存和文件缓存。
+
+#### SimpleCache 类
+
+```python
+from utils.cache import cache
+
+# 设置缓存
+cache.set("weather_beijing", weather_data, ttl=600)
+
+# 获取缓存
+cached_data = cache.get("weather_beijing")
+
+# 获取统计信息
+stats = cache.get_stats()
+print(f"内存缓存: {stats['memory_cache_count']}项")
+print(f"文件缓存: {stats['file_cache_count']}项")
+
+# 清空缓存
+cache.clear()
+```
+
+##### 主要方法
+
+###### get(key: str) -> any
+
+获取缓存值。
+
+**参数：**
+- `key` (str): 缓存键
+
+**返回：**
+- `any`: 缓存值或 None
+
+###### set(key: str, value: any, ttl: int = 3600) -> None
+
+设置缓存值。
+
+**参数：**
+- `key` (str): 缓存键
+- `value` (any): 缓存值
+- `ttl` (int): 生存时间（秒）
+
+###### clear() -> None
+
+清空所有缓存。
+
+###### get_stats() -> dict
+
+获取缓存统计信息。
+
+**返回：**
+- `dict`: 统计信息
+
+## 环境配置
+
+### 必需的环境变量
+
+```bash
+# .env 文件
+# LLM 提供商
+ANTHROPIC_AUTH_TOKEN=your-zhipu-api-token-here
+# 或
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+# 或
+OPENAI_API_KEY=your-openai-api-key-here
+
+# 外部API
+CAIYUN_API_KEY=your-caiyun-api-key-here
+AMAP_API_KEY=your-amap-api-key-here
+
+# 系统配置
+FISHING_ENABLE_FAKE_DATA=false
+DEBUG_LOGGING=false
+```
+
+### 环境变量说明
+
+| 变量名 | 说明 | 必需 | 示例值 |
+|--------|------|------|--------|
+| `ANTHROPIC_AUTH_TOKEN` | 智谱AI API Token | 是 | `your-zhipu-token` |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API Key | 否 | `your-claude-key` |
+| `OPENAI_API_KEY` | OpenAI GPT API Key | 否 | `your-openai-key` |
+| `CAIYUN_API_KEY` | 彩云天气API密钥 | 是 | `your-caiyun-key` |
+| `AMAP_API_KEY` | 高德地图API密钥 | 是 | `your-amap-key` |
+| `FISHING_ENABLE_FAKE_DATA` | 禁用虚假数据 | 是 | `false` |
+| `DEBUG_LOGGING` | 启用调试日志 | 否 | `false` |
+
+## 错误处理
+
+### 伦理约束和错误处理
+
+系统严格遵循伦理约束，绝不编造虚假数据：
+
+```python
+# 天气数据验证示例
+def _validate_weather_data(weather_data: dict) -> bool:
+    """验证天气数据的完整性和合理性"""
+    required_fields = ['temperature', 'condition', 'humidity', 'wind_speed', 'pressure']
+
+    # 检查必需字段
+    if not all(field in weather_data for field in required_fields):
+        return False
+
+    # 检查温度合理性
+    temp = weather_data.get('temperature')
+    if temp is None or temp < -50 or temp > 60:
+        return False
+
+    return True
+```
+
+### 常见错误类型
+
+1. **API密钥未配置**
+   ```python
+   # 错误示例
+   ValueError: 智谱AI API Token 未配置，请设置 ANTHROPIC_AUTH_TOKEN 环境变量
+
+   # 解决方案
+   # 在 .env 文件中配置
+   ANTHROPIC_AUTH_TOKEN=your-zhipu-token-here
+   ```
+
+2. **网络连接失败**
+   ```python
+   # 系统会自动降级到通用建议
+   # 而不是编造虚假数据
+   response = "无法获取天气数据，请检查网络连接。建议在天气条件良好时钓鱼。"
+   ```
+
+3. **位置不存在**
+   ```python
+   # 诚实报告无法找到位置
+   response = "无法找到指定位置：'xxx'。请检查位置名称是否正确。"
+   ```
+
+## 使用示例
+
+### 完整的智能体对话示例
+
+```python
+from agent import create_optimized_fishing_agent
+
+def demo_conversation():
+    """完整的智能体对话示例"""
+
+    # 创建智能体
+    agent = create_optimized_fishing_agent(model_provider="zhipu")
+
+    # 对话示例
+    conversations = [
+        "现在几点了？",
+        "帮我计算 15 * 8",
+        "查询杭州的天气",
+        "明天余杭区钓鱼怎么样？",
+        "未来三天宁波的天气如何？"
+    ]
+
+    for user_input in conversations:
+        print(f"🤔 用户: {user_input}")
+
+        try:
+            response = agent.run(user_input)
+            print(f"🤖 助手: {response}")
+        except Exception as e:
+            print(f"❌ 错误: {e}")
+
+        print("-" * 50)
+
+if __name__ == "__main__":
+    demo_conversation()
+```
+
+### 单独使用工具示例
+
+```python
+# 天气工具
+from tools.weather_tools import get_current_weather, get_weather_forecast
+
+print("=== 天气工具示例 ===")
+weather = get_current_weather("北京")
+print(f"北京天气: {weather}")
+
+forecast = get_weather_forecast("上海", 3)
+print(f"上海3天预报: {forecast}")
+
+# 钓鱼工具
+from tools.fishing_tools import query_fishing_recommendation
+
+print("\n=== 钓鱼工具示例 ===")
+recommendation = query_fishing_recommendation("西湖", "明天")
+print(f"钓鱼建议: {recommendation}")
+
+# 基础工具
+from tools.basic_tools import get_current_time, calculate, get_location_coordinates
+
+print("\n=== 基础工具示例 ===")
+time_info = get_current_time()
+print(f"当前时间: {time_info}")
+
+calc_result = calculate("123 * 456")
+print(f"计算结果: {calc_result}")
+
+coords = get_location_coordinates("深圳")
+print(f"深圳坐标: {coords}")
+```
+
+### 健康检查示例
+
+```python
+from agent import create_optimized_fishing_agent
+
+def health_check_demo():
+    """系统健康检查示例"""
+
+    print("🔍 智能钓鱼助手系统健康检查")
+    print("=" * 50)
+
+    try:
+        # 创建智能体
+        agent = create_optimized_fishing_agent()
+
+        # 执行健康检查
+        health = agent.health_check()
+
+        print(f"🏥 系统状态: {health['status']}")
+        print("📋 组件状态:")
+
+        for check, status in health['checks'].items():
+            print(f"  {check}: {status}")
+
+        # 获取统计信息
+        stats = agent.get_llm_stats()
+        print(f"\n📊 模型调用统计:")
+        print(f"  总调用次数: {stats['total_model_calls']}")
+        print(f"  成功次数: {stats['successful_calls']}")
+        print(f"  失败次数: {stats['failed_calls']}")
+        print(f"  成功率: {stats['success_rate']:.1f}%")
+
+        if health['status'] == 'healthy':
+            print("\n✅ 系统运行正常，可以提供服务")
+        else:
+            print("\n⚠️ 系统存在问题，请检查配置")
+
+    except Exception as e:
+        print(f"❌ 健康检查失败: {e}")
+
+if __name__ == "__main__":
+    health_check_demo()
+```
+
+### 高级使用示例
+
+```python
+from agent import create_optimized_fishing_agent
+from tools.weather_tools import get_current_weather
+from tools.fishing_tools import query_fishing_recommendation
+from tools.basic_tools import get_current_time
+
+def advanced_fishing_planning():
+    """高级钓鱼规划示例"""
+
+    print("🎣 智能钓鱼规划系统")
+    print("=" * 50)
+
+    # 1. 获取当前时间
+    current_time = get_current_time()
+    print(f"📅 规划时间: {current_time}")
+
+    # 2. 获取天气信息
+    locations = ["北京", "上海", "杭州", "广州"]
+
+    print("\n🌤️ 天气信息:")
+    for location in locations:
+        try:
+            weather = get_current_weather(location)
+            print(f"  {location}: {weather[:100]}...")
+        except Exception as e:
+            print(f"  {location}: 获取失败 - {e}")
+
+    # 3. 钓鱼推荐分析
+    print("\n🎯 钓鱼推荐:")
+    fishing_locations = ["西湖", "余杭区", "千岛湖"]
+
+    for location in fishing_locations:
+        try:
+            recommendation = query_fishing_recommendation(location, "明天")
+            print(f"\n📍 {location}:")
+            print(f"  {recommendation[:200]}...")
+        except Exception as e:
+            print(f"  {location}: 分析失败 - {e}")
+
+    # 4. 使用智能体综合分析
+    print("\n🤖 智能体综合分析:")
+    agent = create_optimized_fishing_agent()
+
+    complex_query = "综合考虑北京、上海、杭州的天气情况，推荐明天最适合钓鱼的地方和时间段"
+
+    try:
+        response = agent.run(complex_query)
+        print(f"  分析结果: {response}")
+    except Exception as e:
+        print(f"  分析失败: {e}")
+
+if __name__ == "__main__":
+    advanced_fishing_planning()
+```
+
+## API 限制和注意事项
+
+### 伦理约束
+
+- **零虚假数据**: 系统绝不编造天气数据
+- **诚实报告**: 数据获取失败时明确告知用户
+- **优雅降级**: 提供通用建议而非编造信息
+- **数据验证**: 严格验证所有数据完整性
+
+### API 限制
+
+#### 智谱AI API
+- 需要有效的 API Token
+- 有调用频率限制
+- 支持中文对话优化
+
+#### 彩云天气 API
+- 免费版本有调用次数限制
+- 支持72小时天气预报
+- 建议在生产环境中配置付费计划
+
+#### 高德地图 API
+- 免费版本有日调用量限制
+- 支持中国境内地理编码
+- 建议配置合适的QPS限制
+
+### 最佳实践
+
+1. **错误处理**: 始终使用 try-catch 包装 API 调用
+2. **环境变量**: 不要在代码中硬编码 API 密钥
+3. **数据验证**: 严格验证所有输入数据的完整性
+4. **性能考虑**: 避免频繁的 API 调用，善用缓存机制
+5. **伦理使用**: 诚实地报告数据获取失败，不编造虚假信息
 
 ---
 
-**更新时间**: 2025-11-05
-**版本**: 2.1.0-sync-version
-**维护者**: LangChain 学习项目
+**更新时间**: 2025-11-19
+**版本**: 2.2.0-architecture-simplified
+**维护者**: 智能钓鱼助手项目
+
+**架构设计原则**: 简洁、直接、可靠、伦理

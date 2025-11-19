@@ -1,129 +1,93 @@
-# 新工具模块使用指南
+# 智能钓鱼助手 - 简化工具使用指南
 
-本文档详细介绍如何使用项目中的新工具模块，包括架构设计、使用方法和最佳实践。
+本文档介绍智能钓鱼助手简化架构后的工具使用方法，基于 LangChain 1.0+ 同步架构设计。
 
 ## 目录
 
 - [概述](#概述)
-- [架构设计](#架构设计)
+- [架构简化](#架构简化)
 - [快速开始](#快速开始)
-- [详细使用指南](#详细使用指南)
+- [工具详细使用](#工具详细使用)
+- [智能体集成](#智能体集成)
 - [最佳实践](#最佳实践)
 - [故障排除](#故障排除)
 
 ## 概述
 
-新工具模块是项目重构的核心成果，实现了工具的模块化、独立化和标准化设计。
+智能钓鱼助手在架构简化后，将原有的复杂异步工具系统重构为简洁的同步工具，直接使用 LangChain 1.0+ 的 `@tool` 装饰器。
 
 ### 主要特性
 
-- **🏗️ 模块化架构**: 每个工具都是独立的模块
-- **🔌 统一接口**: 所有工具都实现 `ITool` 接口
-- **⚡ 异步支持**: 支持高性能异步调用
-- **⚙️ 配置化**: 支持灵活的配置管理
-- **📊 注册系统**: 提供工具注册和发现机制
-- **🧪 完整测试**: 每个工具都有完整的测试覆盖
+- **🏗️ 极简架构**: 从75+文件简化到5个核心文件
+- **🔌 同步设计**: 全面采用同步架构，消除异步调用问题
+- **⚡ 直接调用**: 统一API客户端，无中间层
+- **⚙️ 零配置**: 开箱即用，无需复杂配置
+- **📊 伦理约束**: 绝不编造虚假数据，诚实报告系统状态
+- **🧪 真实数据**: 基于真实API数据，提供可靠的钓鱼建议
 
 ### 工具列表
 
-| 工具名称 | 功能描述 | 主要特性 |
+| 工具模块 | 功能描述 | 主要特性 |
 |---------|---------|---------|
-| **TimeTool** | 时间工具 | 时间查询、计算、格式化、时区转换 |
-| **MathTool** | 数学工具 | 基本运算、高级函数、统计计算 |
-| **WeatherTool** | 天气工具 | 天气查询、预报、批量查询 |
-| **SearchTool** | 搜索工具 | 知识库检索、网络搜索、相似匹配 |
+| **weather_tools.py** | 天气工具集 | 实时天气、72小时预报、真实API数据 |
+| **fishing_tools.py** | 钓鱼工具集 | 智能推荐、7因子评分、伦理约束 |
+| **basic_tools.py** | 基础工具集 | 时间查询、数学计算、坐标服务 |
 
-## 架构设计
+## 架构简化
 
-### 核心接口
+### 简化前后对比
 
-#### ITool 接口
+```
+# 简化前 (75+ 文件)
+src/
+├── tools/
+│   ├── async/                    # 异步工具模块
+│   ├── interfaces/               # 接口定义
+│   ├── base_tool.py             # 基础类
+│   └── 20+ 工具实现文件
+├── services/
+│   ├── manager.py               # 服务管理器
+│   ├── registry/                # 注册系统
+│   └── 15+ 服务实现文件
+└── core/
+    ├── interfaces/              # 核心接口
+    └── architecture/            # 架构组件
 
-所有工具都必须实现的核心接口：
-
-```python
-from abc import ABC, abstractmethod
-from typing import Any, Dict
-from dataclasses import dataclass
-
-@dataclass
-class ToolMetadata:
-    """工具元数据"""
-    name: str
-    description: str
-    version: str
-    author: str
-    tags: List[str]
-    dependencies: List[str]
-
-@dataclass
-class ToolResult:
-    """工具执行结果"""
-    success: bool
-    data: Any = None
-    error: str = None
-    metadata: Dict[str, Any] = None
-
-class ITool(ABC):
-    """工具接口"""
-
-    @property
-    @abstractmethod
-    def metadata(self) -> ToolMetadata:
-        """工具元数据"""
-        pass
-
-    @abstractmethod
-    async def execute(self, **kwargs) -> ToolResult:
-        """执行工具操作"""
-        pass
-
-    @abstractmethod
-    def validate_input(self, **kwargs) -> bool:
-        """验证输入参数"""
-        pass
+# 简化后 (5个核心文件)
+src/
+├── agent.py                    # 主智能体 (LangChain 1.0+)
+├── tools/                      # 工具目录
+│   ├── weather_tools.py        # 天气工具集
+│   ├── fishing_tools.py        # 钓鱼工具集
+│   ├── basic_tools.py          # 基础工具集
+│   └── __init__.py             # 工具导出
+├── utils/                      # 工具类目录
+│   ├── api_client.py           # 统一API客户端
+│   ├── coordinate_utils.py     # 坐标工具
+│   ├── cache.py                # 简化缓存系统
+│   └── __init__.py             # 工具类导出
+└── docs/                       # 项目文档
 ```
 
-### 基类体系
-
-#### BaseTool 基础类
-
-提供工具的通用实现：
+### LangChain 1.0+ 工具装饰器
 
 ```python
-from core.base_tool import BaseTool, ConfigurableTool
+from langchain.tools import tool
 
-class MyTool(ConfigurableTool):
-    """自定义工具示例"""
+@tool
+def get_current_weather(location: str) -> str:
+    """获取指定位置的当前天气信息"""
+    # 直接调用API客户端，无中间层
+    from ..utils.api_client import get_weather_client
+    from ..utils.coordinate_utils import get_coordinates
 
-    def __init__(self, config: Optional[Dict] = None, logger: Optional[logging.Logger] = None):
-        super().__init__(config, logger)
-        # 初始化工具特定配置
-        self._my_config = self.get_config_value("my_setting", "default_value")
-
-    @property
-    def metadata(self) -> ToolMetadata:
-        return ToolMetadata(
-            name="my_tool",
-            description="我的自定义工具",
-            version="1.0.0",
-            author="author",
-            tags=["custom", "example"],
-            dependencies=[]
-        )
-
-    def validate_input(self, **kwargs) -> bool:
-        # 验证必需参数
-        return "required_param" in kwargs
-
-    async def _execute(self, **kwargs) -> ToolResult:
-        # 实现具体功能
-        try:
-            # 业务逻辑
-            result = self._process_data(kwargs)
-            return ToolResult(success=True, data=result)
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
+    try:
+        coords = get_coordinates(location)
+        weather_client = get_weather_client()
+        weather_data = weather_client.get_realtime_weather(coords[0], coords[1])
+        return _format_weather_response(weather_data, location)
+    except Exception as e:
+        return f"获取天气数据失败: {str(e)}"
 ```
 
 ## 快速开始
@@ -131,518 +95,288 @@ class MyTool(ConfigurableTool):
 ### 1. 基本使用
 
 ```python
-import asyncio
-from tools import TimeTool, MathTool, WeatherTool, SearchTool
+# 导入工具 - 支持相对和绝对导入
+from tools.weather_tools import get_current_weather, get_weather_forecast
+from tools.fishing_tools import query_fishing_recommendation
+from tools.basic_tools import get_current_time, calculate
 
-async def basic_usage():
-    # 创建工具实例
-    time_tool = TimeTool()
-    math_tool = MathTool()
-    weather_tool = WeatherTool()
-    search_tool = SearchTool()
+# 1. 获取当前时间
+time_result = get_current_time()
+print(f"🕐 当前时间: {time_result}")
 
-    # 使用时间工具
-    time_result = await time_tool.execute(operation='current_time')
-    if time_result.success:
-        print(f"当前时间: {time_result.data['formatted']}")
+# 2. 数学计算
+math_result = calculate("123 * 456")
+print(f"🔢 计算结果: {math_result}")
 
-    # 使用数学工具
-    math_result = await math_tool.execute(operation='add', a=10, b=5)
-    if math_result.success:
-        print(f"计算结果: {math_result.data['formatted']}")
+# 3. 查询天气
+weather_result = get_current_weather("北京")
+print(f"🌤️ 北京天气: {weather_result}")
 
-    # 使用天气工具
-    weather_result = await weather_tool.execute(
-        operation='current_weather',
-        location='北京'
-    )
-    if weather_result.success:
-        data = weather_result.data
-        print(f"北京天气: {data['condition']} {data['temperature']}°C")
-
-    # 使用搜索工具
-    search_result = await search_tool.execute(
-        operation='knowledge_search',
-        query='python'
-    )
-    if search_result.success:
-        print(f"找到 {search_result.data['total_results']} 个结果")
-
-# 运行示例
-asyncio.run(basic_usage())
+# 4. 智能钓鱼推荐
+fishing_result = query_fishing_recommendation("余杭区", "明天")
+print(f"🎣 钓鱼建议: {fishing_result[:200]}...")
 ```
 
-### 2. 批量操作
+### 2. 命令行测试
 
-```python
-async def batch_operations():
-    # 时间工具批量操作
-    time_tool = TimeTool()
+```bash
+# 天气工具测试
+uv run python -c "
+from tools.weather_tools import get_current_weather
+print(get_current_weather('上海'))
+"
 
-    operations = [
-        {"operation": "add_time", "base_time": "2024-01-01", "days": 1},
-        {"operation": "add_time", "base_time": "2024-01-01", "months": 1},
-        {"operation": "format_time", "time_input": "2024-01-01T10:30:45"}
-    ]
+# 钓鱼推荐工具测试
+uv run python -c "
+from tools.fishing_tools import query_fishing_recommendation
+print(query_fishing_recommendation('杭州', '明天'))
+"
 
-    for op in operations:
-        result = await time_tool.execute(**op)
-        if result.success:
-            print(f"操作成功: {result.data['formatted']}")
+# 时间工具测试
+uv run python -c "
+from tools.basic_tools import get_current_time
+print(get_current_time())
+"
 
-    # 天气工具批量查询
-    weather_tool = WeatherTool()
-    cities = ["北京", "上海", "广州", "深圳"]
-
-    result = await weather_tool.execute(
-        operation='batch_weather',
-        locations=cities
-    )
-
-    if result.success:
-        for item in result.data['results']:
-            if item['success']:
-                weather = item['data']
-                print(f"{item['location']}: {weather['condition']} {weather['temperature']}°C")
-
-asyncio.run(batch_operations())
+# 计算工具测试
+uv run python -c "
+from tools.basic_tools import calculate
+print(calculate('12 * 8'))
+"
 ```
 
-### 3. 配置化使用
+### 3. 智能体集成
 
 ```python
-async def configured_usage():
-    # 自定义配置
-    time_config = {
-        "default_timezone": "America/New_York",
-        "precision": 15
-    }
-    time_tool = TimeTool(time_config)
+from agent import create_optimized_fishing_agent
 
-    math_config = {
-        "precision": 20,
-        "enable_cache": True
-    }
-    math_tool = MathTool(math_config)
+# 创建智能钓鱼助手
+agent = create_optimized_fishing_agent(model_provider="zhipu")
 
-    weather_config = {
-        "api_key": "your-api-key",
-        "timeout": 30,
-        "cache_ttl": 7200
-    }
-    weather_tool = WeatherTool(weather_config)
+# 智能对话示例
+queries = [
+    "明天余杭区钓鱼怎么样？",
+    "现在几点了？",
+    "计算 15 * 8",
+    "杭州未来三天天气如何？"
+]
 
-    # 使用配置后的工具
-    result = await time_tool.execute(operation='current_time')
-    print(f"纽约时间: {result.data['formatted']}")
-
-asyncio.run(configured_usage())
+for query in queries:
+    print(f"🤔 用户: {query}")
+    result = agent.run(query)
+    print(f"🤖 助手: {result[:200]}...")
+    print("-" * 50)
 ```
 
-## 详细使用指南
+## 工具详细使用
 
-### TimeTool 时间工具
+### weather_tools.py - 天气工具集
 
-#### 支持的操作
+#### 核心功能
 
-| 操作 | 参数 | 说明 |
-|------|------|------|
-| `current_time` | `timezone_name` (可选) | 获取当前时间 |
-| `add_time` | `base_time`, `years`, `months`, `days`, `hours`, `minutes`, `seconds` | 时间加法 |
-| `subtract_time` | 同上 | 时间减法 |
-| `format_time` | `time_input`, `format_type`, `timezone_name` (可选) | 时间格式化 |
-| `convert_timezone` | `time_input`, `from_tz`, `to_tz` | 时区转换 |
+天气工具集提供实时天气查询、72小时天气预报、指定日期天气查询等功能，基于彩云天气API。
 
-#### 详细示例
+#### 主要工具
+
+| 工具名称 | 功能描述 | 参数 |
+|---------|---------|------|
+| **get_current_weather** | 获取实时天气 | `location: str` - 位置名称 |
+| **get_weather_forecast** | 获取天气预报 | `location: str, days: int` - 位置和天数(1-7) |
+| **get_weather_by_date** | 获取指定日期天气 | `location: str, date_str: str` - 位置和日期 |
+
+#### 使用示例
 
 ```python
-async def time_tool_examples():
-    time_tool = TimeTool()
+from tools.weather_tools import get_current_weather, get_weather_forecast, get_weather_by_date
 
-    # 1. 获取不同时区的当前时间
-    timezones = ["Asia/Shanghai", "America/New_York", "Europe/London"]
-    for tz in timezones:
-        result = await time_tool.execute(operation='current_time', timezone_name=tz)
-        if result.success:
-            data = result.data
-            print(f"{tz}: {data['formatted']}")
+# 1. 获取实时天气
+weather = get_current_weather("杭州")
+print(f"杭州当前天气: {weather}")
 
-    # 2. 复杂时间计算
-    result = await time_tool.execute(
-        operation='add_time',
-        base_time='2024-01-01T10:00:00',
-        years=1,
-        months=2,
-        days=15,
-        hours=3
-    )
-    print(f"复杂计算: {result.data['formatted']}")
+# 2. 获取3天预报
+forecast = get_weather_forecast("北京", 3)
+print(f"北京3天预报: {forecast}")
 
-    # 3. 多种格式化
-    formats = ["default", "date", "time", "iso", "us", "full", "compact"]
-    time_input = "2024-01-01T10:30:45"
-    for fmt in formats:
-        result = await time_tool.execute(
-            operation='format_time',
-            time_input=time_input,
-            format_type=fmt
-        )
-        print(f"{fmt}: {result.data['formatted']}")
-
-    # 4. 时区转换
-    result = await time_tool.execute(
-        operation='convert_timezone',
-        time_input='2024-01-01T10:00:00',
-        from_tz='Asia/Shanghai',
-        to_tz='America/New_York'
-    )
-    print(f"时区转换: {result.data['formatted']}")
-
-asyncio.run(time_tool_examples())
+# 3. 获取指定日期天气
+date_weather = get_weather_by_date("上海", "2024-12-25")
+print(f"上海圣诞节天气: {date_weather}")
 ```
 
-### MathTool 数学工具
+#### 数据格式
 
-#### 支持的操作
+天气数据返回格式示例：
 
-| 操作 | 参数 | 说明 |
-|------|------|------|
-| `add`, `subtract`, `multiply`, `divide` | `a`, `b` | 基本运算 |
-| `power` | `base`, `exponent` | 幂运算 |
-| `sqrt` | `number` | 平方根 |
-| `sin`, `cos`, `tan` | `angle`, `degrees` (默认True) | 三角函数 |
-| `log` | `number`, `base` (默认10) | 对数函数 |
-| `factorial` | `n` | 阶乘 |
-| `average`, `median`, `mode` | `numbers` (列表) | 统计函数 |
-| `std_dev` | `numbers` (列表) | 标准差 |
-| `random` | `min_val`, `max_val`, `integer` (默认True) | 随机数 |
-| `round` | `number`, `decimals` (默认0) | 四舍五入 |
-
-#### 详细示例
-
-```python
-async def math_tool_examples():
-    math_tool = MathTool()
-
-    # 1. 基本运算组合
-    operations = [
-        ("add", {"a": 10, "b": 5}),
-        ("multiply", {"a": 12, "b": 8}),
-        ("power", {"base": 2, "exponent": 10}),
-        ("sqrt", {"number": 144})
-    ]
-
-    for op, params in operations:
-        result = await math_tool.execute(operation=op, **params)
-        print(f"{op}: {result.data['formatted']}")
-
-    # 2. 三角函数计算
-    angles = [0, 30, 45, 60, 90]
-    for angle in angles:
-        result = await math_tool.execute(operation='sin', angle=angle, degrees=True)
-        print(f"sin({angle}°) = {result.data['result']}")
-
-    # 3. 统计计算
-    numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    stats = ["average", "median", "std_dev"]
-    for stat in stats:
-        result = await math_tool.execute(operation=stat, numbers=numbers)
-        if stat == "average":
-            print(f"平均值: {result.data['result']}")
-        elif stat == "median":
-            print(f"中位数: {result.data['result']}")
-        else:
-            print(f"标准差: {result.data['result']}")
-
-    # 4. 随机数和分布
-    import random
-    random.seed(42)  # 固定随机种子
-
-    for i in range(5):
-        result = await math_tool.execute(
-            operation='random',
-            min_val=1,
-            max_val=100,
-            integer=True
-        )
-        print(f"随机数 {i+1}: {result.data['result']}")
-
-    # 5. 复杂数学表达式
-    # 计算 (a + b) * c - d
-    a, b, c, d = 5, 3, 4, 2
-
-    # (a + b) * c
-    step1 = await math_tool.execute(operation='add', a=a, b=b)
-    if step1.success:
-        sum_ab = step1.data['result']
-        step2 = await math_tool.execute(operation='multiply', a=sum_ab, b=c)
-        if step2.success:
-            product = step2.data['result']
-            # product - d
-            step3 = await math_tool.execute(operation='subtract', a=product, b=d)
-            if step3.success:
-                print(f"({a} + {b}) * {c} - {d} = {step3.data['result']}")
-
-asyncio.run(math_tool_examples())
+```
+🌤️ 杭州 当前天气:
+温度: 12.5°C
+天气状况: 晴朗
+湿度: 65.8%
+风速: 3.2 m/s
+气压: 1018.2 hPa
+更新时间: 2025-11-19 20:30:15
 ```
 
-### WeatherTool 天气工具
+### fishing_tools.py - 钓鱼工具集
 
-#### 支持的操作
+#### 核心功能
 
-| 操作 | 参数 | 说明 |
-|------|------|------|
-| `current_weather` | `location` | 获取当前天气 |
-| `get_coordinates` | `location` | 获取坐标 |
-| `batch_weather` | `locations` (列表) | 批量查询 |
-| `search_locations` | `query`, `limit` | 位置搜索 |
-| `weather_forecast` | `location`, `days` | 天气预报 |
-| `weather_by_date` | `location`, `date` | 指定日期天气查询 |
-| `weather_by_datetime` | `location`, `datetime_str` | 时间段天气查询 |
-| `hourly_forecast` | `location`, `hours` | 小时级天气预报 |
+钓鱼工具集基于真实天气数据提供专业的钓鱼推荐分析，采用7因子评分算法，严格遵循伦理约束。
 
-#### 详细示例
+#### 主要工具
 
-```python
-async def weather_tool_examples():
-    weather_tool = WeatherTool()
+| 工具名称 | 功能描述 | 参数 |
+|---------|---------|------|
+| **query_fishing_recommendation** | 智能钓鱼推荐 | `location: str, date: str` - 位置和日期 |
+| **analyze_fishing_conditions** | 钓鱼条件分析 | `weather_data: dict` - 天气数据 |
+| **calculate_fish_activity** | 鱼类活跃度计算 | `weather_data: dict` - 天气数据 |
+| **get_fishing_insights** | 多天钓鱼洞察 | `location: str, days: int` - 位置和天数 |
 
-    # 1. 基本天气查询
-    cities = ["北京", "上海", "广州", "深圳", "杭州"]
-    for city in cities:
-        result = await weather_tool.execute(
-            operation='current_weather',
-            location=city
-        )
-        if result.success:
-            data = result.data
-            print(f"{city}: {data['condition']} {data['temperature']}°C "
-                  f"(湿度{data['humidity']}%)")
+#### 7因子评分算法
 
-    # 2. 批量天气查询
-    batch_result = await weather_tool.execute(
-        operation='batch_weather',
-        locations=["北京", "上海", "广州"]
-    )
-    if batch_result.success:
-        for item in batch_result.data['results']:
-            if item['success']:
-                weather = item['data']
-                print(f"批量 - {item['location']}: {weather['condition']} "
-                      f"{weather['temperature']}°C")
+1. **温度因子**: 10-25°C为最佳范围
+2. **天气因子**: 多云、阴天为佳
+3. **风力因子**: 1-3级微风最适宜
+4. **气压因子**: 稳定高压天气
+5. **湿度因子**: 60-80%适度湿度
+6. **季节因子**: 考虑季节性钓鱼规律
+7. **时间因子**: 黄金时段(早上6-8点, 傍晚18-20点)
 
-    # 3. 位置搜索
-    search_terms = ["北", "上", "广", "湖"]
-    for term in search_terms:
-        result = await weather_tool.execute(
-            operation='search_locations',
-            query=term,
-            limit=3
-        )
-        if result.success:
-            print(f"搜索 '{term}': 找到 {result.data['count']} 个结果")
-            for match in result.data['matches'][:2]:
-                print(f"  - {match['name']}")
-
-    # 4. 天气预报
-    forecast_result = await weather_tool.execute(
-        operation='weather_forecast',
-        location='北京',
-        days=5
-    )
-    if forecast_result.success:
-        current = forecast_result.data['current']
-        print(f"北京当前天气: {current['condition']} {current['temperature']}°C")
-        print("未来5天预报:")
-        for day in forecast_result.data['forecast']:
-            print(f"  第{day['day']}天: {day['condition']} {day['temperature']}°C")
-
-    # 5. 错误码系统使用
-    result = await weather_tool.execute(
-        operation='weather_by_date',
-        location='北京',
-        date='2024-12-25'
-    )
-
-    if result.success:
-        print("✅ 请求成功")
-    else:
-        print(f"❌ 请求失败: {result.error}")
-
-        # 检查详细的错误码信息
-        if result.metadata:
-            error_code = result.metadata.get("error_code")
-            status_message = result.metadata.get("status_message")
-            description = result.metadata.get("description")
-
-            print(f"错误码: {error_code}")
-            print(f"状态: {status_message}")
-            print(f"描述: {description}")
-
-            # 根据错误码采取不同策略
-            if error_code == 6:
-                print("💡 建议: 检查输入参数")
-            elif error_code == 7:
-                print("💡 建议: 检查日期格式")
-            elif error_code == 9:
-                print("💡 建议: 使用有效日期范围")
-
-asyncio.run(weather_tool_examples())
-```
-
-#### 错误码系统
-
-WeatherTool 集成了完整的错误码系统，提供详细的请求状态反馈：
-
-##### 错误码类型
-
-| 错误码 | 类型 | 描述 | 处理建议 |
-|--------|------|------|----------|
-| 0 | 成功 | API调用成功 | 正常使用数据 |
-| 1 | 成功 | 缓存命中 | 正常使用数据 |
-| 2 | API问题 | API错误 | 使用模拟数据 |
-| 3 | 数据问题 | 坐标未找到 | 使用模拟数据 |
-| 4 | API问题 | 网络超时 | 使用模拟数据 |
-| 5 | 数据问题 | 数据解析失败 | 使用模拟数据 |
-| 6 | 参数问题 | 参数错误 | 检查输入参数 |
-| 7 | 参数问题 | 日期解析错误 | 检查日期格式 |
-| 8 | 参数问题 | 时间段错误 | 检查时间表达式 |
-| 9 | 数据问题 | 数据超出范围 | 使用模拟数据 |
-
-##### 错误码使用示例
+#### 使用示例
 
 ```python
-# 检查请求结果
-result = await weather_tool.execute(
-    operation='hourly_forecast',
-    location='北京',
-    hours=24
+from tools.fishing_tools import (
+    query_fishing_recommendation,
+    analyze_fishing_conditions,
+    calculate_fish_activity,
+    get_fishing_insights
 )
 
-# 基础成功检查
-if result.success:
-    print("✅ 请求成功")
-    forecast_data = result.data
-    print(f"预报小时数: {forecast_data['forecast_hours']}")
-else:
-    print(f"❌ 请求失败: {result.error}")
+# 1. 智能钓鱼推荐
+recommendation = query_fishing_recommendation("余杭区", "明天")
+print(f"钓鱼推荐: {recommendation}")
 
-    # 获取详细错误信息
-    if result.metadata:
-        error_code = result.metadata.get("error_code")
-        description = result.metadata.get("description")
+# 2. 钓鱼条件分析
+# 首先获取天气数据
+from tools.weather_tools import get_current_weather
+weather_data = get_current_weather("杭州")
+# 然后分析条件
+analysis = analyze_fishing_conditions({"temperature": 15, "condition": "多云"})
+print(f"条件分析: {analysis}")
 
-        print(f"错误码: {error_code} - {description}")
+# 3. 鱼类活跃度计算
+activity = calculate_fish_activity({"temperature": 18, "wind_speed": 2})
+print(f"鱼类活跃度: {activity}")
 
-        # 根据错误码类别处理
-        if error_code in [0, 1]:
-            print("这是成功情况")
-        elif error_code == 6:
-            print("参数错误，请检查输入")
-        elif error_code in [2, 4]:
-            print("API问题，已使用模拟数据")
-        elif error_code == 9:
-            print("日期范围问题，已使用模拟数据")
+# 4. 多天钓鱼洞察
+insights = get_fishing_insights("西湖", 3)
+print(f"3天钓鱼洞察: {insights}")
 ```
 
-**详细文档**: 参见 [天气服务错误码系统指南](WEATHER_ERROR_CODES_GUIDE.md)
+#### 伦理约束
 
-### SearchTool 搜索工具
+- **零虚假数据**: 绝不编造天气数据
+- **诚实报告**: 数据获取失败时明确告知用户
+- **优雅降级**: 提供通用钓鱼建议而非编造信息
+- **数据验证**: 严格验证天气数据完整性
 
-#### 支持的操作
+### basic_tools.py - 基础工具集
 
-| 操作 | 参数 | 说明 |
-|------|------|------|
-| `web_search` | `query`, `max_results` | 网络搜索 |
-| `knowledge_search` | `query`, `category` | 知识库搜索 |
-| `search_by_category` | `category` | 按类别搜索 |
-| `get_definition` | `topic`, `category` | 获取定义 |
-| `get_features` | `topic`, `category` | 获取特性 |
-| `get_applications` | `topic`, `category` | 获取应用 |
-| `search_similar` | `query`, `threshold` | 相似搜索 |
-| `advanced_search` | `query`, `filters` | 高级搜索 |
+#### 核心功能
 
-#### 详细示例
+基础工具集提供时间查询、数学计算、坐标服务等基础功能。
+
+#### 主要工具
+
+| 工具名称 | 功能描述 | 参数 |
+|---------|---------|------|
+| **get_current_time** | 获取当前时间 | 无参数 |
+| **calculate** | 数学表达式计算 | `expression: str` - 数学表达式 |
+| **get_location_coordinates** | 获取位置坐标 | `location: str` - 位置名称 |
+| **get_fishing_season_advice** | 季节性钓鱼建议 | `location: str` - 位置名称 |
+
+#### 使用示例
 
 ```python
-async def search_tool_examples():
-    search_tool = SearchTool()
+from tools.basic_tools import (
+    get_current_time,
+    calculate,
+    get_location_coordinates,
+    get_fishing_season_advice
+)
 
-    # 1. 知识库搜索
-    topics = ["python", "javascript", "人工智能", "langchain"]
-    for topic in topics:
-        result = await search_tool.execute(
-            operation='knowledge_search',
-            query=topic
-        )
-        if result.success:
-            data = result.data
-            print(f"{topic}: 找到 {data['total_results']} 个结果")
-            for item in data['results'][:2]:
-                print(f"  - {item['topic']}: {item['description'][:50]}...")
+# 1. 获取当前时间
+current_time = get_current_time()
+print(f"当前时间: {current_time}")
 
-    # 2. 按类别浏览
-    categories = ["technology", "science", "general"]
-    for category in categories:
-        result = await search_tool.execute(
-            operation='search_by_category',
-            category=category
-        )
-        if result.success:
-            print(f"类别 '{category}': {result.data['total_topics']} 个主题")
+# 2. 数学计算
+result = calculate("15 * 8 + 32")
+print(f"计算结果: {result}")
 
-    # 3. 获取详细信息
-    result = await search_tool.execute(
-        operation='get_definition',
-        topic='python',
-        category='technology'
-    )
-    if result.success:
-        print(f"Python定义: {result.data['definition']}")
+# 3. 获取坐标
+coords = get_location_coordinates("北京")
+print(f"北京坐标: {coords}")
 
-    result = await search_tool.execute(
-        operation='get_features',
-        topic='python',
-        category='technology'
-    )
-    if result.success:
-        print(f"Python特性: {', '.join(result.data['features'])}")
+# 4. 季节钓鱼建议
+season_advice = get_fishing_season_advice("杭州")
+print(f"季节建议: {season_advice}")
+```
 
-    # 4. 相似度搜索
-    queries = ["ai", "web", "data"]
-    for query in queries:
-        result = await search_tool.execute(
-            operation='search_similar',
-            query=query,
-            threshold=0.3
-        )
-        if result.success:
-            print(f"'{query}' 相似结果: {result.data['total_results']} 个")
-            for item in result.data['results'][:3]:
-                print(f"  - {item['topic']} (相似度: {item['similarity']:.2f})")
+## 智能体集成
 
-    # 5. 高级搜索
-    filters = {
-        'max_results': 8,
-        'categories': ['technology'],
-        'include_web': True,
-        'include_knowledge': True
-    }
-    result = await search_tool.execute(
-        operation='advanced_search',
-        query='编程语言',
-        filters=filters
-    )
-    if result.success:
-        print(f"高级搜索结果: {result.data['total_results']} 个")
-        for item in result.data['results']:
-            source_type = item.get('source_type', 'unknown')
-            if 'title' in item:
-                print(f"  🌐 {item['title']} ({source_type})")
-            else:
-                print(f"  📚 {item['topic']} ({source_type})")
+### 创建智能体
 
-asyncio.run(search_tool_examples())
+```python
+from agent import create_optimized_fishing_agent
+
+# 使用不同模型提供商创建智能体
+agent_zhipu = create_optimized_fishing_agent(model_provider="zhipu")
+agent_claude = create_optimized_fishing_agent(model_provider="anthropic")
+agent_openai = create_optimized_fishing_agent(model_provider="openai")
+```
+
+### 智能对话
+
+```python
+def demo_conversation():
+    agent = create_optimized_fishing_agent(model_provider="zhipu")
+
+    # 对话示例
+    conversations = [
+        "现在几点了？",
+        "帮我计算 24 * 15",
+        "查询杭州的天气",
+        "明天西湖钓鱼怎么样？",
+        "未来三天宁波的天气如何？"
+    ]
+
+    for query in conversations:
+        print(f"用户: {query}")
+        response = agent.run(query)
+        print(f"助手: {response}")
+        print("-" * 50)
+
+demo_conversation()
+```
+
+### 健康检查
+
+```python
+def health_check():
+    agent = create_optimized_fishing_agent()
+
+    # 检查系统状态
+    health = agent.health_check()
+    print(f"系统状态: {health['status']}")
+
+    # 显示各组件状态
+    for check, status in health['checks'].items():
+        print(f"  {check}: {status}")
+
+    # 获取统计信息
+    stats = agent.get_llm_stats()
+    print(f"模型调用统计: {stats}")
+
+health_check()
 ```
 
 ## 最佳实践
@@ -650,193 +384,310 @@ asyncio.run(search_tool_examples())
 ### 1. 错误处理
 
 ```python
-async def best_practice_error_handling():
-    time_tool = TimeTool()
+from tools.weather_tools import get_current_weather
 
-    # 检查输入参数
-    if not time_tool.validate_input(operation='current_time'):
-        print("输入参数无效")
-        return
+def safe_weather_query(location):
+    """安全的天气查询"""
+    try:
+        result = get_current_weather(location)
+        if "获取天气数据失败" in result:
+            print("天气数据获取失败，请检查网络连接")
+            return None
+        return result
+    except Exception as e:
+        print(f"查询出错: {e}")
+        return None
 
-    # 执行并检查结果
-    result = await time_tool.execute(operation='current_time')
-    if result.success:
-        data = result.data
-        print(f"时间: {data['formatted']}")
+# 使用示例
+weather = safe_weather_query("北京")
+if weather:
+    print(f"天气信息: {weather}")
+```
+
+### 2. 数据验证
+
+```python
+from tools.fishing_tools import query_fishing_recommendation
+
+def validate_fishing_data(location, date):
+    """验证钓鱼推荐数据质量"""
+    recommendation = query_fishing_recommendation(location, date)
+
+    # 检查是否包含评分信息
+    if "评分" in recommendation:
+        print("✅ 包含专业评分")
     else:
-        print(f"执行失败: {result.error}")
-        # 可以尝试回退方案
-        fallback_result = await time_tool.execute(
-            operation='current_time',
-            timezone_name='UTC'
-        )
-        if fallback_result.success:
-            print(f"回退成功: {fallback_result.data['formatted']}")
+        print("⚠️ 缺少评分信息")
+
+    # 检查是否有天气数据
+    if "温度" in recommendation:
+        print("✅ 包含天气数据")
+    else:
+        print("⚠️ 缺少天气数据")
+
+    return recommendation
+
+# 使用示例
+result = validate_fishing_data("西湖", "明天")
+print(f"钓鱼推荐: {result}")
 ```
 
-### 2. 配置管理
+### 3. 缓存优化
 
 ```python
-# config.py
-DEFAULT_TIME_CONFIG = {
-    "default_timezone": "Asia/Shanghai",
-    "precision": 10,
-    "cache_ttl": 3600
-}
+from tools.weather_tools import get_current_weather
+from utils.cache import cache
 
-DEFAULT_MATH_CONFIG = {
-    "precision": 15,
-    "enable_cache": True,
-    "cache_ttl": 1800
-}
+def cached_weather_query(location):
+    """带缓存的天气查询"""
+    cache_key = f"weather_{location}"
 
-# 使用配置
-from config import DEFAULT_TIME_CONFIG
-time_tool = TimeTool(DEFAULT_TIME_CONFIG)
+    # 尝试从缓存获取
+    cached_result = cache.get(cache_key)
+    if cached_result:
+        print(f"从缓存获取 {location} 天气数据")
+        return cached_result
+
+    # 获取新数据并缓存
+    result = get_current_weather(location)
+    cache.set(cache_key, result, ttl=600)  # 缓存10分钟
+
+    return result
+
+# 使用示例
+weather = cached_weather_query("上海")
+print(weather)
 ```
 
-### 3. 性能优化
+### 4. 组合工具使用
 
 ```python
-import asyncio
-from typing import List
+def comprehensive_fishing_planning(location):
+    """综合钓鱼规划"""
 
-async def performance_optimization():
-    tools = [
-        TimeTool(),
-        MathTool(),
-        WeatherTool(),
-        SearchTool()
-    ]
+    # 1. 获取当前时间
+    from tools.basic_tools import get_current_time
+    current_time = get_current_time()
+    print(f"规划时间: {current_time}")
 
-    # 并发执行多个操作
-    tasks = []
-    for tool in tools:
-        if isinstance(tool, TimeTool):
-            tasks.append(tool.execute(operation='current_time'))
-        elif isinstance(tool, MathTool):
-            tasks.append(tool.execute(operation='add', a=10, b=5))
+    # 2. 获取天气信息
+    from tools.weather_tools import get_current_weather, get_weather_forecast
+    current_weather = get_current_weather(location)
+    forecast = get_weather_forecast(location, 3)
 
-    # 并发等待所有结果
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    # 3. 获取钓鱼推荐
+    from tools.fishing_tools import query_fishing_recommendation
+    recommendation = query_fishing_recommendation(location, "明天")
 
-    for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            print(f"工具 {i} 执行失败: {result}")
-        elif result.success:
-            print(f"工具 {i} 执行成功")
-```
+    # 4. 获取季节建议
+    from tools.basic_tools import get_fishing_season_advice
+    season_advice = get_fishing_season_advice(location)
 
-### 4. 工具组合使用
+    # 综合输出
+    planning_result = f"""
+🎣 {location} 钓鱼规划报告
+📅 规划时间: {current_time}
 
-```python
-async def tool_combination():
-    # 获取当前时间
-    time_tool = TimeTool()
-    time_result = await time_tool.execute(operation='current_time')
+🌤️ 当前天气: {current_weather}
+📊 天气预报: {forecast[:200]}...
 
-    if time_result.success:
-        current_time = time_result.data['formatted']
-        print(f"当前时间: {current_time}")
+🎯 钓鱼推荐: {recommendation[:300]}...
+🗓️ 季节建议: {season_advice}
+"""
 
-        # 基于时间进行数学计算
-        math_tool = MathTool()
-        hour = time_result.data['hour']
+    return planning_result
 
-        # 计算今天的剩余小时数
-        remaining_hours = 24 - hour
-        calc_result = await math_tool.execute(
-            operation='multiply',
-            a=remaining_hours,
-            b=60
-        )
-
-        if calc_result.success:
-            remaining_minutes = calc_result.data['result']
-            print(f"今天剩余时间: {remaining_hours} 小时 ({remaining_minutes} 分钟)")
-
-            # 搜索关于时间管理的信息
-            search_tool = SearchTool()
-            search_result = await search_tool.execute(
-                operation='knowledge_search',
-                query='时间管理'
-            )
-
-            if search_result.success:
-                print(f"找到 {search_result.data['total_results']} 个时间管理相关结果")
+# 使用示例
+plan = comprehensive_fishing_planning("西湖")
+print(plan)
 ```
 
 ## 故障排除
 
-### 常见问题
+### 常见问题及解决方案
 
-1. **导入错误**
-   ```python
-   # 错误
-   from tools import time_tool  # ❌
+#### 1. 导入错误
 
-   # 正确
-   from tools import TimeTool  # ✅
-   time_tool = TimeTool()
-   ```
+```python
+# 错误的导入方式
+from tools.weather_tools import get_current_weather  # 可能因路径问题失败
 
-2. **异步调用错误**
-   ```python
-   # 错误
-   result = time_tool.execute(operation='current_time')  # ❌
+# 正确的导入方式 - 使用动态导入
+try:
+    from tools.weather_tools import get_current_weather
+except ImportError:
+    try:
+        from src.tools.weather_tools import get_current_weather
+    except ImportError:
+        # 绝对导入作为最后选择
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+        from tools.weather_tools import get_current_weather
+```
 
-   # 正确
-   result = await time_tool.execute(operation='current_time')  # ✅
-   ```
+#### 2. API密钥问题
 
-3. **参数验证失败**
-   ```python
-   # 检查参数是否正确
-   if not time_tool.validate_input(operation='current_time'):
-       print("参数验证失败")
-       return
-   ```
+```bash
+# 检查环境变量
+echo $CAIYUN_API_KEY
+echo $AMAP_API_KEY
 
-4. **配置错误**
-   ```python
-   # 使用默认配置避免错误
-   try:
-       time_tool = TimeTool(config)
-   except Exception as e:
-       print(f"配置错误，使用默认配置: {e}")
-       time_tool = TimeTool()
-   ```
+# 或在Python中检查
+import os
+print("彩云天气API密钥:", "已配置" if os.getenv("CAIYUN_API_KEY") else "未配置")
+print("高德地图API密钥:", "已配置" if os.getenv("AMAP_API_KEY") else "未配置")
+```
+
+#### 3. 网络连接问题
+
+```python
+import requests
+
+def check_network_connectivity():
+    """检查网络连接"""
+    try:
+        response = requests.get("https://api.caiyunapp.com/v2/weather", timeout=5)
+        print("✅ 网络连接正常")
+        return True
+    except requests.exceptions.RequestException as e:
+        print(f"❌ 网络连接失败: {e}")
+        return False
+
+check_network_connectivity()
+```
+
+#### 4. 数据质量问题
+
+```python
+def validate_weather_data(weather_data):
+    """验证天气数据质量"""
+    required_fields = ['temperature', 'condition', 'humidity', 'wind_speed']
+    missing_fields = [field for field in required_fields if field not in weather_data]
+
+    if missing_fields:
+        print(f"⚠️ 天气数据不完整，缺少字段: {missing_fields}")
+        return False
+
+    # 检查温度合理性
+    temp = weather_data.get('temperature')
+    if temp is None or temp < -50 or temp > 60:
+        print(f"⚠️ 温度数据异常: {temp}")
+        return False
+
+    print("✅ 天气数据验证通过")
+    return True
+```
+
+#### 5. 智能体状态检查
+
+```python
+def diagnostic_check():
+    """系统诊断检查"""
+    print("🔍 智能钓鱼助手系统诊断")
+    print("=" * 50)
+
+    # 1. 检查工具导入
+    tools_status = {}
+    try:
+        from tools.weather_tools import get_current_weather
+        tools_status['weather_tools'] = '✅ 正常'
+    except Exception as e:
+        tools_status['weather_tools'] = f'❌ 错误: {e}'
+
+    try:
+        from tools.fishing_tools import query_fishing_recommendation
+        tools_status['fishing_tools'] = '✅ 正常'
+    except Exception as e:
+        tools_status['fishing_tools'] = f'❌ 错误: {e}'
+
+    try:
+        from tools.basic_tools import get_current_time
+        tools_status['basic_tools'] = '✅ 正常'
+    except Exception as e:
+        tools_status['basic_tools'] = f'❌ 错误: {e}'
+
+    for tool, status in tools_status.items():
+        print(f"{tool}: {status}")
+
+    # 2. 检查智能体
+    try:
+        from agent import create_optimized_fishing_agent
+        agent = create_optimized_fishing_agent()
+        health = agent.health_check()
+        print(f"智能体状态: {health['status']}")
+    except Exception as e:
+        print(f"智能体状态: ❌ 错误: {e}")
+
+    # 3. 检查API密钥
+    import os
+    api_keys = {
+        'CAIYUN_API_KEY': os.getenv("CAIYUN_API_KEY"),
+        'AMAP_API_KEY': os.getenv("AMAP_API_KEY"),
+    }
+
+    print("\nAPI密钥状态:")
+    for key, value in api_keys.items():
+        status = "✅ 已配置" if value else "❌ 未配置"
+        print(f"{key}: {status}")
+
+# 运行诊断
+diagnostic_check()
+```
 
 ### 调试技巧
 
-1. **启用详细日志**
-   ```python
-   import logging
-   logging.basicConfig(level=logging.DEBUG)
+#### 启用详细日志
 
-   tool = TimeTool()
-   result = await tool.execute(operation='current_time')
-   ```
+```python
+import logging
+import os
 
-2. **检查工具元数据**
-   ```python
-   tool = TimeTool()
-   print(f"工具名称: {tool.metadata.name}")
-   print(f"工具版本: {tool.metadata.version}")
-   print(f"工具描述: {tool.metadata.description}")
-   ```
+# 设置日志级别
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
-3. **验证工具状态**
-   ```python
-   # 检查工具是否正确初始化
-   if hasattr(tool, '_config'):
-       print("工具配置正确")
-   else:
-       print("工具配置异常")
-   ```
+# 启用工具调试模式
+os.environ['DEBUG_LOGGING'] = 'true'
+
+# 使用工具时会输出详细日志
+from tools.weather_tools import get_current_weather
+result = get_current_weather("北京")
+```
+
+#### 性能监控
+
+```python
+import time
+from functools import wraps
+
+def monitor_performance(func):
+    """性能监控装饰器"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+
+        execution_time = end_time - start_time
+        print(f"⏱️ {func.__name__} 执行时间: {execution_time:.2f}秒")
+
+        return result
+    return wrapper
+
+# 使用监控装饰器
+@monitor_performance
+def test_weather_tool():
+    from tools.weather_tools import get_current_weather
+    return get_current_weather("杭州")
+
+result = test_weather_tool()
+```
 
 ---
 
-**更新时间**: 2025-11-03
-**版本**: 1.0.0
-**维护者**: LangChain 学习项目
+**更新时间**: 2025-11-19
+**版本**: 2.2.0-architecture-simplified
+**维护者**: 智能钓鱼助手项目
