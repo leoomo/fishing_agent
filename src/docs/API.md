@@ -1,18 +1,19 @@
-# 智能钓鱼助手 - API 文档
+# 智能钓鱼助手 - API 文档 v2.2.0
 
-本文档描述了智能钓鱼助手简化架构后的主要 API 接口和使用方法，基于 LangChain 1.0+ 同步架构设计。
+本文档描述智能钓鱼助手v2.2.0简化架构后的主要 API 接口和使用方法，基于 **纯LangChain 1.0+ 同步架构**设计。
 
-## 🔄 版本说明
+## 🏗️ 版本说明
 
-### 简化架构版本 (v2.2.0+) ⭐ **当前版本**
+### 极简架构版本 (v2.2.0) ⭐ **当前版本**
 
-项目已完全重构为**极简架构**，从75+文件简化到5个核心文件，提供更好的开发体验：
+项目已完全重构为**极简架构**，从75+文件简化到5个核心文件，提供最佳开发体验：
 
-- ✅ **架构简化**: 从75+文件简化到5个核心文件
-- ✅ **同步设计**: 全面采用同步架构，消除异步调用问题
-- ✅ **直接调用**: 统一API客户端，无中间层
-- ✅ **伦理约束**: 绝不编造虚假数据，诚实报告系统状态
-- ✅ **LangChain 1.0+**: 使用最新@tool装饰器和create_agent API
+- ✅ **架构极简化**: 从75+文件简化到5个核心文件
+- ✅ **纯LangChain 1.0+**: 移除LangGraph包装层，直接使用原生API
+- ✅ **同步优先设计**: 全面采用同步架构，消除异步调用问题
+- ✅ **零抽象调用**: 统一API客户端，无中间层和服务抽象
+- ✅ **伦理数据约束**: 绝不编造虚假数据，诚实报告系统状态
+- ✅ **原生@tool装饰器**: 使用最新LangChain 1.0+工具系统
 
 ---
 
@@ -33,24 +34,24 @@
 - [错误处理](#错误处理)
 - [使用示例](#使用示例)
 
-## 核心 API
+## 核心 API (v2.2.0)
 
 ### create_optimized_fishing_agent
 
-创建优化的智能钓鱼助手，基于 LangChain 1.0+ 架构。
+创建极简智能钓鱼助手，基于**纯LangChain 1.0+ 架构**（无中间层）。
 
 ```python
-from agent import create_optimized_fishing_agent
+from src.agent import create_optimized_fishing_agent
 
-# 创建智能体（默认使用智谱AI）
+# 创建智能体（默认使用智谱AI GLM-4）
 agent = create_optimized_fishing_agent()
 
 # 指定模型提供商
 agent_zhipu = create_optimized_fishing_agent(model_provider="zhipu")
-agent_claude = create_optimized_fishing_agent(model_provider="anthropic")
-agent_openai = create_optimized_fishing_agent(model_provider="openai")
+agent_qwen = create_optimized_fishing_agent(model_provider="qwen")
+agent_doubao = create_optimized_fishing_agent(model_provider="doubao")
 
-# 带配置的创建
+# 带配置的创建（v2.2.0简化选项）
 agent = create_optimized_fishing_agent(
     model_provider="zhipu",
     enable_logging=True,
@@ -60,14 +61,14 @@ agent = create_optimized_fishing_agent(
 
 **参数：**
 - `model_provider` (str): 模型提供商，支持：
-  - `"zhipu"` - 智谱AI GLM-4.6 (默认)
-  - `"anthropic"` - Anthropic Claude Sonnet 4.5
-  - `"openai"` - OpenAI GPT-4o-mini
-- `enable_logging` (bool, 可选): 启用详细日志记录
-- `timeout` (int, 可选): 超时时间（秒）
+  - `"zhipu"` - 智谱AI GLM-4-flash (默认，推荐)
+  - `"qwen"` - 阿里巴巴通义千问 Qwen-plus
+  - `"doubao"` - 字节跳动豆包
+- `enable_logging` (bool, 可选): 启用详细日志记录（默认True）
+- `timeout` (int, 可选): 请求超时时间（秒，默认60）
 
 **返回：**
-- `OptimizedFishingAgent`: 智能钓鱼助手实例
+- `OptimizedFishingAgent`: 极简智能钓鱼助手实例
 
 ### OptimizedFishingAgent 类
 

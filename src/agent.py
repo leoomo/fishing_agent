@@ -236,16 +236,10 @@ class OptimizedFishingAgent:
 - 基于真实数据给出准确建议，从不提供虚假信息
 
 🛠️ 核心工具功能:
-1. get_current_weather - 获取当前详细天气信息
+1. get_current_time - 获取时间信息
 2. get_weather_forecast - 获取多日天气预报
 3. get_weather_by_date - 查询指定日期天气
 4. query_fishing_recommendation - 智能钓鱼推荐分析（核心）
-5. analyze_fishing_conditions - 深度钓鱼条件分析
-6. get_fishing_insights - 多天钓鱼洞察
-7. get_current_time - 获取时间信息
-8. calculate_fish_activity - 鱼类活跃度计算
-9. get_location_coordinates - 位置坐标查询
-10. get_fishing_season_advice - 季节性钓鱼建议
 
 🎣 专业能力:
 - 7因子钓鱼评分算法（温度、天气、风力、湿度、气压等）
@@ -558,7 +552,7 @@ def demonstrate_agent():
 
             try:
                 response = agent.run(test_input)
-                print(f"🤖 回复: {response[:200]}{'...' if len(response) > 200 else ''}")
+                print(f"🤖 回复:\n{response}")  # 显示完整回复
 
             except Exception as e:
                 print(f"❌ 失败: {e}")

@@ -1,8 +1,8 @@
-# Fishing Agent - 智能钓鱼助手
+# Fishing Agent - 智能钓鱼助手 v2.2.0
 
 基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐和天气分析。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **架构简化版**
 
 ## ✨ 核心功能
 
@@ -71,25 +71,14 @@ uv sync
 
 ### 配置环境变量
 ```bash
-# 创建环境配置文件
-cat > .env << 'EOF'
-# 彩云天气 API 密钥 (必需)
-# 获取方式: https://www.caiyunapp.com/
-CAIYUN_API_KEY=your-caiyun-api-key-here
+# 复制环境配置模板
+cp .env.example .env
 
-# 高德地图 API 密钥 (必需)
-# 获取方式: https://console.amap.com/dev/key/app
-AMAP_API_KEY=your-amap-api-key-here
-
-# 智谱AI GLM API 密钥 (推荐)
-ANTHROPIC_AUTH_TOKEN=your-zhipu-api-token-here
-
-# OpenAI API 密钥 (可选)
-OPENAI_API_KEY=your-openai-api-key-here
-
-# Anthropic API 密钥 (可选)
-ANTHROPIC_API_KEY=your-anthropic-api-key-here
-EOF
+# 编辑 .env 文件，添加您的API密钥
+# 必需的API密钥：
+# - CAIYUN_API_KEY: 彩云天气API
+# - AMAP_API_KEY: 高德地图API
+# - ANTHROPIC_AUTH_TOKEN: 智谱AI API (推荐)
 ```
 
 ### 运行项目
@@ -155,28 +144,22 @@ print(f"坐标: {coords}")
 fishing-agent/
 ├── src/                          # 源代码目录
 │   ├── agent.py                  # 🤖 LangChain智能体主入口
-│   ├── core/                     # 🏗️ 核心架构
-│   │   ├── interfaces.py         # 📋 接口定义
-│   │   ├── base_tool.py          # 🔧 工具基类
-│   │   ├── base_agent.py         # 🤖 智能体基类
-│   │   └── registry.py           # 📊 注册器
-│   ├── tools/                    # 🛠️ 工具模块
-│   │   ├── basic/                 # 基础工具
-│   │   ├── weather/               # 天气工具
-│   │   └── fishing/               # 钓鱼工具
-│   ├── services/                 # 🌐 服务层
-│   │   ├── service_manager.py    # 🔄 服务管理器
-│   │   ├── coordinate/           # 📍 坐标服务
-│   │   ├── weather/              # 🌤️ 天气服务
-│   │   ├── matching/             # 🧠 匹配服务
-│   │   └── middleware/           # 📝 中间件
-│   ├── interfaces/               # 🔧 服务接口
-│   ├── config/                   # ⚙️ 配置管理
+│   ├── tools/                    # 🛠️ 简化工具模块
+│   │   ├── __init__.py          # 工具统一接口
+│   │   ├── basic_tools.py       # 基础工具（时间、数学等）
+│   │   ├── weather_tools.py     # 天气工具（实时天气、预报）
+│   │   └── fishing_tools.py     # 钓鱼工具（推荐、评分）
+│   ├── services/                 # 🌐 服务层（API调用）
 │   └── tests/                    # 🧪 测试套件
 ├── main.py                       # 🚀 程序入口
 ├── pyproject.toml                # 📦 项目配置
 ├── CLAUDE.md                     # 📖 Claude开发指南
-└── README.md                     # 📋 项目说明
+├── CHANGELOG.md                  # 📋 更新日志
+├── README.md                     # 📋 项目说明
+└── docs/                         # 📖 详细文档
+    ├── TOOLS_GUIDE.md           # 工具使用指南
+    ├── API.md                   # API文档
+    └── CONFIGURATION_GUIDE.md   # 配置指南
 ```
 
 ## 🧪 测试

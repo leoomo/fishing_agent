@@ -67,18 +67,6 @@ def get_weather_tools_sync():
     return get_weather_tools()
 
 
-def query_current_weather(location: str):
-    """
-    向后兼容：查询当前天气
-
-    Args:
-        location: 位置名称
-
-    Returns:
-        str: 天气信息
-    """
-    from .weather_tools import get_current_weather
-    return get_current_weather.invoke({"location": location})
 
 
 def query_fishing_recommendation(location: str, date: str = None):
@@ -102,7 +90,6 @@ __all__ = [
     'get_weather_tools',
     'get_fishing_tools',
     'get_weather_tools_sync',
-    'query_current_weather',
     'query_fishing_recommendation',
     # 新架构导出
     'BASIC_TOOLS',

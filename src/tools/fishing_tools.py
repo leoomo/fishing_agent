@@ -6,7 +6,7 @@
 替代原来的15+个文件，提供完整的钓鱼决策支持。
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, date, timedelta
 import logging
 from langchain.tools import tool
@@ -65,140 +65,6 @@ def query_fishing_recommendation(location: str, date: str = None) -> str:
         return f"❌ 分析钓鱼推荐时发生错误: {str(e)}，请稍后重试。"
 
 
-@tool
-def analyze_fishing_conditions(location: str, date: str = None) -> str:
-    """
-    分析钓鱼条件，提供详细的天气适应性分析
-
-    Args:
-        location: 地区名称
-        date: 日期字符串（可选，默认为今天）
-
-    Returns:
-        详细的钓鱼条件分析报告
-    """
-    try:
-        target_date = _parse_date_input(date or "today")
-        date_str = target_date.strftime('%Y-%m-%d')
-
-        # 获取天气数据
-        weather_data = _get_weather_data(location, target_date)
-        if not weather_data:
-            return f"无法获取{location}的天气数据进行条件分析。"
-
-        # 计算各维度评分
-        scores = _calculate_fishing_score(weather_data)
-
-        # 生成分析报告
-        report = f"🎣 {location} 钓鱼条件分析 ({date_str})\n"
-        report += "=" * 50 + "\n\n"
-
-        report += "📊 **各维度评分分析**:\n"
-        report += f"• 🌡️ 温度评分: {scores['temperature']:.1f}/100\n"
-        report += f"• ☁️ 天气评分: {scores['weather']:.1f}/100\n"
-        report += f"• 💨 风力评分: {scores['wind']:.1f}/100\n"
-        report += f"• 💧 湿度评分: {scores['humidity']:.1f}/100\n"
-        report += f"• 🌀 气压评分: {scores['pressure']:.1f}/100\n"
-        report += f"• 🏆 综合评分: {scores['overall']:.1f}/100\n\n"
-
-        report += "📋 **详细条件分析**:\n"
-        report += _generate_detailed_analysis(weather_data, scores)
-
-        return report
-
-    except Exception as e:
-        logger.error(f"钓鱼条件分析失败: {str(e)}")
-        return f"分析钓鱼条件时发生错误: {str(e)}"
-
-
-@tool
-def get_fishing_insights(location: str, days: int = 3) -> str:
-    """
-    获取多天钓鱼洞察，分析最佳的钓鱼时间窗口
-
-    Args:
-        location: 地区名称
-        days: 分析天数（1-7天）
-
-    Returns:
-        多天钓鱼洞察报告，推荐最佳的钓鱼日期和时间
-    """
-    try:
-        if not 1 <= days <= 7:
-            return "分析天数必须在1-7天之间"
-
-        insights = f"🎣 {location} {days}天钓鱼洞察\n"
-        insights += "=" * 50 + "\n\n"
-
-        daily_scores = []
-        today = date.today()
-
-        for i in range(days):
-            target_date = today + timedelta(days=i)
-            date_str = target_date.strftime('%m-%d')
-            day_name = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][target_date.weekday()]
-
-            # 获取天气数据
-            weather_data = _get_weather_data(location, target_date)
-            if weather_data:
-                scores = _calculate_fishing_score(weather_data)
-                daily_scores.append({
-                    'date': target_date,
-                    'date_str': date_str,
-                    'day_name': day_name,
-                    'score': scores['overall'],
-                    'weather': weather_data
-                })
-
-        if not daily_scores:
-            return f"无法获取{location}未来{days}天的天气预报数据。"
-
-        # 排序找出最佳日期
-        daily_scores.sort(key=lambda x: x['score'], reverse=True)
-
-        insights += "📅 **推荐钓鱼日期排行**:\n"
-        for i, day_data in enumerate(daily_scores[:5]):
-            score = day_data['score']
-            date_str = day_data['date_str']
-            day_name = day_data['day_name']
-
-            # 推荐等级
-            if score >= 85:
-                grade = "🌟 优秀"
-                recommendation = "非常适合钓鱼，是出钓的好时机"
-            elif score >= 70:
-                grade = "👍 良好"
-                recommendation = "适合钓鱼，条件较好"
-            elif score >= 55:
-                grade = "👌 一般"
-                recommendation = "可以钓鱼，需选择合适时机和钓点"
-            else:
-                grade = "👎 较差"
-                recommendation = "不太适合钓鱼，建议改期"
-
-            insights += f"第{i+1}位: {date_str} {day_name} - {score:.1f}分 {grade}\n"
-            insights += f"   {recommendation}\n\n"
-
-        # 最佳日期的详细建议
-        best_day = daily_scores[0]
-        insights += f"🎯 **最佳钓鱼日**: {best_day['date_str']} {best_day['day_name']} (评分: {best_day['score']:.1f})\n\n"
-
-        insights += "**最佳时间段建议**:\n"
-        insights += "• 🌅 清晨5:00-9:00: 鱼类活跃度高，温度适宜\n"
-        insights += "• 🌆 傍晚18:00-21:00: 光线柔和，鱼类觅食高峰\n"
-        insights += "• 🌙 夜间钓鱼: 夏季可选，注意安全和蚊虫\n\n"
-
-        # 钓点建议
-        insights += "**钓点选择建议**:\n"
-        insights += "• 🏞️ 选择深水区: 高温时段鱼类喜阴凉深水\n"
-        insights += "• 🌳 靠近水草区: 鱼类觅食和藏身之处\n"
-        insights += "• 🏔️ 背风处: 减少风力影响，提升作钓体验\n"
-
-        return insights
-
-    except Exception as e:
-        logger.error(f"钓鱼洞察生成失败: {str(e)}")
-        return f"生成钓鱼洞察时发生错误: {str(e)}"
 
 
 def _parse_date_input(date_input: str) -> datetime:
@@ -353,19 +219,23 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
         target_wind_speeds = []
         target_humidities = []
         target_pressures = []
+        target_datetimes = []  # 新增：保存时间戳
 
         for i, temp_data in enumerate(temperatures):
             try:
                 # 解析时间戳
                 timestamp = temp_data['datetime']
                 if isinstance(timestamp, str):
-                    hour_date = dateparser.parse(timestamp).date()
+                    parsed_datetime = dateparser.parse(timestamp)
+                    hour_date = parsed_datetime.date()
                 else:
-                    hour_date = datetime.fromtimestamp(timestamp).date()
+                    parsed_datetime = datetime.fromtimestamp(timestamp)
+                    hour_date = parsed_datetime.date()
 
                 if hour_date == target_date:
                     # 收集目标日期的数据
                     target_temps.append(temp_data['value'])
+                    target_datetimes.append(parsed_datetime)  # 新增：保存完整时间戳
 
                     if i < len(skycons):
                         target_conditions.append(skycons[i]['value'])
@@ -403,11 +273,21 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
         avg_pressure = sum(target_pressures) / len(target_pressures) if target_pressures else None
 
         extracted_data = {
+            # 日平均值（向后兼容）
             'temperature': avg_temp,
             'condition': main_condition,
             'wind_speed': avg_wind_speed,
             'humidity': avg_humidity,
             'pressure': avg_pressure,
+            # 新增：24小时数据数组
+            'hourly_temps': target_temps,
+            'hourly_conditions': target_conditions,
+            'hourly_wind_speeds': target_wind_speeds,
+            'hourly_humidities': target_humidities,
+            'hourly_pressures': target_pressures,
+            'hourly_datetimes': target_datetimes,
+            'has_hourly_data': len(target_temps) > 0,  # 标记是否有小时数据
+            # 元数据
             'data_source': 'hourly_forecast',
             'data_quality': 'valid'
         }
@@ -886,6 +766,276 @@ def _calculate_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, float]:
     }
 
 
+def _calculate_hourly_scores(weather_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    按小时计算钓鱼评分
+
+    Args:
+        weather_data: 包含hourly数据数组的天气数据
+
+    Returns:
+        24小时评分列表，每项包含小时、时间、评分和天气详情
+    """
+    try:
+        # 检查是否有小时数据
+        if not weather_data.get('has_hourly_data', False):
+            logger.warning("没有hourly数据，无法计算小时评分")
+            return []
+
+        hourly_temps = weather_data.get('hourly_temps', [])
+        hourly_conditions = weather_data.get('hourly_conditions', [])
+        hourly_wind_speeds = weather_data.get('hourly_wind_speeds', [])
+        hourly_humidities = weather_data.get('hourly_humidities', [])
+        hourly_pressures = weather_data.get('hourly_pressures', [])
+        hourly_datetimes = weather_data.get('hourly_datetimes', [])
+
+        # 验证数据完整性
+        data_length = len(hourly_temps)
+        if data_length == 0:
+            logger.error("hourly_temps为空")
+            return []
+
+        hourly_scores = []
+
+        # 权重配置（与日评分保持一致）
+        weights = {
+            'temperature': 0.25,
+            'weather': 0.30,
+            'wind': 0.20,
+            'humidity': 0.15,
+            'pressure': 0.10
+        }
+
+        # 遍历每个小时
+        for i in range(data_length):
+            try:
+                # 获取该小时的天气数据
+                temp = hourly_temps[i] if i < len(hourly_temps) else None
+                condition = hourly_conditions[i] if i < len(hourly_conditions) else None
+                wind_speed = hourly_wind_speeds[i] if i < len(hourly_wind_speeds) else None
+                humidity = hourly_humidities[i] if i < len(hourly_humidities) else None
+                pressure = hourly_pressures[i] if i < len(hourly_pressures) else None
+                dt = hourly_datetimes[i] if i < len(hourly_datetimes) else None
+
+                # 验证必需字段
+                if None in [temp, condition, wind_speed, humidity, pressure]:
+                    logger.debug(f"第{i}小时数据不完整，跳过")
+                    continue
+
+                # 计算各维度评分（复用现有函数）
+                temp_score = _calc_temp_score(temp)
+                weather_score = _calc_weather_score(condition)
+                wind_score = _calc_wind_score(wind_speed)
+                humidity_score = _calc_humidity_score(humidity)
+                pressure_score = _calc_pressure_score(pressure)
+
+                # 计算综合评分
+                overall_score = (
+                    temp_score * weights['temperature'] +
+                    weather_score * weights['weather'] +
+                    wind_score * weights['wind'] +
+                    humidity_score * weights['humidity'] +
+                    pressure_score * weights['pressure']
+                )
+
+                # 构建该小时的评分记录
+                hour_score = {
+                    'hour': i,
+                    'datetime': dt,
+                    'time_str': dt.strftime('%H:%M') if dt else f'{i}:00',
+                    'score': overall_score,
+                    'temperature': temp,
+                    'condition': condition,
+                    'wind_speed': wind_speed,
+                    'humidity': humidity,
+                    'pressure': pressure,
+                    'scores': {
+                        'temperature': temp_score,
+                        'weather': weather_score,
+                        'wind': wind_score,
+                        'humidity': humidity_score,
+                        'pressure': pressure_score
+                    }
+                }
+
+                hourly_scores.append(hour_score)
+
+            except Exception as e:
+                logger.warning(f"计算第{i}小时评分失败: {e}")
+                continue
+
+        logger.info(f"成功计算{len(hourly_scores)}个小时的钓鱼评分")
+        return hourly_scores
+
+    except Exception as e:
+        logger.error(f"按小时计算评分失败: {e}")
+        return []
+
+
+def _find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) -> List[Dict[str, Any]]:
+    """
+    智能检测最佳钓鱼时段（灵活时段长度）
+
+    Args:
+        hourly_scores: 24小时评分列表
+        top_n: 返回top N个时段，默认3个
+
+    Returns:
+        最佳时段列表，每项包含时段范围、评分、天气摘要等
+    """
+    try:
+        if not hourly_scores:
+            logger.warning("hourly_scores为空，无法检测最佳时段")
+            return []
+
+        # 准备候选时段列表
+        candidate_slots = []
+
+        # 使用滑动窗口检测连续高分时段（窗口大小1-4小时）
+        for window_size in range(1, 5):  # 1-4小时
+            for start_idx in range(len(hourly_scores) - window_size + 1):
+                end_idx = start_idx + window_size
+
+                # 获取窗口内的评分
+                window_scores = hourly_scores[start_idx:end_idx]
+
+                # 计算窗口平均评分
+                avg_score = sum(h['score'] for h in window_scores) / len(window_scores)
+
+                # 获取时间范围
+                start_time = window_scores[0]['time_str']
+                end_hour = window_scores[-1]['hour'] + 1
+                end_time = f"{end_hour:02d}:00" if end_hour < 24 else "24:00"
+
+                # 获取窗口内的平均天气数据
+                avg_temp = sum(h['temperature'] for h in window_scores) / len(window_scores)
+                avg_wind = sum(h['wind_speed'] for h in window_scores) / len(window_scores)
+                avg_humidity = sum(h['humidity'] for h in window_scores) / len(window_scores)
+                avg_pressure = sum(h['pressure'] for h in window_scores) / len(window_scores)
+
+                # 获取主要天气状况（出现频率最高的）
+                conditions = [h['condition'] for h in window_scores]
+                main_condition = max(set(conditions), key=conditions.count)
+
+                # 构建候选时段
+                slot = {
+                    'start_hour': start_idx,
+                    'end_hour': end_idx,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'time_range': f"{start_time}-{end_time}",
+                    'duration_hours': window_size,
+                    'avg_score': avg_score,
+                    'temperature': avg_temp,
+                    'condition': main_condition,
+                    'wind_speed': avg_wind,
+                    'humidity': avg_humidity,
+                    'pressure': avg_pressure
+                }
+
+                candidate_slots.append(slot)
+
+        # 按平均评分降序排序
+        candidate_slots.sort(key=lambda x: x['avg_score'], reverse=True)
+
+        # 选择top N个不重叠的时段
+        selected_slots = []
+        used_hours = set()
+
+        for slot in candidate_slots:
+            # 检查是否与已选时段重叠
+            slot_hours = set(range(slot['start_hour'], slot['end_hour']))
+            if not slot_hours.intersection(used_hours):
+                selected_slots.append(slot)
+                used_hours.update(slot_hours)
+
+                if len(selected_slots) >= top_n:
+                    break
+
+        # 按时间顺序排序（早到晚）
+        selected_slots.sort(key=lambda x: x['start_hour'])
+
+        logger.info(f"成功检测{len(selected_slots)}个最佳钓鱼时段")
+        return selected_slots
+
+    except Exception as e:
+        logger.error(f"智能时段检测失败: {e}")
+        return []
+
+
+def _generate_score_trend(hourly_scores: List[Dict[str, Any]]) -> str:
+    """
+    生成24小时评分趋势ASCII可视化图
+
+    Args:
+        hourly_scores: 24小时评分列表
+
+    Returns:
+        ASCII趋势图字符串
+    """
+    try:
+        if not hourly_scores:
+            return "无评分数据"
+
+        # 提取评分
+        scores = [h['score'] for h in hourly_scores]
+        hours = [h['time_str'] for h in hourly_scores]
+
+        # 计算统计信息
+        max_score = max(scores)
+        min_score = min(scores)
+        avg_score = sum(scores) / len(scores)
+
+        # 构建趋势图
+        chart = []
+        chart.append("📊 24小时钓鱼评分趋势")
+        chart.append("=" * 50)
+        chart.append("")
+
+        # 评分刻度（10个等级，从0到100）
+        height = 10  # 图表高度
+        width = len(scores)  # 图表宽度
+
+        # 绘制图表主体
+        for level in range(height, 0, -1):
+            score_threshold = (level / height) * 100
+            line = f"{int(score_threshold):3d} ┃ "
+
+            for score in scores:
+                if score >= score_threshold:
+                    line += "█"
+                else:
+                    line += " "
+
+            chart.append(line)
+
+        # 绘制底部分隔线
+        chart.append("    ┗" + "━" * width)
+
+        # 绘制时间轴（简化版：只显示关键时刻）
+        time_axis = "      "
+        for i, hour_str in enumerate(hours):
+            if i % 4 == 0:  # 每4小时显示一次
+                hour = hour_str.split(':')[0]
+                time_axis += f"{hour:2s}  "
+
+        chart.append(time_axis + " (时)")
+        chart.append("")
+
+        # 添加统计信息
+        chart.append(f"📈 统计数据:")
+        chart.append(f"   最高评分: {max_score:.1f}分")
+        chart.append(f"   最低评分: {min_score:.1f}分")
+        chart.append(f"   平均评分: {avg_score:.1f}分")
+        chart.append("")
+
+        return "\n".join(chart)
+
+    except Exception as e:
+        logger.error(f"生成评分趋势图失败: {e}")
+        return f"评分趋势图生成失败: {str(e)}"
+
+
 def _calc_temp_score(temp: float) -> float:
     """温度评分"""
     if 15 <= temp <= 25:
@@ -948,7 +1098,7 @@ def _calc_pressure_score(pressure: float) -> float:
 
 
 def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, Any], scores: Dict[str, float]) -> str:
-    """生成钓鱼推荐报告"""
+    """生成钓鱼推荐报告（支持24小时智能时段推荐）"""
     overall_score = scores.get('overall', 0.0)
     data_quality = scores.get('data_quality', 'unknown')
 
@@ -967,6 +1117,34 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
 - 避免在不明确的天气条件下进行钓鱼活动
 
 *出于数据准确性考虑，我们不提供基于虚假或推测信息的钓鱼建议。*"""
+
+    # 🆕 检测是否有hourly数据，尝试生成智能时段推荐
+    hourly_scores = []
+    best_time_slots = []
+    score_trend = ""
+    has_hourly_data = weather_data.get('has_hourly_data', False)
+
+    if has_hourly_data:
+        try:
+            logger.info("检测到hourly数据，开始生成智能时段推荐")
+
+            # 计算24小时评分
+            hourly_scores = _calculate_hourly_scores(weather_data)
+
+            if hourly_scores:
+                # 检测最佳时段
+                best_time_slots = _find_best_time_slots(hourly_scores, top_n=3)
+
+                # 生成评分趋势图
+                score_trend = _generate_score_trend(hourly_scores)
+
+                logger.info(f"智能时段推荐生成成功: {len(best_time_slots)}个时段")
+            else:
+                logger.warning("hourly评分计算失败，将使用默认推荐")
+
+        except Exception as e:
+            logger.error(f"智能时段推荐生成失败: {e}")
+            # 失败时不影响基础报告生成
 
     # 确定推荐等级
     if overall_score >= 85:
@@ -990,10 +1168,53 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
     report = f"🎣 {location} 钓鱼推荐报告 ({date})\n"
     report += "=" * 50 + "\n\n"
 
+    # 🆕 低分天气警告提示（用户选择的"标注相对最佳"）
+    if overall_score < 60:
+        report += "⚠️ **天气条件提示**\n"
+        report += f"整体天气评分较低 ({overall_score:.1f}分)，不太适合钓鱼。\n"
+        if best_time_slots:
+            report += "以下为相对最佳时段，仅供参考，建议谨慎出钓。\n\n"
+        else:
+            report += "建议改期或选择更合适的天气条件。\n\n"
+
     # 综合推荐
     report += f"🏆 **综合评分**: {overall_score:.1f}/100 {grade}\n"
     report += f"📝 **推荐建议**: {recommendation}\n"
-    report += f"⏰ **最佳时段**: {time_advice}\n\n"
+
+    # 🆕 如果有智能时段推荐，优先展示
+    if best_time_slots:
+        report += f"\n⏰ **智能推荐时段** (基于24小时数据分析):\n\n"
+
+        # 排名emoji
+        rank_emojis = ['🥇', '🥈', '🥉']
+
+        for i, slot in enumerate(best_time_slots):
+            emoji = rank_emojis[i] if i < len(rank_emojis) else f"{i+1}."
+            report += f"{emoji} **第{i+1}推荐**: {slot['time_range']} (评分: {slot['avg_score']:.1f}分)\n"
+            report += f"   • 温度: {slot['temperature']:.1f}°C | 天气: {slot['condition']} | 风速: {slot['wind_speed']:.1f}m/s\n"
+            report += f"   • 湿度: {slot['humidity']:.1f}% | 气压: {slot['pressure']:.1f} hPa\n"
+
+            # 添加推荐理由
+            reasons = []
+            if slot['avg_score'] >= 80:
+                if 15 <= slot['temperature'] <= 25:
+                    reasons.append("温度适宜")
+                if slot['wind_speed'] < 3:
+                    reasons.append("风力较小")
+                if 50 <= slot['humidity'] <= 70:
+                    reasons.append("湿度理想")
+            elif slot['avg_score'] >= 60:
+                reasons.append("相对较好的时段")
+            else:
+                reasons.append("整体条件差，此为相对最佳")
+
+            if reasons:
+                report += f"   • 推荐理由: {', '.join(reasons)}\n"
+
+            report += "\n"
+    else:
+        # 没有智能时段数据时，使用默认建议
+        report += f"⏰ **最佳时段**: {time_advice}\n\n"
 
     # 天气条件
     report += f"🌤️ **天气条件**:\n"
@@ -1013,48 +1234,60 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
 
     # 钓鱼建议
     report += f"💡 **钓鱼建议**:\n"
-    _add_fishing_suggestions(report, scores)
+    report += _add_fishing_suggestions(scores)
 
     # 装备建议
     report += f"\n🎒 **装备建议**:\n"
-    _add_equipment_suggestions(report, weather_data)
+    report += _add_equipment_suggestions(weather_data)
+
+    # 🆕 添加24小时评分趋势图（如果有）
+    if score_trend:
+        report += f"\n{score_trend}\n"
 
     return report
 
 
-def _add_fishing_suggestions(report: str, scores: Dict[str, float]):
+def _add_fishing_suggestions(scores: Dict[str, float]) -> str:
     """添加钓鱼建议"""
+    suggestions = ""
+
     if scores['temperature'] >= 80:
-        report += "• ✅ 温度适宜，鱼类活跃度较高\n"
+        suggestions += "• ✅ 温度适宜，鱼类活跃度较高\n"
     elif scores['temperature'] >= 60:
-        report += "• ⚠️ 温度一般，建议选择深水区或遮荫处\n"
+        suggestions += "• ⚠️ 温度一般，建议选择深水区或遮荫处\n"
     else:
-        report += "• ❌ 温度不佳，鱼类活动较少\n"
+        suggestions += "• ❌ 温度不佳，鱼类活动较少\n"
 
     if scores['weather'] >= 80:
-        report += "• ✅ 天气条件良好，适合钓鱼\n"
+        suggestions += "• ✅ 天气条件良好，适合钓鱼\n"
     else:
-        report += "• ⚠️ 天气一般，注意防护\n"
+        suggestions += "• ⚠️ 天气一般，注意防护\n"
 
     if scores['wind'] >= 80:
-        report += "• ✅ 风平浪静，利于作钓\n"
+        suggestions += "• ✅ 风平浪静，利于作钓\n"
     elif scores['wind'] >= 60:
-        report += "• ⚠️ 风力适中，注意抛竿技巧\n"
+        suggestions += "• ⚠️ 风力适中，注意抛竿技巧\n"
     else:
-        report += "• ❌ 风力较大，建议选择避风钓位\n"
+        suggestions += "• ❌ 风力较大，建议选择避风钓位\n"
+
+    return suggestions
 
 
-def _add_equipment_suggestions(report: str, weather_data: Dict[str, Any]):
+def _add_equipment_suggestions(weather_data: Dict[str, Any]) -> str:
     """添加装备建议"""
+    suggestions = ""
+
     if weather_data.get('condition', '').startswith('晴'):
-        report += "• 建议携带防晒装备和遮阳帽\n"
+        suggestions += "• 建议携带防晒装备和遮阳帽\n"
     elif '雨' in weather_data.get('condition', ''):
-        report += "• 建议携带雨具，选择有遮挡的钓位\n"
+        suggestions += "• 建议携带雨具，选择有遮挡的钓位\n"
 
     if weather_data.get('temperature', 20) < 15:
-        report += "• 建议携带保暖衣物\n"
+        suggestions += "• 建议携带保暖衣物\n"
     elif weather_data.get('temperature', 20) > 28:
-        report += "• 建议携带充足的饮水\n"
+        suggestions += "• 建议携带充足的饮水\n"
+
+    return suggestions
 
 
 def _generate_detailed_analysis(weather_data: Dict[str, Any], scores: Dict[str, float]) -> str:
@@ -1095,7 +1328,5 @@ def _generate_detailed_analysis(weather_data: Dict[str, Any], scores: Dict[str, 
 
 # 工具列表，用于agent创建
 FISHING_TOOLS = [
-    query_fishing_recommendation,
-    analyze_fishing_conditions,
-    get_fishing_insights
+    query_fishing_recommendation
 ]

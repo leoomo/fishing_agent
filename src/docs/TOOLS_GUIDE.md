@@ -1,6 +1,6 @@
-# 智能钓鱼助手 - 简化工具使用指南
+# 智能钓鱼助手 - 工具使用指南 v2.2.0
 
-本文档介绍智能钓鱼助手简化架构后的工具使用方法，基于 LangChain 1.0+ 同步架构设计。
+本文档介绍智能钓鱼助手v2.2.0简化架构后的工具使用方法，基于 **纯LangChain 1.0+ 同步架构**设计。
 
 ## 目录
 
@@ -16,57 +16,59 @@
 
 智能钓鱼助手在架构简化后，将原有的复杂异步工具系统重构为简洁的同步工具，直接使用 LangChain 1.0+ 的 `@tool` 装饰器。
 
-### 主要特性
+### 主要特性 (v2.2.0)
 
 - **🏗️ 极简架构**: 从75+文件简化到5个核心文件
-- **🔌 同步设计**: 全面采用同步架构，消除异步调用问题
-- **⚡ 直接调用**: 统一API客户端，无中间层
-- **⚙️ 零配置**: 开箱即用，无需复杂配置
+- **🔌 纯LangChain 1.0+**: 移除LangGraph包装层，直接使用`@tool`装饰器
+- **⚡ 同步设计**: 全面采用同步架构，消除异步调用问题
+- **🎯 直接调用**: 统一API客户端，无中间层和抽象
 - **📊 伦理约束**: 绝不编造虚假数据，诚实报告系统状态
 - **🧪 真实数据**: 基于真实API数据，提供可靠的钓鱼建议
 
-### 工具列表
+### 工具列表 (v2.2.0)
 
-| 工具模块 | 功能描述 | 主要特性 |
-|---------|---------|---------|
-| **weather_tools.py** | 天气工具集 | 实时天气、72小时预报、真实API数据 |
-| **fishing_tools.py** | 钓鱼工具集 | 智能推荐、7因子评分、伦理约束 |
-| **basic_tools.py** | 基础工具集 | 时间查询、数学计算、坐标服务 |
+| 工具模块 | 文件位置 | 功能描述 | 主要特性 |
+|---------|---------|---------|---------|
+| **天气工具集** | `src/tools/weather_tools.py` | 天气查询和预报 | 实时天气、72小时预报、直接API调用 |
+| **钓鱼工具集** | `src/tools/fishing_tools.py` | 钓鱼推荐和评分 | 7因子评分算法、伦理约束、智能推荐 |
+| **基础工具集** | `src/tools/basic_tools.py` | 基础实用工具 | 时间查询、数学计算、坐标服务 |
 
 ## 架构简化
 
 ### 简化前后对比
 
 ```
-# 简化前 (75+ 文件)
+# 简化前 (75+ 文件) - 复杂架构
 src/
 ├── tools/
 │   ├── async/                    # 异步工具模块
-│   ├── interfaces/               # 接口定义
-│   ├── base_tool.py             # 基础类
+│   ├── interfaces/               # 接口定义层
+│   ├── base_tool.py             # 基础抽象类
 │   └── 20+ 工具实现文件
 ├── services/
-│   ├── manager.py               # 服务管理器
+│   ├── manager.py               # 复杂服务管理器
 │   ├── registry/                # 注册系统
 │   └── 15+ 服务实现文件
-└── core/
-    ├── interfaces/              # 核心接口
-    └── architecture/            # 架构组件
+├── core/                        # 核心抽象层
+│   ├── interfaces/              # 核心接口
+│   └── architecture/            # 架构组件
+└── middleware/                  # 中间件系统
+    ├── logging/                 # 日志中间件
+    └── performance/             # 性能监控
 
-# 简化后 (5个核心文件)
+# 简化后 (5个核心文件) - v2.2.0 极简架构
 src/
-├── agent.py                    # 主智能体 (LangChain 1.0+)
-├── tools/                      # 工具目录
-│   ├── weather_tools.py        # 天气工具集
-│   ├── fishing_tools.py        # 钓鱼工具集
-│   ├── basic_tools.py          # 基础工具集
-│   └── __init__.py             # 工具导出
-├── utils/                      # 工具类目录
-│   ├── api_client.py           # 统一API客户端
-│   ├── coordinate_utils.py     # 坐标工具
-│   ├── cache.py                # 简化缓存系统
-│   └── __init__.py             # 工具类导出
-└── docs/                       # 项目文档
+├── agent.py                    # 🤖 主智能体 (纯LangChain 1.0+)
+├── tools/                      # 🛠️ 工具目录
+│   ├── weather_tools.py        # ☁️ 天气工具集 (直接API调用)
+│   ├── fishing_tools.py        # 🎣 钓鱼工具集 (7因子算法)
+│   ├── basic_tools.py          # 🔧 基础工具集 (实用工具)
+│   └── __init__.py             # 📦 工具统一导出
+├── utils/                      # 🔨 工具类目录
+│   ├── api_client.py           # 🌐 统一API客户端
+│   ├── coordinate_utils.py     # 📍 坐标工具
+│   └── cache.py                # 💾 简化缓存系统
+└── config/                     # ⚙️ 配置管理
 ```
 
 ### LangChain 1.0+ 工具装饰器
@@ -90,67 +92,93 @@ def get_current_weather(location: str) -> str:
         return f"获取天气数据失败: {str(e)}"
 ```
 
-## 快速开始
+## 快速开始 (v2.2.0)
 
-### 1. 基本使用
+### 1. 环境配置
+
+```bash
+# 安装依赖
+uv sync
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，添加必需的API密钥
+```
+
+### 2. 基本工具使用
 
 ```python
-# 导入工具 - 支持相对和绝对导入
-from tools.weather_tools import get_current_weather, get_weather_forecast
-from tools.fishing_tools import query_fishing_recommendation
-from tools.basic_tools import get_current_time, calculate
+# 导入工具 - v2.2.0 统一接口
+from src.tools import get_all_tools
+from src.tools.weather_tools import get_current_weather, get_weather_forecast
+from src.tools.fishing_tools import query_fishing_recommendation
+from src.tools.basic_tools import get_current_time, calculate
 
-# 1. 获取当前时间
-time_result = get_current_time()
+# 1. 获取所有工具
+tools = get_all_tools()
+print(f"🛠️ 可用工具数量: {len(tools)}")
+
+# 2. 获取当前时间
+time_result = get_current_time.invoke({})
 print(f"🕐 当前时间: {time_result}")
 
-# 2. 数学计算
-math_result = calculate("123 * 456")
+# 3. 数学计算
+math_result = calculate.invoke({"expression": "123 * 456"})
 print(f"🔢 计算结果: {math_result}")
 
-# 3. 查询天气
-weather_result = get_current_weather("北京")
+# 4. 查询天气（直接API调用）
+weather_result = get_current_weather.invoke({
+    'place': '北京',
+    'date': '今天'
+})
 print(f"🌤️ 北京天气: {weather_result}")
 
-# 4. 智能钓鱼推荐
-fishing_result = query_fishing_recommendation("余杭区", "明天")
+# 5. 智能钓鱼推荐（7因子算法）
+fishing_result = query_fishing_recommendation.invoke({
+    'location': '余杭区',
+    'date': '明天'
+})
 print(f"🎣 钓鱼建议: {fishing_result[:200]}...")
 ```
 
-### 2. 命令行测试
+### 3. 命令行测试 (v2.2.0)
 
 ```bash
+# 测试统一工具接口
+uv run python -c "
+from src.tools import get_all_tools
+tools = get_all_tools()
+print(f'🛠️ 总工具数: {len(tools)}')
+for tool in tools:
+    print(f'  - {tool.name}: {tool.description[:50]}...')
+"
+
 # 天气工具测试
 uv run python -c "
-from tools.weather_tools import get_current_weather
-print(get_current_weather('上海'))
+from src.tools.weather_tools import get_current_weather
+print(get_current_weather.invoke({'place': '上海', 'date': '今天'}))
 "
 
 # 钓鱼推荐工具测试
 uv run python -c "
-from tools.fishing_tools import query_fishing_recommendation
-print(query_fishing_recommendation('杭州', '明天'))
+from src.tools.fishing_tools import query_fishing_recommendation
+print(query_fishing_recommendation.invoke({'location': '杭州', 'date': '明天'}))
 "
 
-# 时间工具测试
+# 基础工具测试
 uv run python -c "
-from tools.basic_tools import get_current_time
-print(get_current_time())
-"
-
-# 计算工具测试
-uv run python -c "
-from tools.basic_tools import calculate
-print(calculate('12 * 8'))
+from src.tools.basic_tools import get_current_time, calculate
+print('🕐 时间:', get_current_time.invoke({}))
+print('🔢 计算:', calculate.invoke({'expression': '12 * 8'}))
 "
 ```
 
-### 3. 智能体集成
+### 4. 智能体集成 (v2.2.0)
 
 ```python
-from agent import create_optimized_fishing_agent
+from src.agent import create_optimized_fishing_agent
 
-# 创建智能钓鱼助手
+# 创建简化智能体（无中间件，纯LangChain 1.0+）
 agent = create_optimized_fishing_agent(model_provider="zhipu")
 
 # 智能对话示例
@@ -158,7 +186,8 @@ queries = [
     "明天余杭区钓鱼怎么样？",
     "现在几点了？",
     "计算 15 * 8",
-    "杭州未来三天天气如何？"
+    "杭州未来三天天气如何？",
+    "推荐一个钓鱼地点"
 ]
 
 for query in queries:
@@ -166,6 +195,27 @@ for query in queries:
     result = agent.run(query)
     print(f"🤖 助手: {result[:200]}...")
     print("-" * 50)
+```
+
+### 5. 交互式CLI使用 (v2.2.0)
+
+```bash
+# 启动交互式命令行界面
+uv run python main.py
+
+# 示例交互对话：
+🎣 智能钓鱼助手 - LangChain 1.0+
+==================================================
+输入您的问题，例如：
+- 明天杭州钓鱼怎么样？
+- 北京今天天气如何？
+- 推荐一个钓鱼地点
+输入 'quit' 退出程序
+==================================================
+
+🎣 请输入您的问题: 明天杭州钓鱼怎么样？
+🤔 正在思考...
+🎯 回答: 根据明天的天气预报...
 ```
 
 ## 工具详细使用

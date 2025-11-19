@@ -1,103 +1,187 @@
-# 彩云天气 API 配置指南
+# 智能钓鱼助手 - 完整配置指南 v2.2.0
 
 ## 📋 概述
 
-本指南将帮助您配置彩云天气 API，以便在 LangChain 智能体中获取真实的天气数据。
+本指南将帮助您配置智能钓鱼助手v2.2.0所需的所有API服务，包括天气数据、坐标服务和LLM提供商。项目采用**极简架构**，配置过程简单直接。
 
-## 🔧 环境变量配置
+## 🔧 环境变量配置 (v2.2.0)
 
-### 1. 配置文件设置
+### 1. 快速配置
 
-项目使用 `.env` 文件来管理环境变量配置。配置步骤如下：
-
-#### 步骤 1: 复制配置模板
 ```bash
+# 1. 安装依赖
+uv sync
+
+# 2. 复制配置模板
 cp .env.example .env
+
+# 3. 编辑配置文件，添加您的API密钥
 ```
 
-#### 步骤 2: 编辑配置文件
-编辑 `.env` 文件，设置您的彩云天气 API 密钥：
+### 2. 必需配置项
+
+编辑 `.env` 文件，配置以下必需的API服务：
 
 ```bash
-# 彩云天气 API 密钥 (用于真实天气数据)
+# === 必需的API服务 ===
+
+# 彩云天气 API 密钥 (必需)
 # 获取方式: https://www.caiyunapp.com/
 # 免费注册后可获得 API 密钥，支持一定次数的免费调用
 CAIYUN_API_KEY=your-caiyun-api-key-here
 
-# 高德地图 API 密钥 (用于坐标查询服务)
+# 高德地图 API 密钥 (必需)
 # 获取方式: https://console.amap.com/dev/key/app
 # 注册成为开发者并创建 Web 服务 API 应用
 AMAP_API_KEY=your-amap-api-key-here
 
-# 调试日志开关 (全局日志控制)
-# true/false, 1/0, yes/no, on/off - 支持多种格式
-# 默认值: true (开启详细调试日志)
-# 生产环境建议设置为: false (关闭详细日志)
-DEBUG_LOGGING=true
+# === LLM提供商 (至少配置一个) ===
+
+# 智谱AI GLM API 密钥 (推荐)
+# 获取方式: https://open.bigmodel.cn/
+ANTHROPIC_AUTH_TOKEN=your-zhipu-api-token-here
+
+# 或者配置其他LLM提供商：
+# 通义千问 API 密钥
+# DASHSCOPE_API_KEY=your-qwen-api-key-here
+
+# === 可选配置 ===
+
+# 日志级别 (可选)
+LOG_LEVEL=INFO
+
+# 缓存过期时间 (秒，可选)
+CACHE_TTL=3600
 ```
 
-将 `your-caiyun-api-key-here` 替换为您实际的 API 密钥。
+### 3. API密钥获取指南
 
-### 2. 获取彩云天气 API 密钥
+#### 🌤️ 彩云天气 API (必需)
 
 1. 访问 [彩云天气官网](https://www.caiyunapp.com/)
 2. 注册账号并登录
 3. 进入开发者控制台
 4. 创建应用并获取 API 密钥
-5. 将 API 密钥填入 `.env` 文件
+5. 将 `CAIYUN_API_KEY` 填入 `.env` 文件
 
-### 3. 验证配置
+#### 🗺️ 高德地图 API (必需)
+
+1. 访问 [高德开放平台](https://console.amap.com/dev/key/app)
+2. 注册成为开发者
+3. 创建 Web 服务 API 应用
+4. 获取 API 密钥
+5. 将 `AMAP_API_KEY` 填入 `.env` 文件
+
+#### 🤖 智谱AI GLM (推荐LLM)
+
+1. 访问 [智谱AI开放平台](https://open.bigmodel.cn/)
+2. 注册账号并实名认证
+3. 获取 API Token
+4. 将 `ANTHROPIC_AUTH_TOKEN` 填入 `.env` 文件
+
+#### 🔄 阿里巴巴通义千问 (可选LLM)
+
+1. 访问 [阿里云百炼平台](https://bailian.console.aliyun.com/)
+2. 开通服务并获取API-KEY
+3. 将 `DASHSCOPE_API_KEY` 填入 `.env` 文件
+
+### 4. 验证配置 (v2.2.0)
 
 运行以下命令验证配置是否正确：
 
 ```bash
-# 运行天气服务测试
-uv run python weather_service.py
+# v2.2.0 简化验证测试
 
-# 或运行完整的测试套件
-uv run python test_real_weather_api.py
+# 1. 测试工具接口
+uv run python -c "
+from src.tools import get_all_tools
+tools = get_all_tools()
+print(f'✅ 工具加载成功: {len(tools)} 个工具')
+"
+
+# 2. 测试天气API (需要CAIYUN_API_KEY)
+uv run python -c "
+from src.tools.weather_tools import get_current_weather
+try:
+    result = get_current_weather.invoke({'place': '北京', 'date': '今天'})
+    print(f'✅ 天气API测试成功: {result[:100]}...')
+except Exception as e:
+    print(f'❌ 天气API测试失败: {e}')
+"
+
+# 3. 测试智能体 (需要LLM API)
+uv run python -c "
+from src.agent import create_optimized_fishing_agent
+try:
+    agent = create_optimized_fishing_agent()
+    result = agent.run('现在几点了？')
+    print(f'✅ 智能体测试成功: {result[:100]}...')
+except Exception as e:
+    print(f'❌ 智能体测试失败: {e}')
+"
+
+# 4. 运行完整测试套件
+uv run pytest src/tests/ -v
 ```
 
-如果配置正确，您将看到真实的天气数据而不是模拟数据。
+如果配置正确，您将看到所有测试都显示"✅ 成功"。
 
-## 📁 配置文件详解
+## 📁 配置文件详解 (v2.2.0)
 
-### `.env` 文件结构
+### `.env` 文件完整结构
 
 ```bash
-# LangChain 1.0+ 智能体所需的 API 密钥
+# === 数据API服务 (必需) ===
+CAIYUN_API_KEY=your-caiyun-api-key-here      # 彩云天气API
+AMAP_API_KEY=your-amap-api-key-here          # 高德地图API
 
-# 智谱AI GLM API 密钥 (默认使用)
-ANTHROPIC_AUTH_TOKEN=your-zhipu-api-token-here
+# === LLM提供商 (至少配置一个) ===
+ANTHROPIC_AUTH_TOKEN=your-zhipu-token-here   # 智谱AI GLM (推荐)
+DASHSCOPE_API_KEY=your-qwen-key-here         # 阿里通义千问
+OPENAI_API_KEY=your-openai-key-here          # OpenAI GPT
+ANTHROPIC_API_KEY=your-claude-key-here       # Anthropic Claude
 
-# Anthropic Claude API 密钥 (备选)
-ANTHROPIC_API_KEY=your-anthropic-api-key-here
-
-# OpenAI API 密钥 (备选)
-OPENAI_API_KEY=your-openai-api-key-here
-
-# 彩云天气 API 密钥 (天气功能核心配置)
-CAIYUN_API_KEY=your-caiyun-api-key-here
+# === 可选配置 ===
+LOG_LEVEL=INFO                               # 日志级别
+CACHE_TTL=3600                               # 缓存过期时间(秒)
 ```
 
-### 环境变量说明
+### 环境变量详细说明
 
-| 变量名 | 必需 | 描述 | 获取方式 |
-|--------|------|------|----------|
-| `CAIYUN_API_KEY` | 是 | 彩云天气 API 密钥 | https://www.caiyunapp.com/ |
-| `ANTHROPIC_AUTH_TOKEN` | 否 | 智谱AI API 密钥 | https://open.bigmodel.cn/ |
-| `ANTHROPIC_API_KEY` | 否 | Anthropic API 密钥 | https://console.anthropic.com/ |
-| `OPENAI_API_KEY` | 否 | OpenAI API 密钥 | https://platform.openai.com/ |
+| 变量名 | 必需 | 描述 | 推荐程度 | 获取方式 |
+|--------|------|------|----------|----------|
+| `CAIYUN_API_KEY` | ✅ 是 | 彩云天气 API 密钥 | 核心必需 | https://www.caiyunapp.com/ |
+| `AMAP_API_KEY` | ✅ 是 | 高德地图 API 密钥 | 核心必需 | https://console.amap.com/dev/key/app |
+| `ANTHROPIC_AUTH_TOKEN` | ⚠️ 推荐 | 智谱AI GLM API | 推荐首选 | https://open.bigmodel.cn/ |
+| `DASHSCOPE_API_KEY` | ⚠️ 推荐 | 通义千问 API | 备选方案 | https://bailian.console.aliyun.com/ |
+| `LOG_LEVEL` | ❌ 否 | 日志级别 | 可选 | INFO/WARNING/ERROR |
 
-## 🚀 使用方法
+## 🚀 使用方法 (v2.2.0)
 
 ### 基本使用
 
 ```python
-from weather_service import get_weather_info
+# 方式1: 直接使用工具
+from src.tools.weather_tools import get_current_weather
+from src.tools.fishing_tools import query_fishing_recommendation
 
 # 获取天气信息
-weather_info = get_weather_info("北京")
+weather_info = get_current_weather.invoke({
+    'place': '北京',
+    'date': '今天'
+})
+
+# 获取钓鱼推荐
+fishing_advice = query_fishing_recommendation.invoke({
+    'location': '杭州',
+    'date': '明天'
+})
+
+# 方式2: 使用智能体
+from src.agent import create_optimized_fishing_agent
+
+agent = create_optimized_fishing_agent(model_provider="zhipu")
+response = agent.run("明天北京适合钓鱼吗？")
 print(weather_info)
 ```
 

@@ -1,6 +1,21 @@
 # 更新日志
 
-## [2025-11-18] v2.0.0 - 架构简化重构
+## [2025-11-19] v2.2.0 - 文档清理和架构优化
+
+### 🧹 Documentation Cleanup
+- **Removed 15+ unused MD files**: Eliminated duplicate and outdated documentation
+- **Consolidated architecture docs**: Merged scattered docs into centralized structure
+- **Updated project structure**: Reflected simplified 5-file architecture
+- **Cleaned CHANGELOG**: Maintained only primary changelog at root
+
+### 📁 Documentation Structure Updated
+- Removed `src/docs/CHANGELOG.md` (duplicate)
+- Removed `src/project_evolution_plan/` (outdated)
+- Removed `src/LangChain_架构详解.md` (superseded)
+- Removed `src/PROJECT_STATUS.md` (covered by README)
+- Removed archive directories and old proposals
+
+## [2025-11-18] v2.1.0 - 架构简化重构
 
 ### 🚀 重大变更
 

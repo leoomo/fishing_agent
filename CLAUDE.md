@@ -4,28 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is "fishing-agent" - an intelligent fishing assistant built with LangChain 1.0+ and LangGraph. The project focuses on fishing time recommendations and weather analysis, supporting multiple LLM providers (Zhipu AI, OpenAI, Anthropic) with real-time weather data integration.
+This is "fishing-agent" v2.2.0 - an intelligent fishing assistant built with **simplified LangChain 1.0+ architecture**. The project focuses on fishing time recommendations and weather analysis, supporting multiple LLM providers (Zhipu AI, Qwen, Doubao) with real-time weather data integration.
 
-## Core Architecture
+### 🏗️ **Simplified Architecture** (v2.2.0)
+**Major architectural simplification completed**: Reduced from 75+ files to 5 core files while maintaining all functionality.
 
-### 🏗️ Central Service Management
-- **Service Manager**: `src/services/service_manager.py` - Singleton pattern for unified service instance management
-- **Interface Abstraction**: `src/interfaces/` - Loose coupling design with dependency injection support
-- **Configuration Management**: `src/config/service_config.py` - Centralized configuration system
+- ✅ **Direct LangChain 1.0+**: Removed LangGraph wrapper layer, uses native LangChain agents
+- ✅ **Synchronous-first**: Eliminates async complexity and event loop issues
+- ✅ **Zero abstraction**: Direct API calls without middleware layers
+- ✅ **Ethical data constraints**: Never generates fake data, graceful degradation on API failures
 
-### 🎯 Key Modules
-- **Agent**: `src/agent.py` - Modern LangChain 1.0+ intelligent agent with refactored architecture
-- **Tools**: `src/tools/` - Modular tool system with independent tool modules
-  - `basic_tools.py` - Independent basic utility tools (time, math, search)
-  - `langchain_weather_tools_sync.py` - Weather and fishing analysis tools
-- **Services**: `src/services/` - Weather, coordinate, matching, and middleware services
-- **Core**: `src/core/` - Base classes, interfaces, and registry systems
+## Current Architecture (v2.2.0)
 
-### 🔄 Synchronous Architecture
-The project has been completely refactored to use synchronous architecture for stability:
-- All `*_sync.py` files are production-ready
-- Eliminates "Event loop is closed" errors
-- Uses `requests` instead of `aiohttp` for API calls
+### 🎯 Core Files (5-file architecture)
+- **`src/agent.py`** - Main LangChain 1.0+ intelligent agent entry point
+- **`src/tools/__init__.py`** - Unified tool interface and exports
+- **`src/tools/basic_tools.py`** - Basic utility tools (time, math, coordinates)
+- **`src/tools/weather_tools.py`** - Weather query and forecast tools
+- **`src/tools/fishing_tools.py`** - Fishing recommendation and scoring tools
+
+### 🔧 Supporting Infrastructure
+- **`src/utils/`** - Utility classes (API client, coordinate utils, cache)
+- **`src/config/`** - Configuration management
+- **`main.py`** - Interactive CLI entry point
+- **`src/tests/`** - Comprehensive test suite
 
 ## Development Commands
 
@@ -34,10 +36,11 @@ The project has been completely refactored to use synchronous architecture for s
 # Install dependencies
 uv sync
 
-# Activate virtual environment
-source .venv/bin/activate
+# Configure environment variables
+cp .env.example .env
+# Edit .env with your API keys
 
-# Run the application
+# Run the interactive application
 uv run python main.py
 # OR
 python main.py
@@ -48,117 +51,201 @@ python main.py
 # Run all tests
 uv run pytest src/tests/
 
-# Run specific tests
+# Run specific test modules
 uv run python src/tests/test_enhanced_fishing_scorer.py
 uv run python src/tests/integration/verify_national_integration.py
+
+# Test weather API
+uv run python src/tests/weather/test_real_weather_api.py
+
+# Test national coverage
+uv run python src/tests/test_national_coverage.py
 ```
 
-### Service Development
+### Tool Development
 ```bash
-# Test coordinate service
-uv run python -c "from src.services.coordinate.amap_coordinate_service import AmapCoordinateService; print(AmapCoordinateService().get_coordinate('北京'))"
+# Test tools directly
+uv run python -c "
+from src.tools import get_all_tools
+tools = get_all_tools()
+print(f'Available tools: {len(tools)}')
+for tool in tools:
+    print(f'- {tool.name}: {tool.description}')
+"
 
-# Test weather service
-uv run python -c "from src.services.weather.enhanced_caiyun_weather_service import EnhancedCaiyunWeatherService; print(EnhancedCaiyunWeatherService().get_weather('杭州'))"
+# Test weather tools
+uv run python -c "
+from src.tools.weather_tools import get_current_weather
+result = get_current_weather.invoke({'place': '北京'})
+print(result)
+"
+
+# Test fishing recommendations
+uv run python -c "
+from src.tools.fishing_tools import query_fishing_recommendation
+result = query_fishing_recommendation.invoke({'location': '杭州', 'date': '明天'})
+print(result)
+"
 ```
 
 ## Key Dependencies & Tech Stack
 
-### Core Framework
-- **langchain>=1.0.5** - Modern LangChain 1.0+ API
-- **langgraph-cli>=0.4.7** - LangGraph for agent development
-- **langchain-anthropic>=1.0.0** - Anthropic Claude integration
-- **langchain-openai>=1.0.1** - OpenAI GPT integration
+### Core Framework (v2.2.0)
+- **langchain>=0.3.0** - Modern LangChain 1.0+ API (direct usage, no LangGraph)
+- **langchain-openai>=1.0.1** - OpenAI GPT integration (also used for Zhipu AI)
+- **langchain-community>=0.3.0** - Community tools and integrations
+- **langchain-anthropic>=0.3.0** - Anthropic Claude integration
 
 ### Data & APIs
-- **requests>=2.25.0** - HTTP client (synchronous)
+- **requests>=2.25.0** - Primary HTTP client (synchronous)
 - **httpx>=0.24.0** - Alternative HTTP client
-- **pydantic>=2.0.0** - Data validation
-- **pandas>=2.3.3** - Data analysis
-- **transformers>=4.21.0** - Hugging Face transformers
-- **torch>=1.12.0** - PyTorch for ML
+- **pydantic>=2.0.0** - Data validation and settings
+- **python-dotenv>=1.1.1** - Environment variable management
+- **pandas>=2.3.3** - Data analysis and weather processing
+
+### LLM Providers
+- **智谱AI GLM** - Default LLM provider (ANTHROPIC_AUTH_TOKEN)
+- **通义千问** - Alibaba Qwen (DASHSCOPE_API_KEY)
+- **豆包** - Bytedance Doubao (optional)
 
 ### External Services
 - **彩云天气 API** - Real-time weather data (CAIYUN_API_KEY required)
 - **高德地图 API** - Geographic coordinate service (AMAP_API_KEY required)
-- **智谱AI GLM** - Default LLM provider (ANTHROPIC_AUTH_TOKEN)
 
-## Project Structure & Important Files
+## Current Project Structure (v2.2.0)
 
 ```
-src/
-├── agent.py                    # 🤖 Main LangChain agent entry point
-├── core/                       # 🏗️ Core architecture
-├── tools/                      # 🛠️ Synchronous tools (weather, fishing)
-├── services/                   # 🌐 Service layer with manager
-├── interfaces/                 # 🔧 Service interfaces
-├── config/                     # ⚙️ Configuration management
-└── tests/                      # 🧪 Test suites
+fishing-agent/
+├── src/                          # 源代码目录
+│   ├── agent.py                  # 🤖 Main LangChain 1.0+ agent
+│   ├── tools/                    # 🛠️ Simplified tool modules
+│   │   ├── __init__.py          # Tool exports and interfaces
+│   │   ├── basic_tools.py       # Basic utilities (time, math, coords)
+│   │   ├── weather_tools.py     # Weather and forecast tools
+│   │   └── fishing_tools.py     # Fishing recommendations and scoring
+│   ├── utils/                    # 🔧 Utility classes
+│   │   ├── api_client.py        # Unified API client
+│   │   ├── coordinate_utils.py  # Coordinate and location utilities
+│   │   └── cache.py             # Simple caching system
+│   ├── config/                   # ⚙️ Configuration management
+│   └── tests/                    # 🧪 Comprehensive test suite
+├── main.py                       # 🚀 Interactive CLI entry point
+├── pyproject.toml                # 📦 Project configuration
+├── .env.example                  # 🔑 Environment variable template
+├── CLAUDE.md                     # 📖 This development guide
+├── README.md                     # 📋 Project documentation
+└── CHANGELOG.md                  # 📋 Version history
 ```
 
-### Critical Files for Development
-- `src/services/service_manager.py` - Central service management
-- `src/tools/basic_tools.py` - Independent basic utility tools (time, math, search)
-- `src/tools/langchain_weather_tools_sync.py` - Weather and fishing analysis tools
-- `src/tools/fishing_analyzer_sync.py` - Fishing analysis engine
-- `src/services/coordinate/amap_coordinate_service.py` - Coordinate service
-- `src/services/weather/enhanced_caiyun_weather_service.py` - Weather service
+### Critical Files for Development (v2.2.0)
+- **`src/agent.py`** - Core OptimizedFishingAgent class using LangChain 1.0+ create_agent
+- **`src/tools/__init__.py`** - Unified tool interface and backward compatibility
+- **`src/tools/weather_tools.py`** - Weather tools with direct API calls
+- **`src/tools/fishing_tools.py`** - 7-factor fishing scoring algorithm
+- **`src/utils/api_client.py`** - Unified HTTP client for weather and coordinate APIs
+- **`main.py`** - Interactive command-line interface
 
-## Core Features
+## Core Features (v2.2.0)
 
 ### 🎣 Fishing Recommendation System
 - **7-Factor Algorithm**: Temperature, weather, wind, pressure, humidity, season, moon phase
+- **Ethical Data Constraints**: Never generates fake weather data, graceful API failure handling
 - **Intelligent Time Recommendations**: Solves the "86-score problem" with professional fishing research
 - **National Coverage**: Supports 3,142+ administrative regions (95%+ coverage)
-- **Natural Language Processing**: Chinese query support
+- **Natural Language Processing**: Chinese query support with direct tool integration
 
-### 🌤️ Weather Service
-- **Real-time Data**: Caiyun Weather API integration
+### 🌤️ Weather Service (Simplified)
+- **Direct API Calls**: No middleware layers, direct Caiyun Weather API integration
 - **Date Queries**: Supports relative ("tomorrow") and absolute ("2024-12-25") dates
-- **24-hour Forecasts**: Hourly weather predictions
-- **Smart Fallback**: Automatic degradation to simulated data when API unavailable
+- **72-hour Forecasts**: Extended hourly weather predictions
+- **Smart Fallback**: Honest error reporting when API unavailable (no fake data)
+- **Zero Configuration**: Works out of the box with proper API keys
 
-### 🗺️ Coordinate Service
-- **Amap API Integration**: Precise geographic coordinate queries
-- **Multi-level Caching**: 90%+ hit rate, <1ms response time
+### 🗺️ Coordinate Service (Unified)
+- **Direct Amap API Integration**: Precise geographic coordinate queries
+- **Simplified Caching**: Effective caching with 90%+ hit rate
 - **Intelligent Matching**: Supports aliases and fuzzy matching
 - **National Coverage**: 95%+ coverage of Chinese administrative regions
+- **Utility-based Design**: Simple coordinate utilities without service abstractions
 
-## Development Guidelines
+## Development Guidelines (v2.2.0)
 
-### When Working with This Codebase
+### Architecture Principles
+1. **Synchronous-first**: Use direct API calls with `requests`, avoid async complexity
+2. **Zero Abstraction**: Direct tool implementations without middleware layers
+3. **Ethical Data**: Never generate fake data, provide honest error messages
+4. **LangChain 1.0+ Native**: Use `@tool` decorator and `create_agent` directly
+5. **Simple Configuration**: Environment variables with `.env.example` template
 
-1. **Use Synchronous Patterns**: Always prefer `*_sync.py` files for production code
-2. **Service Manager**: Access services through `ServiceManager` for proper singleton behavior
-3. **Error Handling**: All services have comprehensive error handling and retry mechanisms
-4. **Caching Strategy**: Leverage the multi-level caching system for performance
-5. **Testing**: Write tests for new tools and services
-
-### Common Import Patterns
+### Common Import Patterns (v2.2.0)
 ```python
 # Agent creation
 from src.agent import create_optimized_fishing_agent
 
-# Service access
-from src.services.service_manager import ServiceManager
-sm = ServiceManager()
-weather_service = sm.get_weather_service()
+# Tool access - simplified unified interface
+from src.tools import get_all_tools, get_weather_tools, get_fishing_tools
 
-# Tool usage - Basic tools
-from src.tools.basic_tools import get_basic_tools, get_current_time, calculate
+# Direct tool usage
+from src.tools.weather_tools import get_current_weather, get_weather_forecast
+from src.tools.fishing_tools import query_fishing_recommendation
+from src.tools.basic_tools import get_current_time, calculate
 
-# Tool usage - Weather tools
-from src.tools.langchain_weather_tools_sync import query_current_weather
+# Utility classes
+from src.utils.api_client import WeatherAPIClient, CoordinateAPIClient
+from src.utils.coordinate_utils import get_coordinates
 ```
 
-### Environment Variables Required
-- `CAIYUN_API_KEY` - Weather API (required)
-- `AMAP_API_KEY` - Coordinate API (required)
-- `ANTHROPIC_AUTH_TOKEN` - Zhipu AI (recommended)
-- `OPENAI_API_KEY` - OpenAI (optional)
-- `ANTHROPIC_API_KEY` - Anthropic (optional)
+### Adding New Tools (v2.2.0)
+```python
+from langchain.tools import tool
+
+@tool
+def my_new_tool(param: str) -> str:
+    """
+    Tool description that will be shown to the LLM
+
+    Args:
+        param: Description of parameter
+
+    Returns:
+        Description of return value
+    """
+    try:
+        # Direct API call or processing
+        result = do_something(param)
+        return f"Result: {result}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+# Export in tools/__init__.py
+MY_TOOLS = [my_new_tool]
+```
+
+### Required Environment Variables
+Create `.env` from `.env.example`:
+
+```bash
+# Required APIs
+CAIYUN_API_KEY=your-caiyun-api-key      # Weather API (required)
+AMAP_API_KEY=your-amap-api-key          # Coordinate API (required)
+
+# LLM Providers (at least one recommended)
+ANTHROPIC_AUTH_TOKEN=your-zhipu-token   # Zhipu AI GLM (recommended)
+DASHSCOPE_API_KEY=your-qwen-key         # Alibaba Qwen
+OPENAI_API_KEY=your-openai-key          # OpenAI GPT
+ANTHROPIC_API_KEY=your-claude-key       # Anthropic Claude
+```
+
+### Testing Guidelines (v2.2.0)
+- Write tests for new tools in `src/tests/`
+- Test both success and error scenarios
+- Verify API integration with real keys
+- Use mock APIs for unit tests when possible
+- Test national coverage for location-based features
 
 ## Python Environment
-- Requires Python >=3.11
-- Uses `uv` for dependency management (as specified in user instructions)
-- Synchronous-first architecture for stability
+- **Requires Python >=3.11**
+- **Uses `uv` for dependency management** (as specified in user instructions)
+- **Synchronous-first architecture** for stability
+- **LangChain 1.0+ native** for tool and agent development
+- **Zero-config deployment** with proper environment variables

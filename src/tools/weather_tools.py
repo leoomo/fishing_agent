@@ -26,85 +26,6 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-def get_current_weather(location: str) -> str:
-    """
-    获取指定位置的当前天气信息
-
-    Args:
-        location: 位置名称，如"杭州"、"北京"、"余杭区"等
-
-    Returns:
-        详细的当前天气信息，包括温度、湿度、风速、天气状况等
-    """
-    try:
-        # 获取坐标
-        coords = get_coordinates(location)
-        longitude, latitude = coords
-
-        # 获取天气数据
-        weather_client = get_weather_client()
-        weather_data = weather_client.get_realtime_weather(longitude, latitude)
-
-        if not weather_data:
-            return f"抱歉，无法获取{location}的天气数据，请稍后重试。"
-
-        # 解析天气数据
-        realtime = weather_data.get('result', {}).get('realtime', {})
-
-        temperature = realtime.get('temperature', 0)
-        humidity = realtime.get('humidity', 0)
-        pressure = realtime.get('pressure', 0)
-        wind_speed = realtime.get('wind', {}).get('speed', 0)
-        wind_direction = realtime.get('wind', {}).get('direction', 0)
-        weather_skycon = realtime.get('skycon', 'unknown')
-        visibility = realtime.get('visibility', 10)
-
-        # 天气状况中文映射
-        weather_map = {
-            'CLEAR_DAY': '晴朗',
-            'CLEAR_NIGHT': '晴朗（夜间）',
-            'PARTLY_CLOUDY_DAY': '多云',
-            'PARTLY_CLOUDY_NIGHT': '多云（夜间）',
-            'CLOUDY': '阴天',
-            'LIGHT_HAZE': '轻度雾霾',
-            'MODERATE_HAZE': '中度雾霾',
-            'HEAVY_HAZE': '重度雾霾',
-            'LIGHT_RAIN': '小雨',
-            'MODERATE_RAIN': '中雨',
-            'HEAVY_RAIN': '大雨',
-            'STORM_RAIN': '暴雨',
-            'LIGHT_SNOW': '小雪',
-            'MODERATE_SNOW': '中雪',
-            'HEAVY_SNOW': '大雪',
-            'STORM_SNOW': '暴雪',
-            'DUST': '浮尘',
-            'SAND': '沙尘',
-            'WIND': '大风'
-        }
-
-        weather_cn = weather_map.get(weather_skycon, weather_skycon)
-
-        # 构建返回结果
-        result = f"🌤️ {location} 当前天气信息：\n\n"
-        result += f"🌡️ 温度: {temperature}°C\n"
-        result += f"☁️ 天气: {weather_cn}\n"
-        result += f"💧 湿度: {humidity}%\n"
-        result += f"💨 风速: {wind_speed} m/s\n"
-        result += f"🧭 风向: {wind_direction}°\n"
-        result += f"🌀 气压: {pressure} hPa\n"
-        result += f"👁️ 能见度: {visibility} km\n"
-        result += f"🕐 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
-        return result
-
-    except ValueError as e:
-        return f"位置错误: {str(e)}"
-    except Exception as e:
-        logger.error(f"获取天气失败: {e}")
-        return f"获取{location}天气信息时发生错误，请稍后重试。"
-
-
-@tool
 def get_weather_forecast(location: str, days: int = 3) -> str:
     """
     获取指定位置的天气预报
@@ -433,7 +354,6 @@ def _format_date_forecast(forecast_data: Dict, location: str, target_date: date)
 
 # 工具列表，用于agent创建
 WEATHER_TOOLS = [
-    get_current_weather,
     get_weather_forecast,
     get_weather_by_date
 ]
