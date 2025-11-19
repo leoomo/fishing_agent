@@ -44,6 +44,11 @@ cp .env.example .env
 uv run python main.py
 # OR
 python main.py
+
+# Run the agent directly (simplified - no PYTHONPATH needed)
+uv run python src/agent.py
+# OR from src directory:
+cd src && uv run python agent.py
 ```
 
 ### Testing
@@ -138,7 +143,9 @@ fishing-agent/
 ```
 
 ### Critical Files for Development (v2.2.0)
-- **`src/agent.py`** - Core OptimizedFishingAgent class using LangChain 1.0+ create_agent
+- **`src/agent.py`** - Core OptimizedFishingAgent class using LangChain 1.0+ create_agent (can be run directly)
+- **`src/fishing_agent/`** - Agent implementation with relative imports
+- **`src/middleware/`** - Health check and middleware utilities
 - **`src/tools/__init__.py`** - Unified tool interface and backward compatibility
 - **`src/tools/weather_tools.py`** - Weather tools with direct API calls
 - **`src/tools/fishing_tools.py`** - 7-factor fishing scoring algorithm

@@ -82,11 +82,25 @@ cp .env.example .env
 ```
 
 ### 运行项目
-```bash
-# 运行主程序
-uv run python main.py
 
-# 或激活虚拟环境后运行
+#### 方法一：交互式应用（推荐）
+```bash
+uv run python main.py
+```
+
+#### 方法二：直接运行Agent（新！）
+```bash
+# 从项目根目录运行
+uv run python src/agent.py
+
+# 或者从src目录运行
+cd src && uv run python agent.py
+```
+
+> ✅ **注意**: v2.2.0新增功能！无需复杂的PYTHONPATH配置，直接运行即可！
+
+#### 方法三：激活虚拟环境
+```bash
 source .venv/bin/activate
 python main.py
 ```
