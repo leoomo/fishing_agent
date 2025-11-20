@@ -122,8 +122,10 @@ python main.py
 
 ### 基础使用
 ```python
-# 导入智能体
-from src.agent import create_optimized_fishing_agent
+# 导入智能体 (添加src到路径)
+import sys
+sys.path.append('src')
+from agent import create_optimized_fishing_agent
 
 # 创建智能体实例
 agent = create_optimized_fishing_agent(model_provider="zhipu")
@@ -224,7 +226,7 @@ fishing-agent/
 │   │   ├── model_factory.py     # 多模型工厂
 │   │   ├── prompts.py           # System Prompt和Few-Shot
 │   │   └── callbacks.py         # 回调处理
-│   ├── tools/                    # 🛠️ 简化工具模块
+│   ├── tools/                    # 🛠️ 简化工具模块 (5-file架构核心)
 │   │   ├── __init__.py          # 工具统一接口和导出
 │   │   ├── basic_tools.py       # 基础工具（时间、数学、坐标）
 │   │   ├── weather_tools.py     # 天气工具（实时天气、预报）
@@ -234,22 +236,14 @@ fishing-agent/
 │   │   ├── coordinate_utils.py  # 坐标和地理工具
 │   │   └── cache.py             # 缓存系统
 │   ├── config/                   # ⚙️ 配置管理
-│   │   └── service_config.py    # 服务配置
 │   ├── middleware/               # 🔌 中间件
-│   │   └── health.py            # 健康检查
 │   ├── data/                     # 📊 数据层
-│   │   ├── national_region_database.py  # 全国地区数据库
-│   │   └── coordinate_enrichment.py     # 坐标数据增强
+│   ├── docs/                     # 📖 技术文档
 │   └── tests/                    # 🧪 测试套件
-│       ├── test_time_period_intent.py   # ⏰ 时间段意图测试（v2.3.0新增）
-│       ├── test_enhanced_fishing_scorer.py
-│       ├── test_national_coverage.py
-│       └── integration/         # 集成测试
-│           └── verify_national_integration.py
-├── docs/                         # 📖 详细文档
+├── docs/                         # 📖 项目文档
 │   └── intent_understanding_optimization.md  # ⏰ 时间段意图优化文档（v2.3.0）
 ├── main.py                       # 🚀 交互式CLI入口
-├── pyproject.toml                # 📦 项目配置（需要升级到v2.3.0）
+├── pyproject.toml                # 📦 项目配置 (v2.3.0)
 ├── CLAUDE.md                     # 📖 Claude开发指南
 ├── CHANGELOG.md                  # 📋 更新日志
 └── README.md                     # 📋 项目说明
