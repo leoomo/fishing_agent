@@ -194,17 +194,27 @@ def _get_weather_data(location: str, target_date: datetime) -> Optional[Dict[str
             # 未来日期：获取预报数据
             days_diff = (target_date - today).days
             if 1 <= days_diff <= 3:
-                # 获取72小时预报数据，确保覆盖未来3天
+                # 1-3天：使用小时级预报（精度最高）
                 hours_needed = days_diff * 24
-                logger.info(f"获取{hours_needed}小时预报数据")
+                logger.info(f"获取{hours_needed}小时预报数据（精度高）")
 
                 hourly_data = weather_client.get_hourly_forecast(longitude, latitude, 72)
                 if hourly_data:
                     return _extract_hourly_weather(hourly_data, target_date)
                 else:
                     return None
+            elif 4 <= days_diff <= 6:
+                # 4-6天：使用日级预报（中等精度）
+                # 注意：daily API返回今天(第0天)+未来6天，共7条数据
+                logger.info(f"获取日级预报数据（第{days_diff}天，使用daily API）")
+
+                daily_data = weather_client.get_daily_forecast(longitude, latitude, 7)
+                if daily_data:
+                    return _extract_daily_weather(daily_data, target_date)
+                else:
+                    return None
             else:
-                logger.warning(f"不支持查询{days_diff}天后的天气数据")
+                logger.warning(f"不支持查询{days_diff}天后的天气数据（API限制：最多6天）")
                 return None
 
     except Exception as e:
@@ -421,6 +431,156 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
 
     except Exception as e:
         logger.error(f"提取小时级天气数据失败: {e}")
+        import traceback
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return {}
+
+
+def _extract_daily_weather(daily_data: Dict[str, Any], target_date: date) -> Dict[str, Any]:
+    """从彩云天气API日级预报数据中提取指定日期的天气字段
+
+    Args:
+        daily_data: 彩云天气API返回的daily预报数据
+        target_date: 目标日期
+
+    Returns:
+        提取的天气数据字典，包含温度、风速、湿度、气压、天气状况等字段
+
+    Note:
+        - 温度单位: °C (直接使用avg值)
+        - 风速单位: m/s (直接使用avg.speed值)
+        - 湿度: 0-1格式需转换为百分比
+        - 气压: Pa需转换为hPa (除以100)
+        - 天气状况: 使用skycon.value
+    """
+    try:
+        logger.info(f"开始提取{target_date}的日级天气数据")
+
+        daily = daily_data.get('result', {}).get('daily', {})
+
+        if not daily:
+            logger.error("API返回数据中没有daily字段")
+            return {}
+
+        # 获取各字段的数据数组
+        temperatures = daily.get('temperature', [])
+        skycons = daily.get('skycon', [])
+        winds = daily.get('wind', [])
+        humidities = daily.get('humidity', [])
+        pressures = daily.get('pressure', [])
+
+        if not temperatures:
+            logger.error("没有温度数据")
+            return {}
+
+        # 查找目标日期的索引
+        from dateutil import parser as dateparser
+
+        target_index = None
+        for i, temp_data in enumerate(temperatures):
+            try:
+                timestamp = temp_data['date']
+                if isinstance(timestamp, str):
+                    parsed_date = dateparser.parse(timestamp).date()
+                else:
+                    parsed_date = datetime.fromtimestamp(timestamp).date()
+
+                if parsed_date == target_date:
+                    target_index = i
+                    break
+            except Exception as e:
+                logger.debug(f"解析日期失败: {e}")
+                continue
+
+        if target_index is None:
+            logger.error(f"没有找到{target_date}的数据")
+            return {}
+
+        # 提取指定日期的数据
+        temp_data = temperatures[target_index]
+        temperature = temp_data.get('avg')  # 平均温度
+
+        # 天气状况
+        condition = None
+        if target_index < len(skycons):
+            condition = skycons[target_index].get('value')
+
+        # 风速
+        wind_speed = None
+        if target_index < len(winds):
+            wind_data = winds[target_index]
+            avg_wind = wind_data.get('avg', {})
+            if isinstance(avg_wind, dict):
+                wind_speed = avg_wind.get('speed')
+            elif isinstance(avg_wind, (int, float)):
+                wind_speed = avg_wind
+
+        # 湿度 (0-1格式转百分比)
+        humidity = None
+        if target_index < len(humidities):
+            humidity_data = humidities[target_index]
+            humidity_val = humidity_data.get('avg')
+            if humidity_val is not None:
+                # 如果是0-1范围，转换为百分比
+                if humidity_val <= 1:
+                    humidity = humidity_val * 100
+                else:
+                    humidity = humidity_val
+
+        # 气压 (Pa转hPa)
+        pressure = None
+        if target_index < len(pressures):
+            pressure_data = pressures[target_index]
+            pressure_val = pressure_data.get('avg')
+            if pressure_val is not None:
+                # 如果是Pa单位（大于10000），转换为hPa
+                if pressure_val > 10000:
+                    pressure = pressure_val / 100
+                else:
+                    pressure = pressure_val
+
+        extracted_data = {
+            'temperature': temperature,
+            'condition': condition,
+            'wind_speed': wind_speed,
+            'humidity': humidity,
+            'pressure': pressure,
+            'data_source': 'daily_forecast',
+            'data_quality': 'valid'
+        }
+
+        # 验证必需字段
+        required_fields = ['temperature', 'condition', 'wind_speed', 'humidity', 'pressure']
+        missing_fields = [field for field in required_fields if extracted_data.get(field) is None]
+
+        # 数据合理性验证
+        validation_errors = []
+
+        # 温度范围检查（-50°C 到 60°C）
+        if extracted_data.get('temperature') is not None:
+            temp = extracted_data['temperature']
+            if not (-50 <= temp <= 60):
+                validation_errors.append(f"温度值异常: {temp:.1f}°C")
+
+        # 气压范围检查（500 hPa 到 1100 hPa，覆盖高海拔地区）
+        if extracted_data.get('pressure') is not None:
+            pressure = extracted_data['pressure']
+            if not (500 <= pressure <= 1100):
+                validation_errors.append(f"气压值异常: {pressure:.1f} hPa")
+
+        if missing_fields:
+            logger.warning(f"日级天气数据不完整，缺少字段: {missing_fields}")
+            extracted_data['data_quality'] = 'incomplete'
+        elif validation_errors:
+            logger.warning(f"日级天气数据验证失败: {validation_errors}")
+            extracted_data['data_quality'] = 'invalid'
+        else:
+            logger.info(f"日级天气数据提取成功: 温度={temperature:.1f}°C, 天气={condition}")
+
+        return extracted_data
+
+    except Exception as e:
+        logger.error(f"提取日级天气数据失败: {e}")
         import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return {}
@@ -876,7 +1036,8 @@ def _calculate_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, float]:
         'weather': weather_score,
         'wind': wind_score,
         'humidity': humidity_score,
-        'pressure': pressure_score
+        'pressure': pressure_score,
+        'data_quality': 'valid'
     }
 
 
@@ -1599,7 +1760,144 @@ def _generate_detailed_analysis(weather_data: Dict[str, Any], scores: Dict[str, 
     return analysis
 
 
+@tool
+def query_week_fishing_recommendation(location: str, start_date: str = "今天") -> str:
+    """
+    查询一周钓鱼推荐（高效批量查询）
+
+    这个工具一次性查询未来7天的钓鱼推荐，比循环调用query_fishing_recommendation更高效。
+    自动从多天数据中推荐最佳钓鱼日期。
+
+    Args:
+        location: 地区名称，如"杭州"、"北京"、"景德镇市"等
+        start_date: 起始日期，支持：
+                   - 相对日期: "今天"、"明天" (默认"今天")
+                   - 绝对日期: "2024-12-25"
+
+    Returns:
+        包含7天钓鱼推荐的结构化表格，仅显示有数据的天数，并推荐最佳钓鱼日期
+
+    Examples:
+        query_week_fishing_recommendation("杭州")
+        query_week_fishing_recommendation("景德镇市", "今天")
+        query_week_fishing_recommendation("北京", "2024-12-25")
+    """
+    try:
+        # 解析起始日期
+        start_datetime = _parse_date_input(start_date)
+
+        # 收集7天数据
+        results = []
+        for day_offset in range(7):
+            target_date = start_datetime + timedelta(days=day_offset)
+            date_obj = target_date.date() if isinstance(target_date, datetime) else target_date
+            date_str = date_obj.strftime('%Y-%m-%d')
+            weekday = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][date_obj.weekday()]
+
+            # 获取天气数据
+            weather_data = _get_weather_data(location, target_date)
+
+            if weather_data:
+                # 计算评分
+                fishing_score = _calculate_fishing_score(weather_data)
+                overall_score = fishing_score.get('overall', 0.0)
+                data_quality = fishing_score.get('data_quality', 'unknown')
+
+                # 只有当数据质量有效时才添加
+                if data_quality == 'valid' and overall_score > 0:
+                    results.append({
+                        'date': date_str,
+                        'weekday': weekday,
+                        'score': overall_score,
+                        'temperature': weather_data.get('temperature'),
+                        'condition': weather_data.get('condition'),
+                        'wind_speed': weather_data.get('wind_speed'),
+                        'data_source': weather_data.get('data_source', 'unknown')
+                    })
+
+        if not results:
+            return f"❌ 抱歉，无法获取{location}未来7天的天气数据，请稍后重试。"
+
+        # 生成报告
+        report = f"🎣 {location}未来一周钓鱼推荐\n\n"
+
+        # 找到最佳日期
+        best_day = max(results, key=lambda x: x['score'])
+        report += f"✨ **最佳钓鱼日期**: {best_day['date']} ({best_day['weekday']})，评分: {best_day['score']:.1f}\n\n"
+
+        # 生成表格
+        report += "| 日期 | 星期 | 评分 | 温度 | 天气 | 风速 | 数据来源 |\n"
+        report += "|------|------|------|------|------|------|----------|\n"
+
+        for result in results:
+            # 转换天气代码为中文
+            condition_cn = _translate_weather_condition(result['condition'])
+
+            # 数据来源标注
+            source_label = {
+                'realtime': '实时',
+                'hourly_forecast': '小时级',
+                'daily_forecast': '日级'
+            }.get(result['data_source'], '未知')
+
+            # 评分等级
+            score = result['score']
+            if score >= 80:
+                score_emoji = "🟢"
+            elif score >= 60:
+                score_emoji = "🟡"
+            else:
+                score_emoji = "🔴"
+
+            report += f"| {result['date']} | {result['weekday']} | {score_emoji} {score:.1f} | {result['temperature']:.1f}°C | {condition_cn} | {result['wind_speed']:.1f}m/s | {source_label} |\n"
+
+        # 数据说明
+        report += f"\n📊 **数据说明**:\n"
+        report += f"- 共获取 {len(results)} 天有效数据\n"
+
+        # 统计数据来源
+        hourly_count = sum(1 for r in results if r['data_source'] == 'hourly_forecast')
+        daily_count = sum(1 for r in results if r['data_source'] == 'daily_forecast')
+
+        if hourly_count > 0:
+            report += f"- 小时级预报（高精度）: {hourly_count}天\n"
+        if daily_count > 0:
+            report += f"- 日级预报（中等精度）: {daily_count}天\n"
+
+        # 评分说明
+        report += f"\n📈 **评分说明**:\n"
+        report += f"- 🟢 80分以上: 优秀，非常适合钓鱼\n"
+        report += f"- 🟡 60-80分: 良好，适合钓鱼\n"
+        report += f"- 🔴 60分以下: 一般，需注意天气条件\n"
+
+        return report
+
+    except Exception as e:
+        logger.error(f"查询一周钓鱼推荐失败: {str(e)}")
+        import traceback
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return f"❌ 查询一周钓鱼推荐时发生错误: {str(e)}，请稍后重试。"
+
+
+def _translate_weather_condition(skycon: str) -> str:
+    """将彩云天气代码转换为中文描述"""
+    translations = {
+        'CLEAR_DAY': '晴天',
+        'CLEAR_NIGHT': '晴夜',
+        'PARTLY_CLOUDY_DAY': '多云',
+        'PARTLY_CLOUDY_NIGHT': '多云',
+        'CLOUDY': '阴天',
+        'RAIN': '雨',
+        'SNOW': '雪',
+        'WIND': '大风',
+        'FOG': '雾',
+        'HAZE': '霾'
+    }
+    return translations.get(skycon, skycon)
+
+
 # 工具列表，用于agent创建
 FISHING_TOOLS = [
-    query_fishing_recommendation
+    query_fishing_recommendation,
+    query_week_fishing_recommendation
 ]

@@ -96,7 +96,7 @@ def demonstrate_agent():
 
         # Test cases
         test_cases = [
-            "明天白天杭州市钓鱼怎么样？",
+            "今天什么时间在杭州余杭区钓鱼合适？",
         ]
 
         print(f"\n🧪 测试 {len(test_cases)} 个用例:")
