@@ -116,8 +116,16 @@ def _get_weather_data(location: str, target_date: datetime) -> Optional[Dict[str
             target_date = target_date.date()
 
         if target_date == today:
-            # 今天：获取实时天气
-            logger.info("获取实时天气数据")
+            # 今天：优先获取小时级预报数据（用于生成趋势图），回退到实时数据
+            logger.info("获取今天的小时级预报数据")
+            hourly_data = weather_client.get_hourly_forecast(longitude, latitude, 24)
+            if hourly_data:
+                result = _extract_hourly_weather(hourly_data, target_date)
+                if result and result.get('has_hourly_data'):
+                    return result
+
+            # 回退到实时天气数据
+            logger.info("回退到实时天气数据")
             weather_data = weather_client.get_realtime_weather(longitude, latitude)
             if weather_data:
                 return _extract_realtime_weather(weather_data)
@@ -191,7 +199,7 @@ def _extract_realtime_weather(weather_data: Dict[str, Any]) -> Dict[str, Any]:
                 validation_errors.append(f"温度值异常: {temp}°C")
                 extracted_data['data_quality'] = 'invalid'
 
-        # 气压范围检查（800 hPa 到 1100 hPa）
+        # 气压范围检查（500 hPa 到 1100 hPa，覆盖高海拔地区）
         if extracted_data.get('pressure') is not None:
             pressure = extracted_data['pressure']
             if not (500 <= pressure <= 1100):
@@ -334,7 +342,7 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
             if not (-50 <= temp <= 60):
                 validation_errors.append(f"温度值异常: {temp:.1f}°C")
 
-        # 气压范围检查（800 hPa 到 1100 hPa）
+        # 气压范围检查（500 hPa 到 1100 hPa，覆盖高海拔地区）
         if extracted_data.get('pressure') is not None:
             pressure = extracted_data['pressure']
             if not (500 <= pressure <= 1100):
@@ -951,8 +959,16 @@ def _find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) -
 
                 # 获取时间范围
                 start_time = window_scores[0]['time_str']
-                end_hour = window_scores[-1]['hour'] + 1
-                end_time = f"{end_hour:02d}:00" if end_hour < 24 else "24:00"
+                # 从最后一个时间点的datetime计算结束时间
+                last_dt = window_scores[-1].get('datetime')
+                if last_dt:
+                    end_dt = last_dt + timedelta(hours=1)
+                    end_time = end_dt.strftime('%H:%M')
+                else:
+                    # 回退：从time_str解析
+                    last_hour = int(window_scores[-1]['time_str'].split(':')[0])
+                    end_hour = (last_hour + 1) % 24
+                    end_time = f"{end_hour:02d}:00"
 
                 # 获取窗口内的平均天气数据
                 avg_temp = sum(h['temperature'] for h in window_scores) / len(window_scores)
