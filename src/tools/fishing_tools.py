@@ -159,13 +159,19 @@ def _extract_realtime_weather(weather_data: Dict[str, Any]) -> Dict[str, Any]:
             logger.error("API返回数据中没有realtime字段")
             return {}
 
+        # 处理气压单位转换（Pa转hPa）
+        pressure = realtime.get('pressure')
+        if pressure and pressure > 10000:  # 检查是否为Pa（正常气压范围80000-110000 Pa）
+            pressure = pressure / 100  # 转换为hPa
+            logger.debug(f"气压单位转换: {realtime.get('pressure')} Pa → {pressure} hPa")
+
         # 直接使用正确的字段映射
         extracted_data = {
             'temperature': realtime.get('temperature'),
             'condition': realtime.get('skycon'),
             'wind_speed': realtime.get('wind', {}).get('speed'),
             'humidity': realtime.get('humidity'),
-            'pressure': realtime.get('pressure'),
+            'pressure': pressure,
             'visibility': realtime.get('visibility'),
             'data_source': 'realtime',
             'data_quality': 'valid'
@@ -175,12 +181,32 @@ def _extract_realtime_weather(weather_data: Dict[str, Any]) -> Dict[str, Any]:
         required_fields = ['temperature', 'condition', 'wind_speed', 'humidity', 'pressure']
         missing_fields = [field for field in required_fields if extracted_data.get(field) is None]
 
+        # 数据合理性验证
+        validation_errors = []
+
+        # 温度范围检查（-50°C 到 60°C）
+        if extracted_data.get('temperature') is not None:
+            temp = extracted_data['temperature']
+            if not (-50 <= temp <= 60):
+                validation_errors.append(f"温度值异常: {temp}°C")
+                extracted_data['data_quality'] = 'invalid'
+
+        # 气压范围检查（800 hPa 到 1100 hPa）
+        if extracted_data.get('pressure') is not None:
+            pressure = extracted_data['pressure']
+            if not (500 <= pressure <= 1100):
+                validation_errors.append(f"气压值异常: {pressure:.1f} hPa")
+                extracted_data['data_quality'] = 'invalid'
+
         if missing_fields:
             logger.warning(f"实时天气数据不完整，缺少字段: {missing_fields}")
             extracted_data['data_quality'] = 'incomplete'
             # 根据伦理要求，不编造数据，让上层逻辑处理
+        elif validation_errors:
+            logger.warning(f"实时天气数据验证失败: {validation_errors}")
+            # data_quality已在上面设置为invalid
         else:
-            logger.info("实时天气数据提取成功，所有必需字段都存在")
+            logger.info("实时天气数据提取成功，所有必需字段都存在且合理")
 
         return extracted_data
 
@@ -251,7 +277,10 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
                         target_humidities.append(humidity_val)
 
                     if i < len(pressures):
-                        target_pressures.append(pressures[i]['value'])
+                        pressure_val = pressures[i]['value']
+                        if pressure_val and pressure_val > 10000:  # 检查是否为Pa（正常气压范围80000-110000 Pa）
+                            pressure_val = pressure_val / 100  # 转换为hPa
+                        target_pressures.append(pressure_val)
 
             except Exception as e:
                 logger.debug(f"处理小时数据失败: {e}")
@@ -296,10 +325,28 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
         required_fields = ['temperature', 'condition', 'wind_speed', 'humidity', 'pressure']
         missing_fields = [field for field in required_fields if extracted_data.get(field) is None]
 
+        # 数据合理性验证
+        validation_errors = []
+
+        # 温度范围检查（-50°C 到 60°C）
+        if extracted_data.get('temperature') is not None:
+            temp = extracted_data['temperature']
+            if not (-50 <= temp <= 60):
+                validation_errors.append(f"温度值异常: {temp:.1f}°C")
+
+        # 气压范围检查（800 hPa 到 1100 hPa）
+        if extracted_data.get('pressure') is not None:
+            pressure = extracted_data['pressure']
+            if not (500 <= pressure <= 1100):
+                validation_errors.append(f"气压值异常: {pressure:.1f} hPa")
+
         if missing_fields:
             logger.warning(f"小时级天气数据不完整，缺少字段: {missing_fields}")
             extracted_data['data_quality'] = 'incomplete'
             # 根据伦理要求，不编造数据，让上层逻辑处理
+        elif validation_errors:
+            logger.warning(f"小时级天气数据验证失败: {validation_errors}")
+            extracted_data['data_quality'] = 'invalid'
         else:
             logger.info(f"小时级天气数据提取成功: 温度={avg_temp:.1f}°C, 天气={main_condition}")
 
@@ -635,7 +682,7 @@ def _parse_pressure_value(line: str) -> Optional[float]:
                     pressure = pressure  # mb == hPa
 
                 # 合理性检查
-                if 800 <= pressure <= 1100:  # 合理的气压范围
+                if 500 <= pressure <= 1100:  # 合理的气压范围
                     logger.debug(f"🌀 解析气压: {pressure} hPa (原值: {match.group(1)} {unit})")
                     return pressure
                 else:
@@ -677,7 +724,7 @@ def _validate_weather_data(weather_data: Dict[str, Any], location: str) -> Dict[
     # 气压验证
     if weather_data.get('pressure') is not None:
         pressure = weather_data['pressure']
-        if not (800 <= pressure <= 1100):  # 合理的气压范围
+        if not (500 <= pressure <= 1100):  # 合理的气压范围
             validation_errors.append(f"气压值不合理: {pressure} hPa")
             weather_data['pressure'] = None
 
@@ -1218,11 +1265,11 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
 
     # 天气条件
     report += f"🌤️ **天气条件**:\n"
-    report += f"• 🌡️ 温度: {weather_data['temperature']}°C\n"
+    report += f"• 🌡️ 温度: {weather_data['temperature']:.1f}°C\n"
     report += f"• ☁️ 天气: {weather_data['condition']}\n"
     report += f"• 💨 风速: {weather_data['wind_speed']} m/s\n"
     report += f"• 💧 湿度: {weather_data['humidity']}%\n"
-    report += f"• 🌀 气压: {weather_data['pressure']} hPa\n\n"
+    report += f"• 🌀 气压: {weather_data['pressure']:.1f} hPa\n\n"
 
     # 各维度评分
     report += f"📊 **详细评分**:\n"
@@ -1316,7 +1363,7 @@ def _generate_detailed_analysis(weather_data: Dict[str, Any], scores: Dict[str, 
         analysis += f"风力{wind_speed}m/s较大，建议选择避风钓位或加重钓组\n"
 
     # 湿度和气压分析
-    analysis += f"• 湿度{weather_data['humidity']}%，气压{weather_data['pressure']}hPa，"
+    analysis += f"• 湿度{weather_data['humidity']:.1f}%，气压{weather_data['pressure']:.1f}hPa，"
 
     if scores['humidity'] >= 75 and scores['pressure'] >= 75:
         analysis += "空气湿润且气压稳定，有利于鱼类觅食\n"
