@@ -23,9 +23,55 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ===== 时间段定义常量 =====
+TIME_PERIOD_DEFINITIONS = {
+    # 标准时间段（24小时制）
+    "白天": {"start": 6, "end": 18, "alias": ["daytime", "白昼"]},
+    "晚上": {"start": 18, "end": 6, "alias": ["night", "夜间", "夜晚"], "cross_midnight": True},
+    "上午": {"start": 6, "end": 12, "alias": ["morning", "早上", "早晨"]},
+    "下午": {"start": 12, "end": 18, "alias": ["afternoon"]},
+    "傍晚": {"start": 16, "end": 19, "alias": ["evening", "黄昏"]},
+    "深夜": {"start": 0, "end": 6, "alias": ["midnight", "凌晨"]},
+    "全天": {"start": 0, "end": 24, "alias": ["all", "整天", "24小时"]},
+}
+
+
+def normalize_time_period(time_period: str) -> str:
+    """
+    标准化时间段字符串
+
+    Args:
+        time_period: 原始时间段字符串（可能包含别名）
+
+    Returns:
+        标准化后的时间段名称（如"白天"、"晚上"）
+
+    Examples:
+        >>> normalize_time_period("daytime")
+        "白天"
+        >>> normalize_time_period("早上")
+        "上午"
+    """
+    if not time_period:
+        return "全天"
+
+    time_period_lower = time_period.lower().strip()
+
+    # 直接匹配
+    if time_period_lower in TIME_PERIOD_DEFINITIONS:
+        return time_period_lower
+
+    # 别名匹配
+    for standard_name, config in TIME_PERIOD_DEFINITIONS.items():
+        if time_period_lower in config.get("alias", []):
+            return standard_name
+
+    # 未识别的时间段，返回全天
+    return "全天"
+
 
 @tool
-def query_fishing_recommendation(location: str, date: str = None) -> str:
+def query_fishing_recommendation(location: str, date: str = None, time_period: str = None) -> str:
     """
     查询钓鱼时间推荐，基于天气条件分析最佳的钓鱼时间
 
@@ -35,6 +81,14 @@ def query_fishing_recommendation(location: str, date: str = None) -> str:
               - 相对日期: "明天"、"后天"、"今天"
               - 绝对日期: "2024-12-25"
               - 空值: 默认为明天
+        time_period: 时间段限制，支持：
+              - "白天" / "daytime": 仅返回6:00-18:00的时段
+              - "晚上" / "night": 仅返回18:00-次日6:00的时段
+              - "上午" / "morning": 仅返回6:00-12:00的时段
+              - "下午" / "afternoon": 仅返回12:00-18:00的时段
+              - "傍晚" / "evening": 仅返回16:00-19:00的时段
+              - "深夜" / "midnight": 仅返回0:00-6:00的时段
+              - "全天" / "all" / None: 返回全天所有时段（默认）
 
     Returns:
         详细的钓鱼推荐报告，包含天气分析和最佳钓鱼时间建议
@@ -43,11 +97,16 @@ def query_fishing_recommendation(location: str, date: str = None) -> str:
         query_fishing_recommendation("杭州", "明天")
         query_fishing_recommendation("余杭区")
         query_fishing_recommendation("北京", "2024-12-25")
+        query_fishing_recommendation("佛山", "明天", "白天")
+        query_fishing_recommendation("杭州", "今天", "晚上")
     """
     try:
         # 解析日期
         target_date = _parse_date_input(date)
         date_str = target_date.strftime('%Y-%m-%d')
+
+        # 标准化时间段参数
+        normalized_period = normalize_time_period(time_period)
 
         # 获取天气数据
         weather_data = _get_weather_data(location, target_date)
@@ -57,8 +116,8 @@ def query_fishing_recommendation(location: str, date: str = None) -> str:
         # 计算钓鱼评分
         fishing_score = _calculate_fishing_score(weather_data)
 
-        # 生成推荐报告
-        return _generate_fishing_report(location, date_str, weather_data, fishing_score)
+        # 生成推荐报告（传递时间段参数）
+        return _generate_fishing_report(location, date_str, weather_data, fishing_score, normalized_period)
 
     except Exception as e:
         logger.error(f"钓鱼推荐分析失败: {str(e)}")
@@ -927,6 +986,120 @@ def _calculate_hourly_scores(weather_data: Dict[str, Any]) -> List[Dict[str, Any
         return []
 
 
+def _filter_time_slots_by_period(
+    time_slots: List[Dict[str, Any]],
+    hourly_datetimes: List[datetime],
+    time_period: str = None
+) -> List[Dict[str, Any]]:
+    """
+    根据时间段过滤推荐时段
+
+    Args:
+        time_slots: 候选时段列表（由 _find_best_time_slots 返回）
+        hourly_datetimes: 小时级时间戳列表（与时段索引对应）
+        time_period: 时间段限制（"白天"/"晚上"/"上午"/"下午"/None）
+
+    Returns:
+        过滤后的时段列表
+
+    Implementation Notes:
+        - 每个时段有 start_hour 和 end_hour，对应实际的小时数
+        - 通过小时数判断时段是否在指定范围内
+        - 时段过滤规则：时段的所有小时必须在指定范围内
+
+    Examples:
+        输入: time_slots=[{"start_hour": 10, "end_hour": 13, ...}]  # 10:00-13:00
+              time_period="上午"  # 6:00-12:00
+        输出: []  # 因为13:00超出上午范围
+
+        输入: time_slots=[{"start_hour": 8, "end_hour": 11, ...}]   # 8:00-11:00
+              time_period="上午"  # 6:00-12:00
+        输出: [{"start_hour": 8, "end_hour": 11, ...}]  # 完全在上午范围内
+    """
+    # 标准化时间段名称
+    normalized_period = normalize_time_period(time_period)
+
+    # 全天模式，不过滤
+    if normalized_period == "全天":
+        return time_slots
+
+    # 获取时间范围配置
+    period_config = TIME_PERIOD_DEFINITIONS.get(normalized_period)
+    if not period_config:
+        return time_slots  # 未识别的时间段，返回全部
+
+    start_hour = period_config["start"]
+    end_hour = period_config["end"]
+    cross_midnight = period_config.get("cross_midnight", False)
+
+    filtered_slots = []
+
+    for slot in time_slots:
+        slot_start_hour = slot.get("start_hour")
+        slot_end_hour = slot.get("end_hour")
+
+        # 安全检查
+        if slot_start_hour is None or slot_end_hour is None:
+            continue
+
+        # 判断时段是否在指定范围内
+        if _is_slot_in_time_range(
+            slot_start_hour,
+            slot_end_hour,
+            start_hour,
+            end_hour,
+            cross_midnight
+        ):
+            filtered_slots.append(slot)
+
+    return filtered_slots
+
+
+def _is_slot_in_time_range(
+    slot_start: int,
+    slot_end: int,
+    range_start: int,
+    range_end: int,
+    cross_midnight: bool = False
+) -> bool:
+    """
+    判断时段是否在指定时间范围内
+
+    Args:
+        slot_start: 时段起始小时（0-23）
+        slot_end: 时段结束小时（0-23）
+        range_start: 范围起始小时（0-23）
+        range_end: 范围结束小时（0-23）
+        cross_midnight: 范围是否跨越午夜（如晚上18:00-次日6:00）
+
+    Returns:
+        bool: 时段是否完全在范围内
+
+    Logic:
+        - 要求时段的**所有小时**都在范围内
+        - 支持跨午夜范围（如18:00-6:00）
+
+    Examples:
+        >>> _is_slot_in_time_range(8, 10, 6, 12, False)
+        True  # 8:00-10:00 完全在 6:00-12:00 内
+
+        >>> _is_slot_in_time_range(11, 13, 6, 12, False)
+        False  # 13:00 超出 12:00
+
+        >>> _is_slot_in_time_range(20, 22, 18, 6, True)
+        True  # 20:00-22:00 在 18:00-次日6:00 内
+    """
+    if not cross_midnight:
+        # 正常范围（不跨午夜）
+        return slot_start >= range_start and slot_end <= range_end
+    else:
+        # 跨午夜范围（如18:00-6:00）
+        # 拆分为两个范围：[range_start, 24) 和 [0, range_end)
+        in_evening = slot_start >= range_start and slot_end >= range_start
+        in_morning = slot_start < range_end and slot_end < range_end
+        return in_evening or in_morning
+
+
 def _find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) -> List[Dict[str, Any]]:
     """
     智能检测最佳钓鱼时段（灵活时段长度）
@@ -1160,8 +1333,20 @@ def _calc_pressure_score(pressure: float) -> float:
         return 55.0
 
 
-def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, Any], scores: Dict[str, float]) -> str:
-    """生成钓鱼推荐报告（支持24小时智能时段推荐）"""
+def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, Any], scores: Dict[str, float], time_period: str = None) -> str:
+    """
+    生成钓鱼推荐报告（支持24小时智能时段推荐和时间段过滤）
+
+    Args:
+        location: 地点名称
+        date: 日期字符串
+        weather_data: 天气数据字典
+        scores: 钓鱼评分字典
+        time_period: 时间段限制（"白天"/"晚上"/"上午"/"下午"/None）
+
+    Returns:
+        格式化的钓鱼推荐报告
+    """
     overall_score = scores.get('overall', 0.0)
     data_quality = scores.get('data_quality', 'unknown')
 
@@ -1196,7 +1381,24 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
 
             if hourly_scores:
                 # 检测最佳时段
-                best_time_slots = _find_best_time_slots(hourly_scores, top_n=3)
+                best_time_slots = _find_best_time_slots(hourly_scores, top_n=5)  # 先获取前5个时段
+
+                # 🆕 根据 time_period 过滤时段
+                if time_period and time_period != "全天":
+                    hourly_datetimes = weather_data.get('hourly_datetimes', [])
+                    best_time_slots = _filter_time_slots_by_period(
+                        time_slots=best_time_slots,
+                        hourly_datetimes=hourly_datetimes,
+                        time_period=time_period
+                    )
+                    logger.info(f"时间段过滤({time_period})后剩余{len(best_time_slots)}个时段")
+
+                    # 如果过滤后没有时段，添加提示信息
+                    if not best_time_slots:
+                        logger.info(f"在时间段'{time_period}'内未找到推荐时段")
+                    else:
+                        # 限制显示前3个
+                        best_time_slots = best_time_slots[:3]
 
                 # 生成评分趋势图
                 score_trend = _generate_score_trend(hourly_scores)
@@ -1244,9 +1446,17 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
     report += f"🏆 **综合评分**: {overall_score:.1f}/100 {grade}\n"
     report += f"📝 **推荐建议**: {recommendation}\n"
 
+    # 🆕 处理时间段过滤后的情况
+    if time_period and time_period != "全天" and has_hourly_data and not best_time_slots:
+        # 有时间段限制但没有找到符合条件的时段
+        report += f"\n⚠️ **提示**: 在指定的时间段（{time_period}）内未找到推荐时段。\n"
+        report += f"💡 建议: 尝试查询其他时间段或全天推荐。\n\n"
+
     # 🆕 如果有智能时段推荐，优先展示
     if best_time_slots:
-        report += f"\n⏰ **智能推荐时段** (基于24小时数据分析):\n\n"
+        # 🆕 添加时间段标识
+        period_label = f"（{time_period}）" if time_period and time_period != "全天" else ""
+        report += f"\n⏰ **智能推荐时段{period_label}** (基于24小时数据分析):\n\n"
 
         # 排名emoji
         rank_emojis = ['🥇', '🥈', '🥉']
