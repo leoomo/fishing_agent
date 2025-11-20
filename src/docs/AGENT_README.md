@@ -1,35 +1,40 @@
-# 智能钓鱼助手 - LangChain 1.0+ 简化架构指南
+# 智能钓鱼助手 - LangChain 1.0+ 简化架构指南 v3.0.0
 
 本项目基于最新的 LangChain 1.0+ API 创建了一个智能钓鱼助手，采用**架构简化设计**（从75+文件简化到5个核心文件），**默认使用智谱AI GLM-4.6 模型**。
 
-## 🆕 LangChain 1.0+ 主要特性
+## 🆕 LangChain 1.0+ 主要特性 (v3.0.0)
 
 - **新的 `create_agent` API**: 替代了旧版本的 `createReactAgent`
 - **架构极简化**: 从75+文件简化到5个核心文件
+- **7因子科学评分**: 温度、天气、风力、气压、湿度 + 季节、月相
+- **动态趋势分析**: 气压/温度/风速趋势分析，识别"钓鱼黄金期"
 - **同步设计**: 全面采用同步架构，消除异步调用问题
 - **伦理数据约束**: 绝不编造虚假天气数据
 - **统一数据获取**: 直接API调用，避免文本解析数据丢失
 - **多模型支持**: 支持智谱AI、Anthropic Claude、OpenAI GPT
 
-## 📁 项目文件（简化架构）
+## 📁 项目文件（简化架构 v3.0.0）
 
 ```
 src/
 ├── agent.py                    # 🤖 主要智能体实现（简化版）
 ├── tools/                      # 🛠️ 工具目录
 │   ├── weather_tools.py        # 🌤️ 天气工具集
-│   ├── fishing_tools.py        # 🎣 钓鱼工具集（伦理约束）
+│   ├── fishing_tools.py        # 🎣 钓鱼工具集（7因子评分）
 │   ├── basic_tools.py          # ⚙️ 基础工具集
-│   └── __init__.py             # 工具导出
+│   ├── __init__.py             # 工具导出
+│   └── scoring/                # 🎯 科学评分模块
+│       ├── enhanced_scorer.py  # 季节/月相/趋势分析算法
+│       └── __init__.py         # 评分模块导出
 ├── utils/                      # 🔧 工具类目录
 │   ├── api_client.py           # 📡 统一API客户端
 │   ├── coordinate_utils.py     # 📍 坐标工具
 │   ├── cache.py                # 💾 简化缓存系统
+│   ├── date_utils.py           # 📅 日期解析工具
 │   └── __init__.py             # 工具类导出
 └── docs/                       # 📚 项目文档
     ├── AGENT_README.md         # 本文档
-    ├── QUICK_START.md          # 快速开始指南
-    └── PROJECT_STATUS.md       # 项目状态
+    └── TOOLS_GUIDE.md          # 工具使用指南
 ```
 
 ## 🚀 快速开始

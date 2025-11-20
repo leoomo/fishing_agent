@@ -136,13 +136,27 @@ def _single_day_recommendation(location: str, date_str: str, time_period: str = 
     # 标准化时间段参数
     normalized_period = normalize_time_period(time_period)
 
-    # 获取天气数据
+    # 获取天气数据（包含历史数据用于趋势分析）
     weather_data = _get_weather_data(location, target_date)
     if not weather_data:
         return f"❌ 抱歉，无法获取{location}在{formatted_date}的天气数据，请稍后重试。"
 
-    # 计算钓鱼评分
-    fishing_score = _calculate_fishing_score(weather_data)
+    # 计算钓鱼评分（传递日期和历史数据）
+    # 如果weather_data中有historical_data，使用它；否则传None
+    historical_data = weather_data.get('historical_data', None)
+
+    # 构建target_date的datetime对象（包含小时信息）
+    if isinstance(target_date, datetime):
+        target_datetime = target_date
+    else:
+        # 如果是date对象，转换为datetime（默认中午12点）
+        target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))
+
+    fishing_score = _calculate_fishing_score(
+        weather_data,
+        target_date=target_datetime,
+        historical_data=historical_data
+    )
 
     # 生成推荐报告
     return _generate_fishing_report(location, formatted_date, weather_data, fishing_score, normalized_period)
@@ -173,8 +187,18 @@ def _multi_day_recommendation(location: str, dates: list) -> str:
         weather_data = _get_weather_data(location, target_date)
 
         if weather_data:
-            # 计算评分
-            fishing_score = _calculate_fishing_score(weather_data)
+            # 构建target_date的datetime对象（默认中午12点）
+            if isinstance(target_date, datetime):
+                target_datetime = target_date
+            else:
+                target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))
+
+            # 计算评分（对于多日概览，不使用趋势分析，但使用季节和月相）
+            fishing_score = _calculate_fishing_score(
+                weather_data,
+                target_date=target_datetime,
+                historical_data=None  # 多日概览不需要趋势分析
+            )
             overall_score = fishing_score.get('overall', 0.0)
             data_quality = fishing_score.get('data_quality', 'unknown')
 
@@ -220,10 +244,11 @@ def _multi_day_recommendation(location: str, dates: list) -> str:
         report += f"| {result['date']} | {result['weekday']} | {score_emoji} {score:.1f} | {result['temperature']:.1f}°C | {condition_cn} | {result['wind_speed']:.1f}m/s |\n"
 
     # 评分说明
-    report += f"\n📈 **评分说明**:\n"
+    report += f"\n📈 **评分说明** (基于7因子科学评分体系):\n"
     report += f"- 🟢 80分以上: 优秀，非常适合钓鱼\n"
     report += f"- 🟡 60-80分: 良好，适合钓鱼\n"
     report += f"- 🔴 60分以下: 一般，需注意天气条件\n"
+    report += f"\n*评分综合考虑：温度、天气、风力、气压、湿度、季节、月相*\n"
 
     return report
 
@@ -453,6 +478,18 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
         avg_humidity = sum(target_humidities) / len(target_humidities) if target_humidities else None
         avg_pressure = sum(target_pressures) / len(target_pressures) if target_pressures else None
 
+        # 🆕 构建历史数据序列（用于趋势分析）
+        historical_data = []
+        if len(target_temps) >= 6:
+            # 取最近6个小时的数据作为历史序列
+            for i in range(max(0, len(target_temps) - 6), len(target_temps)):
+                historical_data.append({
+                    'temperature': target_temps[i] if i < len(target_temps) else None,
+                    'pressure': target_pressures[i] if i < len(target_pressures) else None,
+                    'wind_speed': target_wind_speeds[i] if i < len(target_wind_speeds) else None,
+                    'timestamp': target_datetimes[i] if i < len(target_datetimes) else None
+                })
+
         extracted_data = {
             # 日平均值（向后兼容）
             'temperature': avg_temp,
@@ -468,6 +505,8 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
             'hourly_pressures': target_pressures,
             'hourly_datetimes': target_datetimes,
             'has_hourly_data': len(target_temps) > 0,  # 标记是否有小时数据
+            # 🆕 历史数据（用于趋势分析）
+            'historical_data': historical_data if len(historical_data) >= 3 else None,
             # 元数据
             'data_source': 'hourly_forecast',
             'data_quality': 'valid'
@@ -1043,8 +1082,45 @@ def _validate_weather_data(weather_data: Dict[str, Any], location: str) -> Dict[
     return weather_data
 
 
-def _calculate_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, float]:
-    """计算钓鱼评分 - 严格模式，不使用虚假数据"""
+def _calculate_fishing_score(
+    weather_data: Dict[str, Any],
+    target_date: datetime = None,
+    historical_data: List[Dict[str, Any]] = None
+) -> Dict[str, float]:
+    """
+    计算钓鱼评分 - 7因子科学评分体系 v3.0
+
+    Args:
+        weather_data: 天气数据字典
+        target_date: 目标日期（用于季节和月相计算）
+        historical_data: 历史数据列表（用于趋势分析，至少6个数据点）
+
+    Returns:
+        评分字典，包含7个因子评分和趋势分析结果
+    """
+    # 导入增强评分模块
+    try:
+        from tools.scoring.enhanced_scorer import (
+            calculate_seasonal_score,
+            calculate_lunar_score,
+            analyze_pressure_trend,
+            analyze_temperature_trend,
+            analyze_wind_stability
+        )
+    except ImportError:
+        try:
+            # 备用导入路径（从项目根目录运行时）
+            from src.tools.scoring.enhanced_scorer import (
+                calculate_seasonal_score,
+                calculate_lunar_score,
+                analyze_pressure_trend,
+                analyze_temperature_trend,
+                analyze_wind_stability
+            )
+        except ImportError:
+            logger.warning("增强评分模块导入失败，使用基础评分")
+            # 回退到基础评分
+            return _calculate_basic_fishing_score(weather_data)
 
     # 严格验证天气数据完整性
     required_fields = ['temperature', 'condition', 'wind_speed', 'humidity', 'pressure']
@@ -1054,6 +1130,154 @@ def _calculate_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, float]:
         logger.error(f"天气数据不完整，缺少字段: {missing_fields}")
         logger.error(f"现有数据: {weather_data}")
         # 返回所有0分，表示无法计算
+        return {
+            'overall': 0.0,
+            'temperature': 0.0,
+            'condition': 0.0,
+            'wind': 0.0,
+            'humidity': 0.0,
+            'pressure': 0.0,
+            'seasonal': 0.0,
+            'lunar': 0.0,
+            'data_quality': 'incomplete'
+        }
+
+    # 验证数据的合理性
+    temp = weather_data['temperature']
+    if not isinstance(temp, (int, float)) or temp < -50 or temp > 60:
+        logger.error(f"温度数据异常: {temp}")
+        return {
+            'overall': 0.0, 'temperature': 0.0, 'condition': 0.0, 'wind': 0.0,
+            'humidity': 0.0, 'pressure': 0.0, 'seasonal': 0.0, 'lunar': 0.0,
+            'data_quality': 'invalid'
+        }
+
+    # 获取验证过的数据
+    condition = weather_data['condition']
+    wind = weather_data['wind_speed']
+    humidity = weather_data['humidity']
+    pressure = weather_data['pressure']
+
+    logger.info(f"使用验证过的天气数据: 温度={temp}°C, 天气={condition}, 风速={wind}m/s")
+
+    # 各维度评分（基础5因子）
+    temp_score = _calc_temp_score(temp)
+    weather_score = _calc_weather_score(condition)
+    wind_score = _calc_wind_score(wind)
+    humidity_score = _calc_humidity_score(humidity)
+    pressure_score = _calc_pressure_score(pressure)
+
+    # 新增因子：季节性评分
+    seasonal_score = 75.0  # 默认中等评分
+    if target_date:
+        try:
+            hour = target_date.hour if isinstance(target_date, datetime) else 12
+            seasonal_score = calculate_seasonal_score(target_date, hour)
+            logger.debug(f"季节性评分: {seasonal_score:.1f}分")
+        except Exception as e:
+            logger.warning(f"季节性评分计算失败: {e}")
+
+    # 新增因子：月相评分
+    lunar_score = 75.0  # 默认中等评分
+    if target_date:
+        try:
+            is_night = target_date.hour < 6 or target_date.hour > 18
+            lunar_score = calculate_lunar_score(target_date, is_night)
+            logger.debug(f"月相评分: {lunar_score:.1f}分 (夜间={is_night})")
+        except Exception as e:
+            logger.warning(f"月相评分计算失败: {e}")
+
+    # 趋势分析
+    pressure_multiplier = 1.0
+    temp_multiplier = 1.0
+    wind_multiplier = 1.0
+
+    if historical_data and len(historical_data) >= 3:
+        try:
+            # 气压趋势分析
+            pressure_series = [d.get('pressure') for d in historical_data if d.get('pressure') is not None]
+            if len(pressure_series) >= 3:
+                pressure_trend = analyze_pressure_trend(pressure_series)
+                pressure_multiplier = pressure_trend['multiplier']
+                logger.info(f"气压趋势: {pressure_trend['trend']}, 调整系数={pressure_multiplier}")
+
+            # 温度趋势分析
+            temp_series = [d.get('temperature') for d in historical_data if d.get('temperature') is not None]
+            if len(temp_series) >= 3:
+                temp_multiplier = analyze_temperature_trend(temp_series)
+                logger.debug(f"温度趋势调整系数: {temp_multiplier}")
+
+            # 风速稳定性分析
+            wind_series = [d.get('wind_speed') for d in historical_data if d.get('wind_speed') is not None]
+            if len(wind_series) >= 3:
+                wind_multiplier = analyze_wind_stability(wind_series)
+                logger.debug(f"风速稳定性调整系数: {wind_multiplier}")
+
+        except Exception as e:
+            logger.warning(f"趋势分析失败: {e}")
+
+    # 7因子权重配置 (v3.0)
+    weights = {
+        'temperature': 0.25,  # 温度 25% (不变)
+        'weather': 0.20,      # 天气 20% (从30%降低) ⭐
+        'wind': 0.15,         # 风力 15% (从20%降低)
+        'pressure': 0.15,     # 气压 15% (从10%提升) ⭐
+        'humidity': 0.10,     # 湿度 10% (从15%降低)
+        'seasonal': 0.05,     # 季节 5% (新增) ⭐
+        'lunar': 0.05         # 月相 5% (新增) ⭐
+    }
+
+    # 基础加权评分
+    overall_score = (
+        temp_score * weights['temperature'] +
+        weather_score * weights['weather'] +
+        wind_score * weights['wind'] +
+        pressure_score * weights['pressure'] +
+        humidity_score * weights['humidity'] +
+        seasonal_score * weights['seasonal'] +
+        lunar_score * weights['lunar']
+    )
+
+    # 应用趋势调整（气压趋势最重要）
+    overall_score *= pressure_multiplier
+    overall_score *= temp_multiplier
+    overall_score *= wind_multiplier
+
+    # 确保评分在0-100范围内
+    overall_score = min(100, max(0, overall_score))
+
+    logger.info(f"综合评分: {overall_score:.1f}分 (气压调整={pressure_multiplier}, 温度调整={temp_multiplier}, 风速调整={wind_multiplier})")
+
+    return {
+        'overall': overall_score,
+        'temperature': temp_score,
+        'weather': weather_score,
+        'wind': wind_score,
+        'humidity': humidity_score,
+        'pressure': pressure_score,
+        'seasonal': seasonal_score,  # 新增
+        'lunar': lunar_score,        # 新增
+        'data_quality': 'valid',
+        # 趋势分析结果
+        'trend_analysis': {
+            'pressure_multiplier': pressure_multiplier,
+            'temp_multiplier': temp_multiplier,
+            'wind_multiplier': wind_multiplier
+        }
+    }
+
+
+def _calculate_basic_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, float]:
+    """
+    基础钓鱼评分（回退版本，当增强模块不可用时）
+    5因子评分体系
+    """
+    # 严格验证天气数据完整性
+    required_fields = ['temperature', 'condition', 'wind_speed', 'humidity', 'pressure']
+    missing_fields = [field for field in required_fields if weather_data.get(field) is None]
+
+    if missing_fields:
+        logger.error(f"天气数据不完整，缺少字段: {missing_fields}")
         return {
             'overall': 0.0,
             'temperature': 0.0,
@@ -1079,8 +1303,6 @@ def _calculate_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, float]:
     humidity = weather_data['humidity']
     pressure = weather_data['pressure']
 
-    logger.info(f"使用验证过的天气数据: 温度={temp}°C, 天气={condition}, 风速={wind}m/s")
-
     # 各维度评分
     temp_score = _calc_temp_score(temp)
     weather_score = _calc_weather_score(condition)
@@ -1088,7 +1310,7 @@ def _calculate_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, float]:
     humidity_score = _calc_humidity_score(humidity)
     pressure_score = _calc_pressure_score(pressure)
 
-    # 综合评分（权重分配）
+    # 基础权重配置（旧版本）
     weights = {
         'temperature': 0.25,
         'weather': 0.30,
@@ -1116,12 +1338,13 @@ def _calculate_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, float]:
     }
 
 
-def _calculate_hourly_scores(weather_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _calculate_hourly_scores(weather_data: Dict[str, Any], target_date: date = None) -> List[Dict[str, Any]]:
     """
-    按小时计算钓鱼评分
+    按小时计算钓鱼评分（使用7因子评分体系）
 
     Args:
         weather_data: 包含hourly数据数组的天气数据
+        target_date: 目标日期（用于季节和月相计算）
 
     Returns:
         24小时评分列表，每项包含小时、时间、评分和天气详情
@@ -1147,15 +1370,6 @@ def _calculate_hourly_scores(weather_data: Dict[str, Any]) -> List[Dict[str, Any
 
         hourly_scores = []
 
-        # 权重配置（与日评分保持一致）
-        weights = {
-            'temperature': 0.25,
-            'weather': 0.30,
-            'wind': 0.20,
-            'humidity': 0.15,
-            'pressure': 0.10
-        }
-
         # 遍历每个小时
         for i in range(data_length):
             try:
@@ -1172,39 +1386,52 @@ def _calculate_hourly_scores(weather_data: Dict[str, Any]) -> List[Dict[str, Any
                     logger.debug(f"第{i}小时数据不完整，跳过")
                     continue
 
-                # 计算各维度评分（复用现有函数）
-                temp_score = _calc_temp_score(temp)
-                weather_score = _calc_weather_score(condition)
-                wind_score = _calc_wind_score(wind_speed)
-                humidity_score = _calc_humidity_score(humidity)
-                pressure_score = _calc_pressure_score(pressure)
+                # 构建该小时的天气数据字典
+                hour_weather = {
+                    'temperature': temp,
+                    'condition': condition,
+                    'wind_speed': wind_speed,
+                    'humidity': humidity,
+                    'pressure': pressure
+                }
 
-                # 计算综合评分
-                overall_score = (
-                    temp_score * weights['temperature'] +
-                    weather_score * weights['weather'] +
-                    wind_score * weights['wind'] +
-                    humidity_score * weights['humidity'] +
-                    pressure_score * weights['pressure']
+                # 构建该小时的datetime对象
+                if dt:
+                    hour_datetime = dt
+                elif target_date:
+                    # 如果没有具体datetime，从target_date构建
+                    hour_datetime = datetime.combine(target_date, datetime.min.time()) + timedelta(hours=i)
+                else:
+                    # 最后的回退：使用当前日期
+                    hour_datetime = datetime.now().replace(hour=i, minute=0, second=0, microsecond=0)
+
+                # 使用完整的7因子评分函数
+                # 注意：小时评分暂不使用历史趋势分析（避免复杂度过高）
+                hour_scores_dict = _calculate_fishing_score(
+                    hour_weather,
+                    target_date=hour_datetime,
+                    historical_data=None  # 小时评分不使用趋势分析
                 )
 
                 # 构建该小时的评分记录
                 hour_score = {
                     'hour': i,
-                    'datetime': dt,
-                    'time_str': dt.strftime('%H:%M') if dt else f'{i}:00',
-                    'score': overall_score,
+                    'datetime': hour_datetime,
+                    'time_str': hour_datetime.strftime('%H:%M'),
+                    'score': hour_scores_dict['overall'],
                     'temperature': temp,
                     'condition': condition,
                     'wind_speed': wind_speed,
                     'humidity': humidity,
                     'pressure': pressure,
                     'scores': {
-                        'temperature': temp_score,
-                        'weather': weather_score,
-                        'wind': wind_score,
-                        'humidity': humidity_score,
-                        'pressure': pressure_score
+                        'temperature': hour_scores_dict['temperature'],
+                        'weather': hour_scores_dict['weather'],
+                        'wind': hour_scores_dict['wind'],
+                        'humidity': hour_scores_dict['humidity'],
+                        'pressure': hour_scores_dict['pressure'],
+                        'seasonal': hour_scores_dict.get('seasonal', 75.0),
+                        'lunar': hour_scores_dict.get('lunar', 75.0)
                     }
                 }
 
@@ -1214,7 +1441,7 @@ def _calculate_hourly_scores(weather_data: Dict[str, Any]) -> List[Dict[str, Any
                 logger.warning(f"计算第{i}小时评分失败: {e}")
                 continue
 
-        logger.info(f"成功计算{len(hourly_scores)}个小时的钓鱼评分")
+        logger.info(f"成功计算{len(hourly_scores)}个小时的钓鱼评分（7因子体系）")
         return hourly_scores
 
     except Exception as e:
@@ -1733,13 +1960,64 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
     report += f"• 💧 湿度: {weather_data['humidity']}%\n"
     report += f"• 🌀 气压: {weather_data['pressure']:.1f} hPa\n\n"
 
-    # 各维度评分
-    report += f"📊 **详细评分**:\n"
-    report += f"• 🌡️ 温度评分: {scores['temperature']:.1f}/100\n"
-    report += f"• ☁️ 天气评分: {scores['weather']:.1f}/100\n"
-    report += f"• 💨 风力评分: {scores['wind']:.1f}/100\n"
-    report += f"• 💧 湿度评分: {scores['humidity']:.1f}/100\n"
-    report += f"• 🌀 气压评分: {scores['pressure']:.1f}/100\n\n"
+    # 各维度评分（7因子体系）
+    report += f"📊 **详细评分** (7因子科学评分体系):\n"
+    report += f"• 🌡️ 温度评分: {scores['temperature']:.1f}/100 (权重25%)\n"
+    report += f"• ☁️ 天气评分: {scores['weather']:.1f}/100 (权重20%)\n"
+    report += f"• 💨 风力评分: {scores['wind']:.1f}/100 (权重15%)\n"
+    report += f"• 🌀 气压评分: {scores['pressure']:.1f}/100 (权重15%) ⭐\n"
+    report += f"• 💧 湿度评分: {scores['humidity']:.1f}/100 (权重10%)\n"
+
+    # 新增因子
+    if 'seasonal' in scores:
+        report += f"• 🌸 季节评分: {scores['seasonal']:.1f}/100 (权重5%) ⭐\n"
+    if 'lunar' in scores:
+        report += f"• 🌙 月相评分: {scores['lunar']:.1f}/100 (权重5%) ⭐\n"
+
+    report += "\n"
+
+    # 趋势分析（如果有）
+    if 'trend_analysis' in scores:
+        trend = scores['trend_analysis']
+        has_trend = False
+
+        # 检查是否有显著趋势
+        if trend.get('pressure_multiplier', 1.0) != 1.0 or \
+           trend.get('temp_multiplier', 1.0) != 1.0 or \
+           trend.get('wind_multiplier', 1.0) != 1.0:
+            has_trend = True
+            report += f"📈 **趋势分析** (动态调整):\n"
+
+            # 气压趋势
+            pressure_mult = trend.get('pressure_multiplier', 1.0)
+            if pressure_mult > 1.0:
+                bonus = int((pressure_mult - 1.0) * 100)
+                if pressure_mult >= 1.15:
+                    report += f"• ⚡ 气压快速下降 (+{bonus}%) - 钓鱼黄金期！\n"
+                else:
+                    report += f"• ✅ 气压缓慢下降 (+{bonus}%) - 鱼类活跃\n"
+            elif pressure_mult < 1.0:
+                penalty = int((1.0 - pressure_mult) * 100)
+                report += f"• ⚠️ 气压上升中 (-{penalty}%) - 活跃度降低\n"
+
+            # 温度趋势
+            temp_mult = trend.get('temp_multiplier', 1.0)
+            if temp_mult > 1.0:
+                bonus = int((temp_mult - 1.0) * 100)
+                report += f"• 🌡️ 温度上升中 (+{bonus}%) - 有利于鱼类活动\n"
+            elif temp_mult < 1.0:
+                penalty = int((1.0 - temp_mult) * 100)
+                report += f"• ❄️ 温度下降中 (-{penalty}%) - 活跃度下降\n"
+
+            # 风速稳定性
+            wind_mult = trend.get('wind_multiplier', 1.0)
+            if wind_mult > 1.0:
+                report += f"• 💨 风速稳定 (+5%) - 利于作钓\n"
+            elif wind_mult < 1.0:
+                penalty = int((1.0 - wind_mult) * 100)
+                report += f"• 🌪️ 风速不稳定 (-{penalty}%) - 建议避风钓位\n"
+
+            report += "\n"
 
     # 钓鱼建议
     report += f"💡 **钓鱼建议**:\n"

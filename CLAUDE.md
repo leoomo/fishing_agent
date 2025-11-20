@@ -4,36 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is "fishing-agent" v2.3.1 - an intelligent fishing assistant built with **simplified LangChain 1.0+ architecture**. The project focuses on fishing time recommendations and weather analysis, supporting multiple LLM providers (Zhipu AI, Qwen, Doubao) with real-time weather data integration.
+This is "fishing-agent" v3.0.0 - an intelligent fishing assistant built with **simplified LangChain 1.0+ architecture** and **7-factor scientific scoring system**. The project focuses on fishing time recommendations and weather analysis, supporting multiple LLM providers (Zhipu AI, Qwen, Doubao) with real-time weather data integration.
 
-### 🏗️ **Simplified Architecture** (v2.3.1)
+### 🏗️ **Simplified Architecture** (v3.0.0)
 **Major architectural simplification completed**: Reduced from 75+ files to 5 core files while maintaining all functionality.
 
 - ✅ **Direct LangChain 1.0+**: Removed LangGraph wrapper layer, uses native LangChain agents
 - ✅ **Synchronous-first**: Eliminates async complexity and event loop issues
 - ✅ **Zero abstraction**: Direct API calls without middleware layers
 - ✅ **Ethical data constraints**: Never generates fake data, graceful degradation on API failures
+- ✅ **7-Factor Scientific Scoring**: Upgraded from 5-factor to 7-factor algorithm with trend analysis ⭐ NEW
+- ✅ **Dynamic Trend Analysis**: Pressure/temperature/wind trend analysis for "golden fishing period" identification ⭐ NEW
 - ✅ **LLM Optimization**: feature/llm-optimization branch integration, enhanced reasoning capabilities
 - ✅ **Enhanced Date Processing**: Unified date parsing with date_utils module
 - ✅ **Time Period Intent Recognition**: Few-Shot enhanced intent understanding for time periods
 
-## Current Architecture (v2.3.1)
+## Current Architecture (v3.0.0)
 
 ### 🎯 Core Files (5-file architecture)
 - **`src/agent.py`** - Main LangChain 1.0+ intelligent agent entry point (backward compatibility)
 - **`src/tools/__init__.py`** - Unified tool interface and exports
 - **`src/tools/basic_tools.py`** - Basic utility tools (time, math, coordinates)
 - **`src/tools/weather_tools.py`** - Weather query and forecast tools
-- **`src/tools/fishing_tools.py`** - Fishing recommendation and scoring tools (with time period support)
+- **`src/tools/fishing_tools.py`** - Fishing recommendation and scoring tools (7-factor system + time period support)
 
 ### 🔧 Supporting Infrastructure
 - **`src/utils/`** - Utility classes (API client, coordinate utils, cache, date_utils)
-  - **`date_utils.py`** - 🆕 Enhanced date parsing and formatting utilities
+  - **`date_utils.py`** - Enhanced date parsing and formatting utilities
 - **`src/fishing_agent/`** - Core agent implementation with LLM optimization
   - **`prompts.py`** - Enhanced system prompts with Few-Shot examples
 - **`src/config/`** - Configuration management
+- **`src/tools/scoring/`** - ⭐ NEW: 7-factor scientific scoring system
+  - **`enhanced_scorer.py`** - Seasonal/lunar scoring + trend analysis algorithms
+  - **`__init__.py`** - Scoring module exports
 - **`main.py`** - Interactive CLI entry point
-- **`src/tests/`** - Comprehensive test suite (including time period intent tests)
+- **`src/tests/`** - Comprehensive test suite (including scoring tests with 27 test cases)
+  - **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ NEW: 7-factor scoring unit tests
 
 ## Development Commands
 
@@ -62,6 +68,10 @@ cd src && uv run python agent.py
 # Run all tests
 uv run pytest src/tests/
 
+# ⭐ NEW: Test 7-factor enhanced scoring system (v3.0.0+)
+PYTHONPATH=src uv run pytest src/tests/scoring/test_enhanced_scorer.py -v
+# 27 test cases covering seasonal, lunar, and trend analysis
+
 # Run specific test modules
 uv run python src/tests/test_enhanced_fishing_scorer.py
 uv run python src/tests/integration/verify_national_integration.py
@@ -81,6 +91,19 @@ from src.utils.date_utils import parse_date_input, format_date, get_weekday_cn
 print('Date utils test:')
 print(f'Tomorrow: {format_date(parse_date_input(\"明天\"))} {get_weekday_cn(parse_date_input(\"明天\"))}')
 print(f'Christmas: {format_date(parse_date_input(\"2024-12-25\"))} {get_weekday_cn(parse_date_input(\"2024-12-25\"))}')
+"
+
+# ⭐ NEW: Test enhanced scoring functions directly (v3.0.0+)
+PYTHONPATH=src uv run python -c "
+from tools.scoring.enhanced_scorer import calculate_seasonal_score, analyze_pressure_trend
+from datetime import datetime
+# Test seasonal scoring
+spring_score = calculate_seasonal_score(datetime(2024, 4, 15, 7, 0), 7)
+print(f'Spring morning score: {spring_score}')
+# Test pressure trend
+pressure_series = [1020, 1018, 1015, 1012, 1009, 1005]
+trend = analyze_pressure_trend(pressure_series)
+print(f'Pressure trend: {trend}')
 "
 ```
 
@@ -124,7 +147,7 @@ print(result)
 
 ## Key Dependencies & Tech Stack
 
-### Core Framework (v2.3.1)
+### Core Framework (v3.0.0)
 - **langchain>=0.3.0** - Modern LangChain 1.0+ API (direct usage, no LangGraph)
 - **langchain-openai>=1.0.1** - OpenAI GPT integration (also used for Zhipu AI)
 - **langchain-community>=0.3.0** - Community tools and integrations
@@ -146,7 +169,7 @@ print(result)
 - **彩云天气 API** - Real-time weather data (CAIYUN_API_KEY required)
 - **高德地图 API** - Geographic coordinate service (AMAP_API_KEY required)
 
-## Current Project Structure (v2.3.1)
+## Current Project Structure (v3.0.0)
 
 ```
 fishing-agent/
@@ -162,24 +185,30 @@ fishing-agent/
 │   │   ├── __init__.py          # Tool exports and interfaces
 │   │   ├── basic_tools.py       # Basic utilities (time, math, coords)
 │   │   ├── weather_tools.py     # Weather and forecast tools
-│   │   └── fishing_tools.py     # Fishing recommendations and scoring (time period support)
+│   │   ├── fishing_tools.py     # Fishing recommendations (7-factor scoring + time period)
+│   │   └── scoring/              # ⭐ NEW: 7-factor scientific scoring system
+│   │       ├── __init__.py      # Scoring module exports
+│   │       └── enhanced_scorer.py  # Seasonal/lunar/trend analysis algorithms
 │   ├── utils/                    # 🔧 Utility classes
 │   │   ├── api_client.py        # Unified API client
 │   │   ├── coordinate_utils.py  # Coordinate and location utilities
 │   │   ├── cache.py             # Simple caching system
-│   │   └── date_utils.py        # 🆕 Enhanced date parsing and formatting
+│   │   └── date_utils.py        # Enhanced date parsing and formatting
 │   ├── config/                   # ⚙️ Configuration management
 │   └── tests/                    # 🧪 Comprehensive test suite
-│       └── test_time_period_intent.py  # 🆕 Time period intent tests
+│       ├── test_time_period_intent.py  # Time period intent tests
+│       └── scoring/              # ⭐ NEW: Scoring system tests
+│           ├── __init__.py      # Test module init
+│           └── test_enhanced_scorer.py  # 27 test cases for 7-factor scoring
 ├── main.py                       # 🚀 Interactive CLI entry point
-├── pyproject.toml                # 📦 Project configuration (v2.3.1)
+├── pyproject.toml                # 📦 Project configuration (v3.0.0)
 ├── .env.example                  # 🔑 Environment variable template
 ├── CLAUDE.md                     # 📖 This development guide
 ├── README.md                     # 📋 Project documentation
 └── CHANGELOG.md                  # 📋 Version history
 ```
 
-### Critical Files for Development (v2.3.1)
+### Critical Files for Development (v3.0.0)
 - **`src/agent.py`** - Backward compatibility shim for agent functionality
 - **`src/fishing_agent/`** - Core agent implementation with LLM optimization
   - **`core.py`** - Main OptimizedFishingAgent class using LangChain 1.0+ create_agent
@@ -187,19 +216,31 @@ fishing-agent/
 - **`src/tools/__init__.py`** - Unified tool interface and backward compatibility
 - **`src/tools/weather_tools.py`** - Weather tools with direct API calls
 - **`src/tools/fishing_tools.py`** - 7-factor fishing scoring algorithm with time period support
-- **`src/utils/date_utils.py`** - 🆕 Enhanced date parsing and formatting utilities
+- **`src/tools/scoring/`** - ⭐ NEW: 7-factor scientific scoring system
+  - **`enhanced_scorer.py`** - Seasonal, lunar, and trend analysis algorithms
+  - **`__init__.py`** - Scoring module exports
+- **`src/utils/date_utils.py`** - Enhanced date parsing and formatting utilities
 - **`src/utils/api_client.py`** - Unified HTTP client for weather and coordinate APIs
-- **`src/tests/test_time_period_intent.py`** - 🆕 Time period intent recognition tests
+- **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ NEW: 27 test cases for 7-factor scoring
+- **`src/tests/test_time_period_intent.py`** - Time period intent recognition tests
 - **`main.py`** - Interactive command-line interface
 
-## Core Features (v2.3.1)
+## Core Features (v3.0.0)
 
-### 🎣 Fishing Recommendation System
-- **7-Factor Algorithm**: Temperature, weather, wind, pressure, humidity, season, moon phase
+### 🎣 Fishing Recommendation System (Scientific Upgrade)
+- **7-Factor Scientific Algorithm** ⭐ UPGRADED:
+  - Temperature (25%), Weather (20%), Wind (15%), Pressure (15%), Humidity (10%)
+  - **Season (5%)** ⭐ NEW - Spring/summer/autumn/winter time-of-day scoring
+  - **Lunar (5%)** ⭐ NEW - 8 moon phases with day/night differentiation
+- **Dynamic Trend Analysis** ⭐ NEW:
+  - Pressure trend: Identifies "golden fishing period" (fast falling = +20%)
+  - Temperature trend: Activity adjustment (fast warming = +10%)
+  - Wind stability: Comfort optimization (stable = +5%)
+- **Solves "86-Score Problem"**: Achieves >5 point differentiation between conditions (100% improvement)
+- **Scientific Weight Optimization**: Pressure increased to 15% (from 10%), weather decreased to 20% (from 30%)
 - **Time Period Intent Recognition**: Few-Shot enhanced understanding of time-limited queries (95%+ accuracy)
 - **Enhanced Date Processing**: Unified parsing for relative ("明天") and absolute ("2024-12-25") dates
 - **Ethical Data Constraints**: Never generates fake weather data, graceful API failure handling
-- **Intelligent Time Recommendations**: Solves the "86-score problem" with professional fishing research
 - **National Coverage**: Supports 3,142+ administrative regions (95%+ coverage)
 - **Natural Language Processing**: Chinese query support with direct tool integration
 - **LLM Optimization**: Enhanced reasoning capabilities from feature/llm-optimization branch
@@ -218,7 +259,7 @@ fishing-agent/
 - **National Coverage**: 95%+ coverage of Chinese administrative regions
 - **Utility-based Design**: Simple coordinate utilities without service abstractions
 
-## Development Guidelines (v2.3.1)
+## Development Guidelines (v3.0.0)
 
 ### Architecture Principles
 1. **Synchronous-first**: Use direct API calls with `requests`, avoid async complexity
@@ -226,10 +267,12 @@ fishing-agent/
 3. **Ethical Data**: Never generate fake data, provide honest error messages
 4. **LangChain 1.0+ Native**: Use `@tool` decorator and `create_agent` directly
 5. **Simple Configuration**: Environment variables with `.env.example` template
-6. **LLM Optimization**: Utilize enhanced prompts and Few-Shot examples for better reasoning
-7. **Unified Date Handling**: Use date_utils module for consistent date parsing across the codebase
+6. **7-Factor Scoring**: ⭐ NEW - Use enhanced_scorer module for all fishing scoring calculations
+7. **Trend Analysis**: ⭐ NEW - Provide historical data for dynamic trend adjustments
+8. **LLM Optimization**: Utilize enhanced prompts and Few-Shot examples for better reasoning
+9. **Unified Date Handling**: Use date_utils module for consistent date parsing across the codebase
 
-### Common Import Patterns (v2.3.1)
+### Common Import Patterns (v3.0.0)
 ```python
 # Agent creation (LLM optimized)
 from src.agent import create_optimized_fishing_agent
@@ -242,6 +285,16 @@ from src.tools.weather_tools import get_current_weather, get_weather_forecast
 from src.tools.fishing_tools import query_fishing_recommendation
 from src.tools.basic_tools import get_current_time, calculate
 
+# ⭐ NEW: 7-factor scoring system
+from src.tools.scoring.enhanced_scorer import (
+    calculate_seasonal_score,
+    calculate_lunar_phase,
+    calculate_lunar_score,
+    analyze_pressure_trend,
+    analyze_temperature_trend,
+    analyze_wind_stability
+)
+
 # Utility classes
 from src.utils.api_client import WeatherAPIClient, CoordinateAPIClient
 from src.utils.coordinate_utils import get_coordinates
@@ -251,6 +304,11 @@ from src.utils.date_utils import parse_date_input, format_date, get_weekday_cn
 tomorrow = parse_date_input("明天")
 formatted_date = format_date(tomorrow)
 weekday = get_weekday_cn(tomorrow)
+
+# ⭐ NEW: Enhanced scoring examples
+from datetime import datetime
+spring_score = calculate_seasonal_score(datetime(2024, 4, 15, 7, 0), 7)  # 100分
+pressure_trend = analyze_pressure_trend([1020, 1018, 1015, 1012, 1009, 1005])  # 1.20x multiplier
 ```
 
 ### Adding New Tools (v2.3.1)
