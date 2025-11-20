@@ -1,6 +1,6 @@
 [project]
 name = "fishing-agent"
-version = "2.3.0"
+version = "2.3.1"
 description = "智能钓鱼助手 - 基于 LangChain 1.0+ 的钓鱼时间推荐和天气分析系统"
 readme = "README.md"
 requires-python = ">=3.11"

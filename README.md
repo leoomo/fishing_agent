@@ -1,15 +1,17 @@
-# Fishing Agent - 智能钓鱼助手 v2.3.0
+# Fishing Agent - 智能钓鱼助手 v2.3.1
 
 基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐和天气分析。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **时间段意图理解增强版**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **LLM优化 + 时间段意图理解增强版**
 
 ## ✨ 核心功能
 
 - **🎣 智能钓鱼推荐**: 基于7因子评分算法的专业钓鱼分析
 - **⏰ 时间段意图理解**: 精准识别用户时间限定，支持白天/晚上/上午/下午等时段
+- **🧠 LLM优化**: feature/llm-optimization分支集成，提升模型响应质量和准确性
 - **🌤️ 实时天气查询**: 集成彩云天气API，支持全国3,142+地区
 - **🗺️ 智能坐标服务**: 高德地图API集成，多级缓存优化
+- **📅 增强日期处理**: 新增date_utils模块，统一日期解析和格式化逻辑
 - **🤖 LangChain智能体**: 多模型支持，Few-Shot意图识别增强
 - **📊 同步架构**: 稳定可靠的同步版本，避免异步复杂性
 
@@ -24,6 +26,8 @@
 - **🚀 纯LangChain架构**: 简洁高效的LangChain 1.0+实现，无额外包装层
 - **⏰ 时间段智能识别**: Few-Shot示例 + 思维链增强，95%+意图识别准确率
 - **📝 精准时段过滤**: 基于时间范围的算法过滤，支持跨午夜时间段
+- **🧠 LLM优化增强**: feature/llm-optimization分支优化，提升推理能力和响应质量
+- **📅 统一日期处理**: 集成date_utils模块，支持相对/绝对日期解析和中文星期显示
 
 ### 已修复的技术问题
 - ✅ **数据库路径问题**: 修复相对路径导致的数据库连接失败
@@ -40,6 +44,8 @@
 - ✅ **时间戳解析问题**: 修复ISO 8601格式解析，支持跨日期数据聚合
 - ✅ **架构清理**: 移除tools模块循环依赖，简化为纯LangChain 1.0+架构
 - ✅ **时间段意图理解**: 新增time_period参数支持，实现精准时间段识别和过滤
+- ✅ **日期处理优化**: 新增date_utils模块，统一相对/绝对日期解析逻辑
+- ✅ **LLM优化集成**: feature/llm-optimization分支功能合并，提升推理质量
 
 ### 🎣 钓鱼推荐系统
 - **7因子评分算法**: 温度、天气、风力、气压、湿度、季节、月相
@@ -47,6 +53,8 @@
 - **智能时段过滤**: 支持白天/晚上/上午/下午/傍晚/深夜等6种时段
 - **自然语言理解**: 支持中文查询，如"明天白天哪里钓鱼好？"
 - **全国覆盖**: 支持3,142+地区的钓鱼条件分析
+- **增强日期处理**: 统一日期解析，支持相对日期（今天/明天/后天）和绝对日期格式
+- **LLM优化推理**: 集成feature/llm-optimization分支，提升推理准确性和响应质量
 
 #### 支持的时间段
 - **白天 (daytime)**: 6:00-18:00 - 适合日间活动
@@ -111,6 +119,7 @@ cd src && uv run python agent.py
 
 > ✅ **注意**: v2.2.0新增功能！无需复杂的PYTHONPATH配置，直接运行即可！
 > ⏰ **v2.3.0更新**: 新增时间段意图理解功能，支持精准时段识别！
+> 🧠 **v2.3.1更新**: 集成LLM优化分支，提升推理质量和响应准确性！
 
 #### 方法三：激活虚拟环境
 ```bash
@@ -127,7 +136,7 @@ import sys
 sys.path.append('src')
 from agent import create_optimized_fishing_agent
 
-# 创建智能体实例
+# 创建智能体实例（v2.3.1 LLM优化版）
 agent = create_optimized_fishing_agent(model_provider="zhipu")
 
 # 钓鱼推荐查询（包含时间段限定）
@@ -170,6 +179,24 @@ result = query_fishing_recommendation.invoke({
     'time_period': '上午'  # 仅返回6:00-12:00的时段
 })
 print(f"上午钓鱼推荐: {result}")
+```
+
+### 日期处理功能使用（v2.3.1新增）
+```python
+from src.utils.date_utils import parse_date_input, format_date, get_weekday_cn
+
+# 解析相对日期
+tomorrow = parse_date_input("明天")
+print(f"明天日期: {format_date(tomorrow)} {get_weekday_cn(tomorrow)}")
+
+# 解析绝对日期
+christmas = parse_date_input("2024-12-25")
+print(f"圣诞节: {format_date(christmas)} {get_weekday_cn(christmas)}")
+
+# 解析相对日期列表
+from src.utils.date_utils import parse_dates_list
+dates = parse_dates_list(["今天", "明天", "后天"])
+print(f"未来三天: {[format_date(d) for d in dates]}")
 ```
 
 ### 直接工具调用
@@ -224,7 +251,7 @@ fishing-agent/
 │   │   ├── __init__.py          # 智能体模块导出
 │   │   ├── core.py              # 核心智能体类
 │   │   ├── model_factory.py     # 多模型工厂
-│   │   ├── prompts.py           # System Prompt和Few-Shot
+│   │   ├── prompts.py           # System Prompt和Few-Shot（LLM优化版）
 │   │   └── callbacks.py         # 回调处理
 │   ├── tools/                    # 🛠️ 简化工具模块 (5-file架构核心)
 │   │   ├── __init__.py          # 工具统一接口和导出
@@ -234,7 +261,8 @@ fishing-agent/
 │   ├── utils/                    # 🔧 工具类
 │   │   ├── api_client.py        # 统一HTTP客户端
 │   │   ├── coordinate_utils.py  # 坐标和地理工具
-│   │   └── cache.py             # 缓存系统
+│   │   ├── cache.py             # 缓存系统
+│   │   └── date_utils.py        # 🆕 日期解析工具（支持相对/绝对日期）
 │   ├── config/                   # ⚙️ 配置管理
 │   ├── middleware/               # 🔌 中间件
 │   ├── data/                     # 📊 数据层
@@ -243,7 +271,7 @@ fishing-agent/
 ├── docs/                         # 📖 项目文档
 │   └── intent_understanding_optimization.md  # ⏰ 时间段意图优化文档（v2.3.0）
 ├── main.py                       # 🚀 交互式CLI入口
-├── pyproject.toml                # 📦 项目配置 (v2.3.0)
+├── pyproject.toml                # 📦 项目配置 (v2.3.1)
 ├── CLAUDE.md                     # 📖 Claude开发指南
 ├── CHANGELOG.md                  # 📋 更新日志
 └── README.md                     # 📋 项目说明
@@ -335,4 +363,4 @@ MIT License
 
 ---
 
-> 🎣 智能分析，精准钓鱼！现在支持时间段意图理解！
+> 🎣 智能分析，精准钓鱼！现在支持LLM优化 + 时间段意图理解！

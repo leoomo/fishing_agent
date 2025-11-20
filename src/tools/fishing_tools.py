@@ -15,11 +15,13 @@ try:
     from ..utils.coordinate_utils import get_coordinates
     from ..utils.api_client import get_weather_client
     from ..utils.cache import cache
+    from ..utils.date_utils import parse_date_input, parse_dates_list, format_date, get_weekday_cn
 except ImportError:
     # 回退到绝对导入
     from utils.coordinate_utils import get_coordinates
     from utils.api_client import get_weather_client
     from utils.cache import cache
+    from utils.date_utils import parse_date_input, parse_dates_list, format_date, get_weekday_cn
 
 logger = logging.getLogger(__name__)
 
@@ -71,90 +73,163 @@ def normalize_time_period(time_period: str) -> str:
 
 
 @tool
-def query_fishing_recommendation(location: str, date: str = None, time_period: str = None) -> str:
+def query_fishing_recommendation(location: str, dates: list = None, time_period: str = None) -> str:
     """
     查询钓鱼时间推荐，基于天气条件分析最佳的钓鱼时间
 
     Args:
         location: 地区名称，如"杭州"、"北京"、"余杭区"等
-        date: 日期字符串，支持：
-              - 相对日期: "明天"、"后天"、"今天"
-              - 绝对日期: "2024-12-25"
-              - 空值: 默认为明天
-        time_period: 时间段限制，支持：
-              - "白天" / "daytime": 仅返回6:00-18:00的时段
-              - "晚上" / "night": 仅返回18:00-次日6:00的时段
-              - "上午" / "morning": 仅返回6:00-12:00的时段
-              - "下午" / "afternoon": 仅返回12:00-18:00的时段
-              - "傍晚" / "evening": 仅返回16:00-19:00的时段
-              - "深夜" / "midnight": 仅返回0:00-6:00的时段
-              - "全天" / "all" / None: 返回全天所有时段（默认）
+        dates: 日期列表，支持：
+              - 单日: ["明天"] 或 ["2024-12-25"]
+              - 多日: ["今天", "明天", "后天"]
+              - 一周: 传入7个日期
+              - 空值/None: 默认["明天"]
+        time_period: 时间段限制（仅对单日查询生效），支持：
+              - "白天" / "晚上" / "上午" / "下午" / "傍晚" / "深夜"
+              - "全天" / None: 返回全天所有时段（默认）
 
     Returns:
-        详细的钓鱼推荐报告，包含天气分析和最佳钓鱼时间建议
+        - 单日: 详细钓鱼推荐报告，含24小时时段分析
+        - 多日: 多天钓鱼推荐表格，含最佳日期推荐
 
     Examples:
-        query_fishing_recommendation("杭州", "明天")
-        query_fishing_recommendation("余杭区")
-        query_fishing_recommendation("北京", "2024-12-25")
-        query_fishing_recommendation("佛山", "明天", "白天")
-        query_fishing_recommendation("杭州", "今天", "晚上")
+        query_fishing_recommendation("杭州", ["明天"])
+        query_fishing_recommendation("佛山", ["明天"], "白天")
+        query_fishing_recommendation("杭州", ["今天", "明天", "后天"])
     """
     try:
-        # 解析日期
-        target_date = _parse_date_input(date)
-        date_str = target_date.strftime('%Y-%m-%d')
+        # 参数标准化
+        if not dates:
+            dates = ["明天"]
 
-        # 标准化时间段参数
-        normalized_period = normalize_time_period(time_period)
+        # 限制最多7天
+        if len(dates) > 7:
+            return "❌ 最多支持查询7天的钓鱼推荐"
 
-        # 获取天气数据
-        weather_data = _get_weather_data(location, target_date)
-        if not weather_data:
-            return f"❌ 抱歉，无法获取{location}在{date_str}的天气数据，请稍后重试。"
-
-        # 计算钓鱼评分
-        fishing_score = _calculate_fishing_score(weather_data)
-
-        # 生成推荐报告（传递时间段参数）
-        return _generate_fishing_report(location, date_str, weather_data, fishing_score, normalized_period)
+        # 根据日期数量分发逻辑
+        if len(dates) == 1:
+            return _single_day_recommendation(location, dates[0], time_period)
+        else:
+            return _multi_day_recommendation(location, dates)
 
     except Exception as e:
         logger.error(f"钓鱼推荐分析失败: {str(e)}")
         return f"❌ 分析钓鱼推荐时发生错误: {str(e)}，请稍后重试。"
 
 
+def _single_day_recommendation(location: str, date_str: str, time_period: str = None) -> str:
+    """
+    单日详细钓鱼推荐
+
+    Args:
+        location: 地区名称
+        date_str: 日期字符串
+        time_period: 时间段限制
+
+    Returns:
+        详细的单日钓鱼推荐报告
+    """
+    # 解析日期
+    target_date = parse_date_input(date_str)
+    formatted_date = format_date(target_date)
+
+    # 标准化时间段参数
+    normalized_period = normalize_time_period(time_period)
+
+    # 获取天气数据
+    weather_data = _get_weather_data(location, target_date)
+    if not weather_data:
+        return f"❌ 抱歉，无法获取{location}在{formatted_date}的天气数据，请稍后重试。"
+
+    # 计算钓鱼评分
+    fishing_score = _calculate_fishing_score(weather_data)
+
+    # 生成推荐报告
+    return _generate_fishing_report(location, formatted_date, weather_data, fishing_score, normalized_period)
 
 
-def _parse_date_input(date_input: str) -> datetime:
-    """解析日期输入"""
-    if not date_input:
-        return datetime.now() + timedelta(days=1)  # 默认明天
+def _multi_day_recommendation(location: str, dates: list) -> str:
+    """
+    多日钓鱼推荐
 
-    date_input = date_input.strip().lower()
+    Args:
+        location: 地区名称
+        dates: 日期字符串列表
 
-    # 相对日期映射
-    relative_dates = {
-        'today': '今天', 'tomorrow': '明天', 'yesterday': '昨天',
-        '今天': '今天', '明天': '明天', '昨天': '昨天', '后天': '后天'
-    }
+    Returns:
+        多日钓鱼推荐表格报告
+    """
+    # 解析日期列表
+    parsed_dates = parse_dates_list(dates)
 
-    if date_input in relative_dates:
-        if date_input in ['today', '今天']:
-            return datetime.now()
-        elif date_input in ['tomorrow', '明天']:
-            return datetime.now() + timedelta(days=1)
-        elif date_input in ['yesterday', '昨天']:
-            return datetime.now() - timedelta(days=1)
-        elif date_input in ['后天']:
-            return datetime.now() + timedelta(days=2)
+    # 收集多天数据
+    results = []
+    for target_date in parsed_dates:
+        date_obj = target_date.date() if isinstance(target_date, datetime) else target_date
+        date_str = format_date(date_obj)
+        weekday = get_weekday_cn(date_obj)
 
-    # 尝试解析绝对日期
-    try:
-        return datetime.strptime(date_input, '%Y-%m-%d')
-    except ValueError:
-        # 如果解析失败，默认明天
-        return datetime.now() + timedelta(days=1)
+        # 获取天气数据
+        weather_data = _get_weather_data(location, target_date)
+
+        if weather_data:
+            # 计算评分
+            fishing_score = _calculate_fishing_score(weather_data)
+            overall_score = fishing_score.get('overall', 0.0)
+            data_quality = fishing_score.get('data_quality', 'unknown')
+
+            # 只有当数据质量有效时才添加
+            if data_quality == 'valid' and overall_score > 0:
+                results.append({
+                    'date': date_str,
+                    'weekday': weekday,
+                    'score': overall_score,
+                    'temperature': weather_data.get('temperature'),
+                    'condition': weather_data.get('condition'),
+                    'wind_speed': weather_data.get('wind_speed'),
+                    'data_source': weather_data.get('data_source', 'unknown')
+                })
+
+    if not results:
+        return f"❌ 抱歉，无法获取{location}的天气数据，请稍后重试。"
+
+    # 生成报告
+    report = f"🎣 {location}钓鱼推荐（{len(results)}天）\n\n"
+
+    # 找到最佳日期
+    best_day = max(results, key=lambda x: x['score'])
+    report += f"✨ **最佳钓鱼日期**: {best_day['date']} ({best_day['weekday']})，评分: {best_day['score']:.1f}\n\n"
+
+    # 生成表格
+    report += "| 日期 | 星期 | 评分 | 温度 | 天气 | 风速 |\n"
+    report += "|------|------|------|------|------|------|\n"
+
+    for result in results:
+        # 转换天气代码为中文
+        condition_cn = _translate_weather_condition(result['condition'])
+
+        # 评分等级
+        score = result['score']
+        if score >= 80:
+            score_emoji = "🟢"
+        elif score >= 60:
+            score_emoji = "🟡"
+        else:
+            score_emoji = "🔴"
+
+        report += f"| {result['date']} | {result['weekday']} | {score_emoji} {score:.1f} | {result['temperature']:.1f}°C | {condition_cn} | {result['wind_speed']:.1f}m/s |\n"
+
+    # 评分说明
+    report += f"\n📈 **评分说明**:\n"
+    report += f"- 🟢 80分以上: 优秀，非常适合钓鱼\n"
+    report += f"- 🟡 60-80分: 良好，适合钓鱼\n"
+    report += f"- 🔴 60分以下: 一般，需注意天气条件\n"
+
+    return report
+
+
+
+
 
 
 def _get_weather_data(location: str, target_date: datetime) -> Optional[Dict[str, Any]]:
@@ -1760,125 +1835,6 @@ def _generate_detailed_analysis(weather_data: Dict[str, Any], scores: Dict[str, 
     return analysis
 
 
-@tool
-def query_week_fishing_recommendation(location: str, start_date: str = "今天") -> str:
-    """
-    查询一周钓鱼推荐（高效批量查询）
-
-    这个工具一次性查询未来7天的钓鱼推荐，比循环调用query_fishing_recommendation更高效。
-    自动从多天数据中推荐最佳钓鱼日期。
-
-    Args:
-        location: 地区名称，如"杭州"、"北京"、"景德镇市"等
-        start_date: 起始日期，支持：
-                   - 相对日期: "今天"、"明天" (默认"今天")
-                   - 绝对日期: "2024-12-25"
-
-    Returns:
-        包含7天钓鱼推荐的结构化表格，仅显示有数据的天数，并推荐最佳钓鱼日期
-
-    Examples:
-        query_week_fishing_recommendation("杭州")
-        query_week_fishing_recommendation("景德镇市", "今天")
-        query_week_fishing_recommendation("北京", "2024-12-25")
-    """
-    try:
-        # 解析起始日期
-        start_datetime = _parse_date_input(start_date)
-
-        # 收集7天数据
-        results = []
-        for day_offset in range(7):
-            target_date = start_datetime + timedelta(days=day_offset)
-            date_obj = target_date.date() if isinstance(target_date, datetime) else target_date
-            date_str = date_obj.strftime('%Y-%m-%d')
-            weekday = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][date_obj.weekday()]
-
-            # 获取天气数据
-            weather_data = _get_weather_data(location, target_date)
-
-            if weather_data:
-                # 计算评分
-                fishing_score = _calculate_fishing_score(weather_data)
-                overall_score = fishing_score.get('overall', 0.0)
-                data_quality = fishing_score.get('data_quality', 'unknown')
-
-                # 只有当数据质量有效时才添加
-                if data_quality == 'valid' and overall_score > 0:
-                    results.append({
-                        'date': date_str,
-                        'weekday': weekday,
-                        'score': overall_score,
-                        'temperature': weather_data.get('temperature'),
-                        'condition': weather_data.get('condition'),
-                        'wind_speed': weather_data.get('wind_speed'),
-                        'data_source': weather_data.get('data_source', 'unknown')
-                    })
-
-        if not results:
-            return f"❌ 抱歉，无法获取{location}未来7天的天气数据，请稍后重试。"
-
-        # 生成报告
-        report = f"🎣 {location}未来一周钓鱼推荐\n\n"
-
-        # 找到最佳日期
-        best_day = max(results, key=lambda x: x['score'])
-        report += f"✨ **最佳钓鱼日期**: {best_day['date']} ({best_day['weekday']})，评分: {best_day['score']:.1f}\n\n"
-
-        # 生成表格
-        report += "| 日期 | 星期 | 评分 | 温度 | 天气 | 风速 | 数据来源 |\n"
-        report += "|------|------|------|------|------|------|----------|\n"
-
-        for result in results:
-            # 转换天气代码为中文
-            condition_cn = _translate_weather_condition(result['condition'])
-
-            # 数据来源标注
-            source_label = {
-                'realtime': '实时',
-                'hourly_forecast': '小时级',
-                'daily_forecast': '日级'
-            }.get(result['data_source'], '未知')
-
-            # 评分等级
-            score = result['score']
-            if score >= 80:
-                score_emoji = "🟢"
-            elif score >= 60:
-                score_emoji = "🟡"
-            else:
-                score_emoji = "🔴"
-
-            report += f"| {result['date']} | {result['weekday']} | {score_emoji} {score:.1f} | {result['temperature']:.1f}°C | {condition_cn} | {result['wind_speed']:.1f}m/s | {source_label} |\n"
-
-        # 数据说明
-        report += f"\n📊 **数据说明**:\n"
-        report += f"- 共获取 {len(results)} 天有效数据\n"
-
-        # 统计数据来源
-        hourly_count = sum(1 for r in results if r['data_source'] == 'hourly_forecast')
-        daily_count = sum(1 for r in results if r['data_source'] == 'daily_forecast')
-
-        if hourly_count > 0:
-            report += f"- 小时级预报（高精度）: {hourly_count}天\n"
-        if daily_count > 0:
-            report += f"- 日级预报（中等精度）: {daily_count}天\n"
-
-        # 评分说明
-        report += f"\n📈 **评分说明**:\n"
-        report += f"- 🟢 80分以上: 优秀，非常适合钓鱼\n"
-        report += f"- 🟡 60-80分: 良好，适合钓鱼\n"
-        report += f"- 🔴 60分以下: 一般，需注意天气条件\n"
-
-        return report
-
-    except Exception as e:
-        logger.error(f"查询一周钓鱼推荐失败: {str(e)}")
-        import traceback
-        logger.error(f"错误堆栈: {traceback.format_exc()}")
-        return f"❌ 查询一周钓鱼推荐时发生错误: {str(e)}，请稍后重试。"
-
-
 def _translate_weather_condition(skycon: str) -> str:
     """将彩云天气代码转换为中文描述"""
     translations = {
@@ -1898,6 +1854,5 @@ def _translate_weather_condition(skycon: str) -> str:
 
 # 工具列表，用于agent创建
 FISHING_TOOLS = [
-    query_fishing_recommendation,
-    query_week_fishing_recommendation
+    query_fishing_recommendation
 ]

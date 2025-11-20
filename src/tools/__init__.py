@@ -69,7 +69,7 @@ def get_weather_tools_sync():
 
 
 
-def query_fishing_recommendation(location: str, date: str = None):
+def query_fishing_recommendation_compat(location: str, date: str = None):
     """
     向后兼容：查询钓鱼推荐
 
@@ -81,7 +81,8 @@ def query_fishing_recommendation(location: str, date: str = None):
         str: 钓鱼推荐报告
     """
     from .fishing_tools import query_fishing_recommendation
-    return query_fishing_recommendation.invoke({"location": location, "date": date})
+    dates = [date] if date else None
+    return query_fishing_recommendation.invoke({"location": location, "dates": dates})
 
 
 __all__ = [
@@ -90,7 +91,7 @@ __all__ = [
     'get_weather_tools',
     'get_fishing_tools',
     'get_weather_tools_sync',
-    'query_fishing_recommendation',
+    'query_fishing_recommendation_compat',
     # 新架构导出
     'BASIC_TOOLS',
     'WEATHER_TOOLS',

@@ -16,56 +16,105 @@ try:
     from ..utils.coordinate_utils import get_coordinates
     from ..utils.api_client import get_weather_client
     from ..utils.cache import cache
+    from ..utils.date_utils import parse_date_input, parse_dates_list, format_date, get_weekday_cn
 except ImportError:
     # 回退到绝对导入
     from utils.coordinate_utils import get_coordinates
     from utils.api_client import get_weather_client
     from utils.cache import cache
+    from utils.date_utils import parse_date_input, parse_dates_list, format_date, get_weekday_cn
 
 logger = logging.getLogger(__name__)
 
 
 @tool
-def get_weather_forecast(location: str, days: int = 3) -> str:
+def get_weather(location: str, dates: list = None) -> str:
     """
-    获取指定位置的天气预报
+    获取指定位置的天气信息
 
     Args:
         location: 位置名称，如"杭州"、"北京"、"余杭区"等
-        days: 预报天数（1-7天）
+        dates: 日期列表，支持：
+              - 单日: ["今天"] 或 ["2024-12-25"]
+              - 多日: ["今天", "明天", "后天"]
+              - 空值/None: 默认["今天"]
 
     Returns:
-        详细的天气预报信息，包括未来几天的温度范围和天气状况
+        - 单日: 详细的当日天气信息
+        - 多日: 多天天气预报表格
+
+    Examples:
+        get_weather("杭州", ["今天"])
+        get_weather("北京", ["明天", "后天"])
+        get_weather("余杭区", ["今天", "明天", "后天"])
     """
     try:
-        if not 1 <= days <= 7:
-            return "预报天数必须在1-7天之间"
+        # 参数标准化
+        if not dates:
+            dates = ["今天"]
+
+        # 限制最多7天
+        if len(dates) > 7:
+            return "❌ 最多支持查询7天的天气"
 
         # 获取坐标
         coords = get_coordinates(location)
         longitude, latitude = coords
 
-        # 获取72小时预报数据（支持最多3天）
         weather_client = get_weather_client()
 
-        # 优先尝试hourly预报（72小时）
-        hourly_data = weather_client.get_hourly_forecast(longitude, latitude, 72)
-
-        if hourly_data:
-            return _format_hourly_forecast(hourly_data, location, days)
+        # 根据日期数量分发逻辑
+        if len(dates) == 1:
+            return _single_day_weather(location, dates[0], weather_client, longitude, latitude)
         else:
-            # 降级到daily预报
-            daily_data = weather_client.get_daily_forecast(longitude, latitude, days)
-            if daily_data:
-                return _format_daily_forecast(daily_data, location, days)
-            else:
-                return f"抱歉，无法获取{location}的天气预报数据，请稍后重试。"
+            return _multi_day_weather(location, dates, weather_client, longitude, latitude)
 
     except ValueError as e:
         return f"位置错误: {str(e)}"
     except Exception as e:
-        logger.error(f"获取天气预报失败: {e}")
-        return f"获取{location}天气预报时发生错误，请稍后重试。"
+        logger.error(f"获取天气失败: {e}")
+        return f"获取{location}天气时发生错误，请稍后重试。"
+
+
+def _single_day_weather(location: str, date_str: str, weather_client, longitude: float, latitude: float) -> str:
+    """单日天气查询"""
+    target_date = parse_date_input(date_str)
+    today = date.today()
+
+    if target_date.date() == today:
+        # 今天：获取实时天气
+        weather_data = weather_client.get_realtime_weather(longitude, latitude)
+        if weather_data:
+            return _format_current_weather(weather_data, location, "今天")
+    else:
+        # 其他日期：获取预报
+        days_diff = (target_date.date() - today).days
+        if 1 <= days_diff <= 7:
+            forecast_data = weather_client.get_hourly_forecast(longitude, latitude, days_diff * 24)
+            if forecast_data:
+                return _format_date_forecast(forecast_data, location, target_date.date())
+
+    return f"抱歉，无法获取{location}在{date_str}的天气数据。"
+
+
+def _multi_day_weather(location: str, dates: list, weather_client, longitude: float, latitude: float) -> str:
+    """多日天气查询"""
+    # 解析日期列表
+    parsed_dates = parse_dates_list(dates)
+    days = len(parsed_dates)
+
+    # 优先尝试hourly预报
+    hourly_data = weather_client.get_hourly_forecast(longitude, latitude, 72)
+
+    if hourly_data:
+        return _format_hourly_forecast(hourly_data, location, days)
+    else:
+        # 降级到daily预报
+        daily_data = weather_client.get_daily_forecast(longitude, latitude, days)
+        if daily_data:
+            return _format_daily_forecast(daily_data, location, days)
+        else:
+            return f"抱歉，无法获取{location}的天气预报数据，请稍后重试。"
 
 
 def _format_hourly_forecast(hourly_data: Dict, location: str, days: int) -> str:
@@ -196,85 +245,6 @@ def _format_daily_forecast(daily_data: Dict, location: str, days: int) -> str:
         return f"格式化天气预报数据时发生错误。"
 
 
-@tool
-def get_weather_by_date(location: str, date_str: str) -> str:
-    """
-    获取指定位置和日期的天气信息
-
-    Args:
-        location: 位置名称，如"杭州"、"北京"、"余杭区"等
-        date_str: 日期字符串，支持格式：
-                - 相对日期: "明天"、"后天"、"今天"、"昨天"
-                - 绝对日期: "2024-12-25"
-
-    Returns:
-        指定日期的详细天气信息或预报
-    """
-    try:
-        # 解析日期
-        target_date = _parse_date_input(date_str)
-        today = date.today()
-
-        # 获取坐标
-        coords = get_coordinates(location)
-        longitude, latitude = coords
-
-        weather_client = get_weather_client()
-
-        if target_date == today:
-            # 今天：获取实时天气
-            weather_data = weather_client.get_realtime_weather(longitude, latitude)
-            if weather_data:
-                return _format_current_weather(weather_data, location, "今天")
-        else:
-            # 其他日期：获取预报
-            days_diff = (target_date - today).days
-            if 1 <= days_diff <= 7:
-                forecast_data = weather_client.get_hourly_forecast(longitude, latitude, days_diff * 24)
-                if forecast_data:
-                    return _format_date_forecast(forecast_data, location, target_date)
-
-        return f"抱歉，无法获取{location}在{date_str}的天气数据。"
-
-    except ValueError as e:
-        return f"日期格式错误: {str(e)}"
-    except Exception as e:
-        logger.error(f"获取指定日期天气失败: {e}")
-        return f"获取{location}在{date_str}的天气信息时发生错误，请稍后重试。"
-
-
-def _parse_date_input(date_input: str) -> date:
-    """解析日期输入"""
-    if not date_input:
-        return date.today()
-
-    date_input = date_input.strip().lower()
-
-    # 相对日期映射
-    relative_dates = {
-        'today': '今天', 'tomorrow': '明天', 'yesterday': '昨天',
-        '今天': '今天', '明天': '明天', '昨天': '昨天', '后天': '后天'
-    }
-
-    if date_input in relative_dates:
-        if date_input in ['today', '今天']:
-            return date.today()
-        elif date_input in ['tomorrow', '明天']:
-            return date.today() + timedelta(days=1)
-        elif date_input in ['yesterday', '昨天']:
-            return date.today() - timedelta(days=1)
-        elif date_input in ['后天']:
-            return date.today() + timedelta(days=2)
-
-    # 尝试解析绝对日期
-    try:
-        return datetime.strptime(date_input, '%Y-%m-%d').date()
-    except ValueError:
-        try:
-            # 尝试其他格式
-            return datetime.strptime(date_input, '%m-%d').date().replace(year=date.today().year)
-        except ValueError:
-            raise ValueError(f"无法解析日期格式: {date_input}")
 
 
 def _format_current_weather(weather_data: Dict, location: str, time_desc: str) -> str:
@@ -354,6 +324,5 @@ def _format_date_forecast(forecast_data: Dict, location: str, target_date: date)
 
 # 工具列表，用于agent创建
 WEATHER_TOOLS = [
-    get_weather_forecast,
-    get_weather_by_date
+    get_weather
 ]
