@@ -95,10 +95,10 @@ from agent import create_optimized_fishing_agent
 agent = create_optimized_fishing_agent(model_provider='zhipu')
 print('✅ Agent创建成功')
 
-# 检查统计信息
-stats = agent.get_stats()
-print(f'✅ 工具数量: {stats[\"tools_count\"]}')
-print(f'✅ 架构: {stats[\"architecture\"]}')
+# 检查agent信息
+print(f'✅ Agent创建成功: {type(agent).__name__}')
+print(f'✅ 工具数量: {len(agent.tools)}')
+print(f'✅ 模型提供商: {agent.model_provider}')
 "
 ```
 
@@ -266,8 +266,8 @@ import sys
 sys.path.append('src')
 from agent import create_optimized_fishing_agent
 agent = create_optimized_fishing_agent()
-stats = agent.get_stats()
-print(f'✅ Agent创建成功，工具数: {stats[\"tools_count\"]}')
+print(f'✅ Agent创建成功: {type(agent).__name__}')
+print(f'✅ 工具数量: {len(agent.tools)}')
 "
 echo ""
 
