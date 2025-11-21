@@ -1,10 +1,10 @@
-# Fishing Agent - 智能钓鱼助手 v3.0.0
+# Fishing Agent - 智能钓鱼助手 v3.0.1
 
 基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐和天气分析。
 
 > 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **7因子科学评分体系 + 动态趋势分析**
 
-## ✨ 核心功能（v3.0.0 重大升级）
+## ✨ 核心功能（v3.0.1 测试完善 + v3.0.0 重大升级）
 
 ### 🎣 7因子科学评分体系 ⭐ 新版本亮点
 - **7因子评分算法**: 温度(25%) + 天气(20%) + 风力(15%) + 气压(15%) + 湿度(10%) + **季节(5%)** + **月相(5%)**
@@ -239,6 +239,45 @@ dates = parse_dates_list(["今天", "明天", "后天"])
 print(f"未来三天: {[format_date(d) for d in dates]}")
 ```
 
+### 7因子科学评分系统使用（v3.0.0新增）
+```python
+# 导入增强评分模块
+from src.tools.scoring.enhanced_scorer import (
+    calculate_seasonal_score,
+    calculate_lunar_phase,
+    calculate_lunar_score,
+    analyze_pressure_trend,
+    analyze_temperature_trend,
+    analyze_wind_stability
+)
+
+# 季节性评分（考虑春季、早晚最佳时段）
+from datetime import datetime
+spring_morning = datetime(2024, 4, 15, 7, 0)  # 春季早晨
+seasonal_score = calculate_seasonal_score(spring_morning, 7)  # 7点
+print(f"春季早晨季节评分: {seasonal_score}")  # 应为100分
+
+# 月相计算和评分
+lunar_phase = calculate_lunar_phase(datetime(2024, 4, 15))  # 计算月相
+lunar_score = calculate_lunar_score(lunar_phase, is_night=True)  # 夜间月相评分
+print(f"月相: {lunar_phase}, 夜间评分: {lunar_score}")
+
+# 气压趋势分析（识别钓鱼黄金期）
+pressure_series = [1020, 1018, 1015, 1012, 1009, 1005]  # 6小时气压数据
+pressure_multiplier = analyze_pressure_trend(pressure_series)
+print(f"气压趋势倍率: {pressure_multiplier}")  # 快速下降应为1.20x
+
+# 温度趋势分析
+temp_series = [15, 17, 19, 21, 23, 25]  # 6小时温度数据
+temp_multiplier = analyze_temperature_trend(temp_series)
+print(f"温度趋势倍率: {temp_multiplier}")  # 快速升温应为1.10x
+
+# 风速稳定性分析
+wind_series = [5, 6, 5, 7, 6, 5]  # 6小时风速数据
+wind_multiplier = analyze_wind_stability(wind_series)
+print(f"风速稳定性倍率: {wind_multiplier}")  # 稳定风速应为1.05x
+```
+
 ### 直接工具调用
 ```python
 from src.tools import get_all_tools
@@ -289,7 +328,7 @@ fishing-agent/
 │   ├── agent.py                  # 🤖 LangChain智能体主入口（向后兼容）
 │   ├── fishing_agent/            # 🧠 智能体核心实现
 │   │   ├── __init__.py          # 智能体模块导出
-│   │   ├── core.py              # 核心智能体类
+│   │   ├── core.py              # 核心智能体类（LLM优化版）
 │   │   ├── model_factory.py     # 多模型工厂
 │   │   ├── prompts.py           # System Prompt和Few-Shot（LLM优化版）
 │   │   └── callbacks.py         # 回调处理
@@ -297,21 +336,48 @@ fishing-agent/
 │   │   ├── __init__.py          # 工具统一接口和导出
 │   │   ├── basic_tools.py       # 基础工具（时间、数学、坐标）
 │   │   ├── weather_tools.py     # 天气工具（实时天气、预报）
-│   │   └── fishing_tools.py     # 钓鱼工具（推荐、评分、时段过滤）
+│   │   ├── fishing_tools.py     # 钓鱼工具（7因子评分、时段过滤）
+│   │   └── scoring/              # ⭐ v3.0.0新增：7因子科学评分系统
+│   │       ├── __init__.py      # 评分模块导出
+│   │       └── enhanced_scorer.py  # 季节/月相/趋势分析算法
 │   ├── utils/                    # 🔧 工具类
 │   │   ├── api_client.py        # 统一HTTP客户端
 │   │   ├── coordinate_utils.py  # 坐标和地理工具
 │   │   ├── cache.py             # 缓存系统
 │   │   └── date_utils.py        # 🆕 日期解析工具（支持相对/绝对日期）
 │   ├── config/                   # ⚙️ 配置管理
+│   │   ├── service_config.py    # 服务配置
+│   │   └── __init__.py          # 配置模块导出
 │   ├── middleware/               # 🔌 中间件
+│   │   ├── health.py            # 健康检查中间件
+│   │   └── __init__.py          # 中间件模块导出
 │   ├── data/                     # 📊 数据层
+│   │   ├── admin_divisions.db   # 行政区划数据库
+│   │   ├── coordinates_cache.db # 坐标缓存数据库
+│   │   ├── town_coordinates.db  # 城镇坐标数据库
+│   │   └── cache/               # 缓存文件目录
 │   ├── docs/                     # 📖 技术文档
-│   └── tests/                    # 🧪 测试套件
+│   │   ├── API.md               # API文档
+│   │   ├── CONFIGURATION_GUIDE.md # 配置指南
+│   │   ├── TOOLS_GUIDE.md       # 工具使用指南
+│   │   └── ...                  # 其他技术文档
+│   ├── tests/                    # 🧪 测试套件
+│   │   ├── test_time_period_intent.py  # 时间段意图测试
+│   │   ├── test_national_coverage.py  # 全国覆盖测试
+│   │   ├── scoring/             # ⭐ v3.0.0新增：评分系统测试
+│   │   │   └── test_enhanced_scorer.py  # 27个7因子评分测试用例
+│   │   ├── integration/         # 集成测试
+│   │   ├── unit/                # 单元测试
+│   │   └── weather/             # 天气API测试
+│   └── README.md                 # src模块说明
 ├── docs/                         # 📖 项目文档
+│   ├── design/                   # 🆕 v3.0.0新增：设计文档目录
+│   │   └── ...                  # 设计文档（从最新提交97f3254添加）
 │   └── intent_understanding_optimization.md  # ⏰ 时间段意图优化文档（v2.3.0）
+├── tests/                        # 🧪 项目根测试目录
+│   └── ...                      # 额外的测试文件
 ├── main.py                       # 🚀 交互式CLI入口
-├── pyproject.toml                # 📦 项目配置 (v2.3.1)
+├── pyproject.toml                # 📦 项目配置 (v3.0.1)
 ├── CLAUDE.md                     # 📖 Claude开发指南
 ├── CHANGELOG.md                  # 📋 更新日志
 └── README.md                     # 📋 项目说明
@@ -322,6 +388,9 @@ fishing-agent/
 ```bash
 # 运行测试套件
 uv run pytest src/tests/
+
+# ⭐ v3.0.0新增：运行7因子科学评分系统测试（27个测试用例）
+PYTHONPATH=src uv run pytest src/tests/scoring/test_enhanced_scorer.py -v
 
 # 运行时间段意图测试（v2.3.0新增）
 uv run python src/tests/test_time_period_intent.py -v
@@ -365,42 +434,52 @@ MIT License
 
 ---
 
-## 🆕 v2.3.0 新功能亮点
+## 🆕 v3.0.1 新功能亮点
 
-### ⏰ 时间段意图理解（核心功能）
+### 🧪 测试完善和设计文档补充
 
-**问题解决**：
-- ❌ **旧版**: 用户问"明天白天佛山钓鱼" → 返回包含晚上的全天推荐
-- ✅ **新版**: 智能识别"白天"意图 → 仅返回6:00-18:00的时段推荐
+**测试覆盖完善**：
+- ✅ **7因子科学评分系统**: 27个测试用例，覆盖季节/月相/趋势分析
+- ✅ **时间段意图识别**: 19个测试用例，95%+识别准确率
+- ✅ **边界测试**: 完善的异常处理和容错测试
+- ✅ **集成测试**: API集成和数据流验证
 
-**技术实现**：
-- **Few-Shot学习**: 通过示例教会LLM正确识别时间表达
-- **思维链增强**: 提升意图识别准确率至95%+
-- **智能时段过滤**: 支持6种标准时间段的精准过滤
-- **向后兼容**: `time_period`参数可选，不影响现有功能
+**设计文档完善**：
+- ✅ **完整测试文档**: `docs/TESTING.md` - 46+测试用例详细说明
+- ✅ **快速测试指南**: `docs/QUICK_TEST.md` - 一键验证脚本
+- ✅ **API文档更新**: 升级至v3.0.1，包含7因子评分系统
+- ✅ **项目结构修正**: README.md反映实际目录结构
 
-**支持的时间表达**：
-| 用户表达 | AI识别结果 | 时间范围 |
-|---------|-----------|---------|
-| "明天白天钓鱼" | time_period="白天" | 6:00-18:00 |
-| "今晚钓鱼好吗" | time_period="晚上" | 18:00-次日6:00 |
-| "后天上午" | time_period="上午" | 6:00-12:00 |
-| "明天下午" | time_period="下午" | 12:00-18:00 |
-| "傍晚时分" | time_period="傍晚" | 16:00-19:00 |
-| "深夜钓鱼" | time_period="深夜" | 0:00-6:00 |
-
-**完整测试覆盖**：
-- 19个测试用例，100%通过率
-- 单元测试 + 集成测试 + 边界测试
-- 支持跨午夜时间段（如晚上时段）
-
-### 🛠️ 架构优化
-
-- **工具参数扩展**: `query_fishing_recommendation`新增`time_period`参数
-- **System Prompt增强**: Few-Shot示例和意图识别规则
-- **算法优化**: 基于时间范围的精确过滤算法
-- **错误处理**: 优雅的未识别时间段回退机制
+**命令验证**：
+- ✅ 所有测试命令经过验证可正常运行
+- ✅ 示例代码与实际API保持一致
+- ✅ 环境配置指南完整准确
 
 ---
 
-> 🎣 智能分析，精准钓鱼！现在支持LLM优化 + 时间段意图理解！
+## 🎯 核心技术升级回顾
+
+### 🎣 7因子科学评分体系 (v3.0.0)
+
+**重大算法升级**：
+- ✅ **7因子评分**: 温度(25%) + 天气(20%) + 风力(15%) + 气压(15%) + 湿度(10%) + 季节(5%) + 月相(5%)
+- ✅ **动态趋势分析**: 气压快速下降触发"钓鱼黄金期"(+20%奖励)
+- ✅ **季节性评分**: 基于鱼类生物学规律的时段评分
+- ✅ **月相评分**: 8种月相识别，满月夜间最佳(90分)
+- ✅ **"86分问题"解决**: 评分区分度提升100%
+
+**核心模块**：
+- `src/tools/scoring/enhanced_scorer.py`: 增强评分引擎
+- 27个单元测试覆盖所有算法组件
+
+### ⏰ 时间段意图理解 (v2.3.0)
+
+**智能时段识别**：
+- ✅ **95%+识别准确率**: Few-Shot学习 + 思维链增强
+- ✅ **6种时间段**: 白天、晚上、上午、下午、傍晚、深夜
+- ✅ **零额外成本**: 本地过滤算法，不增加API调用
+- ✅ **跨午夜支持**: 智能处理晚上时段的时间范围
+
+---
+
+> 🎣 智能分析，精准钓鱼！现在支持7因子科学评分 + 动态趋势分析 + LLM优化 + 时间段意图理解！
