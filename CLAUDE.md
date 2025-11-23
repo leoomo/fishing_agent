@@ -24,25 +24,37 @@ This is "fishing-agent" v3.0.1 - an intelligent fishing assistant built with **s
 
 ## Current Architecture (v3.0.1)
 
-### 🎯 Core Files (5 main files)
+### 🎯 Core Files (main files)
 - **`src/agent.py`** - Main LangChain 1.0+ intelligent agent entry point (backward compatibility)
 - **`src/tools/__init__.py`** - Unified tool interface and exports
 - **`src/tools/basic_tools.py`** - Basic utility tools (time functions)
 - **`src/tools/weather_tools.py`** - Weather query and forecast tools
 - **`src/tools/fishing_tools.py`** - Fishing recommendation and scoring tools (7-factor system + time period support)
 
-### 🔧 Supporting Infrastructure (essential modules)
+### 🔧 Supporting Infrastructure (complete modules)
 - **`src/utils/`** - Core utility classes (API client, coordinate utils, cache, date_utils)
   - **`date_utils.py`** - Enhanced date parsing and formatting utilities
 - **`src/fishing_agent/`** - Core agent implementation with LLM optimization
   - **`prompts.py`** - Enhanced system prompts with Few-Shot examples
+  - **`callbacks.py`** - Callback handling
 - **`src/config/`** - Configuration management
+  - **`service_config.py`** - Service configuration
 - **`src/tools/scoring/`** - ⭐ CORE: 7-factor scientific scoring system
   - **`enhanced_scorer.py`** - Seasonal/lunar scoring + trend analysis algorithms
   - **`__init__.py`** - Scoring module exports
+- **`src/data/`** - Data storage and caching
+  - **`admin_divisions.db`** - Administrative divisions database
+  - **`coordinates_cache.db`** - Coordinates cache database
+  - **`town_coordinates.db`** - Town coordinates database
+  - **`cache/`** - Cache directory with weather cache
+- **`src/middleware/`** - Middleware components
+  - **`health.py`** - Health check middleware
 - **`main.py`** - Interactive CLI entry point
 - **`src/tests/`** - Comprehensive test suite (including scoring tests with 27 test cases)
   - **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ CORE: 7-factor scoring unit tests
+  - **`src/tests/integration/`** - Integration tests
+  - **`src/tests/unit/`** - Unit tests
+  - **`src/tests/weather/`** - Weather-specific tests
 
 ## Development Commands
 
@@ -172,24 +184,25 @@ print(result)
 - **彩云天气 API** - Real-time weather data (CAIYUN_API_KEY required)
 - **高德地图 API** - Geographic coordinate service (AMAP_API_KEY required)
 
-## Current Project Structure (v3.0.0)
+## Current Project Structure (v3.0.1)
 
 ```
 fishing-agent/
 ├── src/                          # 源代码目录
 │   ├── agent.py                  # 🤖 Main LangChain 1.0+ agent (backward compatibility)
+│   ├── README.md                 # 📖 src module documentation
 │   ├── fishing_agent/            # 🧠 Core agent implementation
 │   │   ├── __init__.py          # Agent exports and factory functions
 │   │   ├── core.py              # Core agent class with LLM optimization
 │   │   ├── model_factory.py     # Multi-model factory
 │   │   ├── prompts.py           # Enhanced system prompts with Few-Shot
 │   │   └── callbacks.py         # Callback handling
-│   ├── tools/                    # 🛠️ Simplified tool modules
+│   ├── tools/                    # 🛠️ Tool modules
 │   │   ├── __init__.py          # Tool exports and interfaces
 │   │   ├── basic_tools.py       # Basic utilities (time, math, coords)
 │   │   ├── weather_tools.py     # Weather and forecast tools
 │   │   ├── fishing_tools.py     # Fishing recommendations (7-factor scoring + time period)
-│   │   └── scoring/              # ⭐ NEW: 7-factor scientific scoring system
+│   │   └── scoring/              # ⭐ CORE: 7-factor scientific scoring system
 │   │       ├── __init__.py      # Scoring module exports
 │   │       └── enhanced_scorer.py  # Seasonal/lunar/trend analysis algorithms
 │   ├── utils/                    # 🔧 Utility classes
@@ -198,33 +211,69 @@ fishing-agent/
 │   │   ├── cache.py             # Simple caching system
 │   │   └── date_utils.py        # Enhanced date parsing and formatting
 │   ├── config/                   # ⚙️ Configuration management
-│   └── tests/                    # 🧪 Comprehensive test suite
-│       ├── test_time_period_intent.py  # Time period intent tests
-│       └── scoring/              # ⭐ NEW: Scoring system tests
-│           ├── __init__.py      # Test module init
-│           └── test_enhanced_scorer.py  # 27 test cases for 7-factor scoring
+│   │   ├── service_config.py    # Service configuration
+│   │   └── README.md            # Configuration documentation
+│   ├── middleware/               # 🔌 Middleware components
+│   │   └── health.py            # Health check middleware
+│   ├── data/                     # 💾 Data storage and caching
+│   │   ├── admin_divisions.db   # Administrative divisions database
+│   │   ├── coordinates_cache.db # Coordinates cache database
+│   │   ├── town_coordinates.db  # Town coordinates database
+│   │   └── cache/               # Cache directory
+│   │       └── weather_cache.json # Weather cache
+│   ├── docs/                     # 📖 Technical documentation
+│   │   ├── API.md               # API documentation
+│   │   ├── TOOLS_GUIDE.md       # Tools usage guide
+│   │   ├── CONFIGURATION_GUIDE.md # Configuration guide
+│   │   └── FISHING_WEIGHT_ALGORITHMS_GUIDE.md # Algorithm guide
+│   ├── tests/                    # 🧪 Comprehensive test suite
+│   │   ├── test_time_period_intent.py  # Time period intent tests
+│   │   ├── scoring/              # ⭐ CORE: Scoring system tests
+│   │   │   └── test_enhanced_scorer.py  # 27 test cases for 7-factor scoring
+│   │   ├── integration/         # Integration tests
+│   │   │   ├── verify_national_integration.py
+│   │   │   └── test_agent_conversation.py
+│   │   ├── unit/                # Unit tests
+│   │   │   ├── test_weather_service.py
+│   │   │   └── test_agent_structure.py
+│   │   ├── weather/             # Weather-specific tests
+│   │   │   └── test_real_weather_api.py
+│   │   └── demos/               # Demo scripts
+│   │       ├── demo_weather_agent.py
+│   │       └── demo_national_weather_coverage.py
+│   └── examples/                 # 📝 Example code
+├── docs/                         # 📖 Project documentation
+│   ├── TESTING.md                # 🧪 Testing documentation (46+ test cases)
+│   ├── QUICK_TEST.md             # ⚡ Quick testing guide
+│   ├── design/                   # 🏗️ Design documentation
+│   │   └── lure_equipment/       # 🎣 Lure equipment design
+│   │       └── database/         # Database design docs
+│   └── intent_understanding_optimization.md  # ⏰ Intent optimization docs
 ├── main.py                       # 🚀 Interactive CLI entry point
-├── pyproject.toml                # 📦 Project configuration (v3.0.0)
+├── pyproject.toml                # 📦 Project configuration (v3.0.1)
 ├── .env.example                  # 🔑 Environment variable template
 ├── CLAUDE.md                     # 📖 This development guide
 ├── README.md                     # 📋 Project documentation
 └── CHANGELOG.md                  # 📋 Version history
 ```
 
-### Critical Files for Development (v3.0.0)
+### Critical Files for Development (v3.0.1)
 - **`src/agent.py`** - Backward compatibility shim for agent functionality
 - **`src/fishing_agent/`** - Core agent implementation with LLM optimization
   - **`core.py`** - Main OptimizedFishingAgent class using LangChain 1.0+ create_agent
   - **`prompts.py`** - Enhanced system prompts with Few-Shot examples for time period intent
+  - **`callbacks.py`** - Callback handling
 - **`src/tools/__init__.py`** - Unified tool interface and backward compatibility
 - **`src/tools/weather_tools.py`** - Weather tools with direct API calls
 - **`src/tools/fishing_tools.py`** - 7-factor fishing scoring algorithm with time period support
-- **`src/tools/scoring/`** - ⭐ NEW: 7-factor scientific scoring system
+- **`src/tools/scoring/`** - ⭐ CORE: 7-factor scientific scoring system
   - **`enhanced_scorer.py`** - Seasonal, lunar, and trend analysis algorithms
   - **`__init__.py`** - Scoring module exports
 - **`src/utils/date_utils.py`** - Enhanced date parsing and formatting utilities
 - **`src/utils/api_client.py`** - Unified HTTP client for weather and coordinate APIs
-- **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ NEW: 27 test cases for 7-factor scoring
+- **`src/config/service_config.py`** - Service configuration management
+- **`src/data/`** - Data storage and caching databases
+- **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ CORE: 27 test cases for 7-factor scoring
 - **`src/tests/test_time_period_intent.py`** - Time period intent recognition tests
 - **`main.py`** - Interactive command-line interface
 

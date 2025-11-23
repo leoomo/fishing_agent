@@ -32,16 +32,16 @@
 ## 🏗️ 技术架构
 
 ### 简化架构设计 (v3.0.1)
-**大幅简化的架构** - 从75+文件减少到5个核心文件，85%代码减少，保持完整功能：
+**优化架构设计** - 保持核心功能完整性的同时，通过模块化设计实现高效开发：
 
-#### 🎯 核心文件 (5个主要文件)
+#### 🎯 核心文件 (主要文件)
 - **`src/agent.py`**: 主入口点（向后兼容层）
 - **`src/tools/__init__.py`**: 统一工具接口，导出3个核心工具
 - **`src/tools/basic_tools.py`**: 基础工具（时间工具）
 - **`src/tools/weather_tools.py`**: 天气查询和预报工具
 - **`src/tools/fishing_tools.py`**: 钓鱼推荐和评分工具（7因子系统）
 
-#### 🔧 支撑模块 (保留核心功能)
+#### 🔧 支撑模块 (完整功能架构)
 - **`src/tools/scoring/`**: 7因子科学评分系统
   - `enhanced_scorer.py`: 7因子+趋势分析算法
 - **`src/utils/`**: 核心工具类
@@ -53,9 +53,12 @@
   - `core.py`: LangChain 1.0+智能体实现
   - `prompts.py`: 系统提示词和Few-Shot示例
   - `model_factory.py`: 多模型工厂
+  - `callbacks.py`: 回调处理
 - **`src/`**: 其他核心支撑文件
   - `config/`: 配置管理
   - `middleware/`: 健康检查中间件
+  - `data/`: 数据存储和缓存
+  - `docs/`: 技术文档
   - `tests/`: 测试套件（27个评分测试用例）
 
 ### 核心特性
@@ -369,13 +372,14 @@ basic_tools = get_basic_tools()
 print(f"基础工具: {len(basic_tools)}个")
 ```
 
-## 📁 项目结构 (v3.0.1 简化架构)
+## 📁 项目结构 (v3.0.1 完整架构)
 
-### 核心架构 - 5文件设计
+### 项目目录结构
 ```
 fishing-agent/
 ├── src/                          # 源代码目录
 │   ├── agent.py                  # 🤖 主入口点（向后兼容）
+│   ├── README.md                 # 📖 src模块说明文档
 │   └── tools/                    # 🛠️ 核心工具模块
 │       ├── __init__.py          # 🎯 统一工具接口
 │       ├── basic_tools.py       # 🔧 基础工具（时间功能）
@@ -386,38 +390,76 @@ fishing-agent/
 │           └── enhanced_scorer.py  # 7因子+趋势分析算法
 ```
 
-### 支撑架构
+### 完整架构结构
 ```
-├── src/
+fishing-agent/
+├── src/                          # 源代码目录
+│   ├── agent.py                  # 🤖 主入口点
 │   ├── fishing_agent/            # 🧠 智能体实现（LLM优化）
 │   │   ├── __init__.py          # 模块导出
 │   │   ├── core.py              # 🎯 核心智能体类（LangChain 1.0+）
 │   │   ├── model_factory.py     # 🔌 多模型工厂
 │   │   ├── prompts.py           # 📝 System Prompt+Few-Shot
 │   │   └── callbacks.py         # 📊 回调处理
+│   ├── tools/                    # 🛠️ 工具模块
+│   │   ├── basic_tools.py       # 🔧 基础工具
+│   │   ├── weather_tools.py     # 🌤️ 天气工具
+│   │   ├── fishing_tools.py     # 🎣 钓鱼工具
+│   │   └── scoring/             # ⭐ 科学评分系统
+│   │       ├── __init__.py      # 评分模块导出
+│   │       └── enhanced_scorer.py  # 7因子+趋势分析算法
 │   ├── utils/                    # 🔧 工具类
 │   │   ├── api_client.py        # 🌐 统一HTTP客户端
 │   │   ├── coordinate_utils.py  # 🗺️ 坐标和地理工具
 │   │   ├── cache.py             # 💾 缓存系统
 │   │   └── date_utils.py        # 📅 日期解析（相对/绝对日期）
 │   ├── config/                   # ⚙️ 配置管理
-│   ├── middleware/               # 🔌 健康检查中间件
+│   │   ├── service_config.py    # 服务配置
+│   │   └── README.md            # 配置说明文档
+│   ├── middleware/               # 🔌 中间件
+│   │   └── health.py            # 健康检查中间件
+│   ├── data/                     # 💾 数据存储
+│   │   ├── admin_divisions.db   # 行政区划数据库
+│   │   ├── coordinates_cache.db # 坐标缓存数据库
+│   │   ├── town_coordinates.db  # 镇坐标数据库
+│   │   └── cache/               # 缓存目录
+│   │       └── weather_cache.json # 天气缓存
+│   ├── docs/                     # 📖 技术文档
+│   │   ├── API.md               # API文档
+│   │   ├── TOOLS_GUIDE.md       # 工具使用指南
+│   │   ├── CONFIGURATION_GUIDE.md # 配置指南
+│   │   └── FISHING_WEIGHT_ALGORITHMS_GUIDE.md # 算法指南
 │   ├── tests/                    # 🧪 测试套件
 │   │   ├── test_time_period_intent.py  # ⏰ 时间段意图测试
 │   │   ├── scoring/             # ⭐ v3.0.0：7因子评分测试（27个用例）
 │   │   │   └── test_enhanced_scorer.py
-│   │   └── ...                  # 其他测试文件
+│   │   ├── integration/         # 集成测试
+│   │   │   ├── verify_national_integration.py
+│   │   │   └── test_agent_conversation.py
+│   │   ├── unit/                # 单元测试
+│   │   │   ├── test_weather_service.py
+│   │   │   └── test_agent_structure.py
+│   │   ├── weather/             # 天气相关测试
+│   │   │   └── test_real_weather_api.py
+│   │   └── demos/               # 演示脚本
+│   │       ├── demo_weather_agent.py
+│   │       └── demo_national_weather_coverage.py
+│   └── examples/                 # 📝 示例代码
 ├── docs/                         # 📖 项目文档
 │   ├── TESTING.md                # 🧪 测试文档（46+测试用例）
 │   ├── QUICK_TEST.md             # ⚡ 快速测试指南
 │   ├── design/                   # 🏗️ 设计文档目录
 │   │   └── lure_equipment/       # 🎣 路亚装备查询工具设计
-│   │       ├── 01-架构设计.md     # 架构设计文档
-│   │       ├── 02-数据库设计.md   # 数据库设计文档
-│   │       ├── 03-推荐算法设计.md # 推荐算法设计
-│   │       ├── 04-数据获取方案.md # 数据获取方案
-│   │       ├── 05-实施计划.md     # 实施计划文档
-│   │       └── database/         # 数据库详细设计
+│   │       ├── database/         # 数据库详细设计
+│   │       │   ├── 02-00-字典表设计.md
+│   │       │   ├── 02-01-鱼竿表设计.md
+│   │       │   ├── 02-02-渔轮表设计.md
+│   │       │   ├── 02-03-鱼线表设计.md
+│   │       │   ├── 02-04-鱼饵表设计.md
+│   │       │   ├── 02-05-导环表设计.md
+│   │       │   ├── 02-06-配件表设计.md
+│   │       │   └── 02-代码实现.md
+│   │       └── ...              # 其他设计文档
 │   └── intent_understanding_optimization.md  # ⏰ 意图优化文档
 ├── main.py                       # 🚀 交互式CLI入口
 ├── pyproject.toml                # 📦 项目配置 (v3.0.1)
@@ -427,10 +469,12 @@ fishing-agent/
 ```
 
 ### 架构优势
-- **大幅简化**: 从75+文件简化至5个核心文件，85%代码减少
+- **模块化设计**: 清晰的目录结构，便于维护和扩展
 - **零抽象层**: 直接LangChain 1.0+实现，无过度包装
 - **功能完整**: 保持所有核心功能（7因子评分、天气分析、时间段识别）
 - **向后兼容**: 保持所有现有API兼容性
+- **数据存储**: 集成数据库和缓存系统，支持高并发访问
+- **完整测试**: 全面的测试覆盖，确保代码质量
 
 ## 🧪 测试
 
