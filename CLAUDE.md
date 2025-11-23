@@ -27,22 +27,22 @@ This is "fishing-agent" v3.0.1 - an intelligent fishing assistant built with **s
 ### 🎯 Core Files (5 main files)
 - **`src/agent.py`** - Main LangChain 1.0+ intelligent agent entry point (backward compatibility)
 - **`src/tools/__init__.py`** - Unified tool interface and exports
-- **`src/tools/basic_tools.py`** - Basic utility tools (time, math, coordinates)
+- **`src/tools/basic_tools.py`** - Basic utility tools (time functions)
 - **`src/tools/weather_tools.py`** - Weather query and forecast tools
 - **`src/tools/fishing_tools.py`** - Fishing recommendation and scoring tools (7-factor system + time period support)
 
-### 🔧 Supporting Infrastructure (19 additional files)
-- **`src/utils/`** - Utility classes (API client, coordinate utils, cache, date_utils)
+### 🔧 Supporting Infrastructure (essential modules)
+- **`src/utils/`** - Core utility classes (API client, coordinate utils, cache, date_utils)
   - **`date_utils.py`** - Enhanced date parsing and formatting utilities
 - **`src/fishing_agent/`** - Core agent implementation with LLM optimization
   - **`prompts.py`** - Enhanced system prompts with Few-Shot examples
 - **`src/config/`** - Configuration management
-- **`src/tools/scoring/`** - ⭐ NEW: 7-factor scientific scoring system
+- **`src/tools/scoring/`** - ⭐ CORE: 7-factor scientific scoring system
   - **`enhanced_scorer.py`** - Seasonal/lunar scoring + trend analysis algorithms
   - **`__init__.py`** - Scoring module exports
 - **`main.py`** - Interactive CLI entry point
 - **`src/tests/`** - Comprehensive test suite (including scoring tests with 27 test cases)
-  - **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ NEW: 7-factor scoring unit tests
+  - **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ CORE: 7-factor scoring unit tests
 
 ## Development Commands
 
