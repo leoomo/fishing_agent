@@ -1,447 +1,170 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+智能钓鱼助手 v3.0.2 - 基于 LangChain 1.0+ 架构和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析和路亚装备智能推荐，支持多种 LLM 提供商。
 
-## Project Overview
+**当前分支**: feature/llm-optimization
 
-This is "fishing-agent" v3.0.1 - an intelligent fishing assistant built with **simplified LangChain 1.0+ architecture** and **7-factor scientific scoring system**. The project focuses on fishing time recommendations and weather analysis, supporting multiple LLM providers (Zhipu AI, Qwen, Doubao) with real-time weather data integration.
+### 核心特性
+- ✅ **LangChain 1.0+**: 原生 LangChain agents，移除 LangGraph 封装
+- ✅ **同步优先**: 消除异步复杂性和事件循环问题
+- ✅ **零抽象**: 直接 API 调用，无中间层
+- ✅ **7 因子科学评分**: 温度、天气、风力、气压、湿度、季节、月相
+- ✅ **动态趋势分析**: 识别"黄金钓鱼时段"
+- ✅ **LLM 优化**: 95%+ 准确率的推理能力
+- ✅ **时间意图识别**: 95%+ 准确率的时间段理解
+- ✅ **路亚装备推荐**: 智能装备建议系统
 
-**Current Branch**: feature/llm-optimization (LLM optimization features integrated and merged)
+## 架构概览
 
-### 🏗️ **Simplified Architecture** (v3.0.1)
-**Major architectural simplification completed**: Reduced from 75+ files to 5 core files (85% code reduction) while maintaining all functionality.
+### 核心文件
+- **`src/agent.py`** - 主智能代理入口
+- **`src/tools/__init__.py`** - 统一工具接口
+- **`src/tools/basic_tools.py`** - 基础工具
+- **`src/tools/weather_tools.py`** - 天气查询工具
+- **`src/tools/fishing_tools.py`** - 钓鱼推荐工具
+- **`src/tools/lure_tools.py`** - 路亚装备工具
 
-- ✅ **Direct LangChain 1.0+**: Removed LangGraph wrapper layer, uses native LangChain agents
-- ✅ **Synchronous-first**: Eliminates async complexity and event loop issues
-- ✅ **Zero abstraction**: Direct API calls without middleware layers
-- ✅ **Ethical data constraints**: Never generates fake data, graceful degradation on API failures
-- ✅ **7-Factor Scientific Scoring**: Upgraded from 5-factor to 7-factor algorithm with trend analysis ⭐ v3.0.0
-- ✅ **Dynamic Trend Analysis**: Pressure/temperature/wind trend analysis for "golden fishing period" identification ⭐ v3.0.0
-- ✅ **LLM Optimization**: feature/llm-optimization branch merged, enhanced reasoning capabilities (95%+ accuracy)
-- ✅ **Enhanced Date Processing**: Unified date parsing with date_utils module
-- ✅ **Time Period Intent Recognition**: Few-Shot enhanced intent understanding for time periods (95%+ accuracy)
-- ✅ **Documentation Optimization**: v3.0.1 testing完善和设计文档补充
+### 支持模块
+- **`src/utils/`** - 核心工具类
+- **`src/fishing_agent/`** - 智能代理实现
+- **`src/tools/scoring/`** - 7 因子科学评分系统
+- **`src/data/`** - 数据存储和缓存
+- **`src/tests/`** - 测试套件
+- **`main.py`** - 交互式 CLI 入口
 
-## Current Architecture (v3.0.1)
+## 开发指南
 
-### 🎯 Core Files (main files)
-- **`src/agent.py`** - Main LangChain 1.0+ intelligent agent entry point (backward compatibility)
-- **`src/tools/__init__.py`** - Unified tool interface and exports
-- **`src/tools/basic_tools.py`** - Basic utility tools (time functions)
-- **`src/tools/weather_tools.py`** - Weather query and forecast tools
-- **`src/tools/fishing_tools.py`** - Fishing recommendation and scoring tools (7-factor system + time period support)
-
-### 🔧 Supporting Infrastructure (complete modules)
-- **`src/utils/`** - Core utility classes (API client, coordinate utils, cache, date_utils)
-  - **`date_utils.py`** - Enhanced date parsing and formatting utilities
-- **`src/fishing_agent/`** - Core agent implementation with LLM optimization
-  - **`prompts.py`** - Enhanced system prompts with Few-Shot examples
-  - **`callbacks.py`** - Callback handling
-- **`src/config/`** - Configuration management
-  - **`service_config.py`** - Service configuration
-- **`src/tools/scoring/`** - ⭐ CORE: 7-factor scientific scoring system
-  - **`enhanced_scorer.py`** - Seasonal/lunar scoring + trend analysis algorithms
-  - **`__init__.py`** - Scoring module exports
-- **`src/data/`** - Data storage and caching
-  - **`admin_divisions.db`** - Administrative divisions database
-  - **`coordinates_cache.db`** - Coordinates cache database
-  - **`town_coordinates.db`** - Town coordinates database
-  - **`cache/`** - Cache directory with weather cache
-- **`src/middleware/`** - Middleware components
-  - **`health.py`** - Health check middleware
-- **`main.py`** - Interactive CLI entry point
-- **`src/tests/`** - Comprehensive test suite (including scoring tests with 27 test cases)
-  - **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ CORE: 7-factor scoring unit tests
-  - **`src/tests/integration/`** - Integration tests
-  - **`src/tests/unit/`** - Unit tests
-  - **`src/tests/weather/`** - Weather-specific tests
-
-## Development Commands
-
-### Environment Setup
+### 环境配置
 ```bash
-# Install dependencies
+# 安装依赖
 uv sync
 
-# Configure environment variables
+# 配置环境变量
 cp .env.example .env
-# Edit .env with your API keys
 
-# Run the interactive application
+# 运行应用
 uv run python main.py
-# OR
-python main.py
-
-# Run the agent directly (simplified - no PYTHONPATH needed)
-uv run python src/agent.py
-# OR from src directory:
-cd src && uv run python agent.py
 ```
 
-### Testing
+### 测试
 ```bash
-# Run all tests
+# 运行所有测试
 uv run pytest src/tests/
 
-# ⭐ NEW: Test 7-factor enhanced scoring system (v3.0.0+)
+# 测试评分系统
 PYTHONPATH=src uv run pytest src/tests/scoring/test_enhanced_scorer.py -v
-# 27 test cases covering seasonal, lunar, and trend analysis
 
-# Run specific test modules
-uv run python src/tests/test_enhanced_fishing_scorer.py
-uv run python src/tests/integration/verify_national_integration.py
-
-# Test time period intent recognition (v2.3.0+)
-uv run python src/tests/test_time_period_intent.py -v
-
-# Test weather API
-uv run python src/tests/weather/test_real_weather_api.py
-
-# Test national coverage
-uv run python src/tests/test_national_coverage.py
-
-# Test date utilities (v2.3.1+)
-uv run python -c "
-from src.utils.date_utils import parse_date_input, format_date, get_weekday_cn
-print('Date utils test:')
-print(f'Tomorrow: {format_date(parse_date_input(\"明天\"))} {get_weekday_cn(parse_date_input(\"明天\"))}')
-print(f'Christmas: {format_date(parse_date_input(\"2024-12-25\"))} {get_weekday_cn(parse_date_input(\"2024-12-25\"))}')
-"
-
-# ⭐ NEW: Test enhanced scoring functions directly (v3.0.0+)
-PYTHONPATH=src uv run python -c "
-from tools.scoring.enhanced_scorer import calculate_seasonal_score, analyze_pressure_trend
-from datetime import datetime
-# Test seasonal scoring
-spring_score = calculate_seasonal_score(datetime(2024, 4, 15, 7, 0), 7)
-print(f'Spring morning score: {spring_score}')
-# Test pressure trend
-pressure_series = [1020, 1018, 1015, 1012, 1009, 1005]
-trend = analyze_pressure_trend(pressure_series)
-print(f'Pressure trend: {trend}')
-"
+# 测试工具
+uv run python -c "from src.tools import get_all_tools; print(f'工具数量: {len(get_all_tools())}')"
 ```
 
-### Tool Development
-```bash
-# Test tools directly
-uv run python -c "
-from src.tools import get_all_tools
-tools = get_all_tools()
-print(f'Available tools: {len(tools)}')
-for tool in tools:
-    print(f'- {tool.name}: {tool.description}')
-"
+## 技术栈
 
-# Test weather tools
-uv run python -c "
-from src.tools.weather_tools import get_current_weather
-result = get_current_weather.invoke({'place': '北京'})
-print(result)
-"
+### 核心框架
+- **langchain>=0.3.0** - LangChain 1.0+ API
+- **requests>=2.25.0** - HTTP 客户端
+- **pydantic>=2.0.0** - 数据验证
+- **python-dotenv>=1.1.1** - 环境变量管理
+- **pandas>=2.3.3** - 数据分析
 
-# Test fishing recommendations
-uv run python -c "
-from src.tools.fishing_tools import query_fishing_recommendation
-result = query_fishing_recommendation.invoke({'location': '杭州', 'date': '明天'})
-print(result)
-"
+### LLM 提供商
+- **智谱AI GLM** (ANTHROPIC_AUTH_TOKEN)
+- **通义千问** (DASHSCOPE_API_KEY)
+- **OpenAI GPT** (OPENAI_API_KEY)
 
-# Test time period functionality (v2.3.0+)
-uv run python -c "
-from src.tools.fishing_tools import query_fishing_recommendation
-result = query_fishing_recommendation.invoke({
-    'location': '北京',
-    'date': '明天',
-    'time_period': '白天'
-})
-print('Daytime fishing recommendation:')
-print(result)
-"
-```
+### 外部服务
+- **彩云天气 API** (CAIYUN_API_KEY)
+- **高德地图 API** (AMAP_API_KEY)
 
-## Key Dependencies & Tech Stack
-
-### Core Framework (v3.0.0)
-- **langchain>=0.3.0** - Modern LangChain 1.0+ API (direct usage, no LangGraph)
-- **langchain-openai>=1.0.1** - OpenAI GPT integration (also used for Zhipu AI)
-- **langchain-community>=0.3.0** - Community tools and integrations
-- **langchain-anthropic>=0.3.0** - Anthropic Claude integration
-
-### Data & APIs
-- **requests>=2.25.0** - Primary HTTP client (synchronous)
-- **httpx>=0.24.0** - Alternative HTTP client
-- **pydantic>=2.0.0** - Data validation and settings
-- **python-dotenv>=1.1.1** - Environment variable management
-- **pandas>=2.3.3** - Data analysis and weather processing
-
-### LLM Providers
-- **智谱AI GLM** - Default LLM provider (ANTHROPIC_AUTH_TOKEN)
-- **通义千问** - Alibaba Qwen (DASHSCOPE_API_KEY)
-- **豆包** - Bytedance Doubao (optional)
-
-### External Services
-- **彩云天气 API** - Real-time weather data (CAIYUN_API_KEY required)
-- **高德地图 API** - Geographic coordinate service (AMAP_API_KEY required)
-
-## Current Project Structure (v3.0.1)
+## 项目结构
 
 ```
 fishing-agent/
-├── src/                          # 源代码目录
-│   ├── agent.py                  # 🤖 Main LangChain 1.0+ agent (backward compatibility)
-│   ├── README.md                 # 📖 src module documentation
-│   ├── fishing_agent/            # 🧠 Core agent implementation
-│   │   ├── __init__.py          # Agent exports and factory functions
-│   │   ├── core.py              # Core agent class with LLM optimization
-│   │   ├── model_factory.py     # Multi-model factory
-│   │   ├── prompts.py           # Enhanced system prompts with Few-Shot
-│   │   └── callbacks.py         # Callback handling
-│   ├── tools/                    # 🛠️ Tool modules
-│   │   ├── __init__.py          # Tool exports and interfaces
-│   │   ├── basic_tools.py       # Basic utilities (time, math, coords)
-│   │   ├── weather_tools.py     # Weather and forecast tools
-│   │   ├── fishing_tools.py     # Fishing recommendations (7-factor scoring + time period)
-│   │   └── scoring/              # ⭐ CORE: 7-factor scientific scoring system
-│   │       ├── __init__.py      # Scoring module exports
-│   │       └── enhanced_scorer.py  # Seasonal/lunar/trend analysis algorithms
-│   ├── utils/                    # 🔧 Utility classes
-│   │   ├── api_client.py        # Unified API client
-│   │   ├── coordinate_utils.py  # Coordinate and location utilities
-│   │   ├── cache.py             # Simple caching system
-│   │   └── date_utils.py        # Enhanced date parsing and formatting
-│   ├── config/                   # ⚙️ Configuration management
-│   │   ├── service_config.py    # Service configuration
-│   │   └── README.md            # Configuration documentation
-│   ├── middleware/               # 🔌 Middleware components
-│   │   └── health.py            # Health check middleware
-│   ├── data/                     # 💾 Data storage and caching
-│   │   ├── admin_divisions.db   # Administrative divisions database
-│   │   ├── coordinates_cache.db # Coordinates cache database
-│   │   ├── town_coordinates.db  # Town coordinates database
-│   │   └── cache/               # Cache directory
-│   │       └── weather_cache.json # Weather cache
-│   ├── docs/                     # 📖 Technical documentation
-│   │   ├── API.md               # API documentation
-│   │   ├── TOOLS_GUIDE.md       # Tools usage guide
-│   │   ├── CONFIGURATION_GUIDE.md # Configuration guide
-│   │   └── FISHING_WEIGHT_ALGORITHMS_GUIDE.md # Algorithm guide
-│   ├── tests/                    # 🧪 Comprehensive test suite
-│   │   ├── test_time_period_intent.py  # Time period intent tests
-│   │   ├── scoring/              # ⭐ CORE: Scoring system tests
-│   │   │   └── test_enhanced_scorer.py  # 27 test cases for 7-factor scoring
-│   │   ├── integration/         # Integration tests
-│   │   │   ├── verify_national_integration.py
-│   │   │   └── test_agent_conversation.py
-│   │   ├── unit/                # Unit tests
-│   │   │   ├── test_weather_service.py
-│   │   │   └── test_agent_structure.py
-│   │   ├── weather/             # Weather-specific tests
-│   │   │   └── test_real_weather_api.py
-│   │   └── demos/               # Demo scripts
-│   │       ├── demo_weather_agent.py
-│   │       └── demo_national_weather_coverage.py
-│   └── examples/                 # 📝 Example code
-├── docs/                         # 📖 Project documentation
-│   ├── TESTING.md                # 🧪 Testing documentation (46+ test cases)
-│   ├── QUICK_TEST.md             # ⚡ Quick testing guide
-│   ├── design/                   # 🏗️ Design documentation
-│   │   └── lure_equipment/       # 🎣 Lure equipment design
-│   │       └── database/         # Database design docs
-│   └── intent_understanding_optimization.md  # ⏰ Intent optimization docs
-├── main.py                       # 🚀 Interactive CLI entry point
-├── pyproject.toml                # 📦 Project configuration (v3.0.1)
-├── .env.example                  # 🔑 Environment variable template
-├── CLAUDE.md                     # 📖 This development guide
-├── README.md                     # 📋 Project documentation
-└── CHANGELOG.md                  # 📋 Version history
+├── src/                          # 源代码
+│   ├── agent.py                  # 主代理入口
+│   ├── tools/                    # 工具模块
+│   │   ├── basic_tools.py        # 基础工具
+│   │   ├── weather_tools.py      # 天气工具
+│   │   ├── fishing_tools.py      # 钓鱼工具
+│   │   ├── lure_tools.py         # 路亚工具
+│   │   └── scoring/              # 评分系统
+│   ├── fishing_agent/            # 代理实现
+│   ├── utils/                    # 工具类
+│   ├── data/                     # 数据存储
+│   └── tests/                    # 测试套件
+├── docs/                         # 项目文档
+├── main.py                       # CLI 入口
+└── pyproject.toml                # 项目配置
 ```
 
-### Critical Files for Development (v3.0.1)
-- **`src/agent.py`** - Backward compatibility shim for agent functionality
-- **`src/fishing_agent/`** - Core agent implementation with LLM optimization
-  - **`core.py`** - Main OptimizedFishingAgent class using LangChain 1.0+ create_agent
-  - **`prompts.py`** - Enhanced system prompts with Few-Shot examples for time period intent
-  - **`callbacks.py`** - Callback handling
-- **`src/tools/__init__.py`** - Unified tool interface and backward compatibility
-- **`src/tools/weather_tools.py`** - Weather tools with direct API calls
-- **`src/tools/fishing_tools.py`** - 7-factor fishing scoring algorithm with time period support
-- **`src/tools/scoring/`** - ⭐ CORE: 7-factor scientific scoring system
-  - **`enhanced_scorer.py`** - Seasonal, lunar, and trend analysis algorithms
-  - **`__init__.py`** - Scoring module exports
-- **`src/utils/date_utils.py`** - Enhanced date parsing and formatting utilities
-- **`src/utils/api_client.py`** - Unified HTTP client for weather and coordinate APIs
-- **`src/config/service_config.py`** - Service configuration management
-- **`src/data/`** - Data storage and caching databases
-- **`src/tests/scoring/test_enhanced_scorer.py`** - ⭐ CORE: 27 test cases for 7-factor scoring
-- **`src/tests/test_time_period_intent.py`** - Time period intent recognition tests
-- **`main.py`** - Interactive command-line interface
+### 关键文件
+- **`src/agent.py`** - 代理功能
+- **`src/tools/fishing_tools.py`** - 7 因子钓鱼评分
+- **`src/tools/lure_tools.py`** - 路亚装备推荐
+- **`src/tools/scoring/enhanced_scorer.py`** - 评分算法
+- **`main.py`** - 命令行界面
 
-## Core Features (v3.0.0)
+## 核心功能
 
-### 🎣 Fishing Recommendation System (Scientific Upgrade)
-- **7-Factor Scientific Algorithm** ⭐ UPGRADED:
-  - Temperature (25%), Weather (20%), Wind (15%), Pressure (15%), Humidity (10%)
-  - **Season (5%)** ⭐ NEW - Spring/summer/autumn/winter time-of-day scoring
-  - **Lunar (5%)** ⭐ NEW - 8 moon phases with day/night differentiation
-- **Dynamic Trend Analysis** ⭐ NEW:
-  - Pressure trend: Identifies "golden fishing period" (fast falling = +20%)
-  - Temperature trend: Activity adjustment (fast warming = +10%)
-  - Wind stability: Comfort optimization (stable = +5%)
-- **Solves "86-Score Problem"**: Achieves >5 point differentiation between conditions (100% improvement)
-- **Scientific Weight Optimization**: Pressure increased to 15% (from 10%), weather decreased to 20% (from 30%)
-- **Time Period Intent Recognition**: Few-Shot enhanced understanding of time-limited queries (95%+ accuracy)
-- **Enhanced Date Processing**: Unified parsing for relative ("明天") and absolute ("2024-12-25") dates
-- **Ethical Data Constraints**: Never generates fake weather data, graceful API failure handling
-- **National Coverage**: Supports 3,142+ administrative regions (95%+ coverage)
-- **Natural Language Processing**: Chinese query support with direct tool integration
-- **LLM Optimization**: Enhanced reasoning capabilities from feature/llm-optimization branch
+### 钓鱼推荐系统
+- **7 因子科学算法**: 温度、天气、风力、气压、湿度、季节、月相
+- **动态趋势分析**: 识别"黄金钓鱼时段"
+- **时间意图识别**: 95%+ 准确率的时间段理解
+- **全国覆盖**: 支持 3,142+ 行政区域
+- **中文查询**: 自然语言处理支持
 
-### 🌤️ Weather Service (Simplified)
-- **Direct API Calls**: No middleware layers, direct Caiyun Weather API integration
-- **Enhanced Date Queries**: Unified date parsing with date_utils module for relative/absolute dates
-- **72-hour Forecasts**: Extended hourly weather predictions
-- **Smart Fallback**: Honest error reporting when API unavailable (no fake data)
-- **Zero Configuration**: Works out of the box with proper API keys
+### 天气服务
+- **直接 API 调用**: 彩云天气 API 集成
+- **72 小时预报**: 逐小时天气预测
+- **智能降级**: API 失败时诚实报告
 
-### 🗺️ Coordinate Service (Unified)
-- **Direct Amap API Integration**: Precise geographic coordinate queries
-- **Simplified Caching**: Effective caching with 90%+ hit rate
-- **Intelligent Matching**: Supports aliases and fuzzy matching
-- **National Coverage**: 95%+ coverage of Chinese administrative regions
-- **Utility-based Design**: Simple coordinate utilities without service abstractions
+### 路亚装备推荐
+- **智能建议**: 基于目标鱼种和环境条件
+- **装备匹配**: 路亚、鱼线、配件推荐
 
-## Development Guidelines (v3.0.0)
+## 开发指南
 
-### Architecture Principles
-1. **Synchronous-first**: Use direct API calls with `requests`, avoid async complexity
-2. **Zero Abstraction**: Direct tool implementations without middleware layers
-3. **Ethical Data**: Never generate fake data, provide honest error messages
-4. **LangChain 1.0+ Native**: Use `@tool` decorator and `create_agent` directly
-5. **Simple Configuration**: Environment variables with `.env.example` template
-6. **7-Factor Scoring**: ⭐ NEW - Use enhanced_scorer module for all fishing scoring calculations
-7. **Trend Analysis**: ⭐ NEW - Provide historical data for dynamic trend adjustments
-8. **LLM Optimization**: Utilize enhanced prompts and Few-Shot examples for better reasoning
-9. **Unified Date Handling**: Use date_utils module for consistent date parsing across the codebase
+### 架构原则
+1. **同步优先**: 使用 `requests` 直接 API 调用
+2. **零抽象**: 直接工具实现，无中间层
+3. **诚实数据**: 不生成假数据，提供诚实错误信息
+4. **LangChain 1.0+**: 直接使用 `@tool` 装饰器
+5. **统一日期处理**: 使用 date_utils 模块
 
-### Common Import Patterns (v3.0.0)
+### 常用导入
 ```python
-# Agent creation (LLM optimized)
+# 代理创建
 from src.agent import create_optimized_fishing_agent
 
-# Tool access - simplified unified interface
-from src.tools import get_all_tools, get_weather_tools, get_fishing_tools
-
-# Direct tool usage
-from src.tools.weather_tools import get_current_weather, get_weather_forecast
+# 工具导入
+from src.tools import get_all_tools
+from src.tools.weather_tools import get_current_weather
 from src.tools.fishing_tools import query_fishing_recommendation
-from src.tools.basic_tools import get_current_time, calculate
+from src.tools.lure_tools import query_lure_recommendation
 
-# ⭐ NEW: 7-factor scoring system
+# 评分系统
 from src.tools.scoring.enhanced_scorer import (
-    calculate_seasonal_score,
-    calculate_lunar_phase,
-    calculate_lunar_score,
-    analyze_pressure_trend,
-    analyze_temperature_trend,
-    analyze_wind_stability
+    calculate_seasonal_score, analyze_pressure_trend
 )
 
-# Utility classes
-from src.utils.api_client import WeatherAPIClient, CoordinateAPIClient
+# 工具类
+from src.utils.date_utils import parse_date_input, format_date
 from src.utils.coordinate_utils import get_coordinates
-from src.utils.date_utils import parse_date_input, format_date, get_weekday_cn
-
-# Date handling examples
-tomorrow = parse_date_input("明天")
-formatted_date = format_date(tomorrow)
-weekday = get_weekday_cn(tomorrow)
-
-# ⭐ NEW: Enhanced scoring examples
-from datetime import datetime
-spring_score = calculate_seasonal_score(datetime(2024, 4, 15, 7, 0), 7)  # 100分
-pressure_trend = analyze_pressure_trend([1020, 1018, 1015, 1012, 1009, 1005])  # 1.20x multiplier
 ```
 
-### Adding New Tools (v2.3.1)
-```python
-from langchain.tools import tool
-from src.utils.date_utils import parse_date_input  # Use unified date parsing
-
-@tool
-def my_new_tool(param: str, date: str = None) -> str:
-    """
-    Tool description that will be shown to the LLM
-
-    Args:
-        param: Description of parameter
-        date: Date string (supports relative dates like "明天" or absolute like "2024-12-25")
-
-    Returns:
-        Description of return value
-    """
-    try:
-        # Use unified date parsing if date parameter provided
-        if date:
-            parsed_date = parse_date_input(date)
-            formatted_date = format_date(parsed_date)
-
-        # Direct API call or processing
-        result = do_something(param)
-        return f"Result: {result}"
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-# Export in tools/__init__.py
-MY_TOOLS = [my_new_tool]
-```
-
-### Date Utilities Usage (v2.3.1)
-```python
-from src.utils.date_utils import parse_date_input, parse_dates_list, format_date, get_weekday_cn
-
-# Parse single date
-tomorrow = parse_date_input("明天")
-christmas = parse_date_input("2024-12-25")
-today = parse_date_input()  # Defaults to tomorrow if no input
-
-# Parse date list
-dates = parse_dates_list(["今天", "明天", "后天"])
-week_dates = parse_dates_list(["2024-12-25", "2024-12-26", "2024-12-27"])
-
-# Format dates
-formatted = format_date(tomorrow, '%Y年%m月%d日')  # Custom format
-weekday = get_weekday_cn(tomorrow)  # Chinese weekday
-```
-
-### Required Environment Variables
-Create `.env` from `.env.example`:
-
+### 环境变量
 ```bash
-# Required APIs
-CAIYUN_API_KEY=your-caiyun-api-key      # Weather API (required)
-AMAP_API_KEY=your-amap-api-key          # Coordinate API (required)
+# 必需 API
+CAIYUN_API_KEY=your-caiyun-api-key
+AMAP_API_KEY=your-amap-api-key
 
-# LLM Providers (at least one recommended)
-ANTHROPIC_AUTH_TOKEN=your-zhipu-token   # Zhipu AI GLM (recommended)
-DASHSCOPE_API_KEY=your-qwen-key         # Alibaba Qwen
-OPENAI_API_KEY=your-openai-key          # OpenAI GPT
-ANTHROPIC_API_KEY=your-claude-key       # Anthropic Claude
+# LLM 提供商
+ANTHROPIC_AUTH_TOKEN=your-zhipu-token
+DASHSCOPE_API_KEY=your-qwen-key
 ```
 
-### Testing Guidelines (v2.3.1)
-- Write tests for new tools in `src/tests/`
-- Test both success and error scenarios
-- Verify API integration with real keys
-- Use mock APIs for unit tests when possible
-- Test national coverage for location-based features
-- Test time period intent recognition for time-limited queries
-- Test date parsing utilities with various input formats
-- Include LLM optimization scenarios in test cases
-
-## Python Environment
-- **Requires Python >=3.11**
-- **Uses `uv` for dependency management** (as specified in user instructions)
-- **Synchronous-first architecture** for stability
-- **LangChain 1.0+ native** for tool and agent development
-- **Zero-config deployment** with proper environment variables
+### Python 环境
+- **Python >=3.11**
+- **uv 依赖管理**
+- **同步优先架构**
+- **LangChain 1.0+ 原生**

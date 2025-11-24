@@ -11,7 +11,7 @@
 - 📈 **性能提升**: 意图识别准确率95%+，LLM推理质量显著优化
 - 🎯 **简化架构**: 从75+文件简化至5个核心文件，85%代码减少，保持完整功能
 
-## ✨ 核心功能（v3.0.1 测试完善 + v3.0.0 重大升级）
+## ✨ 核心功能（v3.0.1 测试完善 + v3.0.0 重大升级 + v3.0.2 路亚装备）
 
 ### 🎣 7因子科学评分体系 ⭐ 新版本亮点
 - **7因子评分算法**: 温度(25%) + 天气(20%) + 风力(15%) + 气压(15%) + 湿度(10%) + **季节(5%)** + **月相(5%)**
@@ -19,6 +19,14 @@
 - **季节性评分**: 基于鱼类生物学规律的春夏秋冬时段评分
 - **月相评分**: 简化儒略日算法，8种月相精准识别
 - **评分区分度提升**: 解决"86分问题"，不同条件差异>5分
+
+### 🎯 路亚装备智能推荐系统 ⭐ v3.0.2新增
+- **装备购买推荐**: 智能推荐鱼竿、渔轮、鱼线、拟饵和套装，支持预算和规格筛选
+- **多装备对比**: 对比2-5款装备的性价比、性能和适用场景
+- **专业知识查询**: 鱼类习性、钓组绑法、作钓技巧等全面知识库
+- **图片识别**: 识别拟饵类型、钓组配置和鱼种，支持本地图片分析
+- **智能评分系统**: 基于价格匹配、规格匹配、品牌声誉和用户水平的综合评分
+- **套装配置**: 针对不同预算和水平自动配置完整路亚套装
 
 ### 🚀 其他核心功能
 - **⏰ 时间段意图理解**: 精准识别用户时间限定，支持白天/晚上/上午/下午等时段
@@ -36,10 +44,12 @@
 
 #### 🎯 核心文件 (主要文件)
 - **`src/agent.py`**: 主入口点（向后兼容层）
-- **`src/tools/__init__.py`**: 统一工具接口，导出3个核心工具
+- **`src/tools/__init__.py`**: 统一工具接口，导出7个核心工具
 - **`src/tools/basic_tools.py`**: 基础工具（时间工具）
 - **`src/tools/weather_tools.py`**: 天气查询和预报工具
 - **`src/tools/fishing_tools.py`**: 钓鱼推荐和评分工具（7因子系统）
+- **`src/tools/lure_tools.py`**: 路亚装备工具（推荐/对比/查询/识别）
+- **`src/tools/lure/`**: 路亚装备完整模块（数据库/搜索/推荐/对比）
 
 #### 🔧 支撑模块 (完整功能架构)
 - **`src/tools/scoring/`**: 7因子科学评分系统
@@ -323,11 +333,55 @@ wind_multiplier = analyze_wind_stability(wind_series)
 print(f"风速稳定性倍率: {wind_multiplier}")  # 稳定风速应为1.05x
 ```
 
+### 路亚装备智能推荐系统使用（v3.0.2新增）
+```python
+from src.tools.lure_tools import (
+    recommend_equipment,
+    compare_equipment,
+    lookup_fishing_knowledge,
+    identify_from_image
+)
+
+# 装备推荐（买什么）
+result = recommend_equipment.invoke({
+    "equipment_type": "鱼竿",
+    "budget": 500,
+    "user_level": "新手",
+    "target_fish": "鲈鱼"
+})
+print("鱼竿推荐结果:")
+print(result)
+
+# 装备对比（比哪个）
+result = compare_equipment.invoke({
+    "equipment_names": "禧玛诺毒牙264ML, 达亿瓦月下美人76ML",
+    "compare_aspects": "价格, 性能, 适用场景"
+})
+print("装备对比结果:")
+print(result)
+
+# 知识查询（学什么）
+result = lookup_fishing_knowledge.invoke({
+    "topic": "德州钓组怎么绑",
+    "include_images": True
+})
+print("钓组知识:")
+print(result)
+
+# 图片识别（看什么）
+result = identify_from_image.invoke({
+    "image_path": "/path/to/lure_image.jpg",
+    "question": "这是什么饵？"
+})
+print("图片识别结果:")
+print(result)
+```
+
 ### 直接工具调用
 ```python
 from src.tools import get_all_tools
 
-# 获取所有可用工具（当前3个核心工具）
+# 获取所有可用工具（当前7个核心工具：3个基础+4个路亚装备）
 tools = get_all_tools()
 print(f"可用工具数量: {len(tools)}")
 for tool in tools:
@@ -337,6 +391,7 @@ for tool in tools:
 from src.tools.basic_tools import get_current_time
 from src.tools.weather_tools import get_weather
 from src.tools.fishing_tools import query_fishing_recommendation
+from src.tools.lure_tools import recommend_equipment, compare_equipment
 
 # 获取当前时间
 result = get_current_time.invoke({})
@@ -352,12 +407,28 @@ result = query_fishing_recommendation.invoke({
     'date': '明天'
 })
 print(f"钓鱼推荐: {result}")
+
+# 路亚装备推荐
+result = recommend_equipment.invoke({
+    'equipment_type': '鱼竿',
+    'budget': 800,
+    'user_level': '进阶',
+    'specifications': '{"硬度": "ML", "长度": "2.1m"}'
+})
+print(f"装备推荐: {result}")
+
+# 装备对比
+result = compare_equipment.invoke({
+    'equipment_names': '禧玛诺毒牙, 达亿瓦月下美人',
+    'compare_aspects': '价格, 性能, 品牌'
+})
+print(f"装备对比: {result}")
 ```
 
 ### 工具统一接口使用
 ```python
 # 使用简化的工具接口
-from src.tools import get_fishing_tools, get_weather_tools, get_basic_tools
+from src.tools import get_fishing_tools, get_weather_tools, get_basic_tools, get_lure_tools
 
 # 获取钓鱼工具
 fishing_tools = get_fishing_tools()
@@ -370,9 +441,15 @@ print(f"天气工具: {len(weather_tools)}个")
 # 获取基础工具
 basic_tools = get_basic_tools()
 print(f"基础工具: {len(basic_tools)}个")
+
+# 获取路亚装备工具（v3.0.2新增）
+lure_tools = get_lure_tools()
+print(f"路亚装备工具: {len(lure_tools)}个")
+for tool in lure_tools:
+    print(f"- {tool.name}: {tool.description[:50]}...")
 ```
 
-## 📁 项目结构 (v3.0.1 完整架构)
+## 📁 项目结构 (v3.0.2 路亚装备集成)
 
 ### 项目目录结构
 ```
@@ -381,10 +458,24 @@ fishing-agent/
 │   ├── agent.py                  # 🤖 主入口点（向后兼容）
 │   ├── README.md                 # 📖 src模块说明文档
 │   └── tools/                    # 🛠️ 核心工具模块
-│       ├── __init__.py          # 🎯 统一工具接口
+│       ├── __init__.py          # 🎯 统一工具接口（7个核心工具）
 │       ├── basic_tools.py       # 🔧 基础工具（时间功能）
 │       ├── weather_tools.py     # 🌤️ 天气工具（实时天气、72小时预报）
 │       ├── fishing_tools.py     # 🎣 钓鱼工具（7因子评分、时段过滤）
+│       ├── lure_tools.py        # 🎯 路亚装备工具（推荐/对比/查询/识别）
+│       ├── lure/                # 🎣 路亚装备完整模块
+│       │   ├── __init__.py      # 模块导出
+│       │   ├── database.py      # 数据库访问层
+│       │   ├── image_manager.py # 图片存储管理
+│       │   ├── fish_knowledge.py # 鱼类知识服务
+│       │   ├── comparator.py    # 装备对比服务
+│       │   ├── recommender.py   # 智能推荐引擎
+│       │   ├── knowledge_search.py # 知识搜索服务
+│       │   ├── vector_store.py  # 向量存储（支持语义搜索）
+│       │   ├── formatters.py    # 输出格式化
+│       │   ├── knowledge_indexer.py # 知识索引管理
+│       │   ├── init_data.py     # 初始数据
+│       │   └── data/            # 数据目录
 │       └── scoring/              # ⭐ v3.0.0核心：科学评分系统
 │           ├── __init__.py      # 评分模块导出
 │           └── enhanced_scorer.py  # 7因子+趋势分析算法
