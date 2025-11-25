@@ -19,7 +19,7 @@ from fishing_agent import (
     FishingAgentCallback,
     get_system_prompt
 )
-from middleware import HealthCheck
+from src.utils.health_check import HealthCheck
 
 logger = logging.getLogger(__name__)
 
