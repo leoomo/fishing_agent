@@ -1,7 +1,7 @@
 [project]
 name = "fishing-agent"
-version = "3.0.2"
-description = "智能钓鱼助手 v3.0.2 - 基于 LangChain 1.0+ 的钓鱼时间推荐和天气分析系统（7因子科学评分体系 + 路亚装备推荐 + LLM优化）"
+version = "3.0.2.1"
+description = "智能钓鱼助手 v3.0.2.1 - 基于 LangChain 1.0+ 的钓鱼时间推荐和天气分析系统（7因子科学评分体系 + 架构优化 + LLM优化）"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -33,4 +33,5 @@ dependencies = [
     "langgraph-api>=0.5.14",
     "python-dateutil>=2.8.2",
     "langchain-mcp-adapters>=0.1.14",
+    "langchain-oceanbase>=0.2.6",
 ]

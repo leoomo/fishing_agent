@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-智能钓鱼助手 v3.0.2 - 基于 LangChain 1.0+ 架构和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析和路亚装备智能推荐，支持多种 LLM 提供商。
+智能钓鱼助手 v3.0.2.1 - 基于 LangChain 1.0+ 架构和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析，支持多种 LLM 提供商。
 
-**当前分支**: feature/llm-optimization
+**当前版本**: v3.0.2.1 (架构优化和文档更新完善)
 
 ### 核心特性
 - ✅ **LangChain 1.0+**: 原生 LangChain agents，移除 LangGraph 封装
@@ -12,20 +12,23 @@
 - ✅ **动态趋势分析**: 识别"黄金钓鱼时段"
 - ✅ **LLM 优化**: 95%+ 准确率的推理能力
 - ✅ **时间意图识别**: 95%+ 准确率的时间段理解
-- ✅ **路亚装备推荐**: 智能装备建议系统
+- ✅ **架构优化**: 健康检查功能迁移至utils，代码组织更清晰
 
 ## 架构概览
 
-### 核心文件
+### 核心文件（3个工具模块）
 - **`src/agent.py`** - 主智能代理入口
-- **`src/tools/__init__.py`** - 统一工具接口
-- **`src/tools/basic_tools.py`** - 基础工具
+- **`src/tools/__init__.py`** - 统一工具接口，导出3个核心工具
+- **`src/tools/basic_tools.py`** - 基础工具（时间功能）
 - **`src/tools/weather_tools.py`** - 天气查询工具
-- **`src/tools/fishing_tools.py`** - 钓鱼推荐工具
-- **`src/tools/lure_tools.py`** - 路亚装备工具
+- **`src/tools/fishing_tools.py`** - 钓鱼推荐工具（7因子评分系统）
+
+### 扩展模块（已开发但未集成）
+- **`src/tools/lure_tools.py`** - 路亚装备工具（推荐/对比/查询/识别）
+- **`src/tools/lure/`** - 路亚装备完整模块
 
 ### 支持模块
-- **`src/utils/`** - 核心工具类
+- **`src/utils/`** - 核心工具类（包含health_check.py）
 - **`src/fishing_agent/`** - 智能代理实现
 - **`src/tools/scoring/`** - 7 因子科学评分系统
 - **`src/data/`** - 数据存储和缓存

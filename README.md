@@ -1,16 +1,16 @@
-# Fishing Agent - 智能钓鱼助手 v3.0.2
+# Fishing Agent - 智能钓鱼助手 v3.0.2.1
 
-基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐、天气分析和路亚装备推荐。
+基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐和天气分析。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **7因子科学评分体系 + 动态趋势分析 + 路亚装备智能推荐**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **7因子科学评分体系 + 动态趋势分析 + 架构优化**
 
-> **当前分支**: feature/llm-optimization (LLM优化特性已完善)
+> **当前版本**: v3.0.2.1 (架构优化和文档更新完善)
 
-### 🌟 分支状态
-- ✅ **LLM优化集成**: feature/llm-optimization分支功能已完全合并到主分支
+### 🌟 版本状态 (v3.0.2.1)
+- ✅ **架构优化完成**: 健康检查功能从middleware迁移至utils，代码组织更清晰
 - 📈 **性能提升**: 意图识别准确率95%+，LLM推理质量显著优化
-- 🎯 **简化架构**: 从75+文件简化至核心架构，85%代码减少，保持完整功能
-- 🔧 **架构优化**: 健康检查功能从middleware迁移至utils，提升代码组织
+- 🎯 **简化架构**: 核心功能保持完整，移除冗余模块，提升维护性
+- 🔧 **文档准确性**: 所有文档已与实际代码实现保持一致
 
 ## ✨ 核心功能（v3.0.2 路亚装备集成 + v3.0.1 测试完善 + v3.0.0 重大升级）
 
@@ -49,6 +49,8 @@
 - **`src/tools/basic_tools.py`**: 基础工具（时间工具）
 - **`src/tools/weather_tools.py`**: 天气查询和预报工具
 - **`src/tools/fishing_tools.py`**: 钓鱼推荐和评分工具（7因子系统）
+
+#### 🔧 扩展模块 (已开发但未集成)
 - **`src/tools/lure_tools.py`**: 路亚装备工具（推荐/对比/查询/识别）- 已开发但未集成
 - **`src/tools/lure/`**: 路亚装备完整模块（数据库/搜索/推荐/对比）- 已开发但未集成
 
@@ -68,11 +70,15 @@
 - **`src/`**: 其他核心支撑文件
   - `config/`: 配置管理
   - `middleware/`: 中间件目录（保留给未来扩展）
-- `utils/`: 核心工具类
-  - `health_check.py`: 健康检查功能（从middleware迁移）
-  - `data/`: 数据存储和缓存
-  - `docs/`: 技术文档
-  - `tests/`: 测试套件（27个评分测试用例）
+- **`src/utils/`**: 核心工具类
+  - `health_check.py`: 健康检查功能（从middleware迁移至utils）
+  - `api_client.py`: 统一HTTP客户端
+  - `coordinate_utils.py`: 坐标和地理工具
+  - `cache.py`: 缓存系统
+  - `date_utils.py`: 日期处理工具
+- **`src/data/`**: 数据存储和缓存
+- **`src/docs/`**: 技术文档
+- **`src/tests/`**: 测试套件（27个评分测试用例）
 
 ### 核心特性
 - **🚀 LangChain 1.0+原生**: 移除LangGraph包装层，直接使用create_agent
@@ -384,7 +390,7 @@ print(result)
 ```python
 from src.tools import get_all_tools
 
-# 获取所有可用工具（当前7个核心工具：3个基础+4个路亚装备）
+# 获取所有可用工具（当前3个核心工具：1个基础+1个天气+1个钓鱼）
 tools = get_all_tools()
 print(f"可用工具数量: {len(tools)}")
 for tool in tools:
@@ -394,7 +400,6 @@ for tool in tools:
 from src.tools.basic_tools import get_current_time
 from src.tools.weather_tools import get_weather
 from src.tools.fishing_tools import query_fishing_recommendation
-from src.tools.lure_tools import recommend_equipment, compare_equipment
 
 # 获取当前时间
 result = get_current_time.invoke({})
@@ -410,49 +415,9 @@ result = query_fishing_recommendation.invoke({
     'date': '明天'
 })
 print(f"钓鱼推荐: {result}")
-
-# 路亚装备推荐
-result = recommend_equipment.invoke({
-    'equipment_type': '鱼竿',
-    'budget': 800,
-    'user_level': '进阶',
-    'specifications': '{"硬度": "ML", "长度": "2.1m"}'
-})
-print(f"装备推荐: {result}")
-
-# 装备对比
-result = compare_equipment.invoke({
-    'equipment_names': '禧玛诺毒牙, 达亿瓦月下美人',
-    'compare_aspects': '价格, 性能, 品牌'
-})
-print(f"装备对比: {result}")
 ```
 
-### 工具统一接口使用
-```python
-# 使用简化的工具接口
-from src.tools import get_fishing_tools, get_weather_tools, get_basic_tools, get_lure_tools
-
-# 获取钓鱼工具
-fishing_tools = get_fishing_tools()
-print(f"钓鱼工具: {len(fishing_tools)}个")
-
-# 获取天气工具
-weather_tools = get_weather_tools()
-print(f"天气工具: {len(weather_tools)}个")
-
-# 获取基础工具
-basic_tools = get_basic_tools()
-print(f"基础工具: {len(basic_tools)}个")
-
-# 获取路亚装备工具（v3.0.2新增）
-lure_tools = get_lure_tools()
-print(f"路亚装备工具: {len(lure_tools)}个")
-for tool in lure_tools:
-    print(f"- {tool.name}: {tool.description[:50]}...")
-```
-
-## 📁 项目结构 (v3.0.2 路亚装备集成)
+## 📁 项目结构 (v3.0.2.1 架构优化)
 
 ### 项目目录结构
 ```
