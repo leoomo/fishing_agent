@@ -9,9 +9,11 @@
 - fish_knowledge.py: 鱼类知识服务
 - comparator.py: 装备对比服务
 - formatters.py: 输出格式化
+- embeddings.py: Embedding提供商（DashScope等）
 - vector_store.py: 向量存储（Chroma）
 - knowledge_indexer.py: 知识索引管理
 - knowledge_search.py: 知识搜索服务
+- cli.py: CLI管理工具
 """
 
 from .database import LureDatabase, get_db, reset_db
@@ -39,6 +41,11 @@ from .formatters import (
     format_rig_guide,
     format_identification,
     format_package_recommendation
+)
+from .embeddings import (
+    EmbeddingProvider,
+    DashScopeEmbedding,
+    get_embedding_provider
 )
 from .vector_store import (
     VectorStoreAdapter,
@@ -86,6 +93,10 @@ __all__ = [
     'format_rig_guide',
     'format_identification',
     'format_package_recommendation',
+    # Embeddings
+    'EmbeddingProvider',
+    'DashScopeEmbedding',
+    'get_embedding_provider',
     # Vector Store
     'VectorStoreAdapter',
     'ChromaVectorStore',

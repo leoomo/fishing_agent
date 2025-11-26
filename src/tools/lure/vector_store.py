@@ -2,9 +2,9 @@
 向量存储模块
 
 提供基于Chroma的向量存储功能：
-- 文本向量化和搜索（BGE-M3）
-- 图片向量化和搜索（AltCLIP）
-- 跨模态搜索支持
+- 文本向量化和搜索（DashScope Embedding API）
+- 图片向量化：当前已禁用（未来可扩展多模态API）
+- 跨模态搜索：当前已禁用
 """
 
 import os
@@ -93,17 +93,22 @@ class VectorStoreAdapter(ABC):
 
 
 class ChromaVectorStore(VectorStoreAdapter):
-    """Chroma向量存储实现"""
+    """Chroma向量存储实现（使用DashScope Embedding API）"""
 
     # 默认存储路径
     DEFAULT_PERSIST_DIR = Path(__file__).parent / "data" / "vector_store"
 
-    def __init__(self, persist_directory: Optional[str] = None):
+    def __init__(
+        self,
+        persist_directory: Optional[str] = None,
+        embedding_provider=None
+    ):
         """
         初始化Chroma向量存储
 
         Args:
             persist_directory: 持久化存储路径（默认为模块data目录）
+            embedding_provider: Embedding提供商实例（默认使用DashScope）
         """
         self.persist_directory = persist_directory or str(self.DEFAULT_PERSIST_DIR)
 
@@ -113,10 +118,11 @@ class ChromaVectorStore(VectorStoreAdapter):
         # Chroma客户端（懒加载）
         self._client = None
 
-        # Embedding模型（懒加载）
-        self._text_model = None
-        self._image_model = None
-        self._image_processor = None
+        # Embedding提供商（懒加载）
+        self._embedding_provider = embedding_provider
+
+        # 图片功能禁用标记
+        self._image_enabled = False
 
         # 集合缓存
         self._collections: Dict[str, Any] = {}
@@ -142,50 +148,26 @@ class ChromaVectorStore(VectorStoreAdapter):
                 )
         return self._client
 
-    def _get_text_model(self):
-        """懒加载文本Embedding模型（BGE-M3）"""
-        if self._text_model is None:
+    @property
+    def embedding_provider(self):
+        """懒加载Embedding提供商"""
+        if self._embedding_provider is None:
             try:
-                from sentence_transformers import SentenceTransformer
-                # BGE-M3模型，支持中文，1024维
-                self._text_model = SentenceTransformer('BAAI/bge-m3')
-            except ImportError:
-                raise ImportError(
-                    "sentence-transformers未安装，请运行: pip install sentence-transformers"
-                )
-        return self._text_model
-
-    def _get_image_model(self):
-        """懒加载图片Embedding模型（AltCLIP）"""
-        if self._image_model is None:
-            try:
-                from transformers import AltCLIPModel, AltCLIPProcessor
-                import torch
-
-                # AltCLIP模型，支持中文多模态，768维
-                model_name = "BAAI/AltCLIP"
-                self._image_model = AltCLIPModel.from_pretrained(model_name)
-                self._image_processor = AltCLIPProcessor.from_pretrained(model_name)
-
-                # 设置为评估模式
-                self._image_model.eval()
-
-                # 如果有GPU，使用GPU
-                if torch.cuda.is_available():
-                    self._image_model = self._image_model.cuda()
-
-            except ImportError:
-                raise ImportError(
-                    "transformers未安装，请运行: pip install transformers torch"
-                )
-        return self._image_model
+                from .embeddings import get_embedding_provider
+                self._embedding_provider = get_embedding_provider()
+            except Exception as e:
+                raise RuntimeError(f"Failed to initialize embedding provider: {e}")
+        return self._embedding_provider
 
     def _get_collection(self, name: str):
         """获取或创建集合"""
         if name not in self._collections:
             self._collections[name] = self.client.get_or_create_collection(
                 name=name,
-                metadata={"hnsw:space": "cosine"}  # 使用余弦相似度
+                metadata={
+                    "hnsw:space": "cosine",  # 使用余弦相似度
+                    "dimension": self.embedding_provider.dimension
+                }
             )
         return self._collections[name]
 
@@ -210,18 +192,12 @@ class ChromaVectorStore(VectorStoreAdapter):
         if not texts:
             return
 
-        model = self._get_text_model()
-
-        # 批量编码文本
-        embeddings = model.encode(
-            texts,
-            normalize_embeddings=True,  # L2归一化
-            show_progress_bar=len(texts) > 10
-        )
+        # 使用DashScope Embedding API
+        embeddings = self.embedding_provider.embed_texts(texts)
 
         col = self._get_collection(collection)
         col.add(
-            embeddings=embeddings.tolist(),
+            embeddings=embeddings,
             documents=texts,
             ids=ids,
             metadatas=metadatas
@@ -246,18 +222,21 @@ class ChromaVectorStore(VectorStoreAdapter):
         Returns:
             搜索结果列表
         """
-        model = self._get_text_model()
-        query_embedding = model.encode(
-            [query_text],
-            normalize_embeddings=True
-        )
+        try:
+            col = self.client.get_collection(name=collection)
+        except Exception:
+            return []  # 集合不存在，返回空结果
 
-        col = self._get_collection(collection)
+        # 使用DashScope Embedding API
+        query_embedding = self.embedding_provider.embed_query(query_text)
+
+        # 构建where过滤器
+        where_filter = self._build_where_filter(filters) if filters else None
 
         results = col.query(
-            query_embeddings=query_embedding.tolist(),
+            query_embeddings=[query_embedding],
             n_results=top_k,
-            where=filters,
+            where=where_filter,
             include=["documents", "metadatas", "distances"]
         )
 
@@ -282,18 +261,18 @@ class ChromaVectorStore(VectorStoreAdapter):
         if not texts:
             return
 
-        model = self._get_text_model()
-        embeddings = model.encode(texts, normalize_embeddings=True)
+        # 使用DashScope Embedding API
+        embeddings = self.embedding_provider.embed_texts(texts)
 
         col = self._get_collection(collection)
         col.update(
-            embeddings=embeddings.tolist(),
+            embeddings=embeddings,
             documents=texts,
             ids=ids,
             metadatas=metadatas
         )
 
-    # ========== 图片操作 ==========
+    # ========== 图片操作（当前已禁用） ==========
 
     def add_images(
         self,
@@ -302,50 +281,12 @@ class ChromaVectorStore(VectorStoreAdapter):
         ids: List[str],
         metadatas: List[Dict[str, Any]]
     ) -> None:
-        """
-        添加图片向量
-
-        Args:
-            collection: 集合名称
-            image_paths: 图片路径列表
-            ids: ID列表
-            metadatas: 元数据列表
-        """
-        if not image_paths:
-            return
-
-        import torch
-        from PIL import Image
-
-        model = self._get_image_model()
-        embeddings = []
-
-        for path in image_paths:
-            try:
-                image = Image.open(path).convert('RGB')
-                inputs = self._image_processor(images=image, return_tensors="pt")
-
-                # 如果模型在GPU上，输入也需要在GPU上
-                if next(model.parameters()).is_cuda:
-                    inputs = {k: v.cuda() for k, v in inputs.items()}
-
-                with torch.no_grad():
-                    image_features = model.get_image_features(**inputs)
-                    # L2归一化
-                    embedding = image_features / image_features.norm(dim=-1, keepdim=True)
-                    embeddings.append(embedding.squeeze().cpu().numpy())
-
-            except Exception as e:
-                print(f"警告: 处理图片失败 {path}: {e}")
-                # 使用零向量作为占位符
-                embeddings.append([0.0] * 768)
-
-        col = self._get_collection(collection)
-        col.add(
-            embeddings=[e.tolist() if hasattr(e, 'tolist') else e for e in embeddings],
-            ids=ids,
-            metadatas=metadatas
-        )
+        """添加图片向量 - 当前已禁用"""
+        if not self._image_enabled:
+            raise NotImplementedError(
+                "图片embedding功能当前已禁用。"
+                "如需启用，请配置本地模型或多模态API。"
+            )
 
     def search_by_image(
         self,
@@ -354,42 +295,8 @@ class ChromaVectorStore(VectorStoreAdapter):
         top_k: int = 5,
         filters: Optional[Dict] = None
     ) -> List[SearchResult]:
-        """
-        以图搜图
-
-        Args:
-            collection: 集合名称
-            image_path: 查询图片路径
-            top_k: 返回数量
-            filters: 元数据过滤器
-
-        Returns:
-            搜索结果列表
-        """
-        import torch
-        from PIL import Image
-
-        model = self._get_image_model()
-        image = Image.open(image_path).convert('RGB')
-        inputs = self._image_processor(images=image, return_tensors="pt")
-
-        if next(model.parameters()).is_cuda:
-            inputs = {k: v.cuda() for k, v in inputs.items()}
-
-        with torch.no_grad():
-            image_features = model.get_image_features(**inputs)
-            query_embedding = image_features / image_features.norm(dim=-1, keepdim=True)
-
-        col = self._get_collection(collection)
-
-        results = col.query(
-            query_embeddings=query_embedding.squeeze().cpu().numpy().tolist(),
-            n_results=top_k,
-            where=filters,
-            include=["metadatas", "distances"]
-        )
-
-        return self._parse_results(results)
+        """以图搜图 - 当前已禁用"""
+        raise NotImplementedError("图片embedding功能当前已禁用")
 
     def search_image_by_text(
         self,
@@ -398,44 +305,8 @@ class ChromaVectorStore(VectorStoreAdapter):
         top_k: int = 5,
         filters: Optional[Dict] = None
     ) -> List[SearchResult]:
-        """
-        跨模态搜索：用文字描述搜索图片
-
-        Args:
-            collection: 集合名称
-            query_text: 查询文本
-            top_k: 返回数量
-            filters: 元数据过滤器
-
-        Returns:
-            搜索结果列表
-        """
-        import torch
-
-        model = self._get_image_model()
-        inputs = self._image_processor(
-            text=[query_text],
-            return_tensors="pt",
-            padding=True
-        )
-
-        if next(model.parameters()).is_cuda:
-            inputs = {k: v.cuda() for k, v in inputs.items()}
-
-        with torch.no_grad():
-            text_features = model.get_text_features(**inputs)
-            query_embedding = text_features / text_features.norm(dim=-1, keepdim=True)
-
-        col = self._get_collection(collection)
-
-        results = col.query(
-            query_embeddings=query_embedding.squeeze().cpu().numpy().tolist(),
-            n_results=top_k,
-            where=filters,
-            include=["metadatas", "distances"]
-        )
-
-        return self._parse_results(results)
+        """跨模态搜索：用文字描述搜索图片 - 当前已禁用"""
+        raise NotImplementedError("图片embedding功能当前已禁用")
 
     # ========== 删除操作 ==========
 
@@ -474,6 +345,31 @@ class ChromaVectorStore(VectorStoreAdapter):
         return [c.name for c in self.client.list_collections()]
 
     # ========== 私有方法 ==========
+
+    def _build_where_filter(self, filters: Dict) -> Dict:
+        """
+        构建Chroma where过滤器
+
+        Args:
+            filters: 简化的过滤器字典，如 {"knowledge_type": "behavior"}
+
+        Returns:
+            Chroma格式的where过滤器
+        """
+        if not filters:
+            return None
+
+        # 处理简单的相等过滤
+        where = {}
+        for key, value in filters.items():
+            if isinstance(value, dict):
+                # 已经是Chroma格式（如 {"$in": [...]}）
+                where[key] = value
+            else:
+                # 简单相等
+                where[key] = value
+
+        return where if where else None
 
     def _parse_results(self, results: Dict) -> List[SearchResult]:
         """解析Chroma返回结果"""

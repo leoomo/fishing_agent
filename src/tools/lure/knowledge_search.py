@@ -56,7 +56,7 @@ class KnowledgeSearchService:
     COLLECTION_EQUIPMENT_DESC = "equipment_descriptions"
     COLLECTION_IMAGE_EMBEDDINGS = "image_embeddings"
 
-    def __init__(self, db, vector_store, image_manager=None):
+    def __init__(self, db, vector_store, image_manager=None, auto_index=True):
         """
         初始化知识搜索服务
 
@@ -64,10 +64,92 @@ class KnowledgeSearchService:
             db: 数据库实例
             vector_store: 向量存储实例
             image_manager: 图片管理器（可选）
+            auto_index: 是否自动索引（懒加载）
         """
         self.db = db
         self.vector_store = vector_store
         self.image_manager = image_manager
+        self.auto_index = auto_index
+
+        # 索引状态缓存（记录已索引的集合）
+        self._indexed_collections = set()
+
+    # ========== 懒加载索引 ==========
+
+    def _ensure_indexed(self, collection_name: str) -> None:
+        """
+        确保集合已索引（懒加载）
+
+        首次搜索时自动触发索引，避免启动时等待。
+
+        Args:
+            collection_name: 集合名称
+        """
+        import os
+
+        if not self.auto_index:
+            return
+
+        # 从环境变量读取配置
+        auto_index_env = os.getenv("VECTOR_AUTO_INDEX", "true").lower()
+        if auto_index_env not in ("true", "1", "yes"):
+            return
+
+        if collection_name in self._indexed_collections:
+            return  # 已索引
+
+        # 检查集合是否为空
+        try:
+            from .knowledge_indexer import KnowledgeIndexer
+
+            # 检查Chroma集合
+            try:
+                collection = self.vector_store.client.get_collection(collection_name)
+                count = collection.count()
+                if count > 0:
+                    self._indexed_collections.add(collection_name)
+                    return  # 已有数据
+            except Exception:
+                pass  # 集合不存在，需要索引
+
+            # 执行增量索引
+            print(f"🔄 首次搜索检测到未索引数据，正在自动索引 {collection_name}...")
+
+            indexer = KnowledgeIndexer(self.db, self.vector_store, self.image_manager)
+
+            if collection_name == indexer.COLLECTION_FISH_KNOWLEDGE:
+                count = 0
+                while True:
+                    batch_count = indexer.index_fish_knowledge()
+                    count += batch_count
+                    if batch_count == 0:
+                        break
+                print(f"✅ 鱼类知识索引完成: {count} 条")
+
+            elif collection_name == indexer.COLLECTION_RIG_KNOWLEDGE:
+                count = 0
+                while True:
+                    batch_count = indexer.index_rig_knowledge()
+                    count += batch_count
+                    if batch_count == 0:
+                        break
+                print(f"✅ 钓组知识索引完成: {count} 条")
+
+            elif collection_name == indexer.COLLECTION_EQUIPMENT_DESC:
+                count = 0
+                while True:
+                    batch_count = indexer.index_equipment_descriptions()
+                    count += batch_count
+                    if batch_count == 0:
+                        break
+                print(f"✅ 装备描述索引完成: {count} 条")
+
+            self._indexed_collections.add(collection_name)
+
+        except Exception as e:
+            print(f"⚠️  自动索引失败: {e}")
+            print(f"💡 提示：将继续使用数据库关键词搜索")
+            # 继续执行搜索，即使索引失败
 
     # ========== 鱼类知识搜索 ==========
 
@@ -94,6 +176,9 @@ class KnowledgeSearchService:
         Returns:
             KnowledgeSearchResult列表
         """
+        # 懒加载索引
+        self._ensure_indexed(self.COLLECTION_FISH_KNOWLEDGE)
+
         # 构建过滤器
         filters = {}
         if knowledge_types:
@@ -184,6 +269,9 @@ class KnowledgeSearchService:
         Returns:
             RigSearchResult列表
         """
+        # 懒加载索引
+        self._ensure_indexed(self.COLLECTION_RIG_KNOWLEDGE)
+
         filters = {}
         if difficulty:
             filters["difficulty"] = difficulty
@@ -256,6 +344,9 @@ class KnowledgeSearchService:
         Returns:
             装备字典列表
         """
+        # 懒加载索引
+        self._ensure_indexed(self.COLLECTION_EQUIPMENT_DESC)
+
         filters = {}
         if category:
             filters["category"] = category

@@ -34,4 +34,15 @@ dependencies = [
     "python-dateutil>=2.8.2",
     "langchain-mcp-adapters>=0.1.14",
     "langchain-oceanbase>=0.2.6",
+    "chromadb>=0.4.22",
+    "click>=8.1.0",
+]
+
+[project.optional-dependencies]
+# 本地模型支持（未来扩展）
+vector-local = [
+    "sentence-transformers>=2.3.1",
+    "transformers>=4.36.0",
+    "torch>=2.1.0",
+    "Pillow>=10.0.0",
 ]

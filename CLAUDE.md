@@ -13,6 +13,7 @@
 - ✅ **LLM 优化**: 95%+ 准确率的推理能力
 - ✅ **时间意图识别**: 95%+ 准确率的时间段理解
 - ✅ **架构优化**: 健康检查功能迁移至utils，代码组织更清晰
+- ✅ **向量搜索**: 基于 DashScope Embedding API 的语义搜索（路亚装备知识）
 
 ## 架构概览
 
@@ -69,15 +70,18 @@ uv run python -c "from src.tools import get_all_tools; print(f'工具数量: {le
 - **pydantic>=2.0.0** - 数据验证
 - **python-dotenv>=1.1.1** - 环境变量管理
 - **pandas>=2.3.3** - 数据分析
+- **chromadb>=0.4.22** - 向量数据库
+- **click>=8.1.0** - CLI 工具
 
 ### LLM 提供商
 - **智谱AI GLM** (ANTHROPIC_AUTH_TOKEN)
-- **通义千问** (DASHSCOPE_API_KEY)
+- **通义千问** (DASHSCOPE_API_KEY) - 同时用于 Embedding API
 - **OpenAI GPT** (OPENAI_API_KEY)
 
 ### 外部服务
 - **彩云天气 API** (CAIYUN_API_KEY)
 - **高德地图 API** (AMAP_API_KEY)
+- **DashScope Embedding API** (DASHSCOPE_API_KEY) - 向量化服务
 
 ## 项目结构
 
@@ -129,10 +133,9 @@ fishing-agent/
 
 ### 架构原则
 1. **同步优先**: 使用 `requests` 直接 API 调用
-2. **零抽象**: 直接工具实现，无中间层
-3. **诚实数据**: 不生成假数据，提供诚实错误信息
-4. **LangChain 1.0+**: 直接使用 `@tool` 装饰器
-5. **统一日期处理**: 使用 date_utils 模块
+2. **诚实数据**: 不生成假数据，提供诚实错误信息
+3. **LangChain 1.0+**: 直接使用 `@tool` 装饰器
+4. **统一日期处理**: 使用 date_utils 模块
 
 ### 常用导入
 ```python
@@ -153,7 +156,34 @@ from src.tools.scoring.enhanced_scorer import (
 # 工具类
 from src.utils.date_utils import parse_date_input, format_date
 from src.utils.coordinate_utils import get_coordinates
+
+# 向量搜索（路亚装备）
+from src.tools.lure.embeddings import DashScopeEmbedding
+from src.tools.lure.vector_store import get_vector_store
+from src.tools.lure.knowledge_search import KnowledgeSearchService
 ```
+
+### 向量存储管理（路亚装备知识搜索）
+
+#### CLI 命令
+```bash
+# 查看索引状态
+uv run python -m src.tools.lure.cli status
+
+# 重建向量索引
+uv run python -m src.tools.lure.cli rebuild --force
+
+# 测试搜索功能
+uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
+
+# 查看配置
+uv run python -m src.tools.lure.cli config
+```
+
+#### 懒加载索引
+- 默认启用懒加载：首次搜索时自动触发索引
+- 无需手动初始化，对用户透明
+- 可通过环境变量 `VECTOR_AUTO_INDEX=false` 禁用
 
 ### 环境变量
 ```bash
@@ -161,9 +191,13 @@ from src.utils.coordinate_utils import get_coordinates
 CAIYUN_API_KEY=your-caiyun-api-key
 AMAP_API_KEY=your-amap-api-key
 
-# LLM 提供商
+# LLM 提供商（DASHSCOPE同时用于 Embedding）
 ANTHROPIC_AUTH_TOKEN=your-zhipu-token
 DASHSCOPE_API_KEY=your-qwen-key
+
+# 向量存储配置（可选）
+VECTOR_EMBEDDING_MODEL=text-embedding-v3  # 1024维（推荐）
+VECTOR_AUTO_INDEX=true  # 懒加载索引
 ```
 
 ### Python 环境
