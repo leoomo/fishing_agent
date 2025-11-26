@@ -11,6 +11,8 @@
 - 📈 **性能提升**: 意图识别准确率95%+，LLM推理质量显著优化
 - 🎯 **简化架构**: 核心功能保持完整，移除冗余模块，提升维护性
 - 🔧 **文档准确性**: 所有文档已与实际代码实现保持一致
+- 🚀 **向量存储系统**: 集成DashScope Embedding API和ChromaDB，支持路亚装备语义搜索
+- 📋 **CLI管理工具**: 新增向量存储管理CLI，支持索引重建和搜索测试
 
 ## ✨ 核心功能（v3.0.2 路亚装备集成 + v3.0.1 测试完善 + v3.0.0 重大升级）
 
@@ -21,13 +23,15 @@
 - **月相评分**: 简化儒略日算法，8种月相精准识别
 - **评分区分度提升**: 解决"86分问题"，不同条件差异>5分
 
-### 🎯 路亚装备智能推荐系统 ⭐ v3.0.2已开发功能（待集成）
+### 🎯 路亚装备智能推荐系统 ⭐ v3.0.2已开发功能（向量存储完善）
 - **装备购买推荐**: 智能推荐鱼竿、渔轮、鱼线、拟饵和套装，支持预算和规格筛选
 - **多装备对比**: 对比2-5款装备的性价比、性能和适用场景
 - **专业知识查询**: 鱼类习性、钓组绑法、作钓技巧等全面知识库
 - **图片识别**: 识别拟饵类型、钓组配置和鱼种，支持本地图片分析
 - **智能评分系统**: 基于价格匹配、规格匹配、品牌声誉和用户水平的综合评分
 - **套装配置**: 针对不同预算和水平自动配置完整路亚套装
+- **🚀 向量存储系统**: 基于DashScope Embedding API的语义搜索，支持高效知识检索
+- **📋 CLI管理工具**: 提供索引状态查看、重建和搜索测试功能
 
 ### 🚀 其他核心功能
 - **⏰ 时间段意图理解**: 精准识别用户时间限定，支持白天/晚上/上午/下午等时段
@@ -50,9 +54,14 @@
 - **`src/tools/weather_tools.py`**: 天气查询和预报工具
 - **`src/tools/fishing_tools.py`**: 钓鱼推荐和评分工具（7因子系统）
 
-#### 🔧 扩展模块 (已开发但未集成)
-- **`src/tools/lure_tools.py`**: 路亚装备工具（推荐/对比/查询/识别）- 已开发但未集成
-- **`src/tools/lure/`**: 路亚装备完整模块（数据库/搜索/推荐/对比）- 已开发但未集成
+#### 🔧 扩展模块 (路亚装备系统)
+- **`src/tools/lure_tools.py`**: 路亚装备工具（推荐/对比/查询/识别）- 完整功能模块
+- **`src/tools/lure/`**: 路亚装备完整模块，包含：
+  - **embeddings.py**: DashScope Embedding API集成
+  - **vector_store.py**: ChromaDB向量存储
+  - **cli.py**: 向量存储管理CLI工具
+  - **knowledge_search.py**: 语义搜索服务
+  - 其他12个核心支持文件
 
 #### 🔧 支撑模块 (完整功能架构)
 - **`src/tools/scoring/`**: 7因子科学评分系统
@@ -172,6 +181,13 @@
 - **智能缓存**: 90%+命中率，响应时间<1ms
 - **地名匹配**: 支持别名简称和模糊匹配
 - **全国覆盖**: 中国所有行政区划95%+覆盖率
+
+### 🔍 向量存储系统（路亚装备知识搜索） ⭐ v3.0.2新增
+- **DashScope Embedding API**: 支持text-embedding-v3（1024维）和text-embedding-v2（1536维）
+- **ChromaDB向量数据库**: 高效向量存储和检索，支持本地持久化
+- **语义搜索**: 基于鱼类习性、钓组知识、装备描述的智能搜索
+- **懒加载索引**: 首次搜索时自动触发索引，无需手动初始化
+- **CLI管理工具**: 提供索引状态查看、重建和搜索测试功能
 
 ## 🚀 快速开始
 
@@ -386,6 +402,33 @@ print("图片识别结果:")
 print(result)
 ```
 
+### 向量存储系统使用（v3.0.2新增）
+```python
+# 基础Embedding使用
+from src.tools.lure.embeddings import DashScopeEmbedding
+embedding = DashScopeEmbedding(model="text-embedding-v3")
+vector = embedding.embed_query("鲈鱼是一种常见的淡水鱼")
+
+# 向量存储操作
+from src.tools.lure.vector_store import ChromaVectorStore
+store = ChromaVectorStore()
+store.add_texts("fish_knowledge", ["鲈鱼喜欢在清晨和傍晚活动"])
+
+# 语义搜索
+from src.tools.lure.database import get_db
+from src.tools.lure.vector_store import get_vector_store
+from src.tools.lure.knowledge_search import KnowledgeSearchService
+
+db = get_db()
+vector_store = get_vector_store()
+service = KnowledgeSearchService(db, vector_store, auto_index=True)
+
+# 搜索鱼类知识
+results = service.search_fish_knowledge("鲈鱼的生活习性", top_k=3)
+for result in results:
+    print(f"[{result.score:.3f}] {result.title}")
+```
+
 ### 直接工具调用
 ```python
 from src.tools import get_all_tools
@@ -443,6 +486,8 @@ fishing-agent/
 │       │   ├── formatters.py    # 输出格式化
 │       │   ├── knowledge_indexer.py # 知识索引管理
 │       │   ├── init_data.py     # 初始数据
+│       │   ├── embeddings.py    # DashScope Embedding API ⭐ v3.0.2新增
+│       │   ├── cli.py           # 向量存储管理CLI ⭐ v3.0.2新增
 │       │   └── data/            # 数据目录
 │       └── scoring/              # ⭐ v3.0.0核心：科学评分系统
 │           ├── __init__.py      # 评分模块导出
@@ -506,9 +551,11 @@ fishing-agent/
 │   │       ├── demo_weather_agent.py
 │   │       └── demo_national_weather_coverage.py
 │   └── examples/                 # 📝 示例代码
+│       └── vector_store_example.py # 🚀 向量存储使用示例 ⭐ v3.0.2新增
 ├── docs/                         # 📖 项目文档
 │   ├── TESTING.md                # 🧪 测试文档（46+测试用例）
 │   ├── QUICK_TEST.md             # ⚡ 快速测试指南
+│   ├── vector_store_migration_guide.md # 🚀 向量存储迁移指南 ⭐ v3.0.2新增
 │   ├── design/                   # 🏗️ 设计文档目录
 │   │   └── lure_equipment/       # 🎣 路亚装备查询工具设计
 │   │       ├── database/         # 数据库详细设计
@@ -564,6 +611,22 @@ uv run python src/tests/integration/verify_national_integration.py
 
 # 测试覆盖率报告
 uv run pytest src/tests/ --cov=src --cov-report=html
+
+# 🆕 向量存储管理命令（v3.0.2新增）
+# 查看索引状态
+uv run python -m src.tools.lure.cli status
+
+# 重建向量索引
+uv run python -m src.tools.lure.cli rebuild --force
+
+# 测试搜索功能
+uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
+
+# 查看配置
+uv run python -m src.tools.lure.cli config
+
+# 运行向量存储示例
+uv run python examples/vector_store_example.py
 ```
 
 ## 🔧 开发指南

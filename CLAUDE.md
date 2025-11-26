@@ -2,7 +2,7 @@
 
 智能钓鱼助手 v3.0.2.1 - 基于 LangChain 1.0+ 架构和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析，支持多种 LLM 提供商。
 
-**当前版本**: v3.0.2.1 (架构优化和文档更新完善)
+**当前版本**: v3.0.2.1 (架构优化、向量存储完善和文档更新)
 
 ### 核心特性
 - ✅ **LangChain 1.0+**: 原生 LangChain agents，移除 LangGraph 封装
@@ -24,9 +24,14 @@
 - **`src/tools/weather_tools.py`** - 天气查询工具
 - **`src/tools/fishing_tools.py`** - 钓鱼推荐工具（7因子评分系统）
 
-### 扩展模块（已开发但未集成）
-- **`src/tools/lure_tools.py`** - 路亚装备工具（推荐/对比/查询/识别）
-- **`src/tools/lure/`** - 路亚装备完整模块
+### 扩展模块（路亚装备系统）
+- **`src/tools/lure_tools.py`** - 路亚装备工具（推荐/对比/查询/识别）- 完整功能模块
+- **`src/tools/lure/`** - 路亚装备完整模块，包含：
+  - **embeddings.py**: DashScope Embedding API集成（支持v3/v2模型）
+  - **vector_store.py**: ChromaDB向量存储（本地持久化）
+  - **cli.py**: 向量存储管理CLI工具（状态/重建/搜索/配置）
+  - **knowledge_search.py**: 语义搜索服务（鱼类/钓组/装备知识）
+  - 其他12个核心支持文件（数据库/推荐/对比/格式化等）
 
 ### 支持模块
 - **`src/utils/`** - 核心工具类（包含health_check.py）
@@ -81,7 +86,7 @@ uv run python -c "from src.tools import get_all_tools; print(f'工具数量: {le
 ### 外部服务
 - **彩云天气 API** (CAIYUN_API_KEY)
 - **高德地图 API** (AMAP_API_KEY)
-- **DashScope Embedding API** (DASHSCOPE_API_KEY) - 向量化服务
+- **DashScope Embedding API** (DASHSCOPE_API_KEY) - LLM和向量化服务
 
 ## 项目结构
 
@@ -128,6 +133,9 @@ fishing-agent/
 ### 路亚装备推荐
 - **智能建议**: 基于目标鱼种和环境条件
 - **装备匹配**: 路亚、鱼线、配件推荐
+- **语义搜索**: 基于DashScope Embedding的知识检索
+- **向量存储**: ChromaDB本地向量数据库
+- **CLI管理**: 索引状态查看、重建和搜索测试
 
 ## 开发指南
 
@@ -180,10 +188,37 @@ uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
 uv run python -m src.tools.lure.cli config
 ```
 
+#### 代码示例
+```python
+# 基础Embedding使用
+from src.tools.lure.embeddings import DashScopeEmbedding
+embedding = DashScopeEmbedding(model="text-embedding-v3")
+vector = embedding.embed_query("鲈鱼是一种常见的淡水鱼")
+
+# 语义搜索
+from src.tools.lure.database import get_db
+from src.tools.lure.vector_store import get_vector_store
+from src.tools.lure.knowledge_search import KnowledgeSearchService
+
+db = get_db()
+vector_store = get_vector_store()
+service = KnowledgeSearchService(db, vector_store, auto_index=True)
+
+# 搜索鱼类知识
+results = service.search_fish_knowledge("鲈鱼的生活习性", top_k=3)
+for result in results:
+    print(f"[{result.score:.3f}] {result.title}")
+```
+
 #### 懒加载索引
 - 默认启用懒加载：首次搜索时自动触发索引
 - 无需手动初始化，对用户透明
 - 可通过环境变量 `VECTOR_AUTO_INDEX=false` 禁用
+
+#### 迁移指南
+- 详细迁移指南请参考：`docs/vector_store_migration_guide.md`
+- 从本地BGE-M3模型迁移到DashScope API的完整步骤
+- 包含故障排除、性能对比和最佳实践
 
 ### 环境变量
 ```bash
