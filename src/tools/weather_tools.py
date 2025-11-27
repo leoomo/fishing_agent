@@ -30,7 +30,12 @@ logger = logging.getLogger(__name__)
 @tool
 def get_weather(location: str, dates: list = None) -> str:
     """
-    获取指定位置的天气信息
+    获取指定位置的天气信息（纯天气查询专用工具）
+
+    ⚠️ 重要提示：
+    - ✅ 仅用于纯天气查询（用户未提及"钓鱼"关键词）
+    - ❌ 如果用户提到"钓鱼"，必须改用 query_fishing_recommendation 工具
+    - ❌ 绝对禁止与 query_fishing_recommendation 同时调用
 
     Args:
         location: 位置名称，如"杭州"、"北京"、"余杭区"等
@@ -43,10 +48,13 @@ def get_weather(location: str, dates: list = None) -> str:
         - 单日: 详细的当日天气信息
         - 多日: 多天天气预报表格
 
-    Examples:
-        get_weather("杭州", ["今天"])
-        get_weather("北京", ["明天", "后天"])
-        get_weather("余杭区", ["今天", "明天", "后天"])
+    ✅ 正确用法示例:
+        "杭州明天天气如何？" → get_weather("杭州", ["明天"])
+        "北京未来三天天气" → get_weather("北京", ["今天","明天","后天"])
+
+    ❌ 错误用法（应使用 query_fishing_recommendation）:
+        "杭州明天钓鱼天气" → 不要调用此工具！
+        "今天余杭区钓鱼怎么样" → 不要调用此工具！
     """
     try:
         # 参数标准化
