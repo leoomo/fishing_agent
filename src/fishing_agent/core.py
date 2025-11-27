@@ -14,7 +14,7 @@ from langchain_core.runnables import Runnable
 from tools import get_all_tools
 from .model_factory import ModelFactory
 from .prompts import get_system_prompt
-from .callbacks import FishingAgentCallback
+from .callbacks import FishingAgentCallback, OutputFormatValidator
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,9 @@ class FishingAgent:
 
         # Initialize callback handler
         self.callback = FishingAgentCallback(verbose=verbose_callbacks)
+
+        # Initialize output format validator
+        self._format_validator = OutputFormatValidator()
 
         # Initialize components
         self.model = self._initialize_model()
@@ -116,9 +119,14 @@ class FishingAgent:
                 logger.info(f"📝 用户输入: {user_input}")
 
             # Invoke agent with callback tracking
+            # 构建回调列表，包含主回调和 usage 跟踪回调
+            callbacks = [self.callback]
+            if self.callback._usage_handler:
+                callbacks.append(self.callback._usage_handler)
+
             result = self.agent.invoke(
                 {"messages": [HumanMessage(content=user_input)]},
-                config={"callbacks": [self.callback]}
+                config={"callbacks": callbacks}
             )
 
             # Extract response using message protocol
@@ -148,6 +156,8 @@ class FishingAgent:
         Returns:
             Response text string
         """
+        response = ""
+
         if isinstance(result, dict) and "messages" in result:
             messages = result["messages"]
             if messages and len(messages) > 0:
@@ -155,14 +165,40 @@ class FishingAgent:
 
                 # Try to get content attribute
                 if hasattr(last_message, 'content'):
-                    return last_message.content
-
+                    response = last_message.content
                 # Try dict access
-                if isinstance(last_message, dict) and "content" in last_message:
-                    return last_message["content"]
+                elif isinstance(last_message, dict) and "content" in last_message:
+                    response = last_message["content"]
+                else:
+                    response = str(result)
+        else:
+            response = str(result)
 
-        # Fallback to string conversion
-        return str(result)
+        # 验证输出格式（仅在调用了钓鱼推荐工具时）
+        self._validate_output_format(response)
+
+        return response
+
+    def _validate_output_format(self, response: str) -> None:
+        """
+        验证 LLM 输出是否保留了工具的预设格式
+
+        Args:
+            response: LLM 返回的响应内容
+        """
+        # 获取最后调用的工具
+        tool_calls = self.callback.stats.get("tool_calls", {})
+        last_tool = None
+
+        # 检查是否调用了钓鱼推荐工具
+        if "query_fishing_recommendation" in tool_calls:
+            last_tool = "query_fishing_recommendation"
+
+        if last_tool:
+            validation = self._format_validator.validate_fishing_report(
+                response, last_tool
+            )
+            self._format_validator.log_validation_result(validation)
 
     def _is_weather_fishing_query(self, query: str) -> bool:
         """Check if query is weather/fishing related"""

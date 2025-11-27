@@ -1623,6 +1623,12 @@ def _find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) -
                 avg_humidity = sum(h['humidity'] for h in window_scores) / len(window_scores)
                 avg_pressure = sum(h['pressure'] for h in window_scores) / len(window_scores)
 
+                # 获取温度和风速范围
+                min_temp = min(h['temperature'] for h in window_scores)
+                max_temp = max(h['temperature'] for h in window_scores)
+                min_wind = min(h['wind_speed'] for h in window_scores)
+                max_wind = max(h['wind_speed'] for h in window_scores)
+
                 # 获取主要天气状况（出现频率最高的）
                 conditions = [h['condition'] for h in window_scores]
                 main_condition = max(set(conditions), key=conditions.count)
@@ -1637,8 +1643,12 @@ def _find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) -
                     'duration_hours': window_size,
                     'avg_score': avg_score,
                     'temperature': avg_temp,
+                    'temp_min': min_temp,
+                    'temp_max': max_temp,
                     'condition': main_condition,
                     'wind_speed': avg_wind,
+                    'wind_min': min_wind,
+                    'wind_max': max_wind,
                     'humidity': avg_humidity,
                     'pressure': avg_pressure
                 }
@@ -1870,9 +1880,9 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
                     # 如果过滤后没有时段，添加提示信息
                     if not best_time_slots:
                         logger.info(f"在时间段'{time_period}'内未找到推荐时段")
-                    else:
-                        # 限制显示前3个
-                        best_time_slots = best_time_slots[:3]
+
+                # 统一限制显示前3个
+                best_time_slots = best_time_slots[:3]
 
                 # 生成评分趋势图
                 score_trend = _generate_score_trend(hourly_scores)
@@ -1938,7 +1948,7 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
         for i, slot in enumerate(best_time_slots):
             emoji = rank_emojis[i] if i < len(rank_emojis) else f"{i+1}."
             report += f"{emoji} **第{i+1}推荐**: {slot['time_range']} (评分: {slot['avg_score']:.1f}分)\n"
-            report += f"   • 温度: {slot['temperature']:.1f}°C | 天气: {slot['condition']} | 风速: {slot['wind_speed']:.1f}m/s\n"
+            report += f"   • 温度: {slot['temp_min']:.1f}-{slot['temp_max']:.1f}°C | 天气: {slot['condition']} | 风速: {slot['wind_min']:.1f}-{slot['wind_max']:.1f}m/s\n"
             report += f"   • 湿度: {slot['humidity']:.1f}% | 气压: {slot['pressure']:.1f} hPa\n"
 
             # 添加推荐理由
@@ -1965,27 +1975,18 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
 
     # 天气条件
     report += f"🌤️ **天气条件**:\n"
-    report += f"• 🌡️ 温度: {weather_data['temperature']:.1f}°C\n"
+    # 温度范围：从hourly_temps计算，如果没有则用平均温度
+    hourly_temps = weather_data.get('hourly_temps', [])
+    if hourly_temps:
+        temp_min = min(hourly_temps)
+        temp_max = max(hourly_temps)
+        report += f"• 🌡️ 温度: {temp_min:.1f}-{temp_max:.1f}°C\n"
+    else:
+        report += f"• 🌡️ 温度: {weather_data['temperature']:.1f}°C\n"
     report += f"• ☁️ 天气: {weather_data['condition']}\n"
-    report += f"• 💨 风速: {weather_data['wind_speed']} m/s\n"
-    report += f"• 💧 湿度: {weather_data['humidity']}%\n"
+    report += f"• 💨 风速: {float(weather_data['wind_speed']):.1f} m/s\n"
+    report += f"• 💧 湿度: {float(weather_data['humidity']):.1f}%\n"
     report += f"• 🌀 气压: {weather_data['pressure']:.1f} hPa\n\n"
-
-    # 各维度评分（7因子体系）
-    report += f"📊 **详细评分** (7因子科学评分体系):\n"
-    report += f"• 🌡️ 温度评分: {scores['temperature']:.1f}/100 (权重25%)\n"
-    report += f"• ☁️ 天气评分: {scores['weather']:.1f}/100 (权重20%)\n"
-    report += f"• 💨 风力评分: {scores['wind']:.1f}/100 (权重15%)\n"
-    report += f"• 🌀 气压评分: {scores['pressure']:.1f}/100 (权重15%) ⭐\n"
-    report += f"• 💧 湿度评分: {scores['humidity']:.1f}/100 (权重10%)\n"
-
-    # 新增因子
-    if 'seasonal' in scores:
-        report += f"• 🌸 季节评分: {scores['seasonal']:.1f}/100 (权重5%) ⭐\n"
-    if 'lunar' in scores:
-        report += f"• 🌙 月相评分: {scores['lunar']:.1f}/100 (权重5%) ⭐\n"
-
-    report += "\n"
 
     # 趋势分析（如果有）
     if 'trend_analysis' in scores:

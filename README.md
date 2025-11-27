@@ -5,7 +5,8 @@
 > 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **7因子科学评分体系 + 动态趋势分析 + LLM优化**
 
 > **当前版本**: v3.0.2.1 (架构优化、向量存储完善和文档更新)
-> **当前分支**: feature/llm-optimization (LLM优化功能已集成)
+> **当前分支**: feature/llm-optimization (LLM优化功能开发中)
+> **Git状态**: 5个文件已修改，正在进行LLM提示优化
 
 ### 🌟 版本状态 (v3.0.2.1)
 - ✅ **架构优化完成**: 健康检查功能从middleware迁移至utils，代码组织更清晰
@@ -14,6 +15,7 @@
 - 🔧 **文档准确性**: 所有文档已与实际代码实现保持一致
 - 🚀 **向量存储系统**: 集成DashScope Embedding API和ChromaDB，支持路亚装备语义搜索
 - 📋 **CLI管理工具**: 新增向量存储管理CLI，支持索引重建和搜索测试
+- 🧠 **LLM优化开发**: feature/llm-optimization分支正在进行提示工程优化
 
 ## ✨ 核心功能（v3.0.2 路亚装备集成 + v3.0.1 测试完善 + v3.0.0 重大升级）
 
@@ -231,23 +233,28 @@ uv run python main.py
 #### 方法二：直接运行Agent（推荐）
 ```bash
 # 从项目根目录运行（推荐）
-uv run python src/agent.py
+PYTHONPATH=src uv run python src/agent.py
 
 # 或者从src目录运行
 cd src && uv run python agent.py
+
+# 测试agent创建（开发者调试用）
+PYTHONPATH=src uv run python -c "from agent import create_optimized_fishing_agent; print('Agent creation test passed')"
 ```
 
-> ✅ **注意**: v2.2.0新增功能！无需复杂的PYTHONPATH配置，直接运行即可！
+> ✅ **注意**: 需要设置PYTHONPATH=src以确保正确的模块导入路径
 > ⏰ **v2.3.0更新**: 新增时间段意图理解功能，支持精准时段识别！
 > 🧠 **v2.3.1更新**: 集成LLM优化分支，提升推理质量和响应准确性！
+> 🚀 **v3.0.2.2开发中**: LLM提示工程优化正在进行，目标98%+意图识别准确率！
 > 🚀 **v3.0.0更新**: 7因子科学评分体系，解决"86分问题"！
 > 📝 **v3.0.1更新**: 测试完善和设计文档补充，架构进一步优化！
 
 ### 当前分支状态
-> 🔥 **feature/llm-optimization分支已合并** - LLM优化功能已成为主分支核心特性
-> - Few-Shot提示增强，提升意图识别准确率至98%+
+> 🔥 **feature/llm-optimization分支开发中** - LLM优化功能正在积极开发
+> - Few-Shot提示增强，目标提升意图识别准确率至98%+
 > - 思维链推理优化，提高响应质量和逻辑性
-> - 统一的日期处理模块，支持相对/绝对日期解析
+> - 工具选择优化，避免LLM重复调用相同工具
+> - 当前状态：5个文件已修改，提示词工程优化中
 
 #### 方法三：激活虚拟环境
 ```bash

@@ -9,7 +9,6 @@ to the src.agent module for better organization.
 For new code, prefer:
     from src.agent import create_fishing_agent, FishingAgent
 """
-
 import logging
 from fishing_agent import (
     FishingAgent as OptimizedFishingAgent,
@@ -96,7 +95,7 @@ def demonstrate_agent():
 
         # Test cases
         test_cases = [
-            "今天杭州余杭区钓鱼天气如何？",
+            "明天杭州余杭区钓鱼天气如何？",
         ]
 
         print(f"\n🧪 测试 {len(test_cases)} 个用例:")
