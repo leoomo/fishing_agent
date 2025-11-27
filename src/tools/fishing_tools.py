@@ -75,7 +75,15 @@ def normalize_time_period(time_period: str) -> str:
 @tool
 def query_fishing_recommendation(location: str, dates: list = None, time_period: str = None) -> str:
     """
-    查询钓鱼时间推荐，基于天气条件分析最佳的钓鱼时间
+    查询钓鱼时间推荐（已内置天气数据获取功能）
+
+    ⚠️ 重要提示：
+    - ✅ 本工具已自动获取所有必需的天气数据，无需额外调用 get_weather
+    - ✅ 使用7因子科学评分系统（温度、天气、风力、气压、湿度、季节、月相）
+    - ✅ 自动分析趋势并提供详细的钓鱼建议
+    - ❌ 仅用于包含"钓鱼"关键词的查询
+    - ❌ 纯天气查询请使用 get_weather 工具
+    - ❌ 绝对禁止与 get_weather 同时调用
 
     Args:
         location: 地区名称，如"杭州"、"北京"、"余杭区"等
@@ -89,13 +97,16 @@ def query_fishing_recommendation(location: str, dates: list = None, time_period:
               - "全天" / None: 返回全天所有时段（默认）
 
     Returns:
-        - 单日: 详细钓鱼推荐报告，含24小时时段分析
+        - 单日: 详细钓鱼推荐报告（包含完整天气分析和24小时时段推荐）
         - 多日: 多天钓鱼推荐表格，含最佳日期推荐
 
-    Examples:
-        query_fishing_recommendation("杭州", ["明天"])
-        query_fishing_recommendation("佛山", ["明天"], "白天")
-        query_fishing_recommendation("杭州", ["今天", "明天", "后天"])
+    ✅ 正确用法示例:
+        "明天杭州钓鱼怎么样？" → query_fishing_recommendation("杭州", ["明天"])
+        "今天余杭区钓鱼天气" → query_fishing_recommendation("余杭区", ["今天"])
+        "后天白天佛山钓鱼" → query_fishing_recommendation("佛山", ["后天"], "白天")
+
+    ❌ 错误用法（应使用 get_weather）:
+        "杭州明天天气" → 不要调用此工具！
     """
     try:
         # 参数标准化
