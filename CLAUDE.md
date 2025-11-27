@@ -3,6 +3,7 @@
 智能钓鱼助手 v3.0.2.1 - 基于 LangChain 1.0+ 架构和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析，支持多种 LLM 提供商。
 
 **当前版本**: v3.0.2.1 (架构优化、向量存储完善和文档更新)
+**当前分支**: feature/llm-optimization (LLM优化功能已集成)
 
 ### 核心特性
 - ✅ **LangChain 1.0+**: 原生 LangChain agents，移除 LangGraph 封装
@@ -10,15 +11,16 @@
 - ✅ **零抽象**: 直接 API 调用，无中间层
 - ✅ **7 因子科学评分**: 温度、天气、风力、气压、湿度、季节、月相
 - ✅ **动态趋势分析**: 识别"黄金钓鱼时段"
-- ✅ **LLM 优化**: 95%+ 准确率的推理能力
+- ✅ **LLM 优化**: 95%+ 准确率的推理能力，feature/llm-optimization分支已集成
 - ✅ **时间意图识别**: 95%+ 准确率的时间段理解
 - ✅ **架构优化**: 健康检查功能迁移至utils，代码组织更清晰
 - ✅ **向量搜索**: 基于 DashScope Embedding API 的语义搜索（路亚装备知识）
+- ✅ **工具选择优化**: 避免LLM重复调用工具，提升响应效率
 
 ## 架构概览
 
 ### 核心文件（3个工具模块）
-- **`src/agent.py`** - 主智能代理入口
+- **`src/agent.py`** - 主智能代理入口（向后兼容层）
 - **`src/tools/__init__.py`** - 统一工具接口，导出3个核心工具
 - **`src/tools/basic_tools.py`** - 基础工具（时间功能）
 - **`src/tools/weather_tools.py`** - 天气查询工具
@@ -79,14 +81,14 @@ uv run python -c "from src.tools import get_all_tools; print(f'工具数量: {le
 - **click>=8.1.0** - CLI 工具
 
 ### LLM 提供商
-- **智谱AI GLM** (ANTHROPIC_AUTH_TOKEN)
-- **通义千问** (DASHSCOPE_API_KEY) - 同时用于 Embedding API
-- **OpenAI GPT** (OPENAI_API_KEY)
+- **智谱AI GLM** (ANTHROPIC_AUTH_TOKEN) - 推荐
+- **通义千问** (DASHSCOPE_API_KEY) - 同时用于 LLM 和 Embedding API (必需)
+- **OpenAI GPT** (OPENAI_API_KEY) - 可选
 
 ### 外部服务
-- **彩云天气 API** (CAIYUN_API_KEY)
-- **高德地图 API** (AMAP_API_KEY)
-- **DashScope Embedding API** (DASHSCOPE_API_KEY) - LLM和向量化服务
+- **彩云天气 API** (CAIYUN_API_KEY) - 必需
+- **高德地图 API** (AMAP_API_KEY) - 必需
+- **DashScope Embedding API** (DASHSCOPE_API_KEY) - LLM和向量化服务 (必需)
 
 ## 项目结构
 
@@ -225,10 +227,11 @@ for result in results:
 # 必需 API
 CAIYUN_API_KEY=your-caiyun-api-key
 AMAP_API_KEY=your-amap-api-key
+DASHSCOPE_API_KEY=your-dashscope-api-key  # LLM + Embedding
 
-# LLM 提供商（DASHSCOPE同时用于 Embedding）
-ANTHROPIC_AUTH_TOKEN=your-zhipu-token
-DASHSCOPE_API_KEY=your-qwen-key
+# LLM 提供商
+ANTHROPIC_AUTH_TOKEN=your-zhipu-token  # 推荐
+OPENAI_API_KEY=your-openai-key  # 可选
 
 # 向量存储配置（可选）
 VECTOR_EMBEDDING_MODEL=text-embedding-v3  # 1024维（推荐）
