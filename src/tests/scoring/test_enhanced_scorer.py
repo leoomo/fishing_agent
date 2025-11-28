@@ -136,7 +136,8 @@ class TestPressureTrend:
         result = analyze_pressure_trend(falling_series)
 
         assert result['trend'] == 'falling_fast', "应识别为快速下降"
-        assert result['multiplier'] == 1.20, "快速下降应有1.20倍奖励"
+        # v3.1调整：基于科学研究，气压影响系数从±20%降至±10%
+        assert result['multiplier'] == 1.10, "快速下降应有1.10倍奖励（v3.1优化）"
         assert result['change_rate'] < -2, "变化率应<-2"
 
     def test_falling_slow_pressure(self):
@@ -146,7 +147,8 @@ class TestPressureTrend:
         result = analyze_pressure_trend(falling_series)
 
         assert result['trend'] == 'falling_slow', "应识别为缓慢下降"
-        assert result['multiplier'] == 1.10, "缓慢下降应有1.10倍奖励"
+        # v3.1调整：缓慢下降从1.10降至1.05
+        assert result['multiplier'] == 1.05, "缓慢下降应有1.05倍奖励（v3.1优化）"
 
     def test_stable_pressure(self):
         """测试气压稳定"""
@@ -162,7 +164,8 @@ class TestPressureTrend:
         result = analyze_pressure_trend(rising_series)
 
         assert result['trend'] == 'rising_fast', "应识别为快速上升"
-        assert result['multiplier'] == 0.80, "快速上升应有0.80倍惩罚"
+        # v3.1调整：快速上升从0.80调整至0.90
+        assert result['multiplier'] == 0.90, "快速上升应有0.90倍惩罚（v3.1优化）"
 
     def test_insufficient_data(self):
         """测试数据不足"""

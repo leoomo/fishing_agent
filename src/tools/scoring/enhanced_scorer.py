@@ -199,15 +199,17 @@ def calculate_lunar_score(date: datetime, is_night: bool = False) -> float:
         moon_phase = calculate_lunar_phase(date)
 
         # 月相评分映射
+        # 科学依据：月相对淡水鱼影响有限（大口黑鲈研究显示新月21%/满月28%差异不显著）
+        # 调整评分区间至75-85分，减少极端差异
         moon_scores = {
-            'new_moon': 85,          # 新月
-            'waxing_crescent': 80,   # 娥眉月
-            'first_quarter': 75,     # 上弦月
-            'waxing_gibbous': 82,    # 盈凸月
-            'full_moon': 90 if is_night else 65,  # 满月：夜间最佳，白天一般
-            'waning_gibbous': 78,    # 亏凸月
-            'last_quarter': 75,      # 下弦月
-            'waning_crescent': 80    # 残月
+            'new_moon': 80,          # 新月（从85降低）
+            'waxing_crescent': 78,   # 娥眉月（从80降低）
+            'first_quarter': 75,     # 上弦月（保持）
+            'waxing_gibbous': 78,    # 盈凸月（从82降低）
+            'full_moon': 85 if is_night else 75,  # 满月：夜间较好，白天一般（从90/65调整）
+            'waning_gibbous': 78,    # 亏凸月（保持）
+            'last_quarter': 75,      # 下弦月（保持）
+            'waning_crescent': 78    # 残月（从80降低）
         }
 
         score = moon_scores.get(moon_phase, 75.0)
@@ -277,21 +279,23 @@ def analyze_pressure_trend(pressure_series: List[float]) -> Dict[str, Any]:
         change = recent_avg - earlier_avg
 
         # 确定趋势类型和调整系数
+        # 科学依据：气压变化对鱼类影响的证据较弱（黄鲈研究P=0.55无显著性）
+        # 调整系数从±20%降低至±10%，避免过度调整
         if change < -2:
             trend = 'falling_fast'
-            multiplier = 1.20  # ⭐ 快速下降：20%奖励（钓鱼黄金期！）
+            multiplier = 1.10  # 快速下降：10%奖励（从20%降低）
         elif change < -0.5:
             trend = 'falling_slow'
-            multiplier = 1.10  # 缓慢下降：10%奖励
+            multiplier = 1.05  # 缓慢下降：5%奖励（从10%降低）
         elif -0.5 <= change <= 0.5:
             trend = 'stable'
             multiplier = 1.00  # 稳定：正常评分
         elif change <= 2:
             trend = 'rising_slow'
-            multiplier = 0.90  # 缓慢上升：-10%惩罚
+            multiplier = 0.95  # 缓慢上升：-5%惩罚（从-10%降低）
         else:
             trend = 'rising_fast'
-            multiplier = 0.80  # 快速上升：-20%惩罚
+            multiplier = 0.90  # 快速上升：-10%惩罚（从-20%降低）
 
         logger.info(f"气压趋势分析: {trend}, 变化={change:.2f} hPa/6h, 调整系数={multiplier}")
 

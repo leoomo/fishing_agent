@@ -1099,7 +1099,7 @@ def _calculate_fishing_score(
     historical_data: List[Dict[str, Any]] = None
 ) -> Dict[str, float]:
     """
-    计算钓鱼评分 - 7因子科学评分体系 v3.0
+    计算钓鱼评分 - 7因子科学评分体系 v3.1（基于科学研究优化）
 
     Args:
         weather_data: 天气数据字典
@@ -1227,15 +1227,20 @@ def _calculate_fishing_score(
         except Exception as e:
             logger.warning(f"趋势分析失败: {e}")
 
-    # 7因子权重配置 (v3.0)
+    # 7因子权重配置 (v3.1 - 基于科学研究优化)
+    # 科学依据:
+    # - 气压: 黄鲈研究P=0.55无显著性，权重从15%降至10%
+    # - 湿度: 与天气高度相关，权重从10%降至5%
+    # - 季节性: 证据充分，权重从5%提升至13%
+    # - 天气: 核心因子，权重从20%提升至27%
     weights = {
-        'temperature': 0.25,  # 温度 25% (不变)
-        'weather': 0.20,      # 天气 20% (从30%降低) ⭐
-        'wind': 0.15,         # 风力 15% (从20%降低)
-        'pressure': 0.15,     # 气压 15% (从10%提升) ⭐
-        'humidity': 0.10,     # 湿度 10% (从15%降低)
-        'seasonal': 0.05,     # 季节 5% (新增) ⭐
-        'lunar': 0.05         # 月相 5% (新增) ⭐
+        'temperature': 0.25,  # 温度 25% (不变，核心因子)
+        'weather': 0.27,      # 天气 27% (从20%提升) ⭐
+        'wind': 0.15,         # 风力 15% (保持)
+        'pressure': 0.10,     # 气压 10% (从15%降低，科学证据较弱) ⭐
+        'humidity': 0.05,     # 湿度 5% (从10%降低，与天气重叠) ⭐
+        'seasonal': 0.13,     # 季节 13% (从5%提升，证据充分) ⭐
+        'lunar': 0.05         # 月相 5% (保持，作为参考因素)
     }
 
     # 基础加权评分
@@ -1756,23 +1761,35 @@ def _generate_score_trend(hourly_scores: List[Dict[str, Any]]) -> str:
 
 
 def _calc_temp_score(temp: float) -> float:
-    """温度评分"""
-    if 15 <= temp <= 25:
+    """温度评分
+
+    科学依据：大多数鱼类在60-75°F (15-24°C)最活跃
+    扩大黄金区间至14-26°C，更符合实际观测
+    """
+    if 14 <= temp <= 26:       # 扩大黄金区间（从15-25°C）
         return 95.0
-    elif 12 <= temp < 15 or 25 < temp <= 28:
+    elif 10 <= temp < 14 or 26 < temp <= 30:
         return 80.0
-    elif 8 <= temp < 12 or 28 < temp <= 32:
+    elif 5 <= temp < 10 or 30 < temp <= 35:
         return 60.0
     else:
-        return 30.0
+        return 35.0            # 极端温度（从30提高到35）
 
 
 def _calc_weather_score(condition: str) -> float:
-    """天气状况评分"""
-    if condition in ['多云', '阴', '小雨']:
-        return 95.0
+    """天气状况评分
+
+    科学依据：
+    - 多云/阴天：鱼类在弱光条件下更大胆，愿意在开阔水域觅食
+    - 小雨：虽带来氧气，但也会浑浊水体、降低水温，评分从95降至75
+    - 晴天：总体条件好，但夏季中午会造成水层温差
+    """
+    if condition in ['多云', '阴']:
+        return 95.0            # 最佳条件
     elif condition in ['晴', '雾']:
         return 80.0
+    elif condition in ['小雨']:
+        return 75.0            # 从95分降低（小雨效果不如多云/阴天稳定）
     elif condition in ['中雨']:
         return 50.0
     elif condition in ['大雨', '暴雨']:
@@ -1782,16 +1799,24 @@ def _calc_weather_score(condition: str) -> float:
 
 
 def _calc_wind_score(wind: float) -> float:
-    """风力评分"""
-    # 假设输入是m/s
-    if wind < 3:  # < 11 km/h
+    """风力评分
+
+    科学依据：
+    - 最佳风速: 5-10 mph (8-16 km/h, 2.2-4.4 m/s)
+    - 适度风速增加溶氧、推动浮游生物聚集
+    - 过于平静时鱼类警觉性更高
+    """
+    # 输入单位: m/s
+    if 2 <= wind <= 5:         # 最佳风速区间
         return 95.0
-    elif wind < 6:  # < 22 km/h
+    elif wind < 2:             # 过于平静
+        return 85.0
+    elif wind <= 7:            # 中等风速
         return 80.0
-    elif wind < 8:  # < 29 km/h
-        return 50.0
-    else:
-        return 25.0
+    elif wind <= 10:           # 较大风速
+        return 60.0
+    else:                      # 强风
+        return 30.0
 
 
 def _calc_humidity_score(humidity: float) -> float:
