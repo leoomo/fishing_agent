@@ -12,7 +12,7 @@ git status
 
 # 应显示：
 # * feature/llm-optimization
-# 5个文件已修改，正在进行LLM提示优化
+# 4个文件已修改，正在进行LLM提示优化和工具选择改进
 ```
 
 ### 1. 环境检查
