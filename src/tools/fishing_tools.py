@@ -1672,8 +1672,7 @@ def _find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) -
                 if len(selected_slots) >= top_n:
                     break
 
-        # 按时间顺序排序（早到晚）
-        selected_slots.sort(key=lambda x: x['start_hour'])
+        # 保持按评分降序排序，确保🥇对应最高分
 
         logger.info(f"成功检测{len(selected_slots)}个最佳钓鱼时段")
         return selected_slots

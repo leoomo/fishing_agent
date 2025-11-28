@@ -366,15 +366,16 @@ class OutputFormatValidator:
 
     def log_validation_result(self, result: dict) -> None:
         """
-        记录验证结果到日志
+        记录验证结果到日志（仅 DEBUG 级别，不向用户显示）
 
         Args:
             result: validate_fishing_report 的返回值
         """
         if not result["valid"]:
+            # 使用 DEBUG 级别，避免在生产环境向用户显示内部验证警告
             for warning in result["warnings"]:
-                logger.warning(warning)
-            logger.warning(
+                logger.debug(warning)
+            logger.debug(
                 "💡 提示: LLM 可能没有遵循'输出格式规则'，"
                 "请检查系统提示词是否正确加载"
             )

@@ -11,7 +11,11 @@
 
 import os
 import sys
+import warnings
 from dotenv import load_dotenv
+
+# 抑制 LangSmith UUID v7 警告（库内部兼容性问题）
+warnings.filterwarnings("ignore", message="LangSmith now uses UUID v7")
 
 # 加载环境变量
 load_dotenv()
@@ -48,7 +52,7 @@ def main():
                 if not user_input:
                     continue
 
-                print(f"\n🤔 正在思考...")
+                print("\n🤔 正在思考...")
                 response = agent.run(user_input)
                 print(f"\n🎯 回答: {response}")
 
