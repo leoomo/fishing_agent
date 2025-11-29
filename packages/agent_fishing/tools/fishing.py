@@ -18,6 +18,45 @@ from ..utils.date import parse_date_input, parse_dates_list, format_date, get_we
 
 logger = logging.getLogger(__name__)
 
+def safe_convert_temperature(temp_value):
+    """安全转换温度值
+
+    Args:
+        temp_value: 温度值，可能是数字或字符串
+
+    Returns:
+        转换后的浮点数温度值，如果无法转换则返回None
+    """
+    if temp_value is None:
+        return None
+
+    # 如果已经是数字，直接返回
+    if isinstance(temp_value, (int, float)):
+        return float(temp_value)
+
+    # 如果是字符串，尝试转换
+    if isinstance(temp_value, str):
+        try:
+            # 移除常见单位符号
+            temp_str = temp_value.strip().replace('°C', '').replace('℃', '').replace('°F', '').replace('K', '')
+
+            # 转换为浮点数
+            temp_num = float(temp_str)
+
+            # 如果可能的开尔文温度，转换为摄氏度
+            if temp_num > 200:  # 假设超过200可能是开尔文
+                temp_num = temp_num - 273.15
+                logger.debug(f"开尔文转摄氏度: {temp_value} -> {temp_num:.1f}°C")
+
+            return temp_num
+
+        except (ValueError, TypeError) as e:
+            logger.warning(f"温度转换失败: '{temp_value}' - {e}")
+            return None
+
+    # 其他类型无法转换
+    return None
+
 # ===== 时间段定义常量 =====
 TIME_PERIOD_DEFINITIONS = {
     # 标准时间段（24小时制）
@@ -346,9 +385,13 @@ def _extract_realtime_weather(weather_data: Dict[str, Any]) -> Dict[str, Any]:
             pressure = pressure / 100  # 转换为hPa
             logger.debug(f"气压单位转换: {realtime.get('pressure')} Pa → {pressure} hPa")
 
+        # 使用安全温度转换
+        raw_temp = realtime.get('temperature')
+        safe_temp = safe_convert_temperature(raw_temp)
+
         # 直接使用正确的字段映射
         extracted_data = {
-            'temperature': realtime.get('temperature'),
+            'temperature': safe_temp,
             'condition': realtime.get('skycon'),
             'wind_speed': realtime.get('wind', {}).get('speed'),
             'humidity': realtime.get('humidity'),
@@ -365,10 +408,10 @@ def _extract_realtime_weather(weather_data: Dict[str, Any]) -> Dict[str, Any]:
         # 数据合理性验证
         validation_errors = []
 
-        # 温度范围检查（-50°C 到 60°C）
+        # 温度范围检查（-60°C 到 70°C）
         if extracted_data.get('temperature') is not None:
             temp = extracted_data['temperature']
-            if not (-50 <= temp <= 60):
+            if not (-60 <= temp <= 70):
                 validation_errors.append(f"温度值异常: {temp}°C")
                 extracted_data['data_quality'] = 'invalid'
 
@@ -440,8 +483,10 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
                     hour_date = parsed_datetime.date()
 
                 if hour_date == target_date:
-                    # 收集目标日期的数据
-                    target_temps.append(temp_data['value'])
+                    # 使用安全温度转换收集目标日期的数据
+                    safe_temp = safe_convert_temperature(temp_data['value'])
+                    if safe_temp is not None:
+                        target_temps.append(safe_temp)
                     target_datetimes.append(parsed_datetime)  # 新增：保存完整时间戳
 
                     if i < len(skycons):
@@ -471,8 +516,8 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
             logger.error(f"没有找到{target_date}的温度数据")
             return {}
 
-        # 计算平均值/主要值
-        avg_temp = sum(target_temps) / len(target_temps)
+        # 计算平均值/主要值（安全计算）
+        avg_temp = sum(target_temps) / len(target_temps) if target_temps else None
 
         # 获取主要天气状况（出现频率最高的）
         main_condition = max(set(target_conditions), key=target_conditions.count) if target_conditions else None
@@ -523,10 +568,10 @@ def _extract_hourly_weather(hourly_data: Dict[str, Any], target_date: date) -> D
         # 数据合理性验证
         validation_errors = []
 
-        # 温度范围检查（-50°C 到 60°C）
+        # 温度范围检查（-60°C 到 70°C）
         if extracted_data.get('temperature') is not None:
             temp = extracted_data['temperature']
-            if not (-50 <= temp <= 60):
+            if not (-60 <= temp <= 70):
                 validation_errors.append(f"温度值异常: {temp:.1f}°C")
 
         # 气压范围检查（500 hPa 到 1100 hPa，覆盖高海拔地区）
@@ -674,10 +719,10 @@ def _extract_daily_weather(daily_data: Dict[str, Any], target_date: date) -> Dic
         # 数据合理性验证
         validation_errors = []
 
-        # 温度范围检查（-50°C 到 60°C）
+        # 温度范围检查（-60°C 到 70°C）
         if extracted_data.get('temperature') is not None:
             temp = extracted_data['temperature']
-            if not (-50 <= temp <= 60):
+            if not (-60 <= temp <= 70):
                 validation_errors.append(f"温度值异常: {temp:.1f}°C")
 
         # 气压范围检查（500 hPa 到 1100 hPa，覆盖高海拔地区）
@@ -1045,11 +1090,11 @@ def _validate_weather_data(weather_data: Dict[str, Any], location: str) -> Dict[
     """验证天气数据的合理性"""
     validation_errors = []
 
-    # 温度验证
+    # 温度验证 - 扩展合理范围
     if weather_data.get('temperature') is not None:
         temp = weather_data['temperature']
-        if not (-50 <= temp <= 60):  # 地球表面合理温度范围
-            validation_errors.append(f"温度值不合理: {temp}°C")
+        if not (-60 <= temp <= 70):  # 扩展到更现实的地球表面温度范围
+            validation_errors.append(f"温度值超出合理范围: {temp}°C (期望: -60°C 到 70°C)")
             weather_data['temperature'] = None
 
     # 湿度验证
@@ -1138,13 +1183,29 @@ def _calculate_fishing_score(
 
     # 验证数据的合理性
     temp = weather_data['temperature']
-    if not isinstance(temp, (int, float)) or temp < -50 or temp > 60:
-        logger.error(f"温度数据异常: {temp}")
-        return {
-            'overall': 0.0, 'temperature': 0.0, 'condition': 0.0, 'wind': 0.0,
-            'humidity': 0.0, 'pressure': 0.0, 'seasonal': 0.0, 'lunar': 0.0,
-            'data_quality': 'invalid'
-        }
+    if not isinstance(temp, (int, float)) or temp < -60 or temp > 70:
+        logger.error(f"温度数据异常: {temp} (类型: {type(temp)})")
+
+        # 尝试从小时温度数据降级
+        hourly_temps = weather_data.get('hourly_temps', [])
+        if hourly_temps and len(hourly_temps) > 0:
+            avg_temp = sum(hourly_temps) / len(hourly_temps)
+            if -60 <= avg_temp <= 70:
+                logger.info(f"使用小时温度平均值作为降级: {avg_temp}°C")
+                weather_data['temperature'] = avg_temp
+                weather_data['data_quality'] = 'estimated_from_hourly'
+            else:
+                return {
+                    'overall': 0.0, 'temperature': 0.0, 'condition': 0.0, 'wind': 0.0,
+                    'humidity': 0.0, 'pressure': 0.0, 'seasonal': 0.0, 'lunar': 0.0,
+                    'data_quality': 'hourly_temp_invalid'
+                }
+        else:
+            return {
+                'overall': 0.0, 'temperature': 0.0, 'condition': 0.0, 'wind': 0.0,
+                'humidity': 0.0, 'pressure': 0.0, 'seasonal': 0.0, 'lunar': 0.0,
+                'data_quality': 'no_temperature_data'
+            }
 
     # 获取验证过的数据
     condition = weather_data['condition']
@@ -1289,7 +1350,7 @@ def _calculate_basic_fishing_score(weather_data: Dict[str, Any]) -> Dict[str, fl
 
     # 验证数据的合理性
     temp = weather_data['temperature']
-    if not isinstance(temp, (int, float)) or temp < -50 or temp > 60:
+    if not isinstance(temp, (int, float)) or temp < -60 or temp > 70:
         logger.error(f"温度数据异常: {temp}")
         return {
             'overall': 0.0, 'temperature': 0.0, 'condition': 0.0, 'wind': 0.0,
@@ -1954,8 +2015,10 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
 
         for i, slot in enumerate(best_time_slots):
             emoji = rank_emojis[i] if i < len(rank_emojis) else f"{i+1}."
+            # 翻译时段天气条件为中文
+            slot_condition_cn = _translate_weather_condition(slot['condition'])
             report += f"{emoji} **第{i+1}推荐**: {slot['time_range']} (评分: {slot['avg_score']:.1f}分)\n"
-            report += f"   • 温度: {slot['temp_min']:.1f}-{slot['temp_max']:.1f}°C | 天气: {slot['condition']} | 风速: {slot['wind_min']:.1f}-{slot['wind_max']:.1f}m/s\n"
+            report += f"   • 温度: {slot['temp_min']:.1f}-{slot['temp_max']:.1f}°C | 天气: {slot_condition_cn} | 风速: {slot['wind_min']:.1f}-{slot['wind_max']:.1f}m/s\n"
             report += f"   • 湿度: {slot['humidity']:.1f}% | 气压: {slot['pressure']:.1f} hPa\n"
 
             # 添加推荐理由
@@ -1990,7 +2053,9 @@ def _generate_fishing_report(location: str, date: str, weather_data: Dict[str, A
         report += f"• 🌡️ 温度: {temp_min:.1f}-{temp_max:.1f}°C\n"
     else:
         report += f"• 🌡️ 温度: {weather_data['temperature']:.1f}°C\n"
-    report += f"• ☁️ 天气: {weather_data['condition']}\n"
+    # 翻译天气条件为中文
+    condition_cn = _translate_weather_condition(weather_data['condition'])
+    report += f"• ☁️ 天气: {condition_cn}\n"
     report += f"• 💨 风速: {float(weather_data['wind_speed']):.1f} m/s\n"
     report += f"• 💧 湿度: {float(weather_data['humidity']):.1f}%\n"
     report += f"• 🌀 气压: {weather_data['pressure']:.1f} hPa\n\n"
@@ -2083,15 +2148,38 @@ def _add_equipment_suggestions(weather_data: Dict[str, Any]) -> str:
     """添加装备建议"""
     suggestions = ""
 
-    if weather_data.get('condition', '').startswith('晴'):
-        suggestions += "• 建议携带防晒装备和遮阳帽\n"
-    elif '雨' in weather_data.get('condition', ''):
-        suggestions += "• 建议携带雨具，选择有遮挡的钓位\n"
+    condition = weather_data.get('condition', '').upper()
 
-    if weather_data.get('temperature', 20) < 15:
-        suggestions += "• 建议携带保暖衣物\n"
-    elif weather_data.get('temperature', 20) > 28:
-        suggestions += "• 建议携带充足的饮水\n"
+    # 晴天条件：支持中文和英文代码
+    if condition.startswith('晴') or 'CLEAR' in condition:
+        suggestions += "• 建议携带防晒装备和遮阳帽\n"
+    # 雨天条件
+    elif '雨' in condition or 'RAIN' in condition:
+        suggestions += "• 建议携带雨具，选择有遮挡的钓位\n"
+    # 多云条件
+    elif 'CLOUDY' in condition or '云' in condition:
+        suggestions += "• 多云天气，光线柔和适合作钓\n"
+
+    # 温度建议
+    temp = weather_data.get('temperature', 20)
+    if temp is not None:
+        if temp < 10:
+            suggestions += "• 气温较低，建议携带保暖衣物和热饮\n"
+        elif temp < 15:
+            suggestions += "• 建议携带外套保暖\n"
+        elif temp > 30:
+            suggestions += "• 高温天气，建议携带充足饮水和防晒\n"
+        elif temp > 25:
+            suggestions += "• 建议携带充足的饮水\n"
+
+    # 风力建议
+    wind_speed = weather_data.get('wind_speed', 0)
+    if wind_speed and wind_speed > 5:
+        suggestions += "• 风力较大，建议使用重铅或选择避风钓位\n"
+
+    # 如果没有任何建议，添加默认建议
+    if not suggestions:
+        suggestions += "• 建议携带常规钓鱼装备\n"
 
     return suggestions
 
