@@ -1,7 +1,7 @@
 [project]
 name = "fishing-agent"
-version = "3.0.2.1"
-description = "智能钓鱼助手 v3.0.2.1 - 基于 LangChain 1.0+ 的钓鱼时间推荐和天气分析系统（7因子科学评分体系 + 架构优化 + LLM优化）"
+version = "3.1.0"
+description = "智能钓鱼助手 v3.1.0 - 基于 LangChain 1.0+ 的钓鱼时间推荐和天气分析系统（模块化 Agent 架构 + 7因子科学评分 + FastAPI）"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -46,3 +46,11 @@ vector-local = [
     "torch>=2.1.0",
     "Pillow>=10.0.0",
 ]
+
+[project.scripts]
+fishing = "apps.cli.main:main"
+fishing-api = "apps.api.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["packages*", "apps*", "shared*"]

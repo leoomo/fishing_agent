@@ -1,49 +1,81 @@
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
+
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
+
 # CLAUDE.md
 
-智能钓鱼助手 v3.0.2.1 - 基于 LangChain 1.0+ 架构和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析，支持多种 LLM 提供商。
+智能钓鱼助手 v3.1.0 - 模块化 Agent 架构，基于 LangChain 1.0+ 和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析，支持多种 LLM 提供商和 FastAPI 后端。
 
-**当前版本**: v3.0.2.1 (架构优化、向量存储完善和文档更新)
-**当前分支**: feature/llm-optimization (LLM优化功能开发中)
-**Git状态**: 5个文件已修改，正在进行LLM提示优化和工具选择改进
+**当前版本**: v3.1.0 (模块化 Agent 架构 + FastAPI 后端)
+**当前分支**: feature/llm-optimization
+**架构**: packages/agent_fishing 独立 Agent 包
 
 ### 核心特性
-- ✅ **LangChain 1.0+**: 原生 LangChain agents，移除 LangGraph 封装
-- ✅ **同步优先**: 消除异步复杂性和事件循环问题
-- ✅ **零抽象**: 直接 API 调用，无中间层
-- ✅ **7 因子科学评分**: 温度、天气、风力、气压、湿度、季节、月相
-- ✅ **动态趋势分析**: 识别"黄金钓鱼时段"
-- ✅ **LLM 优化**: 95%+ 准确率的推理能力，feature/llm-optimization分支开发中
-- ✅ **时间意图识别**: 95%+ 准确率的时间段理解
-- ✅ **Few-Shot提示**: 增强的提示词工程，提升工具选择准确性
-- ✅ **架构优化**: 健康检查功能迁移至utils，代码组织更清晰
-- ✅ **向量搜索**: 基于 DashScope Embedding API 的语义搜索（路亚装备知识）
-- ✅ **工具选择优化**: 避免LLM重复调用工具，提升响应效率
+- **模块化 Agent**: 完全自包含的 Agent 包架构，支持独立发布
+- **FastAPI 后端**: REST API 支持，便于前端集成
+- **LangChain 1.0+**: 原生 LangChain agents
+- **7 因子科学评分**: 温度、天气、风力、气压、湿度、季节、月相
+- **动态趋势分析**: 识别"黄金钓鱼时段"
+- **向量搜索**: 基于 DashScope Embedding API 的语义搜索
 
 ## 架构概览
 
-### 核心文件（3个工具模块）
-- **`src/agent.py`** - 主智能代理入口（向后兼容层）
-- **`src/tools/__init__.py`** - 统一工具接口，导出3个核心工具
-- **`src/tools/basic_tools.py`** - 基础工具（时间功能）
-- **`src/tools/weather_tools.py`** - 天气查询工具
-- **`src/tools/fishing_tools.py`** - 钓鱼推荐工具（7因子评分系统）
+### 目录结构
+```
+fishing-agent/
+├── packages/                      # Agent 包目录
+│   └── agent_fishing/             # 钓鱼 Agent（完全自包含）
+│       ├── __init__.py            # 包入口
+│       ├── core/                  # Agent 核心
+│       │   ├── agent.py           # FishingAgent 实现
+│       │   ├── model_factory.py   # LLM 工厂
+│       │   ├── prompts.py         # 提示词
+│       │   └── callbacks.py       # 回调系统
+│       ├── tools/                 # Agent 工具
+│       │   ├── basic.py           # 基础工具
+│       │   ├── weather.py         # 天气工具
+│       │   ├── fishing.py         # 钓鱼工具
+│       │   ├── lure_tools.py      # 路亚工具
+│       │   ├── lure/              # 路亚子模块
+│       │   └── scoring/           # 评分系统
+│       └── utils/                 # Agent 工具类
+├── apps/                          # 应用层
+│   ├── cli/                       # CLI 应用
+│   │   └── main.py
+│   └── api/                       # FastAPI 后端
+│       ├── main.py
+│       ├── routes/
+│       └── schemas/
+├── shared/                        # 共享资源
+│   ├── config/                    # 全局配置
+│   └── data/                      # 共享数据
+├── tests/                         # 测试
+│   └── agent_fishing/
+├── main.py                        # CLI 入口
+├── langgraph.json                 # LangGraph 配置
+└── pyproject.toml                 # 项目配置
+```
 
-### 扩展模块（路亚装备系统）
-- **`src/tools/lure_tools.py`** - 路亚装备工具（推荐/对比/查询/识别）- 完整功能模块
-- **`src/tools/lure/`** - 路亚装备完整模块，包含：
-  - **embeddings.py**: DashScope Embedding API集成（支持v3/v2模型）
-  - **vector_store.py**: ChromaDB向量存储（本地持久化）
-  - **cli.py**: 向量存储管理CLI工具（状态/重建/搜索/配置）
-  - **knowledge_search.py**: 语义搜索服务（鱼类/钓组/装备知识）
-  - 其他12个核心支持文件（数据库/推荐/对比/格式化等）
-
-### 支持模块
-- **`src/utils/`** - 核心工具类（包含health_check.py）
-- **`src/fishing_agent/`** - 智能代理实现
-- **`src/tools/scoring/`** - 7 因子科学评分系统
-- **`src/data/`** - 数据存储和缓存
-- **`src/tests/`** - 测试套件
-- **`main.py`** - 交互式 CLI 入口
+### 核心模块
+- **`packages/agent_fishing/`** - 钓鱼 Agent 包（完全自包含）
+- **`apps/cli/`** - 命令行应用
+- **`apps/api/`** - FastAPI REST API
+- **`shared/`** - 共享配置和数据
 
 ## 开发指南
 
@@ -55,193 +87,137 @@ uv sync
 # 配置环境变量
 cp .env.example .env
 
-# 运行应用
+# 运行 CLI
 uv run python main.py
+
+# 运行 API 服务
+uv run uvicorn apps.api.main:app --reload
 ```
 
 ### 测试
 ```bash
 # 运行所有测试
-uv run pytest src/tests/
+uv run pytest tests/
 
-# 测试评分系统
-PYTHONPATH=src uv run pytest src/tests/scoring/test_enhanced_scorer.py -v
+# 测试 Agent 导入
+uv run python -c "from packages.agent_fishing import create_agent; print('OK')"
 
-# 测试工具
-uv run python -c "from src.tools import get_all_tools; print(f'工具数量: {len(get_all_tools())}')"
+# 测试工具列表
+uv run python -c "from packages.agent_fishing import get_all_tools; print(len(get_all_tools()))"
 ```
 
 ## 技术栈
 
 ### 核心框架
 - **langchain>=0.3.0** - LangChain 1.0+ API
-- **requests>=2.25.0** - HTTP 客户端
+- **fastapi>=0.121.2** - REST API 框架
+- **uvicorn>=0.38.0** - ASGI 服务器
 - **pydantic>=2.0.0** - 数据验证
-- **python-dotenv>=1.1.1** - 环境变量管理
-- **pandas>=2.3.3** - 数据分析
 - **chromadb>=0.4.22** - 向量数据库
-- **click>=8.1.0** - CLI 工具
 
 ### LLM 提供商
 - **智谱AI GLM** (ANTHROPIC_AUTH_TOKEN) - 推荐
-- **通义千问** (DASHSCOPE_API_KEY) - 同时用于 LLM 和 Embedding API (必需)
+- **通义千问** (DASHSCOPE_API_KEY) - LLM + Embedding
 - **OpenAI GPT** (OPENAI_API_KEY) - 可选
 
 ### 外部服务
 - **彩云天气 API** (CAIYUN_API_KEY) - 必需
 - **高德地图 API** (AMAP_API_KEY) - 必需
-- **DashScope Embedding API** (DASHSCOPE_API_KEY) - LLM和向量化服务 (必需)
+- **DashScope Embedding API** (DASHSCOPE_API_KEY) - 必需
 
-## 项目结构
+## 常用导入
 
-```
-fishing-agent/
-├── src/                          # 源代码
-│   ├── agent.py                  # 主代理入口
-│   ├── tools/                    # 工具模块
-│   │   ├── basic_tools.py        # 基础工具
-│   │   ├── weather_tools.py      # 天气工具
-│   │   ├── fishing_tools.py      # 钓鱼工具
-│   │   ├── lure_tools.py         # 路亚工具
-│   │   └── scoring/              # 评分系统
-│   ├── fishing_agent/            # 代理实现
-│   ├── utils/                    # 工具类
-│   ├── data/                     # 数据存储
-│   └── tests/                    # 测试套件
-├── docs/                         # 项目文档
-├── main.py                       # CLI 入口
-└── pyproject.toml                # 项目配置
-```
-
-### 关键文件
-- **`src/agent.py`** - 代理功能
-- **`src/tools/fishing_tools.py`** - 7 因子钓鱼评分
-- **`src/tools/lure_tools.py`** - 路亚装备推荐
-- **`src/tools/scoring/enhanced_scorer.py`** - 评分算法
-- **`main.py`** - 命令行界面
-
-## 核心功能
-
-### 钓鱼推荐系统
-- **7 因子科学算法**: 温度、天气、风力、气压、湿度、季节、月相
-- **动态趋势分析**: 识别"黄金钓鱼时段"
-- **时间意图识别**: 95%+ 准确率的时间段理解
-- **全国覆盖**: 支持 3,142+ 行政区域
-- **中文查询**: 自然语言处理支持
-
-### 天气服务
-- **直接 API 调用**: 彩云天气 API 集成
-- **72 小时预报**: 逐小时天气预测
-- **智能降级**: API 失败时诚实报告
-
-### 路亚装备推荐
-- **智能建议**: 基于目标鱼种和环境条件
-- **装备匹配**: 路亚、鱼线、配件推荐
-- **语义搜索**: 基于DashScope Embedding的知识检索
-- **向量存储**: ChromaDB本地向量数据库
-- **CLI管理**: 索引状态查看、重建和搜索测试
-
-## 开发指南
-
-### 架构原则
-1. **同步优先**: 使用 `requests` 直接 API 调用
-2. **诚实数据**: 不生成假数据，提供诚实错误信息
-3. **LangChain 1.0+**: 直接使用 `@tool` 装饰器
-4. **统一日期处理**: 使用 date_utils 模块
-
-### 常用导入
 ```python
-# 代理创建
-from src.agent import create_optimized_fishing_agent
+# Agent 创建
+from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
 
-# 工具导入
-from src.tools import get_all_tools
-from src.tools.weather_tools import get_current_weather
-from src.tools.fishing_tools import query_fishing_recommendation
-from src.tools.lure_tools import query_lure_recommendation
+# 核心模块
+from packages.agent_fishing.core import ModelFactory
+from packages.agent_fishing.tools import get_weather, query_fishing_recommendation
 
 # 评分系统
-from src.tools.scoring.enhanced_scorer import (
+from packages.agent_fishing.tools.scoring.enhanced_scorer import (
     calculate_seasonal_score, analyze_pressure_trend
 )
 
 # 工具类
-from src.utils.date_utils import parse_date_input, format_date
-from src.utils.coordinate_utils import get_coordinates
+from packages.agent_fishing.utils import get_coordinates, parse_date_input
 
-# 向量搜索（路亚装备）
-from src.tools.lure.embeddings import DashScopeEmbedding
-from src.tools.lure.vector_store import get_vector_store
-from src.tools.lure.knowledge_search import KnowledgeSearchService
+# 向量搜索
+from packages.agent_fishing.tools.lure.embeddings import DashScopeEmbedding
+from packages.agent_fishing.tools.lure.vector_store import get_vector_store
 ```
 
-### 向量存储管理（路亚装备知识搜索）
+## API 端点
 
-#### CLI 命令
+```
+GET  /                     # API 信息
+GET  /health               # 健康检查
+POST /api/v1/fishing/chat  # 钓鱼助手对话
+GET  /api/v1/fishing/tools # 工具列表
+```
+
+### 示例请求
 ```bash
-# 查看索引状态
-uv run python -m src.tools.lure.cli status
+# 健康检查
+curl http://localhost:8000/health
 
-# 重建向量索引
-uv run python -m src.tools.lure.cli rebuild --force
-
-# 测试搜索功能
-uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
-
-# 查看配置
-uv run python -m src.tools.lure.cli config
+# 对话
+curl -X POST http://localhost:8000/api/v1/fishing/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "明天杭州钓鱼怎么样？"}'
 ```
 
-#### 代码示例
-```python
-# 基础Embedding使用
-from src.tools.lure.embeddings import DashScopeEmbedding
-embedding = DashScopeEmbedding(model="text-embedding-v3")
-vector = embedding.embed_query("鲈鱼是一种常见的淡水鱼")
+## 环境变量
 
-# 语义搜索
-from src.tools.lure.database import get_db
-from src.tools.lure.vector_store import get_vector_store
-from src.tools.lure.knowledge_search import KnowledgeSearchService
-
-db = get_db()
-vector_store = get_vector_store()
-service = KnowledgeSearchService(db, vector_store, auto_index=True)
-
-# 搜索鱼类知识
-results = service.search_fish_knowledge("鲈鱼的生活习性", top_k=3)
-for result in results:
-    print(f"[{result.score:.3f}] {result.title}")
-```
-
-#### 懒加载索引
-- 默认启用懒加载：首次搜索时自动触发索引
-- 无需手动初始化，对用户透明
-- 可通过环境变量 `VECTOR_AUTO_INDEX=false` 禁用
-
-#### 迁移指南
-- 详细迁移指南请参考：`docs/vector_store_migration_guide.md`
-- 从本地BGE-M3模型迁移到DashScope API的完整步骤
-- 包含故障排除、性能对比和最佳实践
-
-### 环境变量
 ```bash
 # 必需 API
 CAIYUN_API_KEY=your-caiyun-api-key
 AMAP_API_KEY=your-amap-api-key
-DASHSCOPE_API_KEY=your-dashscope-api-key  # LLM + Embedding
+DASHSCOPE_API_KEY=your-dashscope-api-key
 
 # LLM 提供商
-ANTHROPIC_AUTH_TOKEN=your-zhipu-token  # 推荐
-OPENAI_API_KEY=your-openai-key  # 可选
+ANTHROPIC_AUTH_TOKEN=your-zhipu-token
 
 # 向量存储配置（可选）
-VECTOR_EMBEDDING_MODEL=text-embedding-v3  # 1024维（推荐）
-VECTOR_AUTO_INDEX=true  # 懒加载索引
+VECTOR_EMBEDDING_MODEL=text-embedding-v3
+VECTOR_AUTO_INDEX=true
 ```
 
-### Python 环境
-- **Python >=3.11**
-- **uv 依赖管理**
-- **同步优先架构**
-- **LangChain 1.0+ 原生**
+## 新增 Agent 指南
+
+创建新 Agent 时，遵循以下模板：
+
+```bash
+# 1. 创建目录
+mkdir -p packages/agent_xxx/{core,tools,utils}
+
+# 2. 创建必要文件
+touch packages/agent_xxx/{__init__.py,core/__init__.py,tools/__init__.py,utils/__init__.py}
+touch packages/agent_xxx/core/{agent.py,model_factory.py,prompts.py}
+```
+
+```python
+# packages/agent_xxx/__init__.py
+from .core import XxxAgent, create_agent
+from .tools import get_all_tools
+
+__all__ = ["XxxAgent", "create_agent", "get_all_tools"]
+```
+
+更新 `langgraph.json`:
+```json
+{
+  "graphs": {
+    "fishing": "./packages/agent_fishing:get_agent",
+    "xxx": "./packages/agent_xxx:get_agent"
+  }
+}
+```
+
+## 架构原则
+
+1. **Agent 自包含**: 每个 Agent 包完全独立，可单独发布
+2. **同步优先**: 使用 `requests` 直接 API 调用
+3. **诚实数据**: 不生成假数据，提供诚实错误信息
+4. **LangChain 1.0+**: 直接使用 `@tool` 装饰器
