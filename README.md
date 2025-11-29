@@ -1,25 +1,26 @@
-# Fishing Agent - 智能钓鱼助手 v3.0.2.1
+# Fishing Agent - 智能钓鱼助手 v3.1.0
 
 基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐和天气分析。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **7因子科学评分体系 + 动态趋势分析 + LLM优化**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v3.1.0 + 7因子科学评分 + FastAPI 后端**
 
-> **当前版本**: v3.0.2.1 (架构优化、向量存储完善和文档更新)
+> **当前版本**: v3.1.0 (模块化 Agent 架构重构 + FastAPI 后端)
 > **当前分支**: feature/llm-optimization (LLM优化功能开发中)
-> **Git状态**: 5个文件已修改，正在进行LLM提示优化和工具选择改进
+> **架构**: packages/agent_fishing 独立 Agent 包
 
-### 🌟 版本状态 (v3.0.2.1)
-- ✅ **架构优化完成**: 健康检查功能从middleware迁移至utils，代码组织更清晰
+### 🌟 版本状态 (v3.1.0)
+- ✅ **模块化架构重构**: 完全自包含的 Agent 包架构，packages/agent_fishing 独立发布
+- 🚀 **FastAPI 后端**: REST API 支持，便于前端集成和部署
 - 📈 **性能提升**: 意图识别准确率95%+，LLM推理质量显著优化
-- 🎯 **简化架构**: 核心功能保持完整，移除冗余模块，提升维护性
-- 🔧 **文档准确性**: 所有文档已与实际代码实现保持一致
+- 🎯 **LangChain 1.0+**: 原生 LangChain agents，零抽象层设计
+- 🔧 **文档更新**: 全面更新以反映新的 packages 目录结构
 - 🚀 **向量存储系统**: 集成DashScope Embedding API和ChromaDB，支持路亚装备语义搜索
 - 📋 **CLI管理工具**: 新增向量存储管理CLI，支持索引重建和搜索测试
 - 🧠 **LLM优化开发**: feature/llm-optimization分支正在进行提示工程优化和工具选择改进
 - 🔇 **用户体验优化**: 抑制LangSmith UUID v7警告，优化控制台输出显示
-- 🔄 **当前开发状态**: 5个文件已修改，专注于LLM提示优化和输出格式验证
+- 🔄 **当前开发状态**: 模块化架构已重构完成，专注于LLM提示优化和工具选择改进
 
-## ✨ 核心功能（v3.0.2 路亚装备集成 + v3.0.1 测试完善 + v3.0.0 重大升级）
+## ✨ 核心功能（v3.1.0 模块化架构重构 + v3.0.2 路亚装备集成 + v3.0.0 7因子评分升级）
 
 ### 🎣 7因子科学评分体系 ⭐ 核心算法
 - **7因子评分算法**: 温度(25%) + 天气(20%) + 风力(15%) + 气压(15%) + 湿度(10%) + **季节(5%)** + **月相(5%)**
@@ -55,52 +56,54 @@
 
 ## 🏗️ 技术架构
 
-### 简化架构设计 (v3.0.2)
-**优化架构设计** - 保持核心功能完整性的同时，通过模块化设计实现高效开发：
+### 模块化 Agent 架构设计 (v3.1.0)
+**全新架构设计** - 基于 packages 的模块化 Agent 架构，支持独立发布和部署：
 
-#### 🎯 核心文件 (3个工具模块)
-- **`src/agent.py`**: 主入口点（向后兼容层，实际功能在src.fishing_agent中实现）
-- **`src/tools/__init__.py`**: 统一工具接口，导出所有工具模块
-- **`src/tools/basic_tools.py`**: 基础工具（时间功能）
-- **`src/tools/weather_tools.py`**: 天气查询和预报工具
-- **`src/tools/fishing_tools.py`**: 钓鱼推荐和评分工具（7因子系统）
+#### 📦 核心 Agent 包
+- **`packages/agent_fishing/`**: 钓鱼 Agent 包（完全自包含）
+  - **`core/`**: Agent 核心
+    - `agent.py`: FishingAgent 实现（LangChain 1.0+）
+    - `model_factory.py`: LLM 工厂
+    - `prompts.py`: 提示词和 Few-Shot 示例
+    - `callbacks.py`: 回调系统
+  - **`tools/`**: Agent 工具模块
+    - `basic.py`: 基础工具（时间功能）
+    - `weather.py`: 天气工具（72小时预报）
+    - `fishing.py`: 钓鱼工具（7因子科学评分）
+    - `lure_tools.py`: 路亚装备工具（推荐/对比/查询）
+    - `lure/`: 路亚装备完整子模块
+    - `scoring/`: 7因子科学评分系统
+  - **`utils/`**: Agent 工具类
+    - `coordinate.py`: 坐标服务
+    - `health_check.py`: 健康检查
+    - `api_client.py`: HTTP 客户端
+    - `cache.py`: 缓存系统
 
-#### 🔧 扩展模块 (路亚装备系统)
-- **`src/tools/lure_tools.py`**: 路亚装备工具（推荐/对比/查询/识别）- 完整功能模块
-- **`src/tools/lure/`**: 路亚装备完整模块，包含：
-  - **embeddings.py**: DashScope Embedding API集成
-  - **vector_store.py**: ChromaDB向量存储
-  - **cli.py**: 向量存储管理CLI工具
-  - **knowledge_search.py**: 语义搜索服务
-  - 其他12个核心支持文件
+#### 🚀 应用层 (Apps)
+- **`apps/cli/`**: 命令行应用
+  - `main.py`: CLI 入口点
+- **`apps/api/`**: FastAPI REST API 后端
+  - `main.py`: API 服务器
+  - `routes/`: API 路由
+  - `schemas/`: 数据模型
 
-#### 🔧 支撑模块 (完整功能架构)
-- **`src/tools/scoring/`**: 7因子科学评分系统
-  - `enhanced_scorer.py`: 7因子+趋势分析算法
-- **`src/utils/`**: 核心工具类
-  - `api_client.py`: 统一HTTP客户端
-  - `coordinate_utils.py`: 坐标和地理工具
-  - `cache.py`: 缓存系统
-  - `date_utils.py`: 日期处理工具
-- **`src/fishing_agent/`**: 智能体核心实现
-  - `core.py`: LangChain 1.0+智能体实现
-  - `prompts.py`: 系统提示词和Few-Shot示例
-  - `model_factory.py`: 多模型工厂
-  - `callbacks.py`: 回调处理
-- **`src/`**: 其他核心支撑文件
-  - `config/`: 配置管理
-  - `middleware/`: 中间件目录（保留给未来扩展）
-- **`src/utils/`**: 核心工具类
-  - `health_check.py`: 健康检查功能（从middleware迁移至utils）
-  - `api_client.py`: 统一HTTP客户端
-  - `coordinate_utils.py`: 坐标和地理工具
-  - `cache.py`: 缓存系统
-  - `date_utils.py`: 日期处理工具
-- **`src/data/`**: 数据存储和缓存
-- **`src/docs/`**: 技术文档
-- **`src/tests/`**: 测试套件（27个评分测试用例）
+#### 🔧 共享资源 (Shared)
+- **`shared/config/`**: 全局配置
+  - `service_config.py`: 服务配置
+- **`shared/data/`**: 共享数据
+  - `coordinate_enrichment.py`: 坐标数据
+  - `national_region_database.py`: 全国地区数据库
+
+#### 🧪 测试系统
+- **`tests/agent_fishing/`**: Agent 测试套件
+  - `test_enhanced_fishing_scorer.py`: 7因子评分测试（27个用例）
+  - `test_time_period_intent.py`: 时间段意图测试
+  - `test_national_coverage.py`: 全国覆盖测试
+  - `test_tool_selection.py`: 工具选择测试
 
 ### 核心特性
+- **📦 模块化 Agent**: 完全自包含的 Agent 包架构，支持独立发布和部署
+- **🚀 FastAPI 后端**: REST API 支持，便于前端集成和部署
 - **🚀 LangChain 1.0+原生**: 移除LangGraph包装层，直接使用create_agent
 - **⚡ 同步优先设计**: 避免异步复杂性，提升稳定性
 - **🛡️ 零抽象**: 直接API调用，无中间件层
@@ -227,29 +230,52 @@ cp .env.example .env
 
 ### 运行项目
 
-#### 方法一：交互式应用（推荐）
+#### 方法一：CLI 应用（推荐）
 ```bash
+# 交互式 CLI
 uv run python main.py
+
+# 或者直接运行 CLI 入口
+uv run fishing
 ```
 
-#### 方法二：直接运行Agent（推荐）
+#### 方法二：FastAPI API 服务
 ```bash
-# 从项目根目录运行（推荐）
-PYTHONPATH=src uv run python src/agent.py
+# 启动 API 服务器
+uv run uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
 
-# 或者从src目录运行
-cd src && uv run python agent.py
-
-# 测试agent创建（开发者调试用）
-PYTHONPATH=src uv run python -c "from agent import create_optimized_fishing_agent; print('Agent creation test passed')"
+# 或者使用项目脚本
+uv run fishing-api
 ```
 
-> ✅ **注意**: 需要设置PYTHONPATH=src以确保正确的模块导入路径
-> ⏰ **v2.3.0更新**: 新增时间段意图理解功能，支持精准时段识别！
-> 🧠 **v2.3.1更新**: 集成LLM优化分支，提升推理质量和响应准确性！
-> 🚀 **v3.0.2.2开发中**: LLM提示工程优化正在进行，当前5个文件已修改！
-> 🚀 **v3.0.0更新**: 7因子科学评分体系，解决"86分问题"！
-> 📝 **v3.0.1更新**: 测试完善和设计文档补充，架构进一步优化！
+#### 方法三：直接运行 Agent
+```bash
+# 测试 Agent 导入和创建
+uv run python -c "from packages.agent_fishing import create_agent; print('Agent creation test passed')"
+
+# 测试工具列表
+uv run python -c "from packages.agent_fishing import get_all_tools; print(f'Tools: {len(get_all_tools())}')"
+```
+
+#### API 端点测试
+```bash
+# 健康检查
+curl http://localhost:8000/health
+
+# 对话测试
+curl -X POST http://localhost:8000/api/v1/fishing/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "明天杭州钓鱼怎么样？"}'
+
+# 工具列表
+curl http://localhost:8000/api/v1/fishing/tools
+```
+
+> ✅ **v3.1.0更新**: 全新的模块化 Agent 架构，独立 Agent 包支持！
+> 🚀 **v3.1.0新增**: FastAPI REST API 后端，便于前端集成！
+> ⏰ **保持功能**: 时间段意图理解功能，支持精准时段识别！
+> 🧠 **已集成**: LLM优化分支，提升推理质量和响应准确性！
+> 🚀 **7因子评分**: 科学评分体系，解决"86分问题"！
 
 ### 当前分支状态
 > 🔥 **feature/llm-optimization分支开发中** - LLM优化功能正在积极开发
@@ -257,9 +283,9 @@ PYTHONPATH=src uv run python -c "from agent import create_optimized_fishing_agen
 > - 思维链推理优化，提高响应质量和逻辑性
 > - 工具选择优化，避免LLM重复调用相同工具
 > - 输出格式验证优化，仅DEBUG级别显示内部验证信息
-> - 当前状态：5个文件已修改，提示词工程和工具选择改进中
+> - 当前状态：模块化架构已重构完成，专注于LLM提示优化和工具选择改进
 
-#### 方法三：激活虚拟环境
+#### 方法四：激活虚拟环境
 ```bash
 source .venv/bin/activate
 python main.py
@@ -269,13 +295,11 @@ python main.py
 
 ### 基础使用
 ```python
-# 导入智能体
-import sys
-sys.path.append('src')
-from agent import create_optimized_fishing_agent
+# 导入智能体（新的包结构）
+from packages.agent_fishing import create_agent
 
-# 创建智能体实例（v3.0.2.1 LLM优化版）
-agent = create_optimized_fishing_agent(model_provider="zhipu")
+# 创建智能体实例（v3.1.0 模块化架构版）
+agent = create_agent(model_provider="zhipu")
 
 # 钓鱼推荐查询（包含时间段限定）
 response = agent.run("明天白天去杭州钓鱼怎么样？")
@@ -292,7 +316,7 @@ print(response)
 
 ### 时间段功能使用（v2.3.0新增）
 ```python
-from src.tools.fishing_tools import query_fishing_recommendation
+from packages.agent_fishing.tools.fishing import query_fishing_recommendation
 
 # 白天钓鱼推荐
 result = query_fishing_recommendation.invoke({
@@ -321,7 +345,7 @@ print(f"上午钓鱼推荐: {result}")
 
 ### 日期处理功能使用（v2.3.1新增）
 ```python
-from src.utils.date_utils import parse_date_input, format_date, get_weekday_cn
+from packages.agent_fishing.utils.date import parse_date_input, format_date, get_weekday_cn
 
 # 解析相对日期
 tomorrow = parse_date_input("明天")
@@ -332,7 +356,7 @@ christmas = parse_date_input("2024-12-25")
 print(f"圣诞节: {format_date(christmas)} {get_weekday_cn(christmas)}")
 
 # 解析相对日期列表
-from src.utils.date_utils import parse_dates_list
+from packages.agent_fishing.utils.date import parse_dates_list
 dates = parse_dates_list(["今天", "明天", "后天"])
 print(f"未来三天: {[format_date(d) for d in dates]}")
 ```
@@ -340,7 +364,7 @@ print(f"未来三天: {[format_date(d) for d in dates]}")
 ### 7因子科学评分系统使用（v3.0.0新增）
 ```python
 # 导入增强评分模块
-from src.tools.scoring.enhanced_scorer import (
+from packages.agent_fishing.tools.scoring.enhanced_scorer import (
     calculate_seasonal_score,
     calculate_lunar_phase,
     calculate_lunar_score,
@@ -378,7 +402,7 @@ print(f"风速稳定性倍率: {wind_multiplier}")  # 稳定风速应为1.05x
 
 ### 路亚装备智能推荐系统使用（v3.0.2新增）
 ```python
-from src.tools.lure_tools import (
+from packages.agent_fishing.tools.lure_tools import (
     recommend_equipment,
     compare_equipment,
     lookup_fishing_knowledge,
@@ -423,19 +447,19 @@ print(result)
 ### 向量存储系统使用（v3.0.2新增）
 ```python
 # 基础Embedding使用
-from src.tools.lure.embeddings import DashScopeEmbedding
+from packages.agent_fishing.tools.lure.embeddings import DashScopeEmbedding
 embedding = DashScopeEmbedding(model="text-embedding-v3")
 vector = embedding.embed_query("鲈鱼是一种常见的淡水鱼")
 
 # 向量存储操作
-from src.tools.lure.vector_store import ChromaVectorStore
+from packages.agent_fishing.tools.lure.vector_store import ChromaVectorStore
 store = ChromaVectorStore()
 store.add_texts("fish_knowledge", ["鲈鱼喜欢在清晨和傍晚活动"])
 
 # 语义搜索
-from src.tools.lure.database import get_db
-from src.tools.lure.vector_store import get_vector_store
-from src.tools.lure.knowledge_search import KnowledgeSearchService
+from packages.agent_fishing.tools.lure.database import get_db
+from packages.agent_fishing.tools.lure.vector_store import get_vector_store
+from packages.agent_fishing.tools.lure.knowledge_search import KnowledgeSearchService
 
 db = get_db()
 vector_store = get_vector_store()
@@ -449,18 +473,18 @@ for result in results:
 
 ### 直接工具调用
 ```python
-from src.tools import get_all_tools
+from packages.agent_fishing import get_all_tools
 
-# 获取所有可用工具（当前3个核心工具：1个基础+1个天气+1个钓鱼）
+# 获取所有可用工具
 tools = get_all_tools()
 print(f"可用工具数量: {len(tools)}")
 for tool in tools:
     print(f"- {tool.name}: {tool.description}")
 
 # 直接使用工具
-from src.tools.basic_tools import get_current_time
-from src.tools.weather_tools import get_weather
-from src.tools.fishing_tools import query_fishing_recommendation
+from packages.agent_fishing.tools.basic import get_current_time
+from packages.agent_fishing.tools.weather import get_weather
+from packages.agent_fishing.tools.fishing import query_fishing_recommendation
 
 # 获取当前时间
 result = get_current_time.invoke({})
@@ -478,125 +502,79 @@ result = query_fishing_recommendation.invoke({
 print(f"钓鱼推荐: {result}")
 ```
 
-## 📁 项目结构 (v3.0.2.1 架构优化)
+## 📁 项目结构 (v3.1.0 模块化架构重构)
 
 ### 项目目录结构
 ```
 fishing-agent/
-├── src/                          # 源代码目录
-│   ├── agent.py                  # 🤖 主入口点（向后兼容）
-│   ├── README.md                 # 📖 src模块说明文档
-│   └── tools/                    # 🛠️ 核心工具模块
-│       ├── __init__.py          # 🎯 统一工具接口（3个核心工具）
-│       ├── basic_tools.py       # 🔧 基础工具（时间功能）
-│       ├── weather_tools.py     # 🌤️ 天气工具（实时天气、72小时预报）
-│       ├── fishing_tools.py     # 🎣 钓鱼工具（7因子评分、时段过滤）
-│       ├── lure_tools.py        # 🎯 路亚装备工具（推荐/对比/查询/识别）
-│       ├── lure/                # 🎣 路亚装备完整模块
-│       │   ├── __init__.py      # 模块导出
-│       │   ├── database.py      # 数据库访问层
-│       │   ├── image_manager.py # 图片存储管理
-│       │   ├── fish_knowledge.py # 鱼类知识服务
-│       │   ├── comparator.py    # 装备对比服务
-│       │   ├── recommender.py   # 智能推荐引擎
-│       │   ├── knowledge_search.py # 知识搜索服务
-│       │   ├── vector_store.py  # 向量存储（支持语义搜索）
-│       │   ├── formatters.py    # 输出格式化
-│       │   ├── knowledge_indexer.py # 知识索引管理
-│       │   ├── init_data.py     # 初始数据
-│       │   ├── embeddings.py    # DashScope Embedding API ⭐ v3.0.2新增
-│       │   ├── cli.py           # 向量存储管理CLI ⭐ v3.0.2新增
-│       │   └── data/            # 数据目录
-│       └── scoring/              # ⭐ v3.0.0核心：科学评分系统
-│           ├── __init__.py      # 评分模块导出
-│           └── enhanced_scorer.py  # 7因子+趋势分析算法
-```
-
-### 完整架构结构
-```
-fishing-agent/
-├── src/                          # 源代码目录
-│   ├── agent.py                  # 🤖 主入口点
-│   ├── fishing_agent/            # 🧠 智能体实现（LLM优化）
-│   │   ├── __init__.py          # 模块导出
-│   │   ├── core.py              # 🎯 核心智能体类（LangChain 1.0+）
-│   │   ├── model_factory.py     # 🔌 多模型工厂
-│   │   ├── prompts.py           # 📝 System Prompt+Few-Shot
-│   │   └── callbacks.py         # 📊 回调处理
-│   ├── tools/                    # 🛠️ 工具模块
-│   │   ├── basic_tools.py       # 🔧 基础工具
-│   │   ├── weather_tools.py     # 🌤️ 天气工具
-│   │   ├── fishing_tools.py     # 🎣 钓鱼工具
-│   │   └── scoring/             # ⭐ 科学评分系统
-│   │       ├── __init__.py      # 评分模块导出
-│   │       └── enhanced_scorer.py  # 7因子+趋势分析算法
-│   ├── utils/                    # 🔧 工具类
-│   │   ├── api_client.py        # 🌐 统一HTTP客户端
-│   │   ├── coordinate_utils.py  # 🗺️ 坐标和地理工具
-│   │   ├── cache.py             # 💾 缓存系统
-│   │   └── date_utils.py        # 📅 日期解析（相对/绝对日期）
-│   ├── config/                   # ⚙️ 配置管理
-│   │   ├── service_config.py    # 服务配置
-│   │   └── README.md            # 配置说明文档
-│   ├── middleware/               # 🔌 中间件目录
-│   │   └── README.md             # 中间件使用说明
-│   ├── utils/                    # 🔧 工具类
-│   │   ├── health_check.py       # 🏥 健康检查（从middleware迁移）
-│   ├── data/                     # 💾 数据存储
-│   │   ├── admin_divisions.db   # 行政区划数据库
-│   │   ├── coordinates_cache.db # 坐标缓存数据库
-│   │   ├── town_coordinates.db  # 镇坐标数据库
-│   │   └── cache/               # 缓存目录
-│   │       └── weather_cache.json # 天气缓存
-│   ├── docs/                     # 📖 技术文档
-│   │   ├── API.md               # API文档
-│   │   ├── TOOLS_GUIDE.md       # 工具使用指南
-│   │   ├── CONFIGURATION_GUIDE.md # 配置指南
-│   │   └── FISHING_WEIGHT_ALGORITHMS_GUIDE.md # 算法指南
-│   ├── tests/                    # 🧪 测试套件
-│   │   ├── test_time_period_intent.py  # ⏰ 时间段意图测试
-│   │   ├── scoring/             # ⭐ v3.0.0：7因子评分测试（27个用例）
-│   │   │   └── test_enhanced_scorer.py
-│   │   ├── integration/         # 集成测试
-│   │   │   ├── verify_national_integration.py
-│   │   │   └── test_agent_conversation.py
-│   │   ├── unit/                # 单元测试
-│   │   │   ├── test_weather_service.py
-│   │   │   └── test_agent_structure.py
-│   │   ├── weather/             # 天气相关测试
-│   │   │   └── test_real_weather_api.py
-│   │   └── demos/               # 演示脚本
-│   │       ├── demo_weather_agent.py
-│   │       └── demo_national_weather_coverage.py
-│   └── examples/                 # 📝 示例代码
-│       └── vector_store_example.py # 🚀 向量存储使用示例 ⭐ v3.0.2新增
-├── docs/                         # 📖 项目文档
-│   ├── TESTING.md                # 🧪 测试文档（46+测试用例）
-│   ├── QUICK_TEST.md             # ⚡ 快速测试指南
-│   ├── vector_store_migration_guide.md # 🚀 向量存储迁移指南 ⭐ v3.0.2新增
-│   ├── design/                   # 🏗️ 设计文档目录
-│   │   └── lure_equipment/       # 🎣 路亚装备查询工具设计
-│   │       ├── database/         # 数据库详细设计
-│   │       │   ├── 02-00-字典表设计.md
-│   │       │   ├── 02-01-鱼竿表设计.md
-│   │       │   ├── 02-02-渔轮表设计.md
-│   │       │   ├── 02-03-鱼线表设计.md
-│   │       │   ├── 02-04-鱼饵表设计.md
-│   │       │   ├── 02-05-导环表设计.md
-│   │       │   ├── 02-06-配件表设计.md
-│   │       │   └── 02-代码实现.md
-│   │       └── ...              # 其他设计文档
-│   └── intent_understanding_optimization.md  # ⏰ 意图优化文档
-├── main.py                       # 🚀 交互式CLI入口
-├── pyproject.toml                # 📦 项目配置 (v3.0.1)
-├── CLAUDE.md                     # 📖 Claude开发指南
-├── CHANGELOG.md                  # 📋 更新日志
-└── README.md                     # 📋 项目说明
+├── packages/                      # Agent 包目录
+│   └── agent_fishing/             # 钓鱼 Agent（完全自包含）
+│       ├── __init__.py            # 包入口
+│       ├── core/                  # Agent 核心
+│       │   ├── agent.py           # FishingAgent 实现
+│       │   ├── model_factory.py   # LLM 工厂
+│       │   ├── prompts.py         # 提示词
+│       │   └── callbacks.py       # 回调系统
+│       ├── tools/                 # Agent 工具
+│       │   ├── basic.py           # 基础工具
+│       │   ├── weather.py         # 天气工具
+│       │   ├── fishing.py         # 钓鱼工具
+│       │   ├── lure_tools.py      # 路亚工具
+│       │   ├── lure/              # 路亚子模块
+│       │   │   ├── embeddings.py  # DashScope Embedding
+│       │   │   ├── vector_store.py # ChromaDB 向量存储
+│       │   │   ├── database.py    # 数据库访问
+│       │   │   ├── cli.py         # CLI 管理工具
+│       │   │   └── ...            # 其他路亚模块
+│       │   └── scoring/           # 评分系统
+│       │       └── enhanced_scorer.py # 7因子评分算法
+│       └── utils/                 # Agent 工具类
+│           ├── coordinate.py      # 坐标服务
+│           ├── date.py            # 日期处理
+│           ├── cache.py           # 缓存系统
+│           └── health_check.py    # 健康检查
+├── apps/                          # 应用层
+│   ├── cli/                       # CLI 应用
+│   │   └── main.py
+│   └── api/                       # FastAPI 后端
+│       ├── main.py
+│       ├── routes/
+│       │   └── fishing.py         # API 路由
+│       └── schemas/
+│           └── chat.py            # 数据模型
+├── shared/                        # 共享资源
+│   ├── config/                    # 全局配置
+│   │   └── service_config.py
+│   └── data/                      # 共享数据
+│       ├── coordinate_enrichment.py
+│       └── national_region_database.py
+├── tests/                         # 测试
+│   └── agent_fishing/             # Agent 测试套件
+│       ├── test_enhanced_fishing_scorer.py
+│       ├── test_time_period_intent.py
+│       ├── test_national_coverage.py
+│       └── test_tool_selection.py
+├── main.py                        # CLI 入口
+├── langgraph.json                 # LangGraph 配置
+├── pyproject.toml                 # 项目配置
+├── CLAUDE.md                      # Claude 开发指南
+├── CHANGELOG.md                   # 更新日志
+└── README.md                      # 项目说明
 ```
 
 ### 架构优势
-- **模块化设计**: 清晰的目录结构，便于维护和扩展
-- **零抽象层**: 直接LangChain 1.0+实现，无过度包装
+- **📦 模块化 Agent**: 完全自包含的 Agent 包架构，支持独立发布和部署
+- **🚀 FastAPI 后端**: REST API 支持，便于前端集成和部署
+- **🚀 LangChain 1.0+原生**: 移除LangGraph包装层，直接使用create_agent
+- **⚡ 同步优先设计**: 避免异步复杂性，提升稳定性
+- **🛡️ 零抽象**: 直接API调用，无中间件层
+- **⏰ 时间段智能识别**: Few-Shot示例 + 思维链增强，95%+意图识别准确率
+- **📝 精准时段过滤**: 基于时间范围的算法过滤，支持跨午夜时间段
+- **🧠 LLM优化增强**: 已合并LLM优化分支，提升推理能力和响应质量
+- **📅 统一日期处理**: 集成date_utils模块，支持相对/绝对日期解析和中文星期显示
+- **⚡ 多级缓存**: 内存+文件缓存，90%+命中率
+- **🛡️ 同步稳定**: 完全同步架构，消除事件循环问题
+- **🧠 智能匹配**: 智能地名匹配和坐标解析
 - **功能完整**: 保持所有核心功能（7因子评分、天气分析、时间段识别）
 - **向后兼容**: 保持所有现有API兼容性
 - **数据存储**: 集成数据库和缓存系统，支持高并发访问
@@ -605,43 +583,41 @@ fishing-agent/
 ## 🧪 测试
 
 ```bash
-# 运行测试套件
-uv run pytest src/tests/
+# 运行所有测试
+uv run pytest tests/
 
-# ⭐ v3.0.0新增：运行7因子科学评分系统测试（27个测试用例）
-PYTHONPATH=src uv run pytest src/tests/scoring/test_enhanced_scorer.py -v
-
-# 🧠 LLM优化功能测试（feature/llm-optimization分支已合并）
-uv run python src/tests/test_time_period_intent.py -v
+# 运行7因子科学评分系统测试（27个测试用例）
+uv run pytest tests/agent_fishing/test_enhanced_fishing_scorer.py -v
 
 # 时间段意图识别测试（95%+准确率）
-uv run pytest src/tests/test_time_period_intent.py -v -k "not integration"
+uv run pytest tests/agent_fishing/test_time_period_intent.py -v -k "not integration"
 
 # LLM优化集成测试（需要配置API密钥）
-uv run pytest src/tests/test_time_period_intent.py -v -k "integration"
+uv run pytest tests/agent_fishing/test_time_period_intent.py -v -k "integration"
 
 # 运行其他特定测试
-uv run python src/tests/test_enhanced_fishing_scorer.py
-uv run python src/tests/test_national_coverage.py
+uv run python tests/agent_fishing/test_enhanced_fishing_scorer.py
+uv run python tests/agent_fishing/test_national_coverage.py
+uv run python tests/agent_fishing/test_tool_selection.py
 
 # 运行集成测试
-uv run python src/tests/integration/verify_national_integration.py
+uv run python tests/agent_fishing/integration/verify_national_integration.py
 
 # 测试覆盖率报告
-uv run pytest src/tests/ --cov=src --cov-report=html
+uv run pytest tests/ --cov=packages --cov-report=html
 
-# 🆕 向量存储管理命令（v3.0.2新增）
+# 向量存储管理命令（v3.0.2新增）
 # 查看索引状态
-uv run python -m src.tools.lure.cli status
+uv run python -m packages.agent_fishing.tools.lure.cli status
 
 # 重建向量索引
-uv run python -m src.tools.lure.cli rebuild --force
+uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force
 
 # 测试搜索功能
-uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
+uv run python -m packages.agent_fishing.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
 
 # 查看配置
-uv run python -m src.tools.lure.cli config
+uv run python -m packages.agent_fishing.tools.lure.cli config
 
 # 运行向量存储示例
 uv run python examples/vector_store_example.py
