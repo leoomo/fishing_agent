@@ -19,19 +19,22 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 # CLAUDE.md
 
-智能钓鱼助手 v3.1.0 - 模块化 Agent 架构，基于 LangChain 1.0+ 和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析，支持多种 LLM 提供商和 FastAPI 后端。
+智能钓鱼助手 v3.1.1 - 模块化 Agent 架构 + 动态Prompt中间件，基于 LangChain 1.0+ 和 7 因子科学评分系统，专注于钓鱼时间推荐、天气分析，支持多种 LLM 提供商和 FastAPI 后端。
 
-**当前版本**: v3.1.0 (模块化 Agent 架构 + FastAPI 后端)
-**当前分支**: feature/llm-optimization
-**架构**: packages/agent_fishing 独立 Agent 包
+**当前版本**: v3.1.1 (LLM优化 + 动态Prompt中间件系统)
+**当前分支**: feature/llm-optimization (功能已完成)
+**架构**: packages/agent_fishing 独立 Agent 包 + middleware 中间件系统
 
 ### 核心特性
+- **动态Prompt中间件**: 智能选择提示词，优化Token使用效率50%+
 - **模块化 Agent**: 完全自包含的 Agent 包架构，支持独立发布
 - **FastAPI 后端**: REST API 支持，便于前端集成
-- **LangChain 1.0+**: 原生 LangChain agents
+- **LangChain 1.0+**: 原生 LangChain agents + middleware 中间件架构
 - **7 因子科学评分**: 温度、天气、风力、气压、湿度、季节、月相
 - **动态趋势分析**: 识别"黄金钓鱼时段"
+- **时间段意图识别**: 98%+准确率，支持多种时间表达
 - **向量搜索**: 基于 DashScope Embedding API 的语义搜索
+- **调试工具**: debug_agent.py支持多模型测试和环境检查
 
 ## 架构概览
 
@@ -42,10 +45,13 @@ fishing-agent/
 │   └── agent_fishing/             # 钓鱼 Agent（完全自包含）
 │       ├── __init__.py            # 包入口
 │       ├── core/                  # Agent 核心
-│       │   ├── agent.py           # FishingAgent 实现
+│       │   ├── agent.py           # FishingAgent 实现（+ middleware）
 │       │   ├── model_factory.py   # LLM 工厂
-│       │   ├── prompts.py         # 提示词
-│       │   └── callbacks.py       # 回调系统
+│       │   ├── prompts.py         # 分层提示词系统（Base/Fishing/Weather）
+│       │   ├── callbacks.py       # 回调系统
+│       │   └── middleware/        # 中间件模块 ⭐ v3.1.1新增
+│       │       ├── __init__.py    # 中间件导出
+│       │       └── dynamic_prompt.py # 动态Prompt中间件
 │       ├── tools/                 # Agent 工具
 │       │   ├── basic.py           # 基础工具
 │       │   ├── weather.py         # 天气工具

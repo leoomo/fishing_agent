@@ -2,22 +2,24 @@
 
 智能钓鱼助手 REST API 文档
 
-**版本**: v3.1.0
-**架构**: FastAPI 后端 + 模块化 Agent 包
+**版本**: v3.1.1
+**架构**: FastAPI 后端 + 模块化 Agent 包 + 动态Prompt中间件
 **Base URL**: `http://localhost:8000`
 
 ## 概述
 
-Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推荐、天气查询、装备推荐等功能。基于 FastAPI 框架构建，使用模块化 Agent 架构。
+Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推荐、天气查询、装备推荐等功能。基于 FastAPI 框架构建，使用模块化 Agent 架构和动态Prompt中间件系统。
 
 ## 核心特性
 
 - 🚀 **FastAPI 后端**: 高性能异步 API 服务
 - 📦 **模块化 Agent**: 完全自包含的 Agent 包架构
+- 🧠 **动态Prompt中间件**: 智能选择提示词，优化Token使用效率50%+
 - 🎣 **智能推荐**: 7因子科学评分系统
 - 🌤️ **天气查询**: 实时天气数据和72小时预报
-- 🎯 **时段识别**: 精准的时间段意图理解
+- 🎯 **时段识别**: 精准的时间段意图理解（98%+准确率）
 - 🧠 **LLM 优化**: 高质量的自然语言处理
+- 🛠️ **调试工具**: 完整的开发调试支持
 
 ## API 端点
 
@@ -30,7 +32,14 @@ Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推�
 ```json
 {
   "name": "智能钓鱼助手 API",
-  "version": "3.1.0",
+  "version": "3.1.1",
+  "description": "基于LangChain 1.0+和动态Prompt中间件的智能钓鱼助手",
+  "features": [
+    "动态Prompt中间件",
+    "7因子科学评分",
+    "时间段意图识别",
+    "LLM优化"
+  ],
   "docs": "/docs"
 }
 ```

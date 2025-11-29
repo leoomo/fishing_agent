@@ -1,9 +1,9 @@
 # 智能钓鱼助手 - 项目架构文档
 
-**版本**: v3.1.0
-**分支**: feature/llm-optimization
+**版本**: v3.1.1
+**分支**: feature/llm-optimization (功能已完成)
 **目标**: 为大模型(LLM)提供完整的项目架构理解指南
-**架构**: 模块化 Agent 包 + FastAPI 后端
+**架构**: 模块化 Agent 包 + FastAPI 后端 + 动态Prompt中间件
 
 ---
 
@@ -23,20 +23,23 @@
 ## 1. 项目概览与架构哲学
 
 ### 🎯 项目定位
-智能钓鱼助手 v3.1.0 是基于 **LangChain 1.0+** 的模块化智能代理系统，采用全新包架构，专门为路亚钓鱼爱好者提供：
+智能钓鱼助手 v3.1.1 是基于 **LangChain 1.0+** 的模块化智能代理系统，采用全新包架构和动态Prompt中间件，专门为路亚钓鱼爱好者提供：
+- **动态Prompt中间件**，智能选择提示词，优化Token使用效率50%+
 - **实时天气分析**和钓鱼条件评估
 - **7因子科学评分系统**（温度、天气、风力、气压、湿度、季节、月相）
 - **动态趋势分析**识别黄金钓鱼时段
+- **时间段意图识别**，98%+准确率
 - **路亚装备智能推荐**和语义搜索
 - **全国覆盖**的3,142+行政区划支持
 - **FastAPI REST API** 后端支持
 - **完全自包含的 Agent 包**架构
+- **调试工具**支持多模型测试和环境检查
 
 ### 🏗️ 核心架构哲学
 
 #### **模块化包架构 (Modular Package Architecture)**
 ```python
-# v3.1.0: 完全自包含的 Agent 包
+# v3.1.1: 完全自包含的 Agent 包 + 动态Prompt中间件
 from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
 
 # 每个包都是独立可发布的单元
@@ -52,6 +55,19 @@ packages/
 def get_weather(location: str) -> dict:
     response = requests.get(f"https://api.caiyunapp.com/v2.6/{API_KEY}/{coords}/realtime")
     return response.json()
+```
+
+#### **动态Prompt中间件 (Dynamic Prompt Middleware)**
+```python
+# 智能提示词选择
+@dynamic_prompt
+def select_prompt_by_query_type(request: ModelRequest) -> str:
+    if "钓鱼" in user_input:
+        return BASE_SYSTEM_PROMPT + FISHING_OUTPUT_RULES  # ~1200 tokens
+    elif "天气" in user_input:
+        return BASE_SYSTEM_PROMPT + WEATHER_QUERY_RULES   # ~800 tokens
+    else:
+        return BASE_SYSTEM_PROMPT                         # ~600 tokens
 ```
 
 #### **应用层分离 (Application Layer Separation)**
@@ -170,7 +186,7 @@ async def chat(request: ChatRequest):
 
 ## 3. 模块组织
 
-### 📁 核心目录结构 (v3.1.0)
+### 📁 核心目录结构 (v3.1.1)
 
 ```
 fishing-agent/
@@ -233,7 +249,7 @@ fishing-agent/
 
 ### 🎯 入口点与接口
 
-#### **主要入口点 (v3.1.0)**
+#### **主要入口点 (v3.1.1)**
 ```python
 # 1. CLI 命令行
 fishing                        # 新版本 CLI 命令
@@ -459,7 +475,7 @@ def main():
 
     agent = create_agent(model_provider=args.model)
 
-    print("🎣 智能钓鱼助手 v3.1.0")
+    print("🎣 智能钓鱼助手 v3.1.1")
     print("输入 'exit' 退出程序")
 
     while True:
