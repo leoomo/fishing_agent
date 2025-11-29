@@ -1,8 +1,9 @@
 # 智能钓鱼助手 - 项目架构文档
 
-**版本**: v3.0.2.1
+**版本**: v3.1.0
 **分支**: feature/llm-optimization
 **目标**: 为大模型(LLM)提供完整的项目架构理解指南
+**架构**: 模块化 Agent 包 + FastAPI 后端
 
 ---
 
@@ -22,14 +23,28 @@
 ## 1. 项目概览与架构哲学
 
 ### 🎯 项目定位
-智能钓鱼助手是一个基于 **LangChain 1.0+** 的智能代理系统，专门为路亚钓鱼爱好者提供：
+智能钓鱼助手 v3.1.0 是基于 **LangChain 1.0+** 的模块化智能代理系统，采用全新包架构，专门为路亚钓鱼爱好者提供：
 - **实时天气分析**和钓鱼条件评估
 - **7因子科学评分系统**（温度、天气、风力、气压、湿度、季节、月相）
 - **动态趋势分析**识别黄金钓鱼时段
 - **路亚装备智能推荐**和语义搜索
 - **全国覆盖**的3,142+行政区划支持
+- **FastAPI REST API** 后端支持
+- **完全自包含的 Agent 包**架构
 
 ### 🏗️ 核心架构哲学
+
+#### **模块化包架构 (Modular Package Architecture)**
+```python
+# v3.1.0: 完全自包含的 Agent 包
+from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
+
+# 每个包都是独立可发布的单元
+packages/
+├── agent_fishing/          # 钓鱼 Agent 包
+├── agent_weather/          # 天气 Agent 包（未来）
+└── agent_location/         # 地理 Agent 包（未来）
+```
 
 #### **零抽象原则 (Zero Abstraction)**
 ```python
@@ -39,15 +54,18 @@ def get_weather(location: str) -> dict:
     return response.json()
 ```
 
-#### **同步优先 (Synchronous Priority)**
-- 消除异步复杂性和事件循环问题
-- 使用 `requests` 直接进行HTTP调用
-- 简化错误处理和调试
+#### **应用层分离 (Application Layer Separation)**
+```python
+# CLI 应用
+apps/cli/main.py
 
-#### **工具中心化 (Tool-Centric Design)**
-- 清晰分离核心代理逻辑和专用工具
-- 每个工具具有单一职责和明确边界
-- 统一的工具接口和装饰器模式
+# FastAPI 后端
+apps/api/main.py
+
+# 共享资源
+shared/config/
+shared/data/
+```
 
 #### **诚实数据处理 (Honest Data)**
 - 绝不生成虚假或模拟数据
@@ -64,19 +82,27 @@ def get_weather(location: str) -> dict:
 ┌─────────────────────────────────────────────────────────────┐
 │                     用户界面层                               │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │  main.py   │  │  agent.py   │  │   CLI Demo  │          │
-│  │  (交互界面) │  │  (兼容层)   │  │  (演示工具)  │          │
+│  │ fishing CLI │  │fishing-api  │  │  LangGraph  │          │
+│  │ (CLI 应用)   │  │ (FastAPI)   │  │ (Studio)    │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────────┐
-│                    核心代理层                               │
+│                    应用层                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │apps/cli/    │  │apps/api/    │  │ shared/     │          │
+│  │(CLI 逻辑)   │  │(REST API)   │  │(共享配置)    │          │
+│  └─────────────┘  └─────────────┘  └─────────────┘          │
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│                   模块化 Agent 包层                         │
 │  ┌─────────────────────────────────────────────────────────┐ │
-│  │           FishingAgent (src/fishing_agent/)           │ │
-│  │  • ModelFactory (多LLM支持)                           │ │
-│  │  • Core Agent (LangChain 1.0+)                       │ │
-│  │  • Callback System (统计/验证)                        │ │
-│  │  • Prompt Engineering (系统上下文)                   │ │
+│  │        packages/agent_fishing/ (自包含包)               │ │
+│  │  • core/ (Agent核心)                                   │ │
+│  │  • tools/ (工具集成)                                   │ │
+│  │  • utils/ (工具类)                                     │ │
+│  │  • 完全独立，可单独发布                                │ │
 │  └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -118,126 +144,152 @@ def get_weather(location: str) -> dict:
 
 #### **请求处理流程**
 ```
-用户输入 → 意图识别 → 工具选择 → 参数解析 → API调用
+用户输入 → 应用层路由 → Agent包处理 → 工具选择 → 参数解析 → API调用
     ↓
 数据处理 → 评分计算 → 结果格式化 → 输出验证 → 响应返回
 ```
 
-#### **工具选择逻辑**
+#### **应用层路由逻辑**
 ```python
-def select_tool(query: str) -> callable:
-    query_lower = query.lower()
+# CLI 应用 (apps/cli/main.py)
+def main():
+    agent = create_agent(model_provider="zhipu")
+    user_input = input("请输入钓鱼相关问题: ")
+    result = agent.run(user_input)
+    print(result)
 
-    if "钓鱼" in query_lower:
-        return query_fishing_recommendation  # 包含天气分析
-    elif any(kw in query_lower for kw in ["天气", "温度", "下雨"]):
-        return get_weather                    # 纯天气查询
-    else:
-        return get_current_time              # 基础工具
+# FastAPI 应用 (apps/api/main.py)
+@app.post("/api/v1/fishing/chat")
+async def chat(request: ChatRequest):
+    agent = create_agent(model_provider="zhipu")
+    result = agent.run(request.query)
+    return {"response": result}
 ```
 
 ---
 
 ## 3. 模块组织
 
-### 📁 核心目录结构
+### 📁 核心目录结构 (v3.1.0)
 
 ```
 fishing-agent/
-├── src/                           # 源代码根目录
-│   ├── agent.py                   # 主代理入口（向后兼容）
-│   ├── fishing_agent/             # 核心代理实现
-│   │   ├── __init__.py           # 公共API导出
-│   │   ├── core.py               # 主要代理类
-│   │   ├── model_factory.py      # 多LLM工厂
-│   │   ├── prompts.py            # 系统提示词
-│   │   └── callbacks.py          # 统计与验证
-│   ├── tools/                     # 工具模块
-│   │   ├── __init__.py           # 统一工具接口
-│   │   ├── basic_tools.py        # 基础工具（时间功能）
-│   │   ├── weather_tools.py      # 天气查询工具
-│   │   ├── fishing_tools.py      # 钓鱼推荐工具
-│   │   ├── lure_tools.py         # 路亚装备工具
-│   │   └── lure/                 # 路亚装备完整模块
-│   │       ├── embeddings.py     # DashScope嵌入服务
-│   │       ├── vector_store.py   # ChromaDB向量存储
-│   │       ├── knowledge_search.py # 语义搜索服务
-│   │       ├── cli.py           # 向量存储管理CLI
-│   │       └── [12个支持文件]    # 数据库/推荐/对比等
-│   ├── utils/                     # 工具类和辅助模块
-│   │   ├── api_client.py         # HTTP客户端封装
-│   │   ├── coordinate_utils.py   # 地理坐标工具
-│   │   ├── cache.py              # 简单缓存实现
-│   │   ├── date_utils.py         # 日期处理工具
-│   │   └── health_check.py       # 系统健康检查
-│   ├── tools/scoring/             # 7因子科学评分系统
-│   │   └── enhanced_scorer.py    # 增强评分算法
-│   ├── data/                      # 数据存储
-│   └── tests/                     # 测试套件
-├── docs/                          # 项目文档
-├── main.py                        # CLI交互入口
+├── packages/                      # Agent 包目录（新增）
+│   └── agent_fishing/             # 钓鱼 Agent（完全自包含）
+│       ├── __init__.py           # 包入口和 LangGraph 兼容
+│       ├── core/                  # Agent 核心
+│       │   ├── __init__.py
+│       │   ├── agent.py           # FishingAgent 实现
+│       │   ├── model_factory.py   # LLM 工厂
+│       │   ├── prompts.py         # 提示词
+│       │   └── callbacks.py       # 回调系统
+│       ├── tools/                 # Agent 工具
+│       │   ├── __init__.py
+│       │   ├── basic.py           # 基础工具
+│       │   ├── weather.py         # 天气工具
+│       │   ├── fishing.py         # 钓鱼工具
+│       │   ├── lure_tools.py      # 路亚工具
+│       │   ├── lure/              # 路亚子模块
+│       │   └── scoring/           # 评分系统
+│       │       └── enhanced_scorer.py
+│       └── utils/                 # Agent 工具类
+│           ├── __init__.py
+│           ├── api_client.py
+│           ├── coordinate_utils.py
+│           └── date_utils.py
+├── apps/                          # 应用层（新增）
+│   ├── cli/                       # CLI 应用
+│   │   └── main.py
+│   └── api/                       # FastAPI 后端
+│       ├── main.py
+│       ├── routes/
+│       └── schemas/
+├── shared/                        # 共享资源（新增）
+│   ├── config/                    # 全局配置
+│   └── data/                      # 共享数据
+├── tests/                         # 测试
+│   └── agent_fishing/
+├── main.py                        # CLI 入口（兼容层）
+├── langgraph.json                 # LangGraph 配置
 └── pyproject.toml                 # 项目配置
 ```
 
 ### 🔧 模块职责边界
 
-#### **`src/fishing_agent/` - 代理核心**
-- **`core.py`**: 主代理类，LangChain集成和工具管理
-- **`model_factory.py`**: LLM提供商抽象工厂，支持多种模型
-- **`prompts.py`**: 系统提示词和上下文管理
-- **`callbacks.py`**: 使用统计、性能监控、输出验证
+#### **`packages/agent_fishing/` - 自包含 Agent 包**
+- **`core/`**: Agent 核心实现，LLM 集成和工具管理
+- **`tools/`**: 专用工具集，每个工具具有单一职责
+- **`utils/`**: 包内部工具类和辅助模块
+- **完全独立**: 可单独发布和测试，不依赖其他模块
 
-#### **`src/tools/` - 工具模块**
-- **`basic_tools.py`**: 通用工具（时间查询、计算等）
-- **`weather_tools.py`**: 天气API集成（彩云天气）
-- **`fishing_tools.py`**: 钓鱼推荐和7因子评分系统
-- **`lure/`**: 路亚装备数据库和语义搜索系统
+#### **`apps/` - 应用层**
+- **`cli/`**: 命令行应用，用户交互界面
+- **`api/`**: FastAPI REST API 后端服务
+- **业务逻辑编排**: 调用 Agent 包处理用户请求
 
-#### **`src/utils/` - 基础设施**
-- **`api_client.py`**: HTTP客户端封装，包含缓存和重试
-- **`coordinate_utils.py`**: 地理编码和坐标服务
-- **`cache.py`**: 基于TTL的简单内存缓存
-- **`date_utils.py`**: 日期解析和格式化工具
+#### **`shared/` - 共享资源**
+- **`config/`**: 全局配置文件和环境变量
+- **`data/`**: 共享数据文件和模板
 
 ### 🎯 入口点与接口
 
-#### **主要入口点**
+#### **主要入口点 (v3.1.0)**
 ```python
-# 1. CLI交互界面
-main.py → 交互式命令行界面
+# 1. CLI 命令行
+fishing                        # 新版本 CLI 命令
+python main.py                 # 兼容旧版本
 
-# 2. 编程接口
-from src.fishing_agent import FishingAgent
-agent = FishingAgent(model_provider="zhipu")
+# 2. FastAPI 服务
+fishing-api                    # 启动 REST API 服务
+uvicorn apps.api.main:app --reload
 
-# 3. 向后兼容接口
-from src.agent import create_optimized_fishing_agent
+# 3. 编程接口 - 使用新包结构
+from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
+agent = create_agent(model_provider="zhipu")
+
+# 4. LangGraph 兼容
+from packages.agent_fishing import get_agent
+agent = get_agent()  # LangGraph Studio 兼容
 ```
 
 #### **工具访问模式**
 ```python
 # 统一工具访问
-from src.tools import get_all_tools, get_weather_tools
+from packages.agent_fishing import get_all_tools
 
 # 直接工具使用
-from src.tools.weather_tools import get_current_weather
-from src.tools.fishing_tools import query_fishing_recommendation
+from packages.agent_fishing.tools.weather import get_weather
+from packages.agent_fishing.tools.fishing import query_fishing_recommendation
 ```
 
 ---
 
 ## 4. 核心组件分析
 
-### 🤖 FishingAgent核心实现
+### 🤖 模块化 FishingAgent
 
-#### **代理类架构**
+#### **包架构实现**
+```python
+# packages/agent_fishing/__init__.py
+from .core import FishingAgent, create_agent, ModelFactory
+from .tools import get_all_tools
+
+# LangGraph 兼容性
+def get_agent():
+    """LangGraph Studio 兼容的 agent 获取函数"""
+    return create_agent(model_provider="zhipu").agent
+
+__all__ = ["FishingAgent", "create_agent", "get_all_tools", "get_agent"]
+```
+
+#### **Agent 类架构**
 ```python
 class FishingAgent:
     def __init__(self, model_provider="zhipu", timeout=60):
         self.model = ModelFactory.create(model_provider)
         self.tools = get_all_tools()
         self.agent = create_agent(self.model, self.tools, system_prompt)
-        self.callback = FishingAgentCallback()  # 统计追踪
+        self.callback = FishingAgentCallback()
 
     def run(self, user_input: str) -> str:
         # LangChain代理执行与回调
@@ -249,39 +301,71 @@ class FishingAgent:
 ```
 
 **关键特性**:
-- **零中间件**: 直接创建LangChain代理
+- **完全自包含**: 包级别独立，可单独发布
+- **LangGraph 兼容**: 支持 LangGraph Studio 集成
 - **多LLM支持**: 工厂模式管理模型提供商
 - **智能工具选择**: 基于查询意图自动路由
 - **输出验证**: 保持钓鱼报告的工具格式化
-- **优雅降级**: 诚实报告失败并提供回退方案
+
+### 🌐 FastAPI 后端架构
+
+#### **REST API 实现**
+```python
+# apps/api/main.py
+from fastapi import FastAPI
+from packages.agent_fishing import create_agent
+
+app = FastAPI(title="智能钓鱼助手 API", version="3.1.0")
+
+@app.post("/api/v1/fishing/chat")
+async def fishing_chat(request: ChatRequest):
+    """智能钓鱼助手对话接口"""
+    agent = create_agent(model_provider="zhipu")
+    result = agent.run(request.query)
+    return {"response": result}
+
+@app.get("/api/v1/fishing/tools")
+async def list_tools():
+    """获取可用工具列表"""
+    from packages.agent_fishing import get_all_tools
+    tools = get_all_tools()
+    return {"tools": [{"name": tool.name, "description": tool.description} for tool in tools]}
+```
+
+#### **API 端点**
+```python
+GET  /                     # API 信息
+GET  /health               # 健康检查
+POST /api/v1/fishing/chat  # 钓鱼助手对话
+GET  /api/v1/fishing/tools # 工具列表
+```
 
 ### 🛠️ 工具系统架构
+
+#### **模块化工具组织**
+```python
+# packages/agent_fishing/tools/
+tools/
+├── __init__.py           # 统一工具导出
+├── basic.py             # 基础工具（时间功能）
+├── weather.py           # 天气查询工具
+├── fishing.py           # 钓鱼推荐工具
+├── lure_tools.py        # 路亚装备工具
+├── lure/                # 路亚装备子模块
+│   ├── embeddings.py    # DashScope嵌入服务
+│   ├── vector_store.py  # ChromaDB向量存储
+│   └── knowledge_search.py # 语义搜索服务
+└── scoring/             # 评分系统
+    └── enhanced_scorer.py
+```
 
 #### **工具分类体系**
 ```python
 # 具有清晰边界的工具类别
-BASIC_TOOLS = [get_current_time]           # 通用工具
-WEATHER_TOOLS = [get_weather]              # 纯天气查询
-FISHING_TOOLS = [query_fishing_recommendation] # 钓鱼+天气分析
-LURE_TOOLS = [query_lure_recommendation]  # 装备数据库
-```
-
-#### **工具装饰器模式**
-```python
-@tool
-def query_fishing_recommendation(
-    location: str,
-    date: str = None,
-    time_period: str = None
-) -> str:
-    """
-    查询钓鱼时间推荐，基于天气条件分析最佳钓鱼时间
-
-    Args:
-        location: 地区名称
-        date: 日期字符串
-        time_period: 时间段限制（白天/晚上/上午/下午）
-    """
+BASIC_TOOLS = [get_current_time]                    # 通用工具
+WEATHER_TOOLS = [get_weather_by_date]              # 纯天气查询
+FISHING_TOOLS = [query_fishing_recommendation]     # 钓鱼+天气分析
+LURE_TOOLS = [query_lure_recommendation]           # 装备数据库
 ```
 
 ### 📊 评分算法系统
@@ -307,90 +391,38 @@ def calculate_fishing_score(weather_data, location_data) -> dict:
 - **月相集成**: 月相周期对鱼类活动的影响
 - **权重评分**: 不同条件的最优平衡
 
-### 🔍 向量存储与知识库
-
-#### **路亚装备系统**
-```python
-# ChromaDB + DashScope集成
-class VectorStore:
-    def __init__(self):
-        self.embedding_model = DashScopeEmbedding("text-embedding-v3")
-        self.chroma_client = ChromaClient()
-
-    def search_equipment(self, query: str) -> List[Equipment]:
-        vector = self.embedding_model.embed_query(query)
-        results = self.chroma_client.similarity_search(vector)
-        return rank_by_relevance(results, query)
-```
-
-**核心组件**:
-- **语义搜索**: 基于钓鱼场景的装备匹配
-- **知识库**: 鱼类行为、路亚类型、钓鱼技巧
-- **CLI管理**: 索引重建、状态监控、搜索测试
-- **懒加载**: 首次搜索时自动建立索引
-
-### 🌐 LLM集成模式
-
-#### **多提供商支持**
-```python
-# 统一的LLM提供商接口
-class ModelFactory:
-    PROVIDERS = {
-        "zhipu": ChatOpenAI,      # GLM模型
-        "qwen": ChatTongyi,       # 通义千问
-        "doubao": ChatOpenAI,     # 豆包模型
-        "openai": ChatOpenAI      # GPT模型
-    }
-
-    @classmethod
-    def create(cls, provider: str, timeout: int = 60) -> BaseChatModel:
-        if provider == "zhipu":
-            return ChatOpenAI(
-                base_url="https://open.bigmodel.cn/api/paas/v4/",
-                api_key=os.getenv("ANTHROPIC_AUTH_TOKEN"),
-                model="glm-4-flash",
-                timeout=timeout
-            )
-        # ... 其他提供商配置
-```
-
-#### **提示词工程**
-```python
-FISHING_SYSTEM_PROMPT = """
-你是一个专业的智能钓鱼助手，具备以下核心能力：
-
-🎯 专业领域:
-- 路亚钓鱼天气分析和条件评估
-- 7因子科学评分系统（温度/天气/风力/气压/湿度/季节/月相）
-- 动态趋势分析识别黄金钓鱼时段
-- 基于地理位置的个性化钓鱼建议
-- 路亚装备智能匹配和推荐
-
-🛠️ 核心工具:
-1. get_current_time - 获取时间信息
-2. get_weather_forecast - 获取多日天气预报
-3. get_weather_by_date - 查询指定日期天气
-4. query_fishing_recommendation - 智能钓鱼推荐分析（核心）
-5. query_lure_recommendation - 路亚装备推荐
-
-📊 决策原则:
-- 钓鱼查询 → 使用 query_fishing_recommendation（已包含天气分析）
-- 纯天气查询 → 使用天气工具
-- 时间查询 → 使用基础工具
-- 避免冗余工具调用
-
-请根据用户查询，选择最合适的工具提供准确的钓鱼建议。
-"""
-```
-
 ---
 
 ## 5. 开发模式
 
-### 🏭 工厂模式 (Factory Pattern)
+### 🏭 模块化包模式 (Modular Package Pattern)
 
-#### **多LLM提供商管理**
+#### **自包含 Agent 包**
 ```python
+# packages/agent_fishing/__init__.py
+"""
+Fishing Agent - 智能钓鱼助手（完全自包含）
+
+公共 API:
+- FishingAgent: 钓鱼助手 Agent
+- create_agent: 工厂函数
+- get_all_tools: 获取所有工具
+"""
+
+from .core import FishingAgent, create_agent, ModelFactory
+from .tools import get_all_tools
+
+# LangGraph 兼容
+def get_agent():
+    agent = create_agent(model_provider="zhipu")
+    return agent.agent
+
+__all__ = ["FishingAgent", "create_agent", "ModelFactory", "get_all_tools", "get_agent"]
+```
+
+#### **包级别工厂模式**
+```python
+# packages/agent_fishing/core/model_factory.py
 class ModelFactory:
     PROVIDERS = {
         "zhipu": {
@@ -412,58 +444,84 @@ class ModelFactory:
         return provider_config["class"](**provider_config["config"])
 ```
 
-### 🛠️ 工具模式 (Tool Pattern)
+### 🛠️ 应用层分离模式
 
-#### **LangChain工具集成**
+#### **CLI 应用实现**
 ```python
-# 直接工具装饰，边界清晰
-@tool
-def get_weather_by_date(location: str, date: str = None) -> str:
-    """获取指定日期的天气预报"""
-    # 工具实现
+# apps/cli/main.py
+from packages.agent_fishing import create_agent
 
-@tool
-def query_fishing_recommendation(location: str, date: str = None) -> str:
-    """钓鱼推荐查询，包含7因子评分"""
-    # 工具实现
+def main():
+    """CLI 应用主入口"""
+    parser = argparse.ArgumentParser(description="智能钓鱼助手 CLI")
+    parser.add_argument("--model", default="zhipu", help="LLM 提供商")
+    args = parser.parse_args()
+
+    agent = create_agent(model_provider=args.model)
+
+    print("🎣 智能钓鱼助手 v3.1.0")
+    print("输入 'exit' 退出程序")
+
+    while True:
+        try:
+            user_input = input("\n请输入钓鱼相关问题: ").strip()
+            if user_input.lower() in ['exit', 'quit']:
+                break
+
+            result = agent.run(user_input)
+            print(f"\n助手回复: {result}")
+        except KeyboardInterrupt:
+            print("\n再见！")
+            break
+        except Exception as e:
+            print(f"错误: {e}")
+
+if __name__ == "__main__":
+    main()
 ```
 
-### 🎯 策略模式 (Strategy Pattern)
-
-#### **模块化评分组件**
+#### **FastAPI 应用实现**
 ```python
-class ScoringStrategy:
-    def calculate_score(self, data: dict) -> float:
-        raise NotImplementedError
+# apps/api/main.py
+from fastapi import FastAPI
+from packages.agent_fishing import create_agent, get_all_tools
 
-class TemperatureScoring(ScoringStrategy):
-    def calculate_score(self, temperature: float) -> float:
-        # 温度评分逻辑
-        if 10 <= temperature <= 25:
-            return 90 + (temperature - 10) * 2
-        # 其他温度区间处理
+app = FastAPI(title="智能钓鱼助手 API", version="3.1.0")
 
-class PressureScoring(ScoringStrategy):
-    def calculate_score(self, pressure_data: list) -> float:
-        # 气压趋势分析逻辑
-        trend = analyze_pressure_trend(pressure_data)
-        return base_score * trend['multiplier']
-```
-
-### 🔄 API弹性模式
-
-#### **优雅降级策略**
-```python
-def get_weather_with_fallback(location: str) -> dict:
+@app.post("/api/v1/fishing/chat")
+async def fishing_chat(request: ChatRequest):
+    """智能钓鱼助手对话接口"""
     try:
-        return weather_api.get_realtime_weather(location)
-    except APIError as e:
-        # 诚实报告失败，不提供虚假数据
-        return {
-            'status': 'api_error',
-            'message': f'天气服务暂时不可用: {str(e)}',
-            'fallback_advice': '建议关注当地天气预报，选择天气条件较好的时候出行。'
-        }
+        agent = create_agent(model_provider="zhipu")
+        result = agent.run(request.query)
+        return {"response": result, "status": "success"}
+    except Exception as e:
+        return {"error": str(e), "status": "error"}
+
+@app.get("/health")
+async def health_check():
+    """健康检查接口"""
+    return {"status": "healthy", "version": "3.1.0"}
+```
+
+### 🎯 工具模式 (Tool Pattern)
+
+#### **模块化工具集成**
+```python
+# packages/agent_fishing/tools/__init__.py
+from .basic import get_current_time
+from .weather import get_weather_by_date
+from .fishing import query_fishing_recommendation
+from .lure_tools import query_lure_recommendation
+
+def get_all_tools():
+    """获取所有可用工具"""
+    return [
+        get_current_time,
+        get_weather_by_date,
+        query_fishing_recommendation,
+        query_lure_recommendation,
+    ]
 ```
 
 ---
@@ -472,42 +530,37 @@ def get_weather_with_fallback(location: str) -> dict:
 
 ### 📊 请求处理管道
 
-#### **完整数据流**
+#### **v3.1.0 完整数据流**
 ```python
-def process_fishing_query(user_input: str) -> str:
-    # 步骤1: 意图识别
+# 应用层路由
+def process_user_request(user_input: str, app_type: str = "cli") -> str:
+    # 步骤1: 应用层路由
+    if app_type == "cli":
+        return _process_cli_request(user_input)
+    elif app_type == "api":
+        return _process_api_request(user_input)
+
+    # 步骤2: Agent 包处理
+    agent = create_agent(model_provider="zhipu")
+
+    # 步骤3: Agent 内部处理
+    return agent.run(user_input)
+
+# Agent 内部处理流程
+def agent_processing(user_input: str) -> str:
+    # 意图识别 → 工具选择 → 参数解析 → API调用 → 结果格式化
     intent = analyze_intent(user_input)
-
-    # 步骤2: 参数提取
-    location = extract_location(user_input)
-    date = extract_date(user_input) or "明天"
-
-    # 步骤3: 工具选择
-    if intent == "fishing":
-        tool = query_fishing_recommendation
-    elif intent == "weather":
-        tool = get_weather_by_date
-    else:
-        tool = get_current_time
-
-    # 步骤4: 数据获取
-    coords = coordinate_utils.get_coordinates(location)
-    weather_data = weather_api.get_weather(coords, date)
-
-    # 步骤5: 评分计算
-    if intent == "fishing":
-        scores = calculate_fishing_scores(weather_data, date)
-        recommendation = generate_fishing_recommendation(scores, weather_data)
-
-    # 步骤6: 响应格式化
-    return format_response(recommendation if intent == "fishing" else weather_data)
+    tool = select_tool(intent)
+    result = tool.invoke(**extract_params(user_input))
+    return format_response(result)
 ```
 
 ### 💾 缓存策略
 
-#### **TTL缓存实现**
+#### **包级别缓存实现**
 ```python
-class SimpleCache:
+# packages/agent_fishing/utils/cache.py
+class PackageCache:
     def __init__(self):
         self.cache = {}
         self.timestamps = {}
@@ -520,27 +573,13 @@ class SimpleCache:
                 del self.cache[key]
                 del self.timestamps[key]
         return None
-
-    def set(self, key: str, value: Any) -> None:
-        self.cache[key] = value
-        self.timestamps[key] = time.time()
-```
-
-#### **缓存配置**
-```python
-CACHE_CONFIG = {
-    'realtime_weather': 600,      # 10分钟
-    'hourly_forecast': 1800,      # 30分钟
-    'coordinates': 86400,         # 24小时
-    'lure_embeddings': 604800,   # 7天
-}
 ```
 
 ### 🔗 外部API集成
 
-#### **主要API依赖**
+#### **必需 API 依赖**
 ```python
-# 必需API (Mandatory)
+# v3.1.0 API 配置
 REQUIRED_APIS = {
     'DASHSCOPE_API_KEY': {
         'purpose': 'LLM + 嵌入服务',
@@ -558,40 +597,6 @@ REQUIRED_APIS = {
         'features': ['地理编码', '坐标查询']
     }
 }
-
-# 可选API (Optional)
-OPTIONAL_APIS = {
-    'ANTHROPIC_AUTH_TOKEN': {
-        'purpose': '替代LLM',
-        'provider': '智谱AI GLM',
-        'features': ['GLM-4模型']
-    },
-    'OPENAI_API_KEY': {
-        'purpose': '替代LLM',
-        'provider': 'OpenAI',
-        'features': ['GPT模型']
-    }
-}
-```
-
-### ⚠️ 错误处理与回退
-
-#### **分层错误处理**
-```python
-def api_call_with_retry(url: str, max_retries: int = 3) -> dict:
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(url, timeout=30)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.Timeout:
-            if attempt == max_retries - 1:
-                return {'error': 'timeout', 'message': 'API请求超时'}
-            time.sleep(2 ** attempt)  # 指数退避
-        except requests.exceptions.HTTPError as e:
-            return {'error': 'http_error', 'message': f'HTTP错误: {e}'}
-        except Exception as e:
-            return {'error': 'unknown', 'message': f'未知错误: {e}'}
 ```
 
 ---
@@ -600,7 +605,7 @@ def api_call_with_retry(url: str, max_retries: int = 3) -> dict:
 
 ### 🔧 环境变量配置
 
-#### **必需配置**
+#### **v3.1.0 配置**
 ```bash
 # .env 文件配置示例
 
@@ -614,12 +619,8 @@ ANTHROPIC_AUTH_TOKEN=your-zhipu-token         # 智谱AI GLM
 OPENAI_API_KEY=your-openai-key                # OpenAI GPT
 
 # 向量存储配置
-VECTOR_EMBEDDING_MODEL=text-embedding-v3      # 嵌入模型 (v2/v3)
+VECTOR_EMBEDDING_MODEL=text-embedding-v3      # 嵌入模型
 VECTOR_AUTO_INDEX=true                        # 懒加载索引
-
-# 缓存配置
-CACHE_ENABLED=true                            # 启用缓存
-CACHE_TTL=600                                # 默认缓存时间(秒)
 ```
 
 ### 🧪 开发工作流
@@ -631,109 +632,73 @@ uv sync                    # 安装所有依赖
 
 # 2. 环境变量配置
 cp .env.example .env       # 复制环境变量模板
-# 编辑 .env 文件，填入实际API密钥
 
 # 3. 验证安装
-uv run python -c "from src.tools import get_all_tools; print(f'工具数量: {len(get_all_tools())}')"
+uv run python -c "from packages.agent_fishing import get_all_tools; print(f'工具数量: {len(get_all_tools())}')"
 
-# 4. 运行应用
-uv run python main.py      # 启动交互式CLI
+# 4. 运行 CLI 应用
+uv run fishing             # 新版本 CLI 命令
+uv run python main.py      # 兼容旧版本
+
+# 5. 运行 API 服务
+uv run fishing-api          # 启动 REST API
+uv run uvicorn apps.api.main:app --reload  # 开发模式
 ```
 
 #### **测试执行**
 ```bash
 # 运行所有测试
-uv run pytest src/tests/
+uv run pytest tests/
 
-# 运行特定测试套件
-uv run pytest src/tests/scoring/test_enhanced_scorer.py -v  # 7因子评分测试
-uv run python src/tests/test_time_period_intent.py -v       # 时间段意图测试
+# 测试 Agent 包导入
+uv run python -c "from packages.agent_fishing import create_agent; print('OK')"
 
-# 向量存储管理
-uv run python -m src.tools.lure.cli status     # 查看索引状态
-uv run python -m src.tools.lure.cli rebuild   # 重建向量索引
-```
+# 测试工具列表
+uv run python -c "from packages.agent_fishing import get_all_tools; print(len(get_all_tools()))"
 
-### 🛠️ CLI管理工具
-
-#### **向量存储管理**
-```bash
-# 状态查看
-uv run python -m src.tools.lure.cli status
-# 输出: 索引状态、文档数量、向量维度等
-
-# 重建索引
-uv run python -m src.tools.lure.cli rebuild --force
-# 强制重建所有向量索引
-
-# 搜索测试
-uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
-# 测试语义搜索功能
-
-# 配置查看
-uv run python -m src.tools.lure.cli config
-# 查看当前配置信息
-```
-
-#### **系统健康检查**
-```bash
-# 运行健康检查
-uv run python -c "
-from src.utils.health_check import HealthChecker
-checker = HealthChecker()
-status = checker.check_all()
-print(f'系统状态: {status}')
-"
+# 运行特定测试
+uv run pytest tests/agent_fishing/ -v
 ```
 
 ### 📦 项目结构验证
 
-#### **快速验证脚本**
+#### **v3.1.0 架构验证**
 ```bash
 #!/bin/bash
-# verify_setup.sh - 项目设置验证
+# verify_v31_setup.sh - v3.1.0 架构验证
 
-echo "🚀 智能钓鱼助手架构验证"
-echo "========================"
+echo "🚀 智能钓鱼助手 v3.1.0 架构验证"
+echo "=============================="
 
-# 1. 环境检查
-echo "1. Python环境..."
-uv run python --version
+# 1. 包结构检查
+echo "1. 模块化包结构..."
+ls -la packages/agent_fishing/
+echo "✅ packages/agent_fishing/ 存在"
 
-# 2. 依赖检查
-echo "2. 依赖检查..."
+# 2. 应用层检查
+echo "2. 应用层结构..."
+ls -la apps/
+echo "✅ apps/ 目录存在"
+
+# 3. Agent 包导入检查
+echo "3. Agent 包导入..."
 uv run python -c "
-import sys
-required_modules = ['langchain', 'requests', 'chromadb']
-for module in required_modules:
-    try:
-        __import__(module)
-        print(f'✅ {module}')
-    except ImportError:
-        print(f'❌ {module} - 未安装')
+from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
+print(f'✅ FishingAgent 导入成功')
+print(f'✅ 工具数量: {len(get_all_tools())}')
 "
 
-# 3. 工具加载检查
-echo "3. 工具系统..."
-uv run python -c "
-from src.tools import get_all_tools
-tools = get_all_tools()
-print(f'✅ 工具数量: {len(tools)}')
-for tool in tools:
-    print(f'  - {tool.name}')
-"
+# 4. CLI 命令检查
+echo "4. CLI 命令..."
+uv run fishing --help
+echo "✅ fishing 命令可用"
 
-# 4. API配置检查
-echo "4. API配置..."
-uv run python -c "
-import os
-required_keys = ['DASHSCOPE_API_KEY', 'CAIYUN_API_KEY', 'AMAP_API_KEY']
-for key in required_keys:
-    status = '✅' if os.getenv(key) else '❌'
-    print(f'{status} {key}')
-"
+# 5. API 服务检查
+echo "5. API 服务..."
+uv run fishing-api --help
+echo "✅ fishing-api 命令可用"
 
-echo "✅ 验证完成"
+echo "✅ v3.1.0 架构验证完成"
 ```
 
 ---
@@ -742,192 +707,136 @@ echo "✅ 验证完成"
 
 ### 🎯 LLM理解辅助
 
-#### **代码理解优化**
-1. **清晰模块边界**: 每个模块具有单一、明确定义的职责
-2. **一致模式**: 工厂模式、工具模式、策略模式贯穿项目
-3. **全面文档**: 文档字符串解释目的和用法
-4. **最小抽象**: 直接API调用减少复杂性
-5. **类型提示**: 完整的类型支持改善IDE辅助
+#### **v3.1.0 架构理解要点**
+1. **模块化包结构**: 每个包完全自包含，可独立发布
+2. **应用层分离**: CLI 和 API 分离到 apps/ 目录
+3. **LangGraph 兼容**: 支持 LangGraph Studio 集成
+4. **统一工具接口**: 包级别的工具管理
+5. **最小抽象**: 直接API调用减少复杂性
 
-#### **关键文件导航**
+#### **关键文件导航 (v3.1.0)**
 ```python
 # LLM修改项目时的关键入口点
 
-# 1. 了解工具系统
-src/tools/__init__.py           # 统一工具接口
-src/tools/basic_tools.py        # 基础工具示例
-src/tools/fishing_tools.py      # 核心业务逻辑
+# 1. 理解包架构
+packages/agent_fishing/__init__.py      # 包入口和公共 API
+packages/agent_fishing/core/agent.py    # 主代理类
+packages/agent_fishing/tools/__init__.py # 统一工具接口
 
-# 2. 理解代理架构
-src/fishing_agent/core.py       # 主要代理类
-src/fishing_agent/model_factory.py  # LLM抽象
-src/fishing_agent/prompts.py    # 系统提示词
+# 2. 应用层实现
+apps/cli/main.py                         # CLI 应用
+apps/api/main.py                         # FastAPI 后端
 
-# 3. 掌握评分算法
-src/tools/scoring/enhanced_scorer.py  # 7因子算法
+# 3. 共享资源
+shared/config/                           # 全局配置
 
-# 4. 扩展功能
-src/tools/lure/knowledge_search.py    # 语义搜索
-src/utils/coordinate_utils.py         # 地理工具
+# 4. 项目配置
+pyproject.toml                          # 项目配置和脚本
+langgraph.json                          # LangGraph 配置
 ```
 
 ### 🚀 开发效率模式
 
-#### **统一工具接口**
+#### **统一包接口**
 ```python
-# LLM添加新工具的标准模式
+# LLM添加新功能的模式 (v3.1.0)
+
+# 1. 在包中添加新工具
+# packages/agent_fishing/tools/your_tool.py
 from langchain_core.tools import tool
 
 @tool
 def your_new_tool(param1: str, param2: int = None) -> str:
-    """
-    工具描述 - LLM会据此选择工具
-
-    Args:
-        param1: 参数描述
-        param2: 可选参数描述
-
-    Returns:
-        str: 返回结果描述
-
-    Examples:
-        >>> your_new_tool("测试", 10)
-        "预期返回结果"
-    """
-    # 工具实现
+    """新工具描述"""
     return "工具执行结果"
 
-# 在 src/tools/__init__.py 中注册
+# 2. 在包工具初始化中注册
+# packages/agent_fishing/tools/__init__.py
+from .your_tool import your_new_tool
+
 def get_all_tools():
-    tools = [
+    return [
         get_current_time,
-        get_weather,
+        get_weather_by_date,
         query_fishing_recommendation,
         your_new_tool,  # 添加新工具
     ]
-    return tools
 ```
 
-#### **测试驱动开发**
+#### **应用层扩展**
 ```python
-# LLM编写功能时的测试模板
-import pytest
-from src.your_module import your_function
+# 3. 在 CLI 应用中使用
+# apps/cli/main.py
+from packages.agent_fishing import create_agent, get_all_tools
 
-class TestYourFunction:
-    def test_basic_functionality(self):
-        """基础功能测试"""
-        result = your_function("测试输入")
-        assert result is not None
-        assert "预期内容" in result
+def main():
+    agent = create_agent(model_provider="zhipu")
+    # CLI 逻辑
 
-    def test_edge_cases(self):
-        """边界情况测试"""
-        result = your_function("")
-        assert result == "预期默认值"
+# 4. 在 API 应用中使用
+# apps/api/main.py
+from packages.agent_fishing import create_agent
 
-    def test_error_handling(self):
-        """错误处理测试"""
-        with pytest.raises(ValueError):
-            your_function(invalid_input)
+@app.post("/api/v1/fishing/chat")
+async def fishing_chat(request: ChatRequest):
+    agent = create_agent(model_provider="zhipu")
+    result = agent.run(request.query)
+    return {"response": result}
 ```
 
 ### 🔧 扩展点指南
 
-#### **添加新LLM提供商**
+#### **添加新 Agent 包**
 ```python
-# 1. 在 ModelFactory 中添加提供商配置
-# src/fishing_agent/model_factory.py
+# 1. 创建新包结构
+mkdir -p packages/agent_weather/{core,tools,utils}
 
-class ModelFactory:
-    PROVIDERS = {
-        # 现有提供商...
-        "new_provider": {
-            "class": NewProviderModel,
-            "config": {
-                "model": "new-model-name",
-                "api_key": os.getenv("NEW_PROVIDER_KEY")
-            }
-        }
-    }
+# 2. 创建包文件
+touch packages/agent_weather/{__init__.py,core/__init__.py,tools/__init__.py,utils/__init__.py}
+
+# 3. 包入口
+# packages/agent_weather/__init__.py
+from .core import WeatherAgent, create_agent
+from .tools import get_all_tools
+
+__all__ = ["WeatherAgent", "create_agent", "get_all_tools", "get_agent"]
+
+# 4. 更新 langgraph.json
+{
+  "graphs": {
+    "fishing": "./packages/agent_fishing:get_agent",
+    "weather": "./packages/agent_weather:get_agent"
+  }
+}
 ```
 
-#### **扩展评分算法**
+#### **扩展应用层**
 ```python
-# 2. 添加新的评分因子
-# src/tools/scoring/enhanced_scorer.py
+# 5. 添加新的 CLI 应用
+mkdir -p apps/weather_cli
+echo "from packages.agent_weather import create_agent" > apps/weather_cli/main.py
 
-def calculate_new_factor_score(data: dict) -> float:
-    """
-    新评分因子算法
-
-    Args:
-        data: 相关数据字典
-
-    Returns:
-        float: 评分结果 (0-100)
-    """
-    # 实现新因子的评分逻辑
-    base_score = 70.0
-    # 根据数据调整评分
-    return min(100.0, max(0.0, base_score + adjustment))
-
-# 在主评分函数中集成
-def calculate_fishing_score(weather_data, location_data) -> dict:
-    scores = {
-        # 现有因子...
-        'new_factor': calculate_new_factor_score(weather_data)
-    }
-    return normalize_and_weight_scores(scores)
-```
-
-#### **增强向量搜索**
-```python
-# 3. 扩展知识库搜索
-# src/tools/lure/knowledge_search.py
-
-class KnowledgeSearchService:
-    def search_custom_knowledge(self, query: str, knowledge_type: str) -> List[Result]:
-        """
-        自定义知识类型搜索
-
-        Args:
-            query: 搜索查询
-            knowledge_type: 知识类型（如 'techniques', 'locations'）
-
-        Returns:
-            List[Result]: 搜索结果列表
-        """
-        # 实现自定义搜索逻辑
-        vector = self.embedding_model.embed_query(query)
-        collection = self.vector_store.get_collection(f"{knowledge_type}_collection")
-        results = collection.similarity_search(vector)
-        return [self._format_result(r) for r in results]
+# 6. 更新 pyproject.toml 脚本
+[project.scripts]
+fishing = "apps.cli.main:main"
+fishing-api = "apps.api.main:main"
+weather = "apps.weather_cli.main:main"  # 新命令
 ```
 
 ### 📝 开发最佳实践
 
-#### **代码组织原则**
-1. **单一职责**: 每个函数和类只做一件事
-2. **依赖注入**: 通过参数传递依赖，便于测试
-3. **错误优先**: 优先处理错误情况，诚实报告失败
-4. **文档先行**: 在实现前编写文档和类型提示
-5. **测试覆盖**: 为每个新功能编写相应测试
+#### **v3.1.0 包开发原则**
+1. **包独立性**: 每个包完全自包含，不依赖其他包
+2. **统一接口**: 所有包遵循相同的导入和创建模式
+3. **LangGraph 兼容**: 提供 `get_agent()` 函数支持 Studio
+4. **测试覆盖**: 每个包都有独立的测试套件
 
 #### **性能优化指南**
 ```python
-# 缓存优化示例
-from functools import lru_cache
-from src.utils.cache import SimpleCache
+# 包级别缓存
+from packages.agent_fishing.utils.cache import PackageCache
 
-# 使用装饰器缓存
-@lru_cache(maxsize=128)
-def expensive_calculation(param: str) -> float:
-    # 计算密集型操作
-    return result
-
-# 使用项目缓存
-cache = SimpleCache()
+cache = PackageCache()
 
 def get_weather_cached(location: str) -> dict:
     cached_data = cache.get(f"weather_{location}", ttl=600)
@@ -943,31 +852,33 @@ def get_weather_cached(location: str) -> dict:
 
 ## 🎯 总结
 
-### 架构优势
-- **清晰分离**: 模块边界明确，职责单一
-- **最小抽象**: 直接API调用，降低复杂性
-- **全面工具系统**: 7个核心工具覆盖所有功能域
-- **多LLM支持**: 灵活的模型提供商切换
-- **科学评分**: 基于证据的7因子算法
-- **健全测试**: 46+测试用例覆盖核心功能
+### v3.1.0 架构优势
+- **模块化包架构**: 完全自包含的 Agent 包，支持独立发布
+- **应用层分离**: CLI 和 FastAPI 分离，职责清晰
+- **LangGraph 兼容**: 原生支持 LangGraph Studio
+- **统一接口**: 一致的包导入和创建模式
+- **向后兼容**: 保持旧版本入口点可用
+- **扩展性强**: 易于添加新 Agent 包和应用
+
+### 迁移指南
+从 v3.0.2.1 到 v3.1.0 的主要变化：
+- **src/** → **packages/agent_fishing/**: 模块化包结构
+- **新增 apps/**: CLI 和 FastAPI 应用层
+- **新增 shared/**: 共享配置和资源
+- **CLI 命令**: `fishing` 替代直接运行 `main.py`
+- **API 服务**: `fishing-api` 启动 FastAPI 后端
 
 ### LLM导航价值
-本架构文档特别针对LLM理解需求设计，提供：
-- **快速定位**: 关键文件和组件的明确指引
-- **模式识别**: 一致的设计模式便于理解和扩展
-- **扩展指南**: 清晰的扩展点和修改指南
-- **最佳实践**: 代码组织和开发规范
+v3.1.0 架构特别针对LLM理解需求优化：
+- **清晰边界**: 包、应用层、共享层分离明确
+- **一致模式**: 统一的包结构模式便于理解和扩展
+- **扩展指南**: 详细的包创建和应用扩展指南
+- **最佳实践**: 模块化开发规范和模式
 
-### 开发效率
-- **统一接口**: `src/tools/__init__.py` 提供单一导入点
-- **向后兼容**: 旧版本导入仍然有效
-- **模块测试**: 每个组件独立测试套件
-- **CLI工具**: 内置管理和调试工具
-
-这个架构优先考虑**可维护性**、**清晰性**和**实用效果**，同时为智能钓鱼助手提供全面功能支持。简化的设计模式使LLM能够轻松理解和修改代码库。
+这个 v3.1.0 架构优先考虑**模块化**、**可维护性**和**扩展性**，同时为智能钓鱼助手提供现代化、可扩展的包架构支持。
 
 ---
 
-**文档版本**: v3.0.2.1
-**最后更新**: 2025-11-27
+**文档版本**: v3.1.0
+**最后更新**: 2025-11-29
 **维护者**: 智能钓鱼助手开发团队
