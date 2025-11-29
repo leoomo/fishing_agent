@@ -13,8 +13,9 @@ from langchain_core.runnables import Runnable
 
 from ..tools import get_all_tools
 from .model_factory import ModelFactory
-from .prompts import get_system_prompt
+from .prompts import BASE_SYSTEM_PROMPT, FISHING_OUTPUT_RULES, WEATHER_QUERY_RULES
 from .callbacks import FishingAgentCallback, OutputFormatValidator
+from .middleware import select_prompt_by_query_type
 
 logger = logging.getLogger(__name__)
 
@@ -90,17 +91,23 @@ class FishingAgent:
         return tools
 
     def _create_agent(self) -> Runnable:
-        """Create LangChain agent with standard pattern"""
-        system_prompt = get_system_prompt()
+        """
+        Create LangChain agent with dynamic prompt middleware
 
+        使用 @dynamic_prompt 中间件实现运行时 prompt 选择：
+        - 钓鱼查询：~1,200 tokens (BASE + FISHING_OUTPUT_RULES)
+        - 天气查询：~800 tokens (BASE + WEATHER_QUERY_RULES)
+        - 其他查询：~600 tokens (BASE only)
+        """
         agent = create_agent(
             model=self.model,
             tools=self.tools,
-            system_prompt=system_prompt
+            # 不再传递静态 system_prompt，由 middleware 动态提供
+            middleware=[select_prompt_by_query_type]
         )
 
         if self.enable_logging:
-            logger.info("🤖 智能体创建完成")
+            logger.info("🤖 智能体创建完成（使用动态 prompt 中间件）")
 
         return agent
 
