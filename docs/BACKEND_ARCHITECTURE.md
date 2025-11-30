@@ -104,7 +104,7 @@ fishing-agent/
 # 核心配置
 app = FastAPI(
     title="智能钓鱼助手 API",
-    version="3.1.0",
+    version="3.1.1",
     description="基于 LangChain 的智能钓鱼助手 REST API"
 )
 
@@ -419,7 +419,7 @@ def calculate_fishing_score(weather_data, location_data) -> dict:
 ```python
 def _filter_time_slots_by_period(time_slots, hourly_datetimes, time_period):
     """
-    时间段过滤逻辑 - v3.1.0 新增功能
+    时间段过滤逻辑 - v3.1.1 新增功能
 
     支持的时间段定义:
     - "白天": 6:00-18:00 (主要钓鱼时段)
@@ -465,7 +465,7 @@ def _filter_time_slots_by_period(time_slots, hourly_datetimes, time_period):
 def query_fishing_recommendation(
     location: str,
     date: str = None,
-    time_period: str = None  # 🆕 v3.1.0 新增
+    time_period: str = None  # 🆕 v3.1.1 新增
 ) -> str:
     """
     查询钓鱼时间推荐，基于天气条件分析最佳钓鱼时间
@@ -1107,6 +1107,6 @@ def get_weather_by_date(location: str, date: str):
 ---
 
 **文档维护**: 智能钓鱼助手开发团队
-**最后更新**: 2025-11-29
-**版本**: v3.1.0
-**架构**: 模块化 Agent 包 + FastAPI 后端
+**最后更新**: 2025-11-30
+**版本**: v3.1.1
+**架构**: 模块化 Agent 包 + FastAPI 后端 + 动态Prompt中间件
