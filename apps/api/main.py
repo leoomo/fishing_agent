@@ -19,7 +19,7 @@ from .routes import fishing_router
 
 app = FastAPI(
     title="智能钓鱼助手 API",
-    version="3.1.0",
+    version="3.1.1",
     description="基于 LangChain 的智能钓鱼助手 REST API"
 )
 
@@ -41,7 +41,7 @@ async def root():
     """API 根路径"""
     return {
         "name": "智能钓鱼助手 API",
-        "version": "3.1.0",
+        "version": "3.1.1",
         "docs": "/docs"
     }
 

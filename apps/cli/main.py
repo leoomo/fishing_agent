@@ -26,7 +26,7 @@ def main():
     try:
         from packages.agent_fishing import create_agent
 
-        print("🎣 智能钓鱼助手 v3.1.0")
+        print("🎣 智能钓鱼助手 v3.1.1")
         print("=" * 50)
         print("输入您的问题，例如：")
         print("- 明天杭州钓鱼怎么样？")

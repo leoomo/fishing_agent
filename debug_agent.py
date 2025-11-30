@@ -289,7 +289,7 @@ def show_agent_stats(agent):
 
 def print_usage():
     """打印使用说明"""
-    print("🎣 智能钓鱼助手调试脚本 v3.1.0")
+    print("🎣 智能钓鱼助手调试脚本 v3.1.1")
     print("="*50)
     print("用法:")
     print("  python debug_agent.py [model_provider] [mode] [query]")
@@ -318,7 +318,7 @@ def main():
         print_usage()
         return
 
-    print("🎣 智能钓鱼助手调试脚本 v3.1.0")
+    print("🎣 智能钓鱼助手调试脚本 v3.1.1")
     print("="*60)
 
     # 解析命令行参数
