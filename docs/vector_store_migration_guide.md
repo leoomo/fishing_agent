@@ -1,5 +1,9 @@
 # 向量存储迁移指南
 
+**版本**: v3.1.1
+**更新日期**: 2025-11-30
+**适用架构**: packages/agent_fishing + DashScope Embedding + ChromaDB
+
 本指南帮助您从旧版本（使用本地 BGE-M3 模型）迁移到新版本（使用 DashScope Embedding API）。
 
 ## 📋 版本对比
@@ -56,20 +60,20 @@ VECTOR_AUTO_INDEX=true  # 默认启用
 
 ```bash
 # 查看当前索引状态
-uv run python -m src.tools.lure.cli status
+uv run python -m packages.agent_fishing.tools.lure.cli status
 
 # 重建所有索引
-uv run python -m src.tools.lure.cli rebuild --force
+uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force
 
 # 验证重建结果
-uv run python -m src.tools.lure.cli status
+uv run python -m packages.agent_fishing.tools.lure.cli status
 ```
 
 **方式 B: 删除旧索引目录**
 
 ```bash
 # 删除旧的向量存储
-rm -rf src/tools/lure/data/vector_store
+rm -rf packages/agent_fishing/tools/lure/data/vector_store
 
 # 下次搜索时会自动重建（懒加载）
 ```
@@ -77,9 +81,9 @@ rm -rf src/tools/lure/data/vector_store
 **方式 C: 通过代码重建**
 
 ```python
-from src.tools.lure.database import get_db
-from src.tools.lure.vector_store import get_vector_store
-from src.tools.lure.knowledge_indexer import KnowledgeIndexer
+from packages.agent_fishing.tools.lure.database import get_db
+from packages.agent_fishing.tools.lure.vector_store import get_vector_store
+from packages.agent_fishing.tools.lure.knowledge_indexer import KnowledgeIndexer
 
 db = get_db()
 vector_store = get_vector_store()
@@ -94,7 +98,7 @@ print(f"索引完成: {results}")
 
 ```bash
 # 测试搜索功能
-uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
+uv run python -m packages.agent_fishing.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
 
 # 运行示例脚本
 uv run python examples/vector_store_example.py
@@ -131,7 +135,7 @@ VECTOR_EMBEDDING_MODEL=text-embedding-v2
 
 然后重建索引：
 ```bash
-uv run python -m src.tools.lure.cli rebuild --force
+uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force
 ```
 
 ### Q5: 懒加载索引是如何工作的？
@@ -201,7 +205,7 @@ VECTOR_EMBEDDING_MODEL=text-embedding-v3
 
 ```bash
 # 预先建立索引，避免首次搜索慢
-uv run python -m src.tools.lure.cli rebuild --force
+uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force
 
 # 禁用自动索引，手动控制
 VECTOR_AUTO_INDEX=false
@@ -215,7 +219,7 @@ VECTOR_EMBEDDING_MODEL=text-embedding-v3  # 平衡
 
 ```bash
 # 每周检查索引状态
-uv run python -m src.tools.lure.cli status
+uv run python -m packages.agent_fishing.tools.lure.cli status
 
 # 有新数据时增量索引（如果禁用了懒加载）
 # 懒加载会自动处理，无需手动
@@ -257,10 +261,10 @@ cp .env.example .env
 **解决**:
 ```bash
 # 检查数据库
-uv run python -c "from src.tools.lure.database import get_db; db = get_db(); print(db.execute('SELECT COUNT(*) as c FROM fish_knowledge')[0])"
+uv run python -c "from packages.agent_fishing.tools.lure.database import get_db; db = get_db(); print(db.execute('SELECT COUNT(*) as c FROM fish_knowledge')[0])"
 
 # 重建索引
-uv run python -m src.tools.lure.cli rebuild --force
+uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force
 ```
 
 ### 问题 5: 维度不匹配错误
@@ -271,14 +275,14 @@ uv run python -m src.tools.lure.cli rebuild --force
 rm -rf src/tools/lure/data/vector_store
 
 # 重建索引
-uv run python -m src.tools.lure.cli rebuild --force
+uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force
 ```
 
 ## 📞 获取帮助
 
 - **文档**: 查看 `CLAUDE.md` 了解完整配置
 - **示例**: 运行 `examples/vector_store_example.py`
-- **CLI 帮助**: `uv run python -m src.tools.lure.cli --help`
+- **CLI 帮助**: `uv run python -m packages.agent_fishing.tools.lure.cli --help`
 
 ## 📅 迁移检查清单
 

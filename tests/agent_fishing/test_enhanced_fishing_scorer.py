@@ -11,13 +11,13 @@ import os
 # 添加项目路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from tools.enhanced_fishing_scorer import (
-    EnhancedFishingScorer,
-    WeatherTrendAnalyzer,
-    PressureTrendAnalyzer,
-    SeasonalAnalyzer,
-    AstronomicalCalculator,
-    FishingScore
+from packages.agent_fishing.tools.fishing.enhanced_scorer import (
+    calculate_seasonal_score,
+    calculate_lunar_phase,
+    calculate_lunar_score,
+    analyze_pressure_trend,
+    analyze_temperature_trend,
+    analyze_wind_stability
 )
 
 

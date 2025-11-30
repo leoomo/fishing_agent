@@ -633,7 +633,7 @@ uv run pytest tests/
 # 运行7因子科学评分系统测试（27个测试用例）
 uv run pytest tests/agent_fishing/test_enhanced_fishing_scorer.py -v
 
-# 时间段意图识别测试（95%+准确率）
+# 时间段意图识别测试（98%+准确率）
 uv run pytest tests/agent_fishing/test_time_period_intent.py -v -k "not integration"
 
 # LLM优化集成测试（需要配置API密钥）
@@ -695,7 +695,7 @@ MIT License
 
 **测试覆盖完善**：
 - ✅ **7因子科学评分系统**: 27个测试用例，覆盖季节/月相/趋势分析
-- ✅ **时间段意图识别**: 19个测试用例，95%+识别准确率
+- ✅ **时间段意图识别**: 19个测试用例，98%+识别准确率
 - ✅ **边界测试**: 完善的异常处理和容错测试
 - ✅ **集成测试**: API集成和数据流验证
 

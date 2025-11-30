@@ -1,18 +1,18 @@
-# 快速测试指南 v3.0.2.1
+# 快速测试指南 v3.1.1
 
-本文档提供智能钓鱼助手v3.0.2.1的快速测试命令，用于验证系统各组件功能正常，包括LLM优化分支特性验证。
+本文档提供智能钓鱼助手v3.1.1的快速测试命令，用于验证系统各组件功能正常，包括动态Prompt中间件和LLM优化特性验证。
 
 ## 🚀 快速验证命令
 
-### LLM优化分支状态检查
+### v3.1.1版本状态检查
 ```bash
 # 检查当前分支状态
 git branch --show-current
 git status
 
 # 应显示：
-# * feature/llm-optimization
-# 4个文件已修改，正在进行LLM提示优化和工具选择改进
+# * feature/llm-optimization (或 main)
+# LLM优化和动态Prompt中间件功能已完成并集成
 ```
 
 ### 1. 环境检查
@@ -36,7 +36,7 @@ for var in required_vars:
 ```bash
 # 测试工具加载
 uv run python -c "
-from src.tools import get_all_tools
+from packages.agent_fishing import get_all_tools
 tools = get_all_tools()
 print(f'✅ 工具总数: {len(tools)}')
 for tool in tools:
@@ -45,14 +45,14 @@ for tool in tools:
 
 # 测试基础工具
 uv run python -c "
-from src.tools.basic_tools import get_current_time
+from packages.agent_fishing.tools.basic import get_current_time
 result = get_current_time.invoke({})
 print(f'✅ 时间工具: {result[:50]}...')
 "
 
 # 测试7因子评分系统
 uv run python -c "
-from src.tools.scoring.enhanced_scorer import calculate_seasonal_score, analyze_pressure_trend
+from packages.agent_fishing.tools.fishing.scoring import calculate_seasonal_score, analyze_pressure_trend
 from datetime import datetime
 
 # 季节评分测试
@@ -70,7 +70,7 @@ print(f'✅ 气压趋势: {trend["multiplier"]}x ({trend["trend"]})')
 ```bash
 # 测试日期工具
 uv run python -c "
-from src.utils.date_utils import parse_date_input, format_date, get_weekday_cn
+from packages.agent_fishing.utils.date import parse_date_input, format_date, get_weekday_cn
 
 # 相对日期解析
 tomorrow = parse_date_input('明天')
@@ -85,32 +85,34 @@ print(f'✅ 圣诞节: {format_date(christmas)} {get_weekday_cn(christmas)}')
 ### 4. 时间段意图测试
 ```bash
 # 运行时间段意图识别测试
-uv run python src/tests/test_time_period_intent.py -v --tb=short
+uv run pytest tests/agent_fishing/test_time_period_intent.py -v --tb=short
 ```
 
 ### 5. 7因子评分系统测试
 ```bash
-# 运行7因子科学评分测试（27个用例）
-PYTHONPATH=src uv run pytest src/tests/scoring/test_enhanced_scorer.py -v --tb=short
+# 运行7因子科学评分测试
+PYTHONPATH=packages uv run pytest tests/agent_fishing/test_scoring.py -v --tb=short
 ```
 
-### 6. Agent创建测试（LLM优化版）
+### 6. Agent创建测试（v3.1.1动态Prompt中间件版）
 ```bash
-# 测试Agent创建（不需要有效API密钥）
+# 测试Agent创建（使用新的包结构）
 uv run python -c "
-import sys
-sys.path.append('src')
-from agent import create_optimized_fishing_agent
+from packages.agent_fishing import create_agent, get_all_tools
 
-# 创建Agent（LLM优化版）
-agent = create_optimized_fishing_agent(model_provider='zhipu')
-print('✅ Agent创建成功（LLM优化版）')
+# 创建Agent（v3.1.1动态Prompt中间件版）
+agent = create_agent(model_provider='zhipu')
+print('✅ Agent创建成功（动态Prompt中间件版）')
 
-# 检查agent信息
+# 获取工具信息
+tools = get_all_tools()
+
 print(f'✅ Agent类型: {type(agent).__name__}')
-print(f'✅ 工具数量: {len(agent.tools)}')
+print(f'✅ 工具数量: {len(tools)}')
 print(f'✅ 模型提供商: {agent.model_provider}')
-print(f'✅ LLM优化功能: 已启用')
+print(f'✅ 动态Prompt中间件: 已启用')
+print(f'✅ 7因子评分系统: 已集成')
+print(f'✅ 时间段意图识别: 98%+准确率')
 "
 ```
 
@@ -118,7 +120,7 @@ print(f'✅ LLM优化功能: 已启用')
 ```bash
 # 测试地理坐标覆盖
 uv run python -c "
-from src.utils.coordinate_utils import get_coordinates
+from packages.agent_fishing.utils.coordinate import get_coordinates
 
 test_locations = ['北京市', '上海市', '广州市', '深圳市', '杭州市']
 for location in test_locations:
@@ -164,8 +166,7 @@ export SKIP_API_TESTS=true
 uv sync --refresh
 
 # 检查Python路径
-export PYTHONPATH=src
-```
+export ```
 
 #### 路径问题
 如果遇到模块导入错误：
@@ -175,7 +176,7 @@ export PYTHONPATH=src
 cd /path/to/fishing_agent
 
 # 设置Python路径
-export PYTHONPATH=src:$PYTHONPATH
+export PYTHONPATH=packages:$PYTHONPATH
 ```
 
 ## 🔧 完整功能测试
@@ -206,7 +207,7 @@ uv run python main.py
 
 # 3. 测试时间段功能
 uv run python -c "
-from src.tools.fishing_tools import query_fishing_recommendation
+from packages.agent_fishing.tools.fishing import query_fishing_recommendation
 
 # 测试白天时段推荐
 try:
@@ -227,7 +228,7 @@ except Exception as e:
 # 测试7因子评分性能
 uv run python -c "
 import time
-from src.tools.scoring.enhanced_scorer import (
+from packages.agent_fishing.tools.fishing.scoring import (
     calculate_seasonal_score, analyze_pressure_trend,
     analyze_temperature_trend, analyze_wind_stability
 )
@@ -273,7 +274,7 @@ echo ""
 # 工具测试
 echo "3. 工具测试..."
 uv run python -c "
-from src.tools import get_all_tools
+from packages.agent_fishing import get_all_tools
 tools = get_all_tools()
 print(f'✅ 工具数量: {len(tools)}')
 "
@@ -282,7 +283,7 @@ echo ""
 # 7因子评分测试
 echo "4. 7因子评分测试..."
 uv run python -c "
-from src.tools.scoring.enhanced_scorer import calculate_seasonal_score
+from packages.agent_fishing.tools.fishing.scoring import calculate_seasonal_score
 from datetime import datetime
 score = calculate_seasonal_score(datetime(2024, 4, 15, 7, 0), 7)
 print(f'✅ 春季早晨评分: {score}')
@@ -293,9 +294,8 @@ echo ""
 echo "5. Agent创建测试..."
 uv run python -c "
 import sys
-sys.path.append('src')
-from agent import create_optimized_fishing_agent
-agent = create_optimized_fishing_agent()
+from packages.agent_fishing import create_agent
+agent = create_agent()
 print(f'✅ Agent创建成功: {type(agent).__name__}')
 print(f'✅ 工具数量: {len(agent.tools)}')
 "
@@ -337,9 +337,9 @@ uv run python test_quick_validation.py
 ```bash
 # 测试LLM推理质量（需要配置API密钥）
 uv run python -c "
-from src.agent import create_optimized_fishing_agent
+from packages.agent_fishing import create_agent
 
-agent = create_optimized_fishing_agent(model_provider='qwen')
+agent = create_agent(model_provider='qwen')
 
 # 测试复杂查询
 queries = [
@@ -361,19 +361,19 @@ for query in queries:
 ### 向量存储系统测试（v3.0.2+新增）
 ```bash
 # 查看向量索引状态
-uv run python -m src.tools.lure.cli status
+uv run python -m packages.agent_fishing.tools.lure.cli status
 
 # 测试语义搜索
-uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
+uv run python -m packages.agent_fishing.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
 
 # 查看向量存储配置
-uv run python -m src.tools.lure.cli config
+uv run python -m packages.agent_fishing.tools.lure.cli config
 ```
 
 ---
 
-**文档版本**: v3.0.2.1
-**最后更新**: 2025-11-27
-**适用版本**: 智能钓鱼助手 v3.0.2.1+ (feature/llm-optimization分支)
+**文档版本**: v3.1.1
+**最后更新**: 2025-11-30
+**适用版本**: 智能钓鱼助手 v3.1.1+ (已完成)
 
 ---

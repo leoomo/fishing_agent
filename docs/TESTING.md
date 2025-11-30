@@ -1,9 +1,10 @@
-# 智能钓鱼助手 - 测试文档 v3.0.2.1
+# 智能钓鱼助手 - 测试文档 v3.1.1
 
-本文档描述智能钓鱼助手v3.0.2.1的测试体系，包括7因子科学评分系统、时间段意图理解、LLM优化功能、集成测试和性能测试。
+本文档描述智能钓鱼助手v3.1.1的测试体系，包括动态Prompt中间件、7因子科学评分系统、时间段意图理解、LLM优化功能、集成测试和性能测试。
 
-**当前分支**: feature/llm-optimization
-**核心优化**: LLM提示工程优化、工具选择效率提升、推理质量改进
+**当前版本**: v3.1.1
+**当前分支**: feature/llm-optimization (功能已完成)
+**核心优化**: 动态Prompt中间件、LLM提示工程优化、工具选择效率提升、推理质量改进
 
 ## 🧪 测试概览
 
@@ -24,8 +25,8 @@
 ## 🔬 7因子科学评分系统测试 (v3.0.0新增)
 
 ### 测试位置
-- **文件**: `src/tests/scoring/test_enhanced_scorer.py`
-- **执行命令**: `PYTHONPATH=src uv run pytest src/tests/scoring/test_enhanced_scorer.py -v`
+- **文件**: `tests/agent_fishing/test_enhanced_fishing_scorer.py`
+- **执行命令**: `uv run pytest tests/agent_fishing/test_enhanced_fishing_scorer.py -v`
 
 ### 测试类和用例
 
@@ -275,8 +276,8 @@ def test_insufficient_data(self):
 ## ⏰ 时间段意图识别测试 (v2.3.0新增)
 
 ### 测试位置
-- **文件**: `src/tests/test_time_period_intent.py`
-- **执行命令**: `uv run python src/tests/test_time_period_intent.py -v`
+- **文件**: `tests/agent_fishing/test_time_period_intent.py`
+- **执行命令**: `uv run pytest tests/agent_fishing/test_time_period_intent.py -v`
 
 ### 测试类和用例 (19个测试用例)
 
@@ -421,29 +422,29 @@ def test_core_scenario():
 ### CLI管理测试
 ```bash
 # 查看向量索引状态
-uv run python -m src.tools.lure.cli status
+uv run python -m packages.agent_fishing.tools.lure.cli status
 
 # 重建向量索引
-uv run python -m src.tools.lure.cli rebuild --force
+uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force
 
 # 测试语义搜索
-uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
+uv run python -m packages.agent_fishing.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
 
 # 查看配置
-uv run python -m src.tools.lure.cli config
+uv run python -m packages.agent_fishing.tools.lure.cli config
 ```
 
 ### 语义搜索测试
 ```python
 # 基础Embedding使用
-from src.tools.lure.embeddings import DashScopeEmbedding
+from packages.agent_fishing.tools.lure.embeddings import DashScopeEmbedding
 embedding = DashScopeEmbedding(model="text-embedding-v3")
 vector = embedding.embed_query("鲈鱼是一种常见的淡水鱼")
 
 # 语义搜索
-from src.tools.lure.database import get_db
-from src.tools.lure.vector_store import get_vector_store
-from src.tools.lure.knowledge_search import KnowledgeSearchService
+from packages.agent_fishing.tools.lure.database import get_db
+from packages.agent_fishing.tools.lure.vector_store import get_vector_store
+from packages.agent_fishing.tools.lure.knowledge_search import KnowledgeSearchService
 
 db = get_db()
 vector_store = get_vector_store()
@@ -458,8 +459,8 @@ for result in results:
 ## 🌍 全国覆盖测试
 
 ### 测试位置
-- **文件**: `src/tests/test_national_coverage.py`
-- **执行命令**: `uv run python src/tests/test_national_coverage.py`
+- **文件**: `tests/agent_fishing/test_national_coverage.py`
+- **执行命令**: `uv run python tests/agent_fishing/test_national_coverage.py`
 
 ### 测试目标
 验证系统对中国境内3,142+个行政区域的坐标服务支持：
@@ -506,8 +507,8 @@ def test_coordinate_precision(self):
 ## 🔄 集成测试
 
 ### 测试位置
-- **目录**: `src/tests/integration/`
-- **执行命令**: `uv run python src/tests/integration/verify_national_integration.py`
+- **目录**: `tests/agent_fishing/integration/`
+- **执行命令**: `uv run python tests/agent_fishing/integration/verify_national_integration.py`
 
 ### 测试类型
 
@@ -572,45 +573,45 @@ git branch --show-current
 git status
 
 # 运行所有测试
-uv run pytest src/tests/
+uv run pytest tests/
 
 # 运行7因子评分系统测试（27个用例）
-PYTHONPATH=src uv run pytest src/tests/scoring/test_enhanced_scorer.py -v
+PYTHONPATH=packages uv run pytest tests/agent_fishing/test_scoring.py -v
 
 # 运行时间段意图测试（19个用例）
-uv run python src/tests/test_time_period_intent.py -v
+uv run pytest tests/agent_fishing/test_time_period_intent.py -v
 
 # 运行LLM优化验证测试
 uv run python test_quick_validation.py
 
 # 运行全国覆盖测试
-uv run python src/tests/test_national_coverage.py
+uv run pytest tests/agent_fishing/test_national_coverage.py
 
 # 运行集成测试
-uv run python src/tests/integration/verify_national_integration.py
+uv run pytest tests/agent_fishing/integration/verify_national_integration.py
 
 # 测试向量存储系统
-uv run python -m src.tools.lure.cli status
-uv run python -m src.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
+uv run python -m packages.agent_fishing.tools.lure.cli status
+uv run python -m packages.agent_fishing.tools.lure.cli search "鲈鱼习性" --type fish --top-k 3
 
 # 生成测试覆盖率报告
-uv run pytest src/tests/ --cov=src --cov-report=html
+uv run pytest tests/ --cov=packages --cov-report=html
 ```
 
 ### 分类测试执行
 
 ```bash
 # 单元测试（不需要API密钥）
-uv run pytest src/tests/ -k "not integration" -v
+uv run pytest tests/ -k "not integration" -v
 
 # 集成测试（需要API密钥）
-uv run pytest src/tests/ -k "integration" -v
+uv run pytest tests/ -k "integration" -v
 
 # 边界测试
-uv run pytest src/tests/ -k "edge or boundary" -v
+uv run pytest tests/ -k "edge or boundary" -v
 
 # 性能测试
-uv run pytest src/tests/ -k "performance" -v
+uv run pytest tests/ -k "performance" -v
 
 # LLM优化专项测试
 uv run python test_quick_validation.py
@@ -679,27 +680,26 @@ uv run python test_quick_validation.py
 5. **PYTHONPATH问题**
    ```bash
    # 设置正确的Python路径
-   export PYTHONPATH=src
-   uv run pytest src/tests/scoring/test_enhanced_scorer.py -v
+   export    uv run pytest tests/scoring/test_enhanced_scorer.py -v
    ```
 
 ### 调试技巧
 
 ```bash
 # 详细输出模式
-uv run pytest src/tests/ -v -s
+uv run pytest tests/ -v -s
 
 # 只运行失败的测试
-uv run pytest src/tests/ --lf
+uv run pytest tests/ --lf
 
 # 停在第一个失败的测试
-uv run pytest src/tests/ -x
+uv run pytest tests/ -x
 
 # 显示本地变量
-uv run pytest src/tests/ -l
+uv run pytest tests/ -l
 
 # 生成详细报告
-uv run pytest src/tests/ --tb=long
+uv run pytest tests/ --tb=long
 ```
 
 ## 🎯 测试最佳实践
@@ -730,7 +730,7 @@ uv run pytest src/tests/ --tb=long
    ```python
    from unittest.mock import patch, MagicMock
 
-   @patch('src.utils.api_client.get_weather_client')
+   @patch('packages.agent_fishing.utils.api_client.get_weather_client')
    def test_with_mocked_api(self, mock_client):
        mock_client.return_value.get_realtime_weather.return_value = mock_weather_data
        result = function_under_test("北京")
@@ -756,12 +756,11 @@ uv run pytest src/tests/ --tb=long
 
 - name: Run 7-factor scoring tests
   run: |
-    export PYTHONPATH=src
-    uv run pytest src/tests/scoring/test_enhanced_scorer.py -v --tb=short
+    export     uv run pytest tests/scoring/test_enhanced_scorer.py -v --tb=short
 
 - name: Run time period intent tests
   run: |
-    uv run python src/tests/test_time_period_intent.py -v
+    uv run pytest tests/agent_fishing/test_time_period_intent.py -v
 
 - name: Run LLM optimization validation
   run: |
@@ -769,16 +768,16 @@ uv run pytest src/tests/ --tb=long
 
 - name: Test vector storage system
   run: |
-    uv run python -m src.tools.lure.cli status
+    uv run python -m packages.agent_fishing.tools.lure.cli status
 
 - name: Generate coverage report
   run: |
-    uv run pytest src/tests/ --cov=src --cov-report=xml --cov-report=html
+    uv run pytest tests/ --cov=packages --cov-report=xml --cov-report=html
 ```
 
 ---
 
-**文档版本**: v3.0.2.1
+**文档版本**: v3.1.1
 **最后更新**: 2025-11-27
 **测试框架**: pytest 9.0.1
 **覆盖率目标**: >85%

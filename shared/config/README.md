@@ -1,4 +1,8 @@
-# 智能钓鱼助手 - 环境变量配置指南
+# 智能钓鱼助手 v3.1.1 - 环境变量配置指南
+
+**版本**: v3.1.1
+**更新日期**: 2025-11-30
+**适用系统**: 智能钓鱼助手 + 动态Prompt中间件系统
 
 提供统一的环境变量配置管理，支持API密钥配置、伦理约束设置和类型安全的配置访问。
 
@@ -52,7 +56,7 @@ COORDINATE_MAX_RETRIES=3
 COORDINATE_TIMEOUT=10
 
 # 数据库路径
-COORDINATE_DB_PATH=src/data/admin_divisions.db
+COORDINATE_DB_PATH=shared/data/admin_divisions.db
 
 # 缓存开关
 COORDINATE_CACHE_ENABLED=true
@@ -289,7 +293,7 @@ COORDINATE_SERVICE_AUTO_INIT=true
 COORDINATE_HEALTH_CHECK_INTERVAL=300
 COORDINATE_MAX_RETRIES=3
 COORDINATE_TIMEOUT=10
-COORDINATE_DB_PATH=src/data/admin_divisions.db
+COORDINATE_DB_PATH=shared/data/admin_divisions.db
 COORDINATE_CACHE_ENABLED=true
 COORDINATE_CACHE_TTL=3600
 
@@ -400,6 +404,7 @@ if __name__ == '__main__':
 
 ---
 
-**版本**: 1.0.0
-**更新时间**: 2025年1月
-**支持**: 环境变量、类型注解、配置验证
+**版本**: v3.1.1
+**更新时间**: 2025-11-30
+**支持**: 环境变量、类型注解、配置验证、动态Prompt中间件
+**架构**: packages/agent_fishing模块化架构
