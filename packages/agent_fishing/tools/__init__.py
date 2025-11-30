@@ -7,7 +7,7 @@
 """
 from .basic import get_current_time
 from .weather import get_weather
-from .fishing import query_fishing_recommendation
+from .fishing_tool import query_fishing_recommendation
 from .lure_tools import recommend_equipment, compare_equipment, lookup_fishing_knowledge, identify_from_image
 
 

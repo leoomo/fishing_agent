@@ -102,7 +102,7 @@ def debug_weather_api_calls():
     print("="*60)
 
     try:
-        from packages.agent_fishing.tools.fishing import _get_weather_data
+        from packages.agent_fishing.tools.fishing.weather_api import get_weather_data as _get_weather_data
         from packages.agent_fishing.utils.coordinate import get_coordinates
 
         # 1. 测试地理编码
