@@ -241,7 +241,7 @@ fishing-agent/
 │       │   ├── __init__.py
 │       │   ├── basic.py           # 基础工具
 │       │   ├── weather.py         # 天气工具
-│       │   ├── fishing.py         # 钓鱼工具
+│       │   ├── fishing_tool.py    # 钓鱼工具
 │       │   ├── lure_tools.py      # 路亚工具
 │       │   ├── lure/              # 路亚子模块
 │       │   └── scoring/           # 评分系统
@@ -314,7 +314,7 @@ from packages.agent_fishing import get_all_tools
 
 # 直接工具使用
 from packages.agent_fishing.tools.weather import get_weather
-from packages.agent_fishing.tools.fishing import query_fishing_recommendation
+from packages.agent_fishing.tools.fishing_tool import query_fishing_recommendation
 ```
 
 ---
@@ -428,7 +428,7 @@ tools/
 ├── __init__.py           # 统一工具导出
 ├── basic.py             # 基础工具（时间功能）
 ├── weather.py           # 天气查询工具
-├── fishing.py           # 钓鱼推荐工具
+├── fishing_tool.py      # 钓鱼推荐工具
 ├── lure_tools.py        # 路亚装备工具
 ├── lure/                # 路亚装备子模块
 │   ├── embeddings.py    # DashScope嵌入服务
@@ -590,7 +590,7 @@ async def health_check():
 # packages/agent_fishing/tools/__init__.py
 from .basic import get_current_time
 from .weather import get_weather_by_date
-from .fishing import query_fishing_recommendation
+from .fishing_tool import query_fishing_recommendation
 from .lure_tools import query_lure_recommendation
 
 def get_all_tools():

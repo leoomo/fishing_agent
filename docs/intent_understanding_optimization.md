@@ -55,7 +55,7 @@ graph LR
 
 #### 1. **工具参数设计** ✅ 已实现
 
-**文件位置**：`packages/agent_fishing/tools/fishing.py:71-100`
+**文件位置**：`packages/agent_fishing/tools/fishing_tool.py:71-100`
 
 ```python
 @tool
@@ -118,7 +118,7 @@ def query_fishing_recommendation(location: str, dates: list = None, time_period:
 
 #### 3. **结果生成过滤机制** ✅ 已实现
 
-**文件位置**：`packages/agent_fishing/tools/fishing.py:1565-1600`
+**文件位置**：`packages/agent_fishing/tools/fishing_tool.py:1565-1600`
 
 **时间段过滤函数**：
 ```python
@@ -151,7 +151,7 @@ def _filter_time_slots_by_period(
 
 ### 时间段定义常量 ✅ 已实现
 
-**文件位置**：`packages/agent_fishing/tools/fishing.py:28-42`
+**文件位置**：`packages/agent_fishing/tools/fishing_tool.py:28-42`
 
 ```python
 # ===== 时间段定义常量 =====
@@ -169,7 +169,7 @@ TIME_PERIOD_DEFINITIONS = {
 
 ### 时间段标准化函数 ✅ 已实现
 
-**文件位置**：`packages/agent_fishing/tools/fishing.py:44-70`
+**文件位置**：`packages/agent_fishing/tools/fishing_tool.py:44-70`
 
 ```python
 def normalize_time_period(time_period: str) -> str:
@@ -192,7 +192,7 @@ def normalize_time_period(time_period: str) -> str:
 
 ### 智能时段检测 ✅ 已实现
 
-**文件位置**：`packages/agent_fishing/tools/fishing.py:1450-1520`
+**文件位置**：`packages/agent_fishing/tools/fishing_tool.py:1450-1520`
 
 ```python
 def _find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) -> List[Dict[str, Any]]:
@@ -406,7 +406,7 @@ uv run python main.py
 ### API调用示例
 
 ```python
-from packages.agent_fishing.tools.fishing import query_fishing_recommendation
+from packages.agent_fishing.tools.fishing_tool import query_fishing_recommendation
 
 # 直接调用工具（用于API后端）
 result = query_fishing_recommendation.invoke({

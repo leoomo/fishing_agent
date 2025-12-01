@@ -416,7 +416,7 @@ def test_core_scenario():
 ## 🗄️ 向量存储系统测试 (v3.0.2新增)
 
 ### 测试位置
-- **CLI工具**: `src/tools/lure/cli.py`
+- **CLI工具**: `packages/agent_fishing/tools/lure/cli.py`
 - **测试文件**: `examples/vector_store_example.py`
 
 ### CLI管理测试
@@ -680,7 +680,7 @@ uv run python test_quick_validation.py
 5. **PYTHONPATH问题**
    ```bash
    # 设置正确的Python路径
-   export    uv run pytest tests/scoring/test_enhanced_scorer.py -v
+   export PYTHONPATH=packages uv run pytest tests/agent_fishing/test_enhanced_fishing_scorer.py -v
    ```
 
 ### 调试技巧
@@ -756,7 +756,7 @@ uv run pytest tests/ --tb=long
 
 - name: Run 7-factor scoring tests
   run: |
-    export     uv run pytest tests/scoring/test_enhanced_scorer.py -v --tb=short
+    export PYTHONPATH=packages uv run pytest tests/agent_fishing/test_enhanced_fishing_scorer.py -v --tb=short
 
 - name: Run time period intent tests
   run: |

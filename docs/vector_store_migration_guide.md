@@ -272,7 +272,7 @@ uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force
 **解决**:
 ```bash
 # 清空旧索引
-rm -rf src/tools/lure/data/vector_store
+rm -rf packages/agent_fishing/tools/lure/data/vector_store
 
 # 重建索引
 uv run python -m packages.agent_fishing.tools.lure.cli rebuild --force

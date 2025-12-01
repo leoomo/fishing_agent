@@ -52,7 +52,7 @@ print(f'✅ 时间工具: {result[:50]}...')
 
 # 测试7因子评分系统
 uv run python -c "
-from packages.agent_fishing.tools.fishing.scoring import calculate_seasonal_score, analyze_pressure_trend
+from packages.agent_fishing.tools.fishing.scoring.enhanced_scorer import calculate_seasonal_score, analyze_pressure_trend
 from datetime import datetime
 
 # 季节评分测试
@@ -91,7 +91,7 @@ uv run pytest tests/agent_fishing/test_time_period_intent.py -v --tb=short
 ### 5. 7因子评分系统测试
 ```bash
 # 运行7因子科学评分测试
-PYTHONPATH=packages uv run pytest tests/agent_fishing/test_scoring.py -v --tb=short
+PYTHONPATH=packages uv run pytest tests/agent_fishing/test_enhanced_fishing_scorer.py -v --tb=short
 ```
 
 ### 6. Agent创建测试（v3.1.1动态Prompt中间件版）
@@ -207,7 +207,7 @@ uv run python main.py
 
 # 3. 测试时间段功能
 uv run python -c "
-from packages.agent_fishing.tools.fishing import query_fishing_recommendation
+from packages.agent_fishing.tools.fishing_tool import query_fishing_recommendation
 
 # 测试白天时段推荐
 try:
@@ -228,7 +228,7 @@ except Exception as e:
 # 测试7因子评分性能
 uv run python -c "
 import time
-from packages.agent_fishing.tools.fishing.scoring import (
+from packages.agent_fishing.tools.fishing.scoring.enhanced_scorer import (
     calculate_seasonal_score, analyze_pressure_trend,
     analyze_temperature_trend, analyze_wind_stability
 )
@@ -283,7 +283,7 @@ echo ""
 # 7因子评分测试
 echo "4. 7因子评分测试..."
 uv run python -c "
-from packages.agent_fishing.tools.fishing.scoring import calculate_seasonal_score
+from packages.agent_fishing.tools.fishing.scoring.enhanced_scorer import calculate_seasonal_score
 from datetime import datetime
 score = calculate_seasonal_score(datetime(2024, 4, 15, 7, 0), 7)
 print(f'✅ 春季早晨评分: {score}')

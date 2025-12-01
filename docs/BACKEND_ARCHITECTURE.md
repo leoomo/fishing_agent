@@ -76,7 +76,7 @@ fishing-agent/
 │   ├── tools/                       # Agent 工具集
 │   │   ├── basic.py                 # 基础工具
 │   │   ├── weather.py               # 天气工具
-│   │   ├── fishing.py               # 钓鱼工具
+│   │   ├── fishing_tool.py          # 钓鱼工具
 │   │   ├── lure_tools.py            # 路亚工具
 │   │   └── scoring/                 # 评分系统
 │   └── utils/                       # 工具类

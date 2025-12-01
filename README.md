@@ -348,7 +348,7 @@ print(response)
 
 ### 时间段功能使用（v2.3.0新增）
 ```python
-from packages.agent_fishing.tools.fishing import query_fishing_recommendation
+from packages.agent_fishing.tools.fishing_tool import query_fishing_recommendation
 
 # 白天钓鱼推荐
 result = query_fishing_recommendation.invoke({
@@ -516,7 +516,7 @@ for tool in tools:
 # 直接使用工具
 from packages.agent_fishing.tools.basic import get_current_time
 from packages.agent_fishing.tools.weather import get_weather
-from packages.agent_fishing.tools.fishing import query_fishing_recommendation
+from packages.agent_fishing.tools.fishing_tool import query_fishing_recommendation
 
 # 获取当前时间
 result = get_current_time.invoke({})
@@ -553,7 +553,7 @@ fishing-agent/
 │       ├── tools/                 # Agent 工具
 │       │   ├── basic.py           # 基础工具
 │       │   ├── weather.py         # 天气工具
-│       │   ├── fishing.py         # 钓鱼工具
+│       │   ├── fishing_tool.py    # 钓鱼工具
 │       │   ├── lure_tools.py      # 路亚工具
 │       │   ├── lure/              # 路亚子模块
 │       │   │   ├── embeddings.py  # DashScope Embedding
@@ -724,7 +724,7 @@ MIT License
 - ✅ **"86分问题"解决**: 评分区分度提升100%
 
 **核心模块**：
-- `src/tools/scoring/enhanced_scorer.py`: 增强评分引擎
+- `packages/agent_fishing/tools/scoring/enhanced_scorer.py`: 增强评分引擎
 - 27个单元测试覆盖所有算法组件
 
 ### ⏰ 时间段意图理解 (v2.3.0)
