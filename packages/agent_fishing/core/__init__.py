@@ -14,7 +14,7 @@ from .agent import FishingAgent
 from .model_factory import ModelFactory
 from .prompts import get_system_prompt, create_fishing_prompt
 from .callbacks import FishingAgentCallback
-from .middleware import select_prompt_by_query_type
+from ..middleware import select_prompt_by_query_type
 
 
 def create_agent(**kwargs) -> FishingAgent:

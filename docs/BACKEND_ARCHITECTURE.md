@@ -70,9 +70,9 @@ fishing-agent/
 │   │   ├── agent.py                 # 主 Agent 类
 │   │   ├── model_factory.py         # LLM 工厂
 │   │   ├── prompts.py               # 系统提示词
-│   │   ├── callbacks.py             # 回调和监控
-│   │   └── middleware/              # 🆕 动态Prompt中间件
-│   │       └── dynamic_prompt.py    # @dynamic_prompt装饰器
+│   │   └── callbacks.py             # 回调和监控
+│   ├── middleware/                  # 🆕 动态Prompt中间件
+│   │   └── dynamic_prompt.py        # @dynamic_prompt装饰器
 │   ├── tools/                       # Agent 工具集
 │   │   ├── basic.py                 # 基础工具
 │   │   ├── weather.py               # 天气工具

@@ -75,9 +75,9 @@
     - `model_factory.py`: LLM 工厂
     - `prompts.py`: 分层提示词系统（Base/Fishing/Weather）
     - `callbacks.py`: 回调系统
-    - `middleware/`: 中间件模块 ⭐ v3.1.1新增
-      - `dynamic_prompt.py`: 动态Prompt中间件
-      - `__init__.py`: 中间件导出
+  - **`middleware/`**: 中间件模块 ⭐ v3.1.1新增
+    - `dynamic_prompt.py`: 动态Prompt中间件
+    - `__init__.py`: 中间件导出
   - **`tools/`**: Agent 工具模块
     - `basic.py`: 基础工具（时间功能）
     - `weather.py`: 天气工具（72小时预报）
@@ -546,10 +546,10 @@ fishing-agent/
 │       │   ├── agent.py           # FishingAgent 实现（+ middleware）
 │       │   ├── model_factory.py   # LLM 工厂
 │       │   ├── prompts.py         # 分层提示词系统（Base/Fishing/Weather）
-│       │   ├── callbacks.py       # 回调系统
-│       │   └── middleware/        # 中间件模块 ⭐ v3.1.1新增
-│       │       ├── __init__.py    # 中间件导出
-│       │       └── dynamic_prompt.py # 动态Prompt中间件
+│       │   └── callbacks.py       # 回调系统
+│       ├── middleware/            # 中间件模块 ⭐ v3.1.1新增
+│       │   ├── __init__.py        # 中间件导出
+│       │   └── dynamic_prompt.py  # 动态Prompt中间件
 │       ├── tools/                 # Agent 工具
 │       │   ├── basic.py           # 基础工具
 │       │   ├── weather.py         # 天气工具

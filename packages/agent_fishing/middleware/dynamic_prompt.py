@@ -11,7 +11,7 @@ Dynamic Prompt Middleware - 根据查询类型动态选择系统 prompt
 import logging
 from langchain.agents.middleware import dynamic_prompt, ModelRequest
 
-from ..prompts import BASE_SYSTEM_PROMPT, FISHING_OUTPUT_RULES, WEATHER_QUERY_RULES
+from ..core.prompts import BASE_SYSTEM_PROMPT, FISHING_OUTPUT_RULES, WEATHER_QUERY_RULES
 
 logger = logging.getLogger(__name__)
 

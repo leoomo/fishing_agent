@@ -15,7 +15,7 @@ from ..tools import get_all_tools
 from .model_factory import ModelFactory
 from .prompts import BASE_SYSTEM_PROMPT, FISHING_OUTPUT_RULES, WEATHER_QUERY_RULES
 from .callbacks import FishingAgentCallback, OutputFormatValidator
-from .middleware import select_prompt_by_query_type
+from ..middleware import select_prompt_by_query_type
 
 logger = logging.getLogger(__name__)
 
