@@ -1,7 +1,7 @@
 {
   "dependencies": ["."],
   "graphs": {
-    "fishing": "./packages/agent_fishing:get_agent"
+    "fishing": "./packages/agent_fishing/__init__.py:get_agent"
   },
   "env": ".env"
 }
