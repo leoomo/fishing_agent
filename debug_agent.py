@@ -324,7 +324,7 @@ def main():
     # 解析命令行参数
     model_provider = "qwen"  # 默认使用通义千问
     mode = "direct"         # 默认直接查询模式
-    query = "明天杭州路亚怎么样？"  # 默认查询
+    query = "明天去河桥镇钓鱼，哪个时段比较合适？"  # 默认查询
 
     if len(sys.argv) > 1:
         model_provider = sys.argv[1]

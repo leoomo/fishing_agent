@@ -25,6 +25,17 @@ AMAP_GEOCODE_URL = "https://restapi.amap.com/v3/geocode/geo"
 # 缓存配置
 COORDINATE_CACHE_TTL = 86400  # 24小时
 
+# 地理编码优先区域配置
+GEOCODE_PRIORITY_PROVINCE = os.getenv('GEOCODE_PRIORITY_PROVINCE', '浙江省')
+
+# 浙江省经纬度范围（用于地理围栏）
+GEOCODE_PRIORITY_BOUNDS = {
+    'lon_min': float(os.getenv('GEOCODE_LON_MIN', '118.0')),
+    'lon_max': float(os.getenv('GEOCODE_LON_MAX', '123.0')),
+    'lat_min': float(os.getenv('GEOCODE_LAT_MIN', '27.0')),
+    'lat_max': float(os.getenv('GEOCODE_LAT_MAX', '31.0'))
+}
+
 
 def get_coordinates(location: str) -> Tuple[float, float]:
     """
@@ -65,7 +76,7 @@ def get_coordinates(location: str) -> Tuple[float, float]:
 
 def _fetch_coordinates_from_api(location: str) -> Optional[Tuple[float, float]]:
     """
-    从高德地图API获取坐标
+    从高德地图API获取坐标（支持多结果智能选择）
 
     Args:
         location: 位置名称
@@ -90,13 +101,25 @@ def _fetch_coordinates_from_api(location: str) -> Optional[Tuple[float, float]]:
         data = response.json()
 
         if data.get('status') == '1' and data.get('geocodes'):
-            geocode = data['geocodes'][0]
-            if geocode.get('location'):
-                # 解析坐标: "120.12345,30.67890"
-                location_str = geocode['location']
+            geocodes = data['geocodes']
+
+            # 记录多结果情况
+            if len(geocodes) > 1:
+                logger.info(f"地名 '{location}' 有 {len(geocodes)} 个匹配结果，执行智能选择")
+
+            # 使用智能选择逻辑
+            best_geocode = select_best_geocode(
+                geocodes,
+                GEOCODE_PRIORITY_PROVINCE,
+                GEOCODE_PRIORITY_BOUNDS
+            )
+
+            if best_geocode and best_geocode.get('location'):
+                location_str = best_geocode['location']
                 lon_str, lat_str = location_str.split(',')
                 longitude = float(lon_str)
                 latitude = float(lat_str)
+
                 return (longitude, latitude)
         else:
             logger.warning(f"高德API返回无坐标: {data}")
@@ -133,6 +156,97 @@ def validate_coordinates(coords: Tuple[float, float]) -> bool:
         return (-180 <= lon_float <= 180) and (-90 <= lat_float <= 90)
     except (ValueError, TypeError):
         return False
+
+
+def is_within_bounds(longitude: float, latitude: float, bounds: dict) -> bool:
+    """
+    检查坐标是否在指定边界内
+
+    Args:
+        longitude: 经度
+        latitude: 纬度
+        bounds: 边界字典 {lon_min, lon_max, lat_min, lat_max}
+
+    Returns:
+        是否在边界内
+    """
+    return (bounds['lon_min'] <= longitude <= bounds['lon_max'] and
+            bounds['lat_min'] <= latitude <= bounds['lat_max'])
+
+
+def select_best_geocode(geocodes: list, priority_province: str, priority_bounds: dict) -> Optional[dict]:
+    """
+    从多个地理编码结果中选择最佳匹配
+
+    优先级：
+    1. 优先选择指定省份内的结果
+    2. 其次选择优先区域边界内的结果
+    3. 最后回退到第一个结果
+
+    Args:
+        geocodes: 高德API返回的geocodes数组
+        priority_province: 优先省份名称
+        priority_bounds: 优先区域边界
+
+    Returns:
+        选中的geocode字典，或None
+    """
+    if not geocodes:
+        return None
+
+    # 解析所有有效的geocode
+    candidates = []
+    for geocode in geocodes:
+        location_str = geocode.get('location')
+        if not location_str:
+            continue
+
+        try:
+            lon_str, lat_str = location_str.split(',')
+            longitude = float(lon_str)
+            latitude = float(lat_str)
+
+            province = geocode.get('province', '')
+            city = geocode.get('city', '')
+            district = geocode.get('district', '')
+
+            candidates.append({
+                'longitude': longitude,
+                'latitude': latitude,
+                'province': province,
+                'city': city,
+                'district': district,
+                'raw': geocode
+            })
+        except (ValueError, AttributeError) as e:
+            logger.debug(f"解析geocode失败: {e}")
+            continue
+
+    if not candidates:
+        return None
+
+    # 策略1: 优先选择指定省份
+    province_matches = [c for c in candidates if priority_province in c['province']]
+    if province_matches:
+        best = province_matches[0]
+        logger.info(f"✅ 地名匹配: {best['province']}{best['city']}{best['district']} "
+                   f"[{best['longitude']:.6f}, {best['latitude']:.6f}]")
+        return best['raw']
+
+    # 策略2: 选择地理边界内的结果
+    bounds_matches = [c for c in candidates
+                     if is_within_bounds(c['longitude'], c['latitude'], priority_bounds)]
+    if bounds_matches:
+        best = bounds_matches[0]
+        logger.info(f"⚠️ 边界匹配: {best['province']}{best['city']}{best['district']} "
+                   f"[{best['longitude']:.6f}, {best['latitude']:.6f}]")
+        return best['raw']
+
+    # 策略3: 回退到第一个结果
+    fallback = candidates[0]
+    logger.warning(f"⚠️ 使用首个结果: {fallback['province']}{fallback['city']}{fallback['district']} "
+                  f"[{fallback['longitude']:.6f}, {fallback['latitude']:.6f}]")
+    return fallback['raw']
 
 
 def format_coordinates(coords: Tuple[float, float]) -> str:
