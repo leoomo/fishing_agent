@@ -1,27 +1,60 @@
-# Fishing Agent - 智能钓鱼助手 v3.1.1
+# Fishing Agent - 智能钓鱼助手 v3.2.0
 
-基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐和天气分析。
+基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐、天气分析和路亚装备管理。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v3.1.1 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v3.2.0 + 用户装备管理 + 电商爬虫 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
 
-> **当前版本**: v3.1.1 (LLM优化 + 动态Prompt中间件系统)
-> **当前分支**: feature/llm-optimization (LLM优化功能已实现)
-> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构
+> **当前版本**: v3.2.0 (用户装备管理 + 电商爬虫 + LLM优化)
+> **当前分支**: feature/user-equipment-info
+> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构 + 用户装备管理
 
-### 🌟 版本状态 (v3.1.1)
+### 🌟 版本状态 (v3.2.0) ⭐ 新增用户装备管理 + 电商爬虫
+- ✅ **用户装备管理系统**: 完整的用户装备库管理，支持添加/查询/删除/统计/推荐功能
+- ✅ **电商爬虫模块**: 支持淘宝/京东/论坛装备数据爬取，自动数据去重和持久化
+- ✅ **智能推荐算法**: 基于用户装备的升级推荐、配置完善和搭配分析（3种推荐策略）
+- ✅ **RESTful API扩展**: 新增6个用户装备管理API端点，支持前端集成
+- ✅ **LangChain工具集成**: 4个新增@tool工具，Agent可直接调用用户装备功能
+- ✅ **反爬虫策略**: UA轮换、请求延迟、指数退避重试，确保数据获取稳定性
+- ✅ **数据去重系统**: 3级去重策略（精确匹配/模糊匹配/规格匹配），避免重复数据
 - ✅ **模块化架构重构**: 完全自包含的 Agent 包架构，packages/agent_fishing 独立发布
 - 🚀 **动态Prompt中间件**: 智能选择提示词，优化Token使用效率 (600-1200 tokens)
 - 🧠 **LLM优化系统**: 分层Prompt架构，Base/Fishing/Weather三层设计
 - 🚀 **FastAPI 后端**: REST API 支持，便于前端集成和部署
 - 📈 **性能提升**: 意图识别准确率98%+，LLM推理质量显著优化
 - 🎯 **LangChain 1.0+**: 原生 LangChain agents，middleware中间件架构
-- 🔧 **文档更新**: 全面更新以反映新的 middleware 架构
 - 🚀 **向量存储系统**: 集成DashScope Embedding API和ChromaDB，支持路亚装备语义搜索
 - 📋 **CLI管理工具**: 新增向量存储管理CLI，支持索引重建和搜索测试
-- 🔇 **用户体验优化**: 抑制LangSmith UUID v7警告，优化控制台输出显示
-- 🔄 **当前开发状态**: LLM优化和动态Prompt中间件系统已完成并集成
 
-## ✨ 核心功能（v3.1.1 LLM优化 + v3.1.0 模块化架构重构 + v3.0.2 路亚装备集成 + v3.0.0 7因子评分升级）
+## ✨ 核心功能（v3.2.0 用户装备管理 + v3.1.1 LLM优化 + v3.1.0 模块化架构重构 + v3.0.2 路亚装备集成）
+
+### 🎒 用户装备管理系统 ⭐ v3.2.0核心功能
+- **装备库管理**: 添加、查询、删除用户装备，支持收藏、备注、标签管理
+- **装备统计分析**: 按类别统计装备数量、总花费、平均价格、品牌分布
+- **智能推荐系统**: 3种推荐策略提供个性化建议
+  - **升级推荐**: 分析用户装备水平，推荐更高级装备替换薄弱环节
+  - **完善推荐**: 检查基础装备是否齐全，推荐缺失的装备类型
+  - **搭配推荐**: 分析装备兼容性，检查鱼竿/渔轮/鱼线是否匹配
+- **4个LangChain工具**: Agent可直接调用用户装备功能
+  - `list_my_equipment`: 查看装备库
+  - `add_equipment_to_profile`: 添加装备
+  - `remove_equipment_from_profile`: 删除装备
+  - `recommend_based_on_my_equipment`: 基于用户装备推荐
+- **6个RESTful API端点**: 支持前端集成和第三方调用
+- **用户上下文集成**: Agent对话支持用户ID传递，提供个性化服务
+
+### 🕷️ 电商装备爬虫 ⭐ v3.2.0核心功能
+- **多源数据爬取**: 支持淘宝、京东、路亚论坛装备数据采集
+- **反爬虫策略**:
+  - UA轮换（10+真实浏览器User-Agent）
+  - 请求延迟（2-5秒随机）
+  - 指数退避重试（最多3次）
+- **智能数据去重**: 3级去重策略避免重复数据
+  - 精确匹配：品牌 + 型号
+  - 模糊匹配：品牌 + 名称相似度>80%
+  - 规格匹配：类别 + 关键规格参数
+- **数据持久化**: 自动保存到数据库，支持增量更新
+- **图片下载管理**: 自动下载装备图片，规范化命名和存储
+- **爬虫CLI工具**: 独立命令行工具支持批量爬取和定时同步
 
 ### 🧠 动态Prompt中间件系统 ⭐ v3.1.1核心功能
 - **智能Prompt选择**: 根据查询类型动态选择系统提示词
@@ -289,13 +322,47 @@ uv run python debug_agent.py --interactive
 # 健康检查
 curl http://localhost:8000/health
 
-# 对话测试
+# 对话测试（钓鱼推荐）
 curl -X POST http://localhost:8000/api/v1/fishing/chat \
   -H "Content-Type: application/json" \
   -d '{"query": "明天杭州钓鱼怎么样？"}'
 
+# 对话测试（带用户上下文）⭐ v3.2.0新增
+curl -X POST http://localhost:8000/api/v1/fishing/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "推荐一个适合我的鱼竿", "user_id": 1, "model_provider": "zhipu"}'
+
 # 工具列表
 curl http://localhost:8000/api/v1/fishing/tools
+
+# ========== 用户装备管理API ⭐ v3.2.0新增 ==========
+
+# 创建用户
+curl -X POST http://localhost:8000/api/v1/user-equipment/users \
+  -H "Content-Type: application/json" \
+  -d '{"username": "test_user", "nickname": "测试用户", "user_level": "新手"}'
+
+# 添加装备到用户库
+curl -X POST http://localhost:8000/api/v1/user-equipment/users/1/equipment \
+  -H "Content-Type: application/json" \
+  -d '{"equipment_id": 123, "purchase_price": 599.99, "notes": "我的第一支鱼竿"}'
+
+# 查询用户装备列表
+curl http://localhost:8000/api/v1/user-equipment/users/1/equipment
+
+# 按类别查询
+curl "http://localhost:8000/api/v1/user-equipment/users/1/equipment?category=鱼竿"
+
+# 删除装备
+curl -X DELETE http://localhost:8000/api/v1/user-equipment/users/1/equipment/123
+
+# 获取装备推荐
+curl -X POST http://localhost:8000/api/v1/user-equipment/users/1/recommend \
+  -H "Content-Type: application/json" \
+  -d '{"recommendation_type": "upgrade"}'
+
+# 获取装备统计
+curl http://localhost:8000/api/v1/user-equipment/users/1/statistics
 ```
 
 > ✅ **v3.1.0更新**: 全新的模块化 Agent 架构，独立 Agent 包支持！
@@ -305,13 +372,14 @@ curl http://localhost:8000/api/v1/fishing/tools
 > 🚀 **7因子评分**: 科学评分体系，解决"86分问题"！
 
 ### 当前分支状态
-> ✅ **feature/llm-optimization分支已完成** - LLM优化和动态Prompt中间件系统已实现
-> - ✅ 动态Prompt中间件：智能选择提示词，优化Token使用效率50%+
-> - ✅ 分层Prompt架构：Base(600tokens) + Fishing(1200tokens) + Weather(800tokens)
-> - ✅ 意图识别准确率：98%+，支持钓鱼/天气/一般查询自动识别
-> - ✅ 调试工具：新增debug_agent.py，支持多模型测试和环境检查
-> - ✅ 架构文档：新增BACKEND_ARCHITECTURE.md，详细说明middleware实现
-> - 当前状态：LLM优化和中间件系统已完全集成，功能稳定可用
+> ✅ **feature/user-equipment-info分支已完成** - 用户装备管理和电商爬虫系统已实现
+> - ✅ 用户装备管理：完整的装备库CRUD + 统计分析 + 智能推荐
+> - ✅ 电商爬虫模块：淘宝/京东/论坛多源爬取 + 反爬虫策略 + 数据去重
+> - ✅ API端点扩展：新增6个RESTful端点支持用户装备管理
+> - ✅ LangChain工具集成：4个@tool工具供Agent调用
+> - ✅ 推荐算法：升级/完善/搭配3种推荐策略
+> - ✅ 数据库扩展：users和user_equipment表，支持用户装备关联
+> - 当前状态：用户装备管理和爬虫系统已完全集成，功能稳定可用
 
 #### 方法四：激活虚拟环境
 ```bash
@@ -503,6 +571,170 @@ for result in results:
     print(f"[{result.score:.3f}] {result.title}")
 ```
 
+### 用户装备管理使用（v3.2.0新增）⭐
+```python
+from packages.agent_fishing.tools.user_equipment import (
+    UserEquipmentManager,
+    UserBasedRecommender,
+)
+from packages.agent_fishing.tools.lure.database import get_db
+
+# 初始化管理器
+db = get_db()
+manager = UserEquipmentManager(db)
+recommender = UserBasedRecommender(db, manager)
+
+# 1. 创建用户
+user_id = manager.create_user(
+    username="fishing_lover",
+    nickname="钓鱼爱好者",
+    user_level="进阶",  # 新手/进阶/高手
+    fishing_experience_years=3,
+    preferred_fish="鲈鱼,翘嘴"
+)
+print(f"创建用户成功: user_id={user_id}")
+
+# 2. 添加装备到装备库
+record_id = manager.add_equipment(
+    user_id=user_id,
+    equipment_id=123,  # 装备ID（来自equipment表）
+    purchase_price=599.99,
+    purchase_date="2024-01-15",
+    notes="第一支路亚竿",
+    tags=["入门", "鲈鱼专用"]
+)
+print(f"添加装备成功: record_id={record_id}")
+
+# 3. 查询装备列表
+equipment_list = manager.list_user_equipment(user_id, category="鱼竿")
+for eq in equipment_list:
+    print(f"{'⭐' if eq.is_favorite else '  '} {eq.equipment_name} - ¥{eq.purchase_price:.2f}")
+
+# 4. 统计分析
+stats = manager.get_equipment_statistics(user_id)
+print(f"装备总数: {stats['total_count']}")
+print(f"总花费: ¥{stats['total_spent']:.2f}")
+print(f"收藏数: {stats['favorite_count']}")
+
+# 5. 获取推荐
+# 升级推荐
+upgrade_rec = recommender.recommend_upgrade(user_id)
+print("升级推荐:", upgrade_rec)
+
+# 完善推荐（检查缺失装备）
+complete_rec = recommender.recommend_complete_set(user_id)
+print("完善推荐:", complete_rec)
+
+# 搭配推荐（检查装备匹配度）
+match_rec = recommender.recommend_matching(user_id)
+print("搭配推荐:", match_rec)
+
+# 6. Agent对话中使用（带用户上下文）
+from packages.agent_fishing import create_agent
+
+agent = create_agent(model_provider="zhipu")
+
+# 方式1: 直接在查询中指定用户ID
+response = agent.run("[USER_ID:1] 帮我查看一下我的装备库")
+print(response)
+
+# 方式2: 通过API传递user_id（推荐用于前端集成）
+# POST /api/v1/fishing/chat
+# {"query": "推荐一个鱼竿", "user_id": 1, "model_provider": "zhipu"}
+```
+
+### 电商爬虫使用（v3.2.0新增）⭐
+```python
+from packages.agent_fishing.tools.crawler import (
+    TaobaoSpider,
+    JDSpider,
+    ForumSpider,
+    DataPersister,
+)
+from packages.agent_fishing.tools.lure.database import get_db
+
+# 初始化爬虫和持久化器
+db = get_db()
+persister = DataPersister(db)
+
+# 1. 淘宝爬虫 - 搜索装备
+taobao = TaobaoSpider()
+equipment_list = taobao.search_equipment(
+    keyword="禧玛诺鱼竿",
+    category="鱼竿",
+    max_results=20
+)
+
+# 2. 京东爬虫 - 搜索装备
+jd = JDSpider()
+equipment_list = jd.search_equipment(
+    keyword="达亿瓦渔轮",
+    category="渔轮",
+    max_results=20
+)
+
+# 3. 论坛爬虫 - 获取装备测评
+forum = ForumSpider()
+equipment_list = forum.search_equipment(
+    keyword="路亚竿推荐",
+    category=None,  # 自动识别类别
+    max_results=10
+)
+
+# 4. 保存到数据库（自动去重）
+for equipment in equipment_list:
+    try:
+        equipment_id = persister.save_equipment(
+            equipment,
+            update_if_exists=True  # 如果已存在则更新价格和图片
+        )
+        print(f"✅ 保存成功: {equipment.name} (ID: {equipment_id})")
+    except Exception as e:
+        print(f"❌ 保存失败: {equipment.name} - {e}")
+
+# 5. 批量爬取（推荐使用CLI工具）
+# 见下方CLI命令示例
+```
+
+### 爬虫CLI工具使用（v3.2.0新增）
+```bash
+# 1. 爬取淘宝装备数据
+uv run python -m packages.agent_fishing.tools.crawler.cli crawl \
+    --source taobao \
+    --keyword "禧玛诺鱼竿" \
+    --category 鱼竿 \
+    --max-results 50
+
+# 2. 爬取京东装备数据
+uv run python -m packages.agent_fishing.tools.crawler.cli crawl \
+    --source jd \
+    --keyword "达亿瓦渔轮" \
+    --category 渔轮 \
+    --max-results 50
+
+# 3. 爬取论坛装备测评
+uv run python -m packages.agent_fishing.tools.crawler.cli crawl \
+    --source forum \
+    --keyword "路亚装备推荐" \
+    --max-results 30
+
+# 4. 增量同步（更新最近30天的装备数据）
+uv run python -m packages.agent_fishing.tools.crawler.cli sync --days 30
+
+# 5. 批量爬取多个关键词
+uv run python -m packages.agent_fishing.tools.crawler.cli crawl \
+    --source taobao \
+    --keywords "禧玛诺,达亿瓦,光威" \
+    --category 鱼竿 \
+    --max-results 20
+
+# 注意：
+# - 请遵守网站robots.txt和服务条款
+# - 建议设置合理的延迟时间（2-5秒）
+# - 避免频繁大量爬取导致IP被封
+# - 爬取的数据仅供学习和个人使用
+```
+
 ### 直接工具调用
 ```python
 from packages.agent_fishing import get_all_tools
@@ -561,6 +793,20 @@ fishing-agent/
 │       │   │   ├── database.py    # 数据库访问
 │       │   │   ├── cli.py         # CLI 管理工具
 │       │   │   └── ...            # 其他路亚模块
+│       │   ├── crawler/           # ⭐ v3.2.0新增：电商爬虫模块
+│       │   │   ├── base_spider.py     # 基础爬虫类
+│       │   │   ├── taobao_spider.py   # 淘宝爬虫
+│       │   │   ├── jd_spider.py       # 京东爬虫
+│       │   │   ├── forum_spider.py    # 论坛爬虫
+│       │   │   ├── anti_crawler.py    # 反爬虫策略
+│       │   │   ├── deduplicator.py    # 数据去重器
+│       │   │   ├── downloader.py      # 图片下载器
+│       │   │   ├── data_persister.py  # 数据持久化
+│       │   │   └── cli.py             # 爬虫CLI工具
+│       │   ├── user_equipment/    # ⭐ v3.2.0新增：用户装备管理模块
+│       │   │   ├── manager.py         # 装备管理器（CRUD + 统计）
+│       │   │   ├── tools.py           # 4个LangChain工具
+│       │   │   └── recommender.py     # 推荐算法（3种策略）
 │       │   └── scoring/           # 评分系统
 │       │       └── enhanced_scorer.py # 7因子评分算法
 │       └── utils/                 # Agent 工具类
@@ -574,9 +820,11 @@ fishing-agent/
 │   └── api/                       # FastAPI 后端
 │       ├── main.py
 │       ├── routes/
-│       │   └── fishing.py         # API 路由
+│       │   ├── fishing.py         # 钓鱼API路由
+│       │   └── user_equipment.py  # ⭐ v3.2.0新增：用户装备API
 │       └── schemas/
-│           └── chat.py            # 数据模型
+│           ├── chat.py            # 对话数据模型（已扩展user_id）
+│           └── user_equipment.py  # ⭐ v3.2.0新增：装备数据模型
 ├── shared/                        # 共享资源
 │   ├── config/                    # 全局配置
 │   │   └── service_config.py
@@ -584,16 +832,23 @@ fishing-agent/
 │       ├── coordinate_enrichment.py
 │       └── national_region_database.py
 ├── tests/                         # 测试
-│   └── agent_fishing/             # Agent 测试套件
-│       ├── test_enhanced_fishing_scorer.py
-│       ├── test_time_period_intent.py
-│       ├── test_national_coverage.py
-│       └── test_tool_selection.py
+│   ├── agent_fishing/             # Agent 测试套件
+│   │   ├── test_enhanced_fishing_scorer.py
+│   │   ├── test_time_period_intent.py
+│   │   ├── test_national_coverage.py
+│   │   └── test_tool_selection.py
+│   └── test_user_equipment_integration.py  # ⭐ v3.2.0新增：装备管理集成测试
 ├── docs/                          # 文档目录
 │   ├── API.md                     # REST API 文档
+│   ├── API_REFERENCE.md           # ⭐ v3.2.0新增：完整API参考
 │   ├── ARCHITECTURE.md            # 架构文档
 │   ├── BACKEND_ARCHITECTURE.md    # 后端架构详解 ⭐ v3.1.1新增
+│   ├── USER_EQUIPMENT_GUIDE.md    # ⭐ v3.2.0新增：用户装备使用指南
+│   ├── CRAWLER_GUIDE.md           # ⭐ v3.2.0新增：爬虫使用指南
 │   └── ...                        # 其他文档
+├── examples/                      # 示例代码
+│   ├── user_equipment_example.py  # ⭐ v3.2.0新增：装备管理示例
+│   └── vector_store_example.py    # 向量存储示例
 ├── main.py                        # CLI 入口
 ├── debug_agent.py                 # 调试工具 ⭐ v3.1.1新增
 ├── langgraph.json                 # LangGraph 配置
@@ -689,6 +944,53 @@ MIT License
 
 ---
 
+## 🆕 v3.2.0 新功能亮点 ⭐ 用户装备管理 + 电商爬虫
+
+### 🎒 用户装备管理系统
+**完整的装备库管理功能**：
+- ✅ **装备CRUD操作**: 添加、查询、删除用户装备，支持收藏和标签管理
+- ✅ **智能统计分析**: 按类别统计装备数量、总花费、平均价格、品牌分布
+- ✅ **3种推荐策略**:
+  - 升级推荐：分析用户装备水平，推荐更高级装备
+  - 完善推荐：检查基础装备是否齐全，推荐缺失装备
+  - 搭配推荐：分析装备兼容性，提供匹配建议
+- ✅ **Agent集成**: 4个LangChain工具无缝集成，Agent可直接调用
+- ✅ **RESTful API**: 6个API端点支持前端集成
+- ✅ **用户上下文**: 对话接口支持user_id传递，提供个性化服务
+
+**核心模块**：
+- `packages/agent_fishing/tools/user_equipment/manager.py`: 装备管理器
+- `packages/agent_fishing/tools/user_equipment/recommender.py`: 推荐算法
+- `packages/agent_fishing/tools/user_equipment/tools.py`: LangChain工具
+- `apps/api/routes/user_equipment.py`: RESTful API端点
+- `tests/test_user_equipment_integration.py`: 集成测试
+
+### 🕷️ 电商装备爬虫系统
+**多源数据采集和智能去重**：
+- ✅ **多平台支持**: 淘宝、京东、路亚论坛装备数据爬取
+- ✅ **反爬虫策略**: UA轮换、请求延迟、指数退避重试
+- ✅ **智能去重**: 3级去重策略（精确/模糊/规格匹配）
+- ✅ **数据持久化**: 自动保存到数据库，支持增量更新
+- ✅ **图片管理**: 自动下载和规范化存储装备图片
+- ✅ **CLI工具**: 独立命令行工具支持批量爬取
+
+**核心模块**：
+- `packages/agent_fishing/tools/crawler/base_spider.py`: 基础爬虫类
+- `packages/agent_fishing/tools/crawler/taobao_spider.py`: 淘宝爬虫
+- `packages/agent_fishing/tools/crawler/jd_spider.py`: 京东爬虫
+- `packages/agent_fishing/tools/crawler/deduplicator.py`: 数据去重器
+- `packages/agent_fishing/tools/crawler/data_persister.py`: 数据持久化
+
+### 📝 文档和测试
+**完善的文档和示例**：
+- ✅ **用户指南**: `docs/USER_EQUIPMENT_GUIDE.md` - 完整的装备管理使用指南
+- ✅ **爬虫指南**: `docs/CRAWLER_GUIDE.md` - 爬虫使用和最佳实践
+- ✅ **API文档**: `docs/API_REFERENCE.md` - 完整的API参考文档
+- ✅ **示例代码**: `examples/user_equipment_example.py` - 可运行的示例
+- ✅ **集成测试**: 完整的端到端测试覆盖
+
+---
+
 ## 🆕 v3.0.1 新功能亮点
 
 ### 🧪 测试完善和设计文档补充
@@ -737,4 +1039,14 @@ MIT License
 
 ---
 
-> 🎣 智能分析，精准钓鱼！现在支持7因子科学评分 + 动态趋势分析 + LLM优化 + 时间段意图理解！
+> 🎣 智能分析，精准钓鱼！
+>
+> v3.2.0 全新升级：
+> - 🎒 **用户装备管理系统** - 完整的装备库管理、智能推荐、统计分析
+> - 🕷️ **电商装备爬虫** - 多平台数据采集、智能去重、自动化入库
+> - 🤖 **Agent集成增强** - 4个新增LangChain工具，6个RESTful API端点
+> - 📊 **7因子科学评分** - 动态趋势分析、季节月相评分
+> - 🧠 **LLM优化** - 动态Prompt中间件、意图识别准确率98%+
+> - ⏰ **时间段意图理解** - 精准识别用户时间限定
+>
+> 立即开始：`uv run python main.py` 或查看 `docs/USER_EQUIPMENT_GUIDE.md`

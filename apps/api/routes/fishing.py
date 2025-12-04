@@ -14,14 +14,20 @@ async def chat(request: ChatRequest):
     与钓鱼助手对话
 
     Args:
-        request: 聊天请求，包含查询内容和模型提供商
+        request: 聊天请求，包含查询内容、模型提供商和用户ID（可选）
 
     Returns:
         ChatResponse: Agent 的回复
     """
     try:
         agent = create_agent(model_provider=request.model_provider)
-        response = agent.run(request.query)
+
+        # 如果提供了 user_id，注入到查询上下文
+        query = request.query
+        if request.user_id:
+            query = f"[USER_ID:{request.user_id}] {query}"
+
+        response = agent.run(query)
         return ChatResponse(response=response, status="success")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

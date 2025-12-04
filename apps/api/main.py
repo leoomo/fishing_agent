@@ -16,6 +16,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import fishing_router
+from .routes.user_equipment import router as user_equipment_router
 
 app = FastAPI(
     title="智能钓鱼助手 API",
@@ -34,6 +35,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(fishing_router, prefix="/api/v1/fishing", tags=["fishing"])
+app.include_router(user_equipment_router, prefix="/api/v1/user-equipment", tags=["user-equipment"])
 
 
 @app.get("/")

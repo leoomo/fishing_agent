@@ -389,6 +389,21 @@ class LureDatabase:
 
         conn.commit()
 
+        # 运行数据库迁移
+        self._run_migrations()
+
+    def _run_migrations(self):
+        """运行数据库迁移"""
+        try:
+            from .migrations import DatabaseMigrations
+            conn = self._get_connection()
+            migrations = DatabaseMigrations(conn)
+            migrations.run_all_migrations()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"数据库迁移执行失败（可能已经执行过）: {e}")
+
     def execute(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
         """执行查询（只读）"""
         conn = self._get_connection()
