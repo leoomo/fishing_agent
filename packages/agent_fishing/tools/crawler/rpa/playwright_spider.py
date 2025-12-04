@@ -75,15 +75,30 @@ class PlaywrightSpider(BaseSpider, ABC):
             else:
                 raise ValueError(f"不支持的浏览器类型: {self.rpa_config.browser_type}")
 
-            # 启动浏览器
-            self.browser = browser_launcher.launch(
-                headless=self.rpa_config.headless,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-dev-shm-usage",
-                    "--no-sandbox",
-                ]
-            )
+            # 启动浏览器（优先使用系统 Chrome）
+            try:
+                self.browser = browser_launcher.launch(
+                    headless=self.rpa_config.headless,
+                    channel="chrome",  # 使用系统 Chrome 浏览器
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-dev-shm-usage",
+                        "--no-sandbox",
+                    ]
+                )
+                logger.info("✅ 使用系统 Chrome 浏览器")
+            except Exception as e:
+                # 回退到 Playwright 自带浏览器
+                logger.warning(f"无法使用系统 Chrome，使用 Playwright 浏览器: {e}")
+                logger.info("提示：如需使用 Playwright 浏览器，请运行: uv run playwright install chromium")
+                self.browser = browser_launcher.launch(
+                    headless=self.rpa_config.headless,
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-dev-shm-usage",
+                        "--no-sandbox",
+                    ]
+                )
 
             # 创建浏览器上下文
             self.context = self._create_context()
