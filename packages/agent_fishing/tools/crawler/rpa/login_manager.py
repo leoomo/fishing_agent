@@ -199,19 +199,29 @@ class LoginManager:
             for i in range(60):
                 time.sleep(2)
 
-                # 检查是否登录成功
-                if self.is_session_valid(page):
-                    logger.info("✅ 扫码登录成功！")
-                    print("\n✅ 登录成功！\n")
+                # 检查是否登录成功（通过 URL 跳转判断）
+                current_url = page.url
 
-                    # 7. 保存 Cookie
-                    self._save_cookies(page, context)
+                # 登录成功后会跳转离开 login.taobao.com
+                if "login.taobao.com" not in current_url:
+                    logger.info(f"✅ 检测到页面跳转: {current_url}")
+                    print("\n✅ 登录成功！正在验证...\n")
 
-                    return True
+                    # 再次验证登录状态（此时才跳转到首页验证）
+                    time.sleep(1)
+                    if self.is_session_valid(page):
+                        logger.info("✅ 扫码登录验证成功！")
+
+                        # 7. 保存 Cookie
+                        self._save_cookies(page, context)
+                        return True
+                    else:
+                        logger.warning("登录验证失败，继续等待...")
 
                 # 每10秒提示一次
                 if (i + 1) % 5 == 0:
                     logger.info(f"等待扫码... ({(i + 1) * 2}/120秒)")
+                    print(f"⏳ 等待中... ({(i + 1) * 2}/120秒)")
 
             # 超时
             logger.error("❌ 扫码登录超时（120秒）")
