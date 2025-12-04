@@ -43,6 +43,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# RPA爬虫支持
+rpa = [
+    "playwright>=1.40.0",
+]
+
 # 本地模型支持（未来扩展）
 vector-local = [
     "sentence-transformers>=2.3.1",
