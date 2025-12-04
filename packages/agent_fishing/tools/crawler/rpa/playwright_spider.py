@@ -43,6 +43,7 @@ class PlaywrightSpider(BaseSpider, ABC):
         self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
+        self.page: Optional[Page] = None
 
         logger.info(f"初始化 Playwright 爬虫: {self.rpa_config}")
 
@@ -103,6 +104,10 @@ class PlaywrightSpider(BaseSpider, ABC):
             # 创建浏览器上下文
             self.context = self._create_context()
 
+            # 创建页面
+            self.page = self.context.new_page()
+            logger.debug("页面创建成功")
+
             logger.info(f"浏览器启动成功 (headless={self.rpa_config.headless})")
 
         except Exception as e:
@@ -112,6 +117,11 @@ class PlaywrightSpider(BaseSpider, ABC):
     def _stop_browser(self):
         """关闭 Playwright 浏览器"""
         try:
+            if self.page:
+                self.page.close()
+                self.page = None
+                logger.debug("页面已关闭")
+
             if self.context:
                 self.context.close()
                 self.context = None
