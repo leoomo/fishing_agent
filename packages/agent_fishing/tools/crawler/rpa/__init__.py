@@ -17,10 +17,14 @@ from .taobao_rpa import TaobaoRPA
 from .shop_manager import ShopManager
 from .taobao_shop_rpa import TaobaoShopRPA
 
+# 店铺分类RPA爬虫
+from .taobao_shop_category_rpa import TaobaoShopCategoryRPA
+
 __all__ = [
     "RPAConfig",
     "PlaywrightSpider",
     "TaobaoRPA",
     "ShopManager",
     "TaobaoShopRPA",
+    "TaobaoShopCategoryRPA",
 ]

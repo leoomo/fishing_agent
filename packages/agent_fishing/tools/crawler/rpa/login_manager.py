@@ -208,7 +208,13 @@ class LoginManager:
                     time.sleep(2)
 
                     # 检查是否登录成功（通过 URL 跳转判断）
-                    current_url = page.url
+                    # 等待页面 URL 更新，确保获取最新的 URL
+                    try:
+                        page.wait_for_url(lambda url: "login.taobao.com" not in url, timeout=5000)
+                        current_url = page.url
+                    except:
+                        # 如果等待超时，获取当前 URL
+                        current_url = page.url
 
                     # 登录成功后会跳转离开 login.taobao.com
                     if "login.taobao.com" not in current_url:

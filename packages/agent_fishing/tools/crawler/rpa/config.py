@@ -29,6 +29,14 @@ class RPAConfig:
     max_retries: int = 3
     page_timeout: int = 30  # 秒
 
+    # 滚动配置
+    scroll_step_min: float = 0.8  # 最小滚动步长（视窗高度倍数）
+    scroll_step_max: float = 1.5  # 最大滚动步长（视窗高度倍数）
+    scroll_wait_min: float = 1.5  # 最小等待时间（秒）
+    scroll_wait_max: float = 2.5  # 最大等待时间（秒）
+    scroll_max_attempts: int = 50  # 最大滚动尝试次数
+    scroll_completion_threshold: int = 5  # 完成检测阈值
+
     # 店铺配置
     shop_config_path: str = "shared/data/shops/shops.json"
     shop_max_items_per_category: int = 100

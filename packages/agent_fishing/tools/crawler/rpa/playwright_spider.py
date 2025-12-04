@@ -85,6 +85,7 @@ class PlaywrightSpider(BaseSpider, ABC):
                         "--disable-blink-features=AutomationControlled",
                         "--disable-dev-shm-usage",
                         "--no-sandbox",
+                        "--start-maximized",  # 启动时最大化
                     ]
                 )
                 logger.info("✅ 使用系统 Chrome 浏览器")
@@ -98,6 +99,7 @@ class PlaywrightSpider(BaseSpider, ABC):
                         "--disable-blink-features=AutomationControlled",
                         "--disable-dev-shm-usage",
                         "--no-sandbox",
+                        "--start-maximized",  # 启动时最大化
                     ]
                 )
 
@@ -149,7 +151,6 @@ class PlaywrightSpider(BaseSpider, ABC):
         """
         # 创建上下文
         context = self.browser.new_context(
-            viewport={"width": 1920, "height": 1080},
             user_agent=self.ua_rotator.get_random_ua(),
             locale="zh-CN",
             timezone_id="Asia/Shanghai",

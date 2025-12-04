@@ -470,8 +470,15 @@ class TaobaoShopRPA(PlaywrightSpider):
         """
         results = []
 
-        # 商品选择器（与搜索页类似）
+        # 商品选择器（基于 data-spm-anchor-id）
         item_selectors = [
+            # 主要选择器 - 基于 data-spm-anchor-id
+            "[data-spm-anchor-id*='product_shelf']",  # 最准确的选择器
+            ".title--GExDBPUi[data-spm-anchor-id*='product_shelf']",  # 你提供的HTML结构
+            "div[data-spm-anchor-id*='product_shelf']",  # 包含该属性的div
+            "[class*='title--'][data-spm-anchor-id*='product_shelf']",  # 标题类+属性
+            # 备用选择器
+            ".descContainer--Emd1UYe_",  # 你提供的容器类
             ".item",
             ".shop-item",
             ".J_TItems .item",
@@ -534,6 +541,10 @@ class TaobaoShopRPA(PlaywrightSpider):
     def _extract_item_name_from_element(self, item) -> Optional[str]:
         """从商品元素提取名称"""
         selectors = [
+            # 基于你提供的HTML结构的选择器
+            ".title--GExDBPUi",  # 直接标题类
+            "[class*='title--']",  # 模糊匹配标题类
+            "div[data-spm-anchor-id*='product_shelf']",  # 商品容器本身
             ".title",
             ".item-name",
             "a[class*='title']",
@@ -545,10 +556,24 @@ class TaobaoShopRPA(PlaywrightSpider):
                 elem = item.locator(selector).first
                 if elem.count() > 0:
                     text = elem.inner_text().strip()
-                    if text:
+                    if text and len(text) > 3:  # 确保标题有意义
                         return text
             except:
                 continue
+
+        # 如果直接从元素获取不到，尝试从元素的文本内容获取
+        try:
+            text = item.inner_text().strip()
+            if text and len(text) < 200:  # 合理的标题长度
+                # 简单清理：移除价格等非标题信息
+                lines = text.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith('¥') and not line.isdigit():
+                        if len(line) > 5:  # 标题通常较长
+                            return line
+        except:
+            pass
 
         return None
 
@@ -557,6 +582,11 @@ class TaobaoShopRPA(PlaywrightSpider):
         import re
 
         selectors = [
+            # 基于你提供的HTML结构的选择器
+            ".text-price",  # 价格文本类
+            ".price--WtT08bds",  # 价格容器类
+            "[class*='text-price']",  # 模糊匹配价格文本类
+            "[class*='price--']",  # 模糊匹配价格相关类
             ".price",
             ".item-price",
             "span[class*='price']",
@@ -568,12 +598,43 @@ class TaobaoShopRPA(PlaywrightSpider):
                 elem = item.locator(selector).first
                 if elem.count() > 0:
                     text = elem.inner_text().strip()
-                    # 清理价格
+                    # 清理价格 - 移除所有非数字和小数点的字符
                     text = re.sub(r"[^\d.]", "", text)
-                    if text:
-                        return text
+                    if text and len(text) > 0:
+                        # 确保价格是合理的数字格式
+                        if '.' in text:
+                            parts = text.split('.')
+                            if len(parts) == 2 and parts[0] and parts[1]:
+                                return text
+                        else:
+                            return text
             except:
                 continue
+
+        # 如果直接选择器失败，尝试从元素文本中提取价格
+        try:
+            text = item.inner_text().strip()
+            # 使用正则表达式查找价格模式
+            price_patterns = [
+                r'¥(\d+\.?\d*)',  # ¥123.45
+                r'￥(\d+\.?\d*)',  # ￥123.45
+                r'(\d+\.\d+)',    # 123.45
+                r'(\d+)',          # 123
+            ]
+
+            for pattern in price_patterns:
+                match = re.search(pattern, text)
+                if match:
+                    price = match.group(1)
+                    # 验证价格是否合理（1-99999元）
+                    try:
+                        price_float = float(price)
+                        if 1 <= price_float <= 99999:
+                            return price
+                    except:
+                        continue
+        except:
+            pass
 
         return None
 
@@ -586,25 +647,77 @@ class TaobaoShopRPA(PlaywrightSpider):
             "a",
         ]
 
+        # 首先尝试从元素的href属性获取
         for selector in selectors:
             try:
                 elem = item.locator(selector).first
                 if elem.count() > 0:
                     href = elem.get_attribute("href")
-                    if href:
-                        # 修复协议
-                        if href.startswith("//"):
-                            href = "https:" + href
-                        elif not href.startswith("http"):
-                            href = "https:" + href
-
-                        # 只返回淘宝/天猫链接
-                        if "item.taobao.com" in href or "detail.tmall.com" in href:
-                            return href
+                    if href and self._is_valid_taobao_url(href):
+                        return self._normalize_url(href)
             except:
                 continue
 
+        # 如果直接href属性获取失败，尝试查找父级或相关链接元素
+        try:
+            # 检查元素是否有data-spm-anchor-id属性
+            data_spm = item.get_attribute("data-spm-anchor-id")
+            if data_spm and "product_shelf" in data_spm:
+                logger.debug(f"找到商品元素 data-spm-anchor-id: {data_spm}")
+
+                # 尝试查找包装的链接容器
+                # 在HTML结构中，商品通常被包含在一个可点击的容器中
+                container_selectors = [
+                    "a",
+                    "[onclick]",
+                    "[href]",
+                ]
+
+                for container_sel in container_selectors:
+                    try:
+                        # 从当前元素向上查找3级父元素
+                        current = item
+                        for level in range(3):
+                            parent = current.locator("xpath=..").first
+                            if parent.count() > 0:
+                                # 检查父元素是否是链接
+                                parent_tag = parent.evaluate("el => el.tagName.toLowerCase()")
+                                parent_href = parent.get_attribute("href")
+                                parent_onclick = parent.get_attribute("onclick")
+
+                                if (parent_tag == "a" and parent_href) or parent_onclick:
+                                    logger.debug(f"找到可能的链接容器: {parent_tag}")
+                                    if parent_href and self._is_valid_taobao_url(parent_href):
+                                        return self._normalize_url(parent_href)
+                                current = parent
+                            else:
+                                break
+                    except:
+                        continue
+        except:
+            pass
+
         return None
+
+    def _is_valid_taobao_url(self, url: str) -> bool:
+        """检查是否为有效的淘宝/天猫商品URL"""
+        if not url:
+            return False
+
+        valid_patterns = [
+            "item.taobao.com",
+            "detail.tmall.com",
+        ]
+
+        return any(pattern in url for pattern in valid_patterns)
+
+    def _normalize_url(self, url: str) -> str:
+        """标准化URL格式"""
+        if url.startswith("//"):
+            return "https:" + url
+        elif not url.startswith("http"):
+            return "https://" + url
+        return url
 
     def _extract_brand_from_name(self, name: str) -> str:
         """从商品名称推断品牌（复用TaobaoRPA逻辑）"""
@@ -644,6 +757,137 @@ class TaobaoShopRPA(PlaywrightSpider):
                 continue
 
         return False
+
+    def search_equipment(
+        self,
+        keyword: str,
+        category: str = "通用",
+        max_results: int = 20,
+    ) -> List[EquipmentData]:
+        """
+        搜索装备（店铺爬取模式）
+
+        注意：此方法为了兼容 BaseSpider 接口，实际使用店铺爬取逻辑
+
+        Args:
+            keyword: 搜索关键词（在店铺爬取模式下会被忽略）
+            category: 装备类型
+            max_results: 最大结果数
+
+        Returns:
+            装备数据列表
+        """
+        logger.info(f"店铺爬取模式搜索: keyword={keyword}, category={category}, max_results={max_results}")
+
+        # 实际执行默认店铺爬取
+        return self.crawl_default_shops()
+
+    def get_product_detail(self, product_url: str) -> Optional[EquipmentData]:
+        """
+        获取商品详情（店铺爬取模式）
+
+        Args:
+            product_url: 商品详情页URL
+
+        Returns:
+            装备数据或None
+        """
+        logger.info(f"获取商品详情: {product_url}")
+
+        try:
+            with self as spider:
+                page = spider.page
+                context = spider.context
+
+                # 确保已登录
+                if not self.login_manager.ensure_logged_in(page, context):
+                    logger.error("❌ 登录失败")
+                    return None
+
+                # 访问详情页
+                if not self.safe_goto(page, product_url):
+                    logger.error("❌ 访问详情页失败")
+                    return None
+
+                # 等待页面加载
+                time.sleep(3)
+
+                # 模拟滚动（触发延迟加载）
+                self._simulate_scroll(page)
+
+                # 提取基础信息
+                name = self._extract_item_name_from_url(page)
+                if not name:
+                    logger.warning("未提取到商品名称")
+                    return None
+
+                price = self._extract_item_price_from_url(page)
+                brand = self._extract_brand_from_name(name)
+
+                # 构建数据
+                equipment = EquipmentData(
+                    name=name,
+                    brand=brand,
+                    price=price,
+                    url=product_url,
+                    category="未知",
+                    source="shop_rpa_detail",
+                )
+
+                logger.info(f"✅ 提取商品详情: {name} ({brand})")
+                return equipment
+
+        except Exception as e:
+            logger.error(f"获取商品详情失败: {e}")
+            return None
+
+    def _extract_item_name_from_url(self, page: Page) -> Optional[str]:
+        """从详情页提取商品名称"""
+        name_selectors = [
+            "h1",
+            ".tb-detail-hd h1",
+            ".ItemHeader--mainTitle",
+            "h1[class*='title']",
+            ".tb-main-title",
+        ]
+
+        for selector in name_selectors:
+            try:
+                elem = page.locator(selector).first
+                if elem.count() > 0:
+                    text = elem.inner_text().strip()
+                    if text:
+                        return text
+            except:
+                continue
+
+        return None
+
+    def _extract_item_price_from_url(self, page: Page) -> Optional[str]:
+        """从详情页提取价格"""
+        import re
+
+        price_selectors = [
+            ".tb-rmb-num",
+            ".Price--priceText",
+            "span[class*='price']",
+            ".tm-price",
+            ".price",
+        ]
+
+        for selector in price_selectors:
+            try:
+                elem = page.locator(selector).first
+                if elem.count() > 0:
+                    text = elem.inner_text().strip()
+                    # 清理价格
+                    text = re.sub(r"[^\d.]", "", text)
+                    if text:
+                        return text
+            except:
+                continue
+
+        return None
 
     def _goto_next_page(self, page: Page) -> bool:
         """翻到下一页"""

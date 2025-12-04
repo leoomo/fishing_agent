@@ -44,6 +44,13 @@
 
 ### 🕷️ 电商装备爬虫 ⭐ v3.2.0核心功能
 - **多源数据爬取**: 支持淘宝、京东、路亚论坛装备数据采集
+- **RPA自动化爬虫**（v3.2.1更新）:
+  - 基于Playwright的浏览器自动化
+  - 三种爬虫模式：关键词搜索、店铺分类、店铺爬取
+  - 交互式登录确认，解决登录页面刷新问题
+  - ariaTipText支持，提高商品名称提取准确率
+  - 新标签页处理优化，正确处理商品详情页
+  - 竖向滚动优化（渐进式滚动，测试期间注释）
 - **反爬虫策略**:
   - UA轮换（10+真实浏览器User-Agent）
   - 请求延迟（2-5秒随机）
@@ -845,6 +852,7 @@ fishing-agent/
 │   ├── BACKEND_ARCHITECTURE.md    # 后端架构详解 ⭐ v3.1.1新增
 │   ├── USER_EQUIPMENT_GUIDE.md    # ⭐ v3.2.0新增：用户装备使用指南
 │   ├── CRAWLER_GUIDE.md           # ⭐ v3.2.0新增：爬虫使用指南
+│   ├── RPA_CRAWLER_GUIDE.md       # ⭐ v3.2.1更新：RPA爬虫详细使用指南
 │   └── ...                        # 其他文档
 ├── examples/                      # 示例代码
 │   ├── user_equipment_example.py  # ⭐ v3.2.0新增：装备管理示例
@@ -985,6 +993,7 @@ MIT License
 **完善的文档和示例**：
 - ✅ **用户指南**: `docs/USER_EQUIPMENT_GUIDE.md` - 完整的装备管理使用指南
 - ✅ **爬虫指南**: `docs/CRAWLER_GUIDE.md` - 爬虫使用和最佳实践
+- ✅ **RPA爬虫指南**: `RPA_CRAWLER_GUIDE.md` - RPA自动化爬虫详细使用指南（v3.2.1更新）
 - ✅ **API文档**: `docs/API_REFERENCE.md` - 完整的API参考文档
 - ✅ **示例代码**: `examples/user_equipment_example.py` - 可运行的示例
 - ✅ **集成测试**: 完整的端到端测试覆盖
