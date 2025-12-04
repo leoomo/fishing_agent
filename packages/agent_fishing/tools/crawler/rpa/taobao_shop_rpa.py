@@ -31,7 +31,16 @@ class TaobaoShopRPA(PlaywrightSpider):
         if config is None:
             config = RPAConfig.from_env()
 
-        super().__init__(config)
+        # 将 RPAConfig 转换为 BaseSpider 期望的字典格式
+        base_config = {
+            "request_delay": config.request_delay,
+            "max_retries": config.max_retries,
+            "timeout": config.page_timeout,
+        }
+        super().__init__(base_config)
+
+        # 保存 RPA 配置
+        self.config = config
         self.login_manager = LoginManager(config)
         self.shop_manager = ShopManager(config.shop_config_path)
 
