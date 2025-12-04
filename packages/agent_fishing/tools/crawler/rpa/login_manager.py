@@ -192,40 +192,72 @@ class LoginManager:
             if not self.config.headless:
                 print("浏览器窗口中也可直接扫码")
 
-            print("等待扫码中...")
             print("=" * 60 + "\n")
 
-            # 6. 轮询检测登录状态（最多60秒）
-            for i in range(60):
-                time.sleep(2)
+            # 6. 交互式确认（最多3次重试机会）
+            max_attempts = 3
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    # 等待用户扫码完成
+                    input(f"👉 请扫码完成后按回车键继续... (尝试 {attempt}/{max_attempts})\n")
 
-                # 检查是否登录成功（通过 URL 跳转判断）
-                current_url = page.url
+                    logger.info("用户确认扫码完成，开始验证登录状态...")
+                    print("\n⏳ 正在验证登录状态...\n")
 
-                # 登录成功后会跳转离开 login.taobao.com
-                if "login.taobao.com" not in current_url:
-                    logger.info(f"✅ 检测到页面跳转: {current_url}")
-                    print("\n✅ 登录成功！正在验证...\n")
+                    # 等待页面可能的跳转
+                    time.sleep(2)
 
-                    # 再次验证登录状态（此时才跳转到首页验证）
-                    time.sleep(1)
-                    if self.is_session_valid(page):
-                        logger.info("✅ 扫码登录验证成功！")
+                    # 检查是否登录成功（通过 URL 跳转判断）
+                    current_url = page.url
 
-                        # 7. 保存 Cookie
-                        self._save_cookies(page, context)
-                        return True
+                    # 登录成功后会跳转离开 login.taobao.com
+                    if "login.taobao.com" not in current_url:
+                        logger.info(f"✅ 检测到页面跳转: {current_url}")
+                        print("✅ 检测到登录跳转，正在验证...\n")
+
+                        # 再次验证登录状态（访问首页验证）
+                        time.sleep(1)
+                        if self.is_session_valid(page):
+                            logger.info("✅ 扫码登录验证成功！")
+                            print("✅ 登录成功！\n")
+
+                            # 7. 保存 Cookie
+                            self._save_cookies(page, context)
+                            return True
+                        else:
+                            print("❌ 登录验证失败\n")
+                            logger.warning("登录验证失败")
                     else:
-                        logger.warning("登录验证失败，继续等待...")
+                        print("❌ 未检测到登录（页面未跳转）\n")
+                        logger.warning("未检测到登录，页面仍在登录页")
 
-                # 每10秒提示一次
-                if (i + 1) % 5 == 0:
-                    logger.info(f"等待扫码... ({(i + 1) * 2}/120秒)")
-                    print(f"⏳ 等待中... ({(i + 1) * 2}/120秒)")
+                    # 如果不是最后一次尝试，询问是否重试
+                    if attempt < max_attempts:
+                        retry = input(f"是否重试？(y/n，剩余 {max_attempts - attempt} 次机会): ").strip().lower()
+                        if retry not in ['y', 'yes', '是', '']:
+                            print("\n用户取消登录\n")
+                            return False
 
-            # 超时
-            logger.error("❌ 扫码登录超时（120秒）")
-            print("\n❌ 登录超时，请重试\n")
+                        # 刷新页面，获取新二维码
+                        print("\n刷新页面，获取新二维码...\n")
+                        page.reload(timeout=15000)
+                        time.sleep(3)
+
+                        # 更新截图
+                        try:
+                            page.screenshot(path=qr_screenshot)
+                            print(f"📸 新二维码截图: {qr_screenshot}\n")
+                        except:
+                            pass
+
+                except KeyboardInterrupt:
+                    print("\n\n用户中断登录\n")
+                    logger.info("用户中断登录流程")
+                    return False
+
+            # 所有尝试都失败
+            logger.error("❌ 扫码登录失败（已用完所有尝试次数）")
+            print("\n❌ 登录失败，已用完所有尝试次数\n")
             return False
 
         except Exception as e:
