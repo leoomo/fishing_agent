@@ -208,6 +208,9 @@ data/*.db
 data/*.sqlite
 data/*.sqlite3
 
+# Exception: allow equipment database
+!packages/agent_fishing/tools/lure/data/equipment.db
+
 # Cache directories
 cache/
 .cache/
