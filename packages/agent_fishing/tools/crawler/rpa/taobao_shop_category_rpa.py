@@ -102,7 +102,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                 return products
 
         except Exception as e:
-            logger.error(f"爬取过程中发生错误: {e}")
+            logger.error(f"爬取过程中发生错误: {e}", exc_info=True)
             return products
 
     def _enter_shop_page(self, page: Page) -> bool:
@@ -132,7 +132,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
             return True
 
         except Exception as e:
-            logger.error(f"进入店铺页面时发生错误: {e}")
+            logger.error(f"进入店铺页面时发生错误: {e}", exc_info=True)
             return False
 
     def _click_lure_rod_category(self, page: Page) -> bool:
@@ -169,7 +169,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                         time.sleep(3)
                         return True
             except Exception as e:
-                logger.debug(f"尝试选择器失败 ({selector}): {e}")
+                logger.debug(f"尝试选择器失败 ({selector}): {e}", exc_info=True)
                 continue
 
         logger.error("❌ 未找到'路亚竿'分类")
@@ -210,7 +210,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                 logger.debug(f"等待分类加载... ({elapsed_time}s)")
 
             except Exception as e:
-                logger.debug(f"检查分类加载状态时发生错误: {e}")
+                logger.debug(f"检查分类加载状态时发生错误: {e}", exc_info=True)
                 time.sleep(wait_interval)
                 elapsed_time += wait_interval
 
@@ -239,7 +239,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
             last_height = page.evaluate("document.body.scrollHeight")
             logger.debug(f"初始页面高度: {last_height}")
         except Exception as e:
-            logger.warning(f"获取初始页面高度失败: {e}")
+            logger.warning(f"获取初始页面高度失败: {e}", exc_info=True)
             return False
 
         while scroll_count < max_scrolls:
@@ -309,7 +309,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                     break
 
             except Exception as e:
-                logger.warning(f"滚动操作失败 (第{scroll_count}次): {e}")
+                logger.warning(f"滚动操作失败 (第{scroll_count}次): {e}", exc_info=True)
                 scroll_count += 1
                 if scroll_count >= max_scrolls:
                     logger.error("滚动操作失败，已达最大重试次数")
@@ -331,102 +331,92 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
         """
         logger.info("开始处理第一个商品...")
 
-        # 保存当前页面URL用于返回
-        current_url = page.url
+        # 使用XPath定位商品元素
+        selector = "//div//div[@data-spm='product_shelf']/div[contains(@class, 'container--')]/div[contains(@class,'cardContainer--')]"
 
-        # 等待商品列表加载
-        product_selectors = [
-            # 你提供的具体XPath（转换为CSS选择器和XPath）
-            "//div//div[@data-spm='product_shelf']/div[contains(@class, 'container--')]/div[contains(@class,'cardContainer--')]",
-            # CSS选择器版本
-            "div[data-spm='product_shelf'] div[class*='container--'] div[class*='cardContainer--']",
-            # 原有的备用选择器
-            "[data-spm-anchor-id*='product_shelf']",
-            ".title--GExDBPUi[data-spm-anchor-id*='product_shelf']",
-            "[data-spm='product_shelf']",
-            "[class*='product_shelf']",
-            ".item",
-            ".Card--doubleCard",
-        ]
+        try:
+            elements = page.locator(f"xpath={selector}").all()
+            if not elements:
+                logger.warning("未找到商品元素")
+                return None
 
-        for selector in product_selectors:
-            try:
-                # 区分CSS选择器和XPath
-                if selector.startswith("//"):
-                    # XPath选择器
-                    elements = page.locator(f"xpath={selector}").all()
-                    selector_type = "XPath"
-                else:
-                    # CSS选择器
-                    elements = page.locator(selector).all()
-                    selector_type = "CSS"
+            logger.info(f"找到 {len(elements)} 个商品元素，处理第一个")
 
-                if elements:
-                    first_product = elements[0]
-                    logger.info(f"使用 {selector_type} 选择器 '{selector}' 找到 {len(elements)} 个商品元素，处理第一个")
+            # 点击第一个商品并在新标签页中打开
+            return self._open_product_and_extract(page, elements[0])
 
-                    # 直接点击商品元素进入详情页
-                    new_page = None
-                    try:
-                        logger.info("点击商品元素进入详情页")
+        except Exception as e:
+            logger.error(f"处理商品失败: {e}", exc_info=True)
+            return None
 
-                        # 监听新页面打开
-                        with page.expect_popup() as popup_info:
-                            first_product.click()
+    def _open_product_and_extract(self, page: Page, product_element: Locator) -> Optional[EquipmentData]:
+        """
+        打开商品详情页并提取信息
 
-                        # 获取新打开的页面
-                        new_page = popup_info.value
-                        logger.info(f"新标签页已打开，等待页面加载...")
-                        # 等待页面基本加载完成，不等待 networkidle
-                        new_page.wait_for_load_state('domcontentloaded', timeout=10000)
+        Args:
+            page: 当前页面对象
+            product_element: 商品元素定位器
 
-                        time.sleep(3)
+        Returns:
+            商品详细信息，如果失败则返回None
+        """
+        new_page = None
+        try:
+            # 监听新页面打开
+            with page.expect_popup() as popup_info:
+                product_element.click()
 
-                        # 提取商品ID（从新页面的URL）
-                        product_url = new_page.url
-                        logger.info(f"新页面URL: {product_url}")
-                        product_id = self._extract_product_id_from_url(product_url)
-                        if not product_id:
-                            logger.warning("无法提取商品ID")
-                            continue
+            # 获取新打开的页面
+            new_page = popup_info.value
+            logger.info("新标签页已打开，等待页面加载...")
+            new_page.wait_for_load_state('domcontentloaded', timeout=10000)
+            time.sleep(3)
 
-                        logger.info(f"商品ID: {product_id}")
+            # 提取商品ID
+            product_id = self._extract_product_id_from_url(new_page.url)
+            if not product_id:
+                logger.warning("无法提取商品ID")
+                return None
 
-                        # 提取商品详细信息（使用新页面）
-                        product_data = self._extract_product_details(new_page, product_id)
+            logger.info(f"商品ID: {product_id}")
 
-                        if product_data:
-                            # 下载商品图片
-                            downloaded_count = self._download_product_images(product_data)
-                            logger.info(f"下载了 {downloaded_count} 张图片")
+            # 提取商品详细信息
+            product_data = self._extract_product_details(new_page, product_id)
+            if not product_data:
+                logger.warning("商品详情提取失败")
+                return None
 
-                            # 设置商品ID
-                            product_data.id = product_id
+            # 设置商品ID
+            product_data.id = product_id
 
-                            return product_data
-                        else:
-                            logger.warning("商品详情提取失败")
-                            continue
+            # 竖向滚动商品详情页，确保所有图片加载完成
+            logger.info("滚动商品详情页以加载所有图片...")
+            self._scroll_to_load_all_products(new_page)
 
-                    except Exception as e:
-                        logger.warning(f"点击商品元素失败: {e}")
-                        continue
-                    finally:
-                        # 确保关闭新页面（如果存在）
-                        if new_page:
-                            try:
-                                new_page.close()
-                            except Exception as close_error:
-                                logger.warning(f"关闭新页面时出错: {close_error}")
+            # 滚动后重新提取图片列表，获取懒加载的图片
+            logger.info("重新提取图片列表...")
+            updated_images = self._extract_product_images(new_page)
+            if updated_images:
+                # 转换为字典格式
+                image_list = [{"url": img_url, "type": "detail"} for img_url in updated_images]
+                product_data.images = image_list
+                logger.info(f"更新后的图片数量: {len(updated_images)}")
 
-                break
+            # 下载商品图片
+            downloaded_count = self._download_product_images(product_data, product_id)
+            logger.info(f"下载了 {downloaded_count} 张图片")
+            return product_data
 
-            except Exception as e:
-                logger.debug(f"使用选择器 {selector} 失败: {e}")
-                continue
-
-        logger.warning("未找到可处理的商品")
-        return None
+        except Exception as e:
+            logger.error(f"打开商品详情页失败: {e}", exc_info=True)
+            return None
+        finally:
+            # 确保关闭新页面
+            if new_page:
+                try:
+                    new_page.close()
+                except Exception as e:
+                    logger.warning(f"关闭新页面时出错: {e}", exc_info=True)
 
     def _get_product_url_from_element(self, element: Locator, page: Page) -> Optional[str]:
         """
@@ -470,7 +460,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
             return None
 
         except Exception as e:
-            logger.error(f"提取商品URL时发生错误: {e}")
+            logger.error(f"提取商品URL时发生错误: {e}", exc_info=True)
             return None
 
     def _is_valid_product_url(self, url: str) -> bool:
@@ -521,7 +511,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
             return None
 
         except Exception as e:
-            logger.error(f"从URL提取商品ID失败: {e}")
+            logger.error(f"从URL提取商品ID失败: {e}", exc_info=True)
             return None
 
     def _extract_product_details(self, page: Page, product_id: str) -> Optional[EquipmentData]:
@@ -568,16 +558,29 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
             logger.info(f"图片数量: {len(images)}")
             logger.info(f"规格参数数量: {len(specs or {})}")
 
+            # 解析价格
+            price_min = 0.0
+            if price:
+                try:
+                    # 提取数字部分
+                    price_match = re.search(r'[\d.]+', str(price))
+                    if price_match:
+                        price_min = float(price_match.group())
+                except (ValueError, AttributeError) as e:
+                    logger.warning(f"价格解析失败: {price}, 错误: {e}", exc_info=True)
+
+            # 转换图片格式为字典列表
+            image_list = [{"url": img_url, "type": "detail"} for img_url in (images or [])]
+
             # 创建商品数据对象
             product_data = EquipmentData(
                 name=name,
-                brand=brand or "未知品牌",
-                price=price or "价格面议",
-                url=page.url,
-                category="路亚竿",
-                source="taobao_shop_rpa",
+                category="鱼竿",  # 路亚竿属于鱼竿类别
+                brand_name=brand or "未知品牌",
+                price_min=price_min,
+                source_url=page.url,
                 description=description,
-                images=images,
+                images=image_list,
                 specs=specs or {},
             )
 
@@ -585,118 +588,27 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
             return product_data
 
         except Exception as e:
-            logger.error(f"提取商品详细信息时发生错误: {e}")
+            logger.error(f"提取商品详细信息时发生错误: {e}", exc_info=True)
             return None
 
     def _extract_product_name(self, page: Page) -> Optional[str]:
         """提取商品名称"""
-        selectors = [
-            "h1[data-spm='1000983']",
-            ".tb-main-title",
-            "[data-spm='item_title']",
-            "h1",
-            ".item-title",
-            ".product-title",
-            "[class*='title'][class*='main']",
-            "[class*='ItemTitle']",
-            "#J_Title",
-        ]
-
-        for selector in selectors:
-            try:
-                element = page.locator(selector).first
-                if element.is_visible(timeout=2000):
-                    name = element.text_content().strip()
-                    if name and len(name) > 5:  # 确保名称有意义
-                        logger.info(f"使用选择器 {selector} 提取到商品名称: {name}")
-                        return name
-            except Exception:
-                continue
-
-        # 尝试从 aria-label 属性提取（用户提供的结构）
         try:
-            element = page.locator("#ariaTipText")
-            if element.count() > 0:
-                aria_label = element.get_attribute("aria-label")
-                if aria_label:
-                    # 从 aria-label 中提取商品名称
-                    # 格式类似: "欢迎进入 DOOP多普灵感/轻鸿KINHON/知境/信号钟芳斌路亚竿虫竿鲈鱼鳜鱼杆-淘宝网,盲人用户使用操作智能引导..."
-                    import re
-                    # 提取"欢迎进入"和"-淘宝网"之间的内容
-                    name_match = re.search(r'欢迎进入\s*(.+?)-淘宝网', aria_label)
-                    if name_match:
-                        name = name_match.group(1).strip()
-                        if name and len(name) > 5:
-                            logger.info(f"从 aria-label 提取到商品名称: {name}")
-                            return name
+            # 使用 XPath 提取 title 属性
+            element = page.locator("xpath=//div[@id='tbpcDetail_SkuPanelBody']//span[contains(@class, 'mainTitle--')]").first
+            name = element.get_attribute("title", timeout=5000)
+            if name and len(name) > 5:
+                logger.info(f"提取到商品名称: {name}")
+                return name
         except Exception as e:
-            logger.debug(f"从 aria-label 提取商品名称失败: {e}")
-
-        # 尝试通过属性选择器查找
-        try:
-            # 查找包含商品标题的元素
-            title_elements = page.locator("h1, [class*='title'], [data-title]").all()
-            for element in title_elements:
-                text = element.text_content().strip()
-                if text and len(text) > 10 and not text.isdigit():
-                    logger.info(f"通过通用方法提取到商品名称: {text}")
-                    return text
-        except Exception:
-            pass
+            logger.error(f"提取商品名称失败: {e}", exc_info=True)
 
         return None
 
     def _extract_product_price(self, page: Page) -> Optional[str]:
         """提取商品价格"""
-        selectors = [
-            "[data-spm='1000985']",
-            ".not-acquire",
-            ".tm-fcs-panel",
-            ".tb-price",
-            "[class*='priceWrap']",
-            "[class*='price']",
-            ".price",
-            "[class*='Price']",
-            ".notranslate",
-        ]
-
-        for selector in selectors:
-            try:
-                element = page.locator(selector).first
-                if element.is_visible(timeout=2000):
-                    price_text = element.text_content().strip()
-                    if price_text:
-                        # 提取数字和货币符号
-                        import re
-                        # 查找包含 ¥ 或 ￥ 符号的价格
-                        price_match = re.search(r'[¥￥]\s*\d+(?:,\d{3})*\.?\d*', price_text)
-                        if price_match:
-                            logger.info(f"使用选择器 {selector} 提取到价格: {price_match.group()}")
-                            return price_match.group()
-                        # 或者只提取数字部分
-                        number_match = re.search(r'\d+(?:,\d{3})*\.?\d*', price_text)
-                        if number_match:
-                            price = f"¥{number_match.group()}"
-                            logger.info(f"使用选择器 {selector} 提取到价格: {price}")
-                            return price
-            except Exception:
-                continue
-
-        # 尝试通过文本内容查找价格
-        try:
-            # 查找包含货币符号的元素
-            price_elements = page.locator("span:has-text('¥'), span:has-text('￥'), em:has-text('¥')").all()
-            for element in price_elements:
-                text = element.text_content().strip()
-                if text and ('¥' in text or '￥' in text):
-                    import re
-                    price_match = re.search(r'[¥￥]\s*\d+(?:,\d{3})*\.?\d*', text)
-                    if price_match:
-                        logger.info(f"通过文本搜索提取到价格: {price_match.group()}")
-                        return price_match.group()
-        except Exception:
-            pass
-
+        # TODO: 实现价格提取逻辑
+        _ = page  # 未来会使用
         return None
 
     def _extract_product_brand(self, page: Page) -> Optional[str]:
@@ -715,7 +627,8 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                     brand = element.text_content().strip()
                     if brand and len(brand) < 20:  # 品牌名通常不会太长
                         return brand
-            except Exception:
+            except Exception as e:
+                logger.debug(f"提取品牌失败 ({selector}): {e}", exc_info=True)
                 continue
 
         return None
@@ -737,7 +650,8 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                     desc = element.text_content().strip()
                     if desc and len(desc) > 10:
                         return desc[:500]  # 限制描述长度
-            except Exception:
+            except Exception as e:
+                logger.debug(f"提取描述失败 ({selector}): {e}", exc_info=True)
                 continue
 
         return None
@@ -784,7 +698,8 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                             # 限制图片数量
                             if len(images) >= 10:
                                 break
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"提取图片失败 ({selector}): {e}", exc_info=True)
                     continue
 
                 if len(images) >= 10:
@@ -805,7 +720,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
             logger.info(f"提取到 {len(images)} 张商品图片")
 
         except Exception as e:
-            logger.error(f"提取商品图片时发生错误: {e}")
+            logger.error(f"提取商品图片时发生错误: {e}", exc_info=True)
 
         return images
 
@@ -846,28 +761,31 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
 
                                     if key and value and len(key) < 30 and len(value) < 200:
                                         specs[key] = value
-                            except Exception:
+                            except Exception as e:
+                                logger.debug(f"解析规格参数失败: {e}", exc_info=True)
                                 continue
 
                         if specs:
                             logger.info(f"使用选择器 {selector} 提取到 {len(specs)} 个规格参数")
                             break
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"提取规格参数失败 ({selector}): {e}", exc_info=True)
                     continue
 
             logger.info(f"提取到 {len(specs)} 个规格参数")
 
         except Exception as e:
-            logger.error(f"提取商品规格参数时发生错误: {e}")
+            logger.error(f"提取商品规格参数时发生错误: {e}", exc_info=True)
 
         return specs if specs else None
 
-    def _download_product_images(self, product: EquipmentData) -> int:
+    def _download_product_images(self, product: EquipmentData, product_id: str) -> int:
         """
         下载商品所有图片到shared/images目录
 
         Args:
             product: 商品数据
+            product_id: 商品ID
 
         Returns:
             下载的图片数量
@@ -876,7 +794,6 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
 
         try:
             # 创建商品图片保存目录
-            product_id = getattr(product, 'id', 'unknown')
             save_dir = self.image_save_dir / product_id
             save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -884,8 +801,15 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
 
             # 下载所有图片
             if hasattr(product, 'images') and product.images:
-                for i, image_url in enumerate(product.images):
+                for i, image_item in enumerate(product.images):
                     try:
+                        # 从字典中提取URL
+                        if isinstance(image_item, dict):
+                            image_url = image_item.get('url')
+                        else:
+                            # 兼容旧格式（字符串列表）
+                            image_url = image_item
+
                         if not image_url:
                             continue
 
@@ -895,7 +819,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                         save_path = save_dir / filename
 
                         # 下载图片
-                        success = self._download_single_image(image_url, str(save_path), product.url)
+                        success = self._download_single_image(image_url, str(save_path), product.source_url)
 
                         if success:
                             downloaded_count += 1
@@ -904,12 +828,12 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                             logger.warning(f"下载图片失败: {image_url}")
 
                     except Exception as e:
-                        logger.warning(f"下载第{i+1}张图片失败: {e}")
+                        logger.warning(f"下载第{i+1}张图片失败: {e}", exc_info=True)
 
             logger.info(f"图片下载完成，成功下载 {downloaded_count} 张图片")
 
         except Exception as e:
-            logger.error(f"下载商品图片失败: {e}")
+            logger.error(f"下载商品图片失败: {e}", exc_info=True)
 
         return downloaded_count
 
@@ -950,7 +874,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
             return True
 
         except Exception as e:
-            logger.error(f"下载图片失败: {url}, 错误: {e}")
+            logger.error(f"下载图片失败: {url}, 错误: {e}", exc_info=True)
             return False
 
     def search_equipment(
@@ -1022,7 +946,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                 return None
 
         except Exception as e:
-            logger.error(f"获取商品详情失败: {e}")
+            logger.error(f"获取商品详情失败: {e}", exc_info=True)
             return None
 
     def _find_product_elements(self, page: Page) -> List:
@@ -1076,7 +1000,7 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
                     logger.debug(f"选择器 '{selector}' 未找到商品元素")
 
             except Exception as e:
-                logger.debug(f"使用选择器 '{selector}' 失败: {e}")
+                logger.debug(f"使用选择器 '{selector}' 失败: {e}", exc_info=True)
                 continue
 
         if not elements:
