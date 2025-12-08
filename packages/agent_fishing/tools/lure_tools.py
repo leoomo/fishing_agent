@@ -106,7 +106,7 @@ def recommend_equipment(
     Args:
         equipment_type: 装备类型（鱼竿/渔轮/鱼线/拟饵/套装）
         budget: 预算金额（元），如 500、1000
-        specifications: 规格要求JSON字符串，如 '{"硬度": "ML", "长度": "2.1m"}'
+        specifications: 规格要求JSON字符串，如 '{"硬度": "ML", "长度": "2.1m", "适用饵范围": "2-10g", "重量": "<120g"}'
         target_fish: 目标鱼种，如 鲈鱼、翘嘴、鳜鱼
         scenario: 使用场景（水草区/深水区/障碍区/岸钓/船钓）
         user_level: 用户水平（新手/进阶/高手）
@@ -117,6 +117,7 @@ def recommend_equipment(
     Examples:
         >>> recommend_equipment("鱼竿", budget=500, specifications='{"硬度": "ML"}')
         >>> recommend_equipment("套装", budget=1000, user_level="新手")
+        >>> recommend_equipment("鱼竿", specifications='{"适用饵范围": "2-10g"}')
     """
     services = _get_services()
     recommender = services['recommender']

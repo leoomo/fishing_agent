@@ -100,7 +100,7 @@ class LureRecommender:
             equipment_type: 装备类型（鱼竿/渔轮/鱼线/拟饵）
             user_specs: 用户需求规格
                 - budget: 预算
-                - specifications: 规格要求（硬度/长度等）
+                - specifications: 规格要求（硬度/长度/重量等）
                 - target_fish: 目标鱼种
                 - scenario: 使用场景
                 - user_level: 用户水平
@@ -119,7 +119,28 @@ class LureRecommender:
         if not candidates:
             return []
 
-        # 2. 计算每个装备的得分
+        # 2. 应用重量过滤（如果指定了重量要求）
+        if equipment_type == "鱼竿" and "重量" in specifications:
+            candidates = self._filter_by_weight(candidates, specifications["重量"])
+
+            if not candidates:
+                return []
+
+        # 2.5. 应用适用饵范围过滤（如果指定了适用饵要求）
+        if equipment_type == "鱼竿":
+            lure_key = None
+            for key in ["适用饵范围", "适用饵", "饵重范围", "饵重"]:
+                if key in specifications:
+                    lure_key = key
+                    break
+
+            if lure_key:
+                candidates = self._filter_by_lure_weight(candidates, specifications[lure_key])
+
+                if not candidates:
+                    return []
+
+        # 3. 计算每个装备的得分
         results = []
         for eq in candidates:
             scores = self._calculate_scores(eq, user_specs)
@@ -144,7 +165,7 @@ class LureRecommender:
                 specs=self._get_equipment_specs(eq)
             ))
 
-        # 3. 排序并返回top_k
+        # 4. 排序并返回top_k
         results.sort(key=lambda x: x.total_score, reverse=True)
         return results[:top_k]
 
@@ -387,13 +408,23 @@ class LureRecommender:
         budget: Optional[float]
     ) -> List[Dict]:
         """获取候选装备列表"""
-        query = """
-            SELECT e.*, b.name_cn as brand_name
-            FROM equipment e
-            LEFT JOIN brands b ON e.brand_id = b.id
-            WHERE e.category = ? AND e.is_active = 1
-        """
-        params = [equipment_type]
+        # 鱼竿需要同时查询"鱼竿"和"路亚竿"两个分类
+        if equipment_type == "鱼竿":
+            query = """
+                SELECT e.*, b.name_cn as brand_name
+                FROM equipment e
+                LEFT JOIN brands b ON e.brand_id = b.id
+                WHERE e.category IN ('鱼竿', '路亚竿') AND e.is_active = 1
+            """
+            params = []
+        else:
+            query = """
+                SELECT e.*, b.name_cn as brand_name
+                FROM equipment e
+                LEFT JOIN brands b ON e.brand_id = b.id
+                WHERE e.category = ? AND e.is_active = 1
+            """
+            params = [equipment_type]
 
         # 价格过滤（允许20%超预算）
         if budget:
@@ -415,7 +446,8 @@ class LureRecommender:
 
         specs = {}
 
-        if category == "鱼竿":
+        # 鱼竿和路亚竿使用相同的规格表
+        if category in ("鱼竿", "路亚竿"):
             query = "SELECT * FROM rod_specs WHERE equipment_id = ?"
             rows = self.db.execute(query, (eq_id,))
             if rows:
@@ -425,7 +457,9 @@ class LureRecommender:
                     "硬度": row.get('power'),
                     "调性": row.get('action'),
                     "自重": row.get('weight'),
-                    "节数": row.get('sections')
+                    "节数": row.get('sections'),
+                    "适用饵范围": f"{row.get('lure_weight_min')}-{row.get('lure_weight_max')}g"
+                        if row.get('lure_weight_min') and row.get('lure_weight_max') else None
                 }
 
         elif category == "渔轮":
@@ -564,6 +598,155 @@ class LureRecommender:
             compatibility["notes"].append("鱼竿鱼线搭配合理")
 
         return compatibility
+
+    def _filter_by_weight(self, candidates: List[Dict], weight_spec: str) -> List[Dict]:
+        """
+        根据重量规格过滤装备
+
+        Args:
+            candidates: 候选装备列表
+            weight_spec: 重量规格，支持格式：
+                - "<120g" 或 "<120" - 小于120克
+                - ">100g" 或 ">100" - 大于100克
+                - "100-150g" 或 "100-150" - 100到150克之间
+
+        Returns:
+            过滤后的装备列表
+        """
+        import re
+
+        # 提取数字和比较符号
+        if weight_spec.startswith("<"):
+            # 小于
+            match = re.search(r'<(\d+(?:\.\d+)?)', weight_spec)
+            if match:
+                max_weight = float(match.group(1))
+                return self._filter_candidates_by_weight(candidates, max_weight=max_weight)
+        elif weight_spec.startswith(">"):
+            # 大于
+            match = re.search(r'>(\d+(?:\.\d+)?)', weight_spec)
+            if match:
+                min_weight = float(match.group(1))
+                return self._filter_candidates_by_weight(candidates, min_weight=min_weight)
+        elif "-" in weight_spec:
+            # 范围
+            match = re.search(r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)', weight_spec)
+            if match:
+                min_weight = float(match.group(1))
+                max_weight = float(match.group(2))
+                return self._filter_candidates_by_weight(candidates, min_weight=min_weight, max_weight=max_weight)
+
+        # 无法解析，返回原列表
+        return candidates
+
+    def _filter_candidates_by_weight(
+        self,
+        candidates: List[Dict],
+        min_weight: Optional[float] = None,
+        max_weight: Optional[float] = None
+    ) -> List[Dict]:
+        """
+        根据重量范围过滤候选装备
+
+        Args:
+            candidates: 候选装备列表
+            min_weight: 最小重量（克）
+            max_weight: 最大重量（克）
+
+        Returns:
+            过滤后的装备列表
+        """
+        filtered = []
+
+        for eq in candidates:
+            # 获取装备规格
+            specs = self._get_equipment_specs(eq)
+            weight = specs.get("自重")
+
+            if weight is None:
+                # 无重量数据，跳过
+                continue
+
+            # 检查重量范围
+            if min_weight is not None and weight < min_weight:
+                continue
+            if max_weight is not None and weight > max_weight:
+                continue
+
+            filtered.append(eq)
+
+        return filtered
+
+    def _filter_by_lure_weight(self, candidates: List[Dict], lure_spec: str) -> List[Dict]:
+        """
+        根据适用饵范围过滤装备
+
+        Args:
+            candidates: 候选装备列表
+            lure_spec: 适用饵规格，支持格式：
+                - "2-10g" 或 "2-10" 或 "介于2-10克" - 2到10克范围
+
+        Returns:
+            过滤后的装备列表
+        """
+        import re
+
+        # 提取范围（支持"介于2-10克"、"2-10g"、"2-10"等格式）
+        match = re.search(r'(\d+(?:\.\d+)?)\s*[-到至]\s*(\d+(?:\.\d+)?)', lure_spec)
+        if match:
+            min_lure = float(match.group(1))
+            max_lure = float(match.group(2))
+            return self._filter_candidates_by_lure_weight(candidates, min_lure, max_lure)
+
+        # 无法解析，返回原列表
+        return candidates
+
+    def _filter_candidates_by_lure_weight(
+        self,
+        candidates: List[Dict],
+        min_lure: float,
+        max_lure: float
+    ) -> List[Dict]:
+        """
+        根据适用饵范围过滤候选装备
+
+        Args:
+            candidates: 候选装备列表
+            min_lure: 最小饵重（克）
+            max_lure: 最大饵重（克）
+
+        Returns:
+            过滤后的装备列表（鱼竿的适用饵范围能够覆盖指定范围）
+        """
+        filtered = []
+
+        for eq in candidates:
+            eq_id = eq.get('equipment_id')
+            if not eq_id:
+                continue
+
+            # 获取适用饵范围
+            query = "SELECT lure_weight_min, lure_weight_max FROM rod_specs WHERE equipment_id = ?"
+            rows = self.db.execute(query, (eq_id,))
+
+            if not rows:
+                # 无适用饵数据，跳过
+                continue
+
+            row = rows[0]
+            lure_min = row.get('lure_weight_min')
+            lure_max = row.get('lure_weight_max')
+
+            if lure_min is None or lure_max is None:
+                # 无适用饵数据，跳过
+                continue
+
+            # 检查鱼竿的适用饵范围是否能够覆盖用户需要的范围
+            # 要求：lure_weight_min <= min_lure 且 lure_weight_max >= max_lure
+            if lure_min <= min_lure and lure_max >= max_lure:
+                filtered.append(eq)
+
+        return filtered
 
 
 # ========== 便捷函数 ==========
