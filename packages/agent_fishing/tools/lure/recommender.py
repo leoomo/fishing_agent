@@ -47,6 +47,16 @@ POWER_ORDER = ["UUL", "UL", "L", "ML", "M", "MH", "H", "XH", "XXH"]
 # 调性等级排序
 ACTION_ORDER = ["S", "M", "MF", "F", "XF"]
 
+# 调性中文名称映射
+ACTION_NAME_MAP = {
+    # 英文缩写 -> 标准缩写
+    "S": "S", "M": "M", "MF": "MF", "F": "F", "XF": "XF",
+    # 中文名称 -> 标准缩写
+    "慢调": "S", "中调": "M", "中快调": "MF", "快调": "F", "先调": "XF", "超快调": "XF",
+    # 其他别名
+    "软": "S", "中软": "M", "中快": "MF", "快": "F", "超快": "XF", "先": "XF"
+}
+
 # 用户水平映射
 USER_LEVEL_MAP = {
     "新手": 1, "初学者": 1, "入门": 1,
@@ -139,6 +149,13 @@ class LureRecommender:
 
                 if not candidates:
                     return []
+
+        # 2.6. 应用调性过滤（如果指定了调性要求）
+        if equipment_type == "鱼竿" and "调性" in specifications:
+            candidates = self._filter_by_action(candidates, specifications["调性"])
+
+            if not candidates:
+                return []
 
         # 3. 计算每个装备的得分
         results = []
@@ -745,6 +762,52 @@ class LureRecommender:
             # 要求：lure_weight_min <= min_lure 且 lure_weight_max >= max_lure
             if lure_min <= min_lure and lure_max >= max_lure:
                 filtered.append(eq)
+
+        return filtered
+
+    def _filter_by_action(self, candidates: List[Dict], action_spec: str) -> List[Dict]:
+        """
+        根据调性过滤装备
+
+        Args:
+            candidates: 候选装备列表
+            action_spec: 调性规格，支持中文（如"中快调"）或英文（如"MF"）
+
+        Returns:
+            过滤后的装备列表
+        """
+        # 标准化调性名称
+        target_action = ACTION_NAME_MAP.get(action_spec, action_spec.upper())
+
+        if target_action not in ACTION_ORDER:
+            # 无法识别的调性，返回原列表
+            return candidates
+
+        filtered = []
+
+        for eq in candidates:
+            # 获取装备规格
+            specs = self._get_equipment_specs(eq)
+            actual_action = specs.get("调性")
+
+            if not actual_action:
+                # 无调性数据，跳过
+                continue
+
+            # 检查调性是否匹配（允许±2级容差）
+            try:
+                target_idx = ACTION_ORDER.index(target_action)
+                actual_idx = ACTION_ORDER.index(actual_action.upper().replace("+", ""))  # XF+ -> XF
+                diff = abs(target_idx - actual_idx)
+
+                # 容差为2级（例如：用户要MF[中快]，可以推荐F[快]或XF[先调]）
+                # ACTION_ORDER = ["S", "M", "MF", "F", "XF"]
+                # MF(idx=2) -> F(idx=3)差1级, XF(idx=4)差2级
+                if diff <= 2:
+                    filtered.append(eq)
+            except ValueError:
+                # 无法在ACTION_ORDER中找到，跳过
+                continue
 
         return filtered
 
