@@ -794,16 +794,15 @@ class LureRecommender:
                 # 无调性数据，跳过
                 continue
 
-            # 检查调性是否匹配（允许±2级容差）
+            # 检查调性是否严格匹配
             try:
                 target_idx = ACTION_ORDER.index(target_action)
                 actual_idx = ACTION_ORDER.index(actual_action.upper().replace("+", ""))  # XF+ -> XF
-                diff = abs(target_idx - actual_idx)
 
-                # 容差为2级（例如：用户要MF[中快]，可以推荐F[快]或XF[先调]）
+                # 严格匹配：必须完全相同
                 # ACTION_ORDER = ["S", "M", "MF", "F", "XF"]
-                # MF(idx=2) -> F(idx=3)差1级, XF(idx=4)差2级
-                if diff <= 2:
+                # 用户要MF，只匹配MF，不匹配F或XF
+                if target_idx == actual_idx:
                     filtered.append(eq)
             except ValueError:
                 # 无法在ACTION_ORDER中找到，跳过
