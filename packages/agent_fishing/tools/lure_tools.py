@@ -512,7 +512,140 @@ def _semantic_search_knowledge(topic: str, include_images: bool, services: dict)
     return output
 
 
-# ========== 工具4：图片识别 ==========
+# ========== 工具4：装备查询 ==========
+
+@tool
+def query_equipment(
+    query_text: str,
+    category: Optional[str] = None,
+    max_results: int = 10
+) -> str:
+    """
+    查询装备信息 - 用于了解特定品牌/型号/系列的装备
+
+    当用户想要【查询】【了解】某个品牌、型号或系列的装备时使用。
+    支持灵活的查询方式,会自动匹配品牌名、型号、产品名等字段。
+
+    触发关键词: 有哪些、什么型号、型号、品牌、系列、产品、查一下
+
+    Args:
+        query_text: 查询关键词（品牌名/型号/系列名/产品名）
+            示例: "多普"、"KINHONG"、"月下美人"、"C661"
+        category: 装备类别过滤（可选）
+            可选值: 路亚竿、纺车轮、水滴轮、鱼线、拟饵
+        max_results: 最多返回结果数（默认10）
+
+    Returns:
+        Markdown格式的装备列表
+
+    Examples:
+        >>> query_equipment("多普")  # 查询所有多普品牌装备
+        >>> query_equipment("多普", category="路亚竿")  # 查询多普的鱼竿
+        >>> query_equipment("KINHONG")  # 查询KINHONG系列
+        >>> query_equipment("C661")  # 查询型号包含C661的装备
+    """
+    services = _get_services()
+    db = services['db']
+    image_manager = services['image_manager']
+
+    # 1. 构建灵活的查询SQL（匹配多个字段）
+    query = """
+        SELECT e.equipment_id, e.name, e.model, e.category,
+               e.description, e.features, e.price_min, e.price_max,
+               b.name_cn as brand_name, b.name_en as brand_name_en
+        FROM equipment e
+        LEFT JOIN brands b ON e.brand_id = b.id
+        WHERE e.is_active = 1
+        AND (
+            b.name_cn LIKE ? OR
+            b.name_en LIKE ? OR
+            e.name LIKE ? OR
+            e.model LIKE ?
+        )
+    """
+    search_pattern = f"%{query_text}%"
+    params = [search_pattern, search_pattern, search_pattern, search_pattern]
+
+    # 2. 添加类别过滤
+    if category:
+        query += " AND e.category = ?"
+        params.append(category)
+
+    query += f" ORDER BY e.created_at DESC LIMIT ?"
+    params.append(max_results)
+
+    # 3. 执行查询
+    rows = db.execute(query, tuple(params))
+
+    if not rows:
+        filter_text = f"关键词「{query_text}」"
+        if category:
+            filter_text += f" + 类别「{category}」"
+        return f"未找到符合{filter_text}的装备。请尝试：\n- 检查关键词拼写\n- 使用品牌中文名（如「多普」而非「DOOP」）\n- 去掉类别过滤看看是否有其他类别的产品"
+
+    # 4. 格式化输出
+    output = "# 装备查询结果\n\n"
+
+    # 查询条件摘要
+    output += "## 查询条件\n\n"
+    output += f"- **关键词**: {query_text}\n"
+    if category:
+        output += f"- **类别**: {category}\n"
+    output += f"- **找到**: {len(rows)} 款装备\n\n"
+
+    # 按类别分组展示（更清晰）
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for row in rows:
+        grouped[row['category']].append(row)
+
+    for cat, items in grouped.items():
+        output += f"## {cat} ({len(items)}款)\n\n"
+
+        for i, row in enumerate(items, 1):
+            # 紧凑的标题格式
+            brand = row.get('brand_name', '未知品牌')
+            model = row.get('model', '')
+            title = f"{brand} {model}" if model else brand
+
+            output += f"### {i}. {title}\n\n"
+
+            # 获取主图
+            main_image = image_manager.get_main_image(row['equipment_id'])
+            if main_image:
+                output += f"![{row['name']}]({main_image})\n\n"
+
+            # 信息表格
+            output += "| 参数 | 值 |\n|------|-----|\n"
+            output += f"| 完整名称 | {row['name']} |\n"
+
+            # 价格信息
+            if row.get('price_min'):
+                if row.get('price_max') and row['price_max'] != row['price_min']:
+                    output += f"| 价格 | ¥{row['price_min']:.0f} - ¥{row['price_max']:.0f} |\n"
+                else:
+                    output += f"| 价格 | ¥{row['price_min']:.0f} |\n"
+
+            output += "\n"
+
+            # 简要描述（精简版）
+            if row.get('features'):
+                features_text = row['features'][:150]
+                output += f"**特性**: {features_text}...\n\n"
+            elif row.get('description'):
+                desc_text = row['description'][:150]
+                output += f"**描述**: {desc_text}...\n\n"
+
+            output += "---\n\n"
+
+    # 提示语
+    if len(rows) == max_results:
+        output += f"\n💡 **提示**: 结果已达到最大显示数量({max_results}款)，可能还有更多产品未显示。\n"
+
+    return output
+
+
+# ========== 工具5：图片识别 ==========
 
 @tool
 def identify_from_image(
@@ -585,6 +718,7 @@ LURE_TOOLS = [
     recommend_equipment,
     compare_equipment,
     lookup_fishing_knowledge,
+    query_equipment,
     identify_from_image
 ]
 
