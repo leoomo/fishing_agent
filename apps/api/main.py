@@ -17,6 +17,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import fishing_router
 from .routes.user_equipment import router as user_equipment_router
+from .routes.auth import router as auth_router
+from .middleware import install_api_logging_middleware
 
 app = FastAPI(
     title="智能钓鱼助手 API",
@@ -33,9 +35,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# API logging middleware
+install_api_logging_middleware(
+    app,
+    excluded_paths=["/health", "/", "/docs", "/redoc", "/openapi.json"]
+)
+
 # 注册路由
 app.include_router(fishing_router, prefix="/api/v1/fishing", tags=["fishing"])
 app.include_router(user_equipment_router, prefix="/api/v1/user-equipment", tags=["user-equipment"])
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 
 
 @app.get("/")

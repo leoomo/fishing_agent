@@ -32,6 +32,7 @@ class DatabaseMigrations:
         migrations = [
             self._migration_001_add_crawler_fields,
             self._migration_002_add_user_tables,
+            self._migration_003_add_admin_users_table,
         ]
 
         for i, migration in enumerate(migrations, 1):
@@ -166,6 +167,107 @@ class DatabaseMigrations:
             "CREATE INDEX IF NOT EXISTS idx_user_equipment_favorite ON user_equipment(is_favorite)"
         )
         logger.info("  创建索引: idx_user_equipment_*")
+
+    def _migration_003_add_admin_users_table(self):
+        """
+        迁移003: 创建后端管理员用户表
+
+        创建表:
+        - admin_users: 后端管理员用户表
+        - system_configs: 系统配置表 (依赖admin_users)
+        - analytics_reports: 数据分析报告表 (依赖admin_users)
+        """
+        logger.info("执行迁移003: 创建后端管理员用户表")
+
+        # ========== admin_users表 ==========
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                full_name TEXT,
+                role TEXT NOT NULL DEFAULT 'readonly',
+                is_active INTEGER NOT NULL DEFAULT 1,
+                last_login TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        logger.info("  创建表: admin_users")
+
+        # 创建索引
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_admin_users_role ON admin_users(role)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_admin_users_is_active ON admin_users(is_active)"
+        )
+        logger.info("  创建索引: idx_admin_users_*")
+
+        # ========== system_config表 ==========
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                config_key TEXT NOT NULL UNIQUE,
+                config_value TEXT NOT NULL,
+                config_type TEXT NOT NULL,
+                description TEXT,
+                is_encrypted INTEGER DEFAULT 0,
+                last_modified_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (last_modified_by) REFERENCES admin_users(id)
+            )
+        """)
+        logger.info("  创建表: system_config")
+
+        # 创建索引
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_system_config_key ON system_config(config_key)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_system_config_type ON system_config(config_type)"
+        )
+        logger.info("  创建索引: idx_system_config_*")
+
+        # ========== analytics_reports表 ==========
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS analytics_reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                report_type TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                report_data TEXT NOT NULL,
+                generated_by INTEGER,
+                is_published INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (generated_by) REFERENCES admin_users(id)
+            )
+        """)
+        logger.info("  创建表: analytics_reports")
+
+        # 创建索引
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_analytics_reports_type ON analytics_reports(report_type)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_analytics_reports_start ON analytics_reports(start_date)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_analytics_reports_end ON analytics_reports(end_date)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_analytics_reports_generated ON analytics_reports(generated_by)"
+        )
+        logger.info("  创建索引: idx_analytics_reports_*")
 
     def _get_table_columns(self, table_name: str) -> list:
         """
