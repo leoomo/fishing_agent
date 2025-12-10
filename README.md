@@ -1,14 +1,18 @@
-# Fishing Agent - 智能钓鱼助手 v4.0.0
+# Fishing Agent - 智能钓鱼助手 v5.0.0
 
 基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐、天气分析和路亚装备管理。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v4.0.0 + JWT认证系统 + 爬虫监控模块 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v5.0.0 + JWT认证系统 + 爬虫监控模块 + 数据分析配置 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
 
-> **当前版本**: v4.0.0 (Phase 4 爬虫和监控模块完成)
+> **当前版本**: v5.0.0 (Phase 5 数据分析和配置管理完成)
 > **当前分支**: feature/equipment-ui
-> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构 + JWT认证 + 爬虫监控
+> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构 + JWT认证 + 爬虫监控 + 数据分析配置
 
-### 🌟 版本状态 (v4.0.0) ⭐ Phase 4 爬虫和监控模块完成
+### 🌟 版本状态 (v5.0.0) ⭐ Phase 5 数据分析和配置管理完成
+- ✅ **数据分析报表**: 装备数据统计、价格分布、品牌排行、用户行为分析
+- ✅ **业务报表生成**: 支持多种报表类型，可导出PDF/Excel格式
+- ✅ **系统配置管理**: API密钥管理、系统参数配置、配置加密存储
+- ✅ **API密钥测试**: 在线测试API密钥有效性，支持多平台验证
 - ✅ **爬虫任务管理**: 支持淘宝、京东、论坛三种爬虫，任务调度和监控
 - ✅ **系统监控面板**: API统计、LLM使用统计、数据库性能监控
 - ✅ **WebSocket实时推送**: 爬虫进度和系统监控实时数据
@@ -16,6 +20,7 @@
 - ✅ **RBAC权限管理**: 基于角色的访问控制，支持管理员和普通用户
 - ✅ **认证中间件**: 自动Token验证和权限检查，API安全保护
 - ✅ **装备管理UI优化**: 改进的用户界面，更好的用户体验
+- ✅ **React管理前端**: 基于React + TypeScript + Ant Design的管理界面
 - ✅ **测试覆盖完善**: 新增JWT认证、权限管理、集成测试
 - ✅ **API安全增强**: 401/403错误处理，安全的密码哈希
 - ✅ **模块化架构重构**: 完全自包含的 Agent 包架构，packages/agent_fishing 独立发布
@@ -27,7 +32,7 @@
 - 🚀 **向量存储系统**: 集成DashScope Embedding API和ChromaDB，支持路亚装备语义搜索
 - 📋 **CLI管理工具**: 新增向量存储管理CLI，支持索引重建和搜索测试
 
-## ✨ 核心功能（v4.0.0 Phase 4 爬虫监控 + v3.1.1 JWT认证 + v3.1.0 LLM优化 + v3.0.2 路亚装备集成）
+## ✨ 核心功能（v5.0.0 Phase 5 数据分析配置 + v4.0.0 爬虫监控 + v3.1.1 JWT认证 + v3.1.0 LLM优化 + v3.0.2 路亚装备集成）
 
 ### 🔐 JWT认证系统 ⭐ v3.1.1核心功能
 - **JWT Token认证**: 完整的用户登录、注册、token验证机制
@@ -61,6 +66,22 @@
 - **系统健康检查**: API/DB/LLM服务状态检查
 - **实时监控推送**: WebSocket每5秒推送实时统计数据
 - **权限控制**: 基于RBAC的监控权限（MONITOR_READ）
+
+### 📈 数据分析报表 ⭐ v5.0.0新增
+- **装备数据统计**: 装备总量、分类统计、价格分布分析
+- **装备趋势分析**: 按月统计装备增长趋势，支持自定义时间范围
+- **品牌排行分析**: Top N品牌统计，包含装备数量和市场占有率
+- **用户行为分析**: 用户活跃度统计、装备购买行为分析
+- **业务报表生成**: 支持装备报表、用户报表、综合业务报表
+- **报表导出功能**: PDF和Excel格式导出，支持自定义筛选条件
+
+### ⚙️ 系统配置管理 ⭐ v5.0.0新增
+- **配置分类管理**: 支持agent、algorithm、api、system四种配置类型
+- **API密钥管理**: 安全存储和管理各类API密钥，支持加密
+- **配置版本控制**: 配置更新历史记录，支持回滚操作
+- **在线密钥测试**: 实时验证API密钥有效性，支持多平台测试
+- **批量配置操作**: 支持配置的批量导入导出
+- **权限控制**: 基于RBAC的配置管理权限（CONFIG_READ/CREATE/UPDATE/DELETE）
 
 ### 🎒 装备管理UI优化 ⭐ v3.1.1更新
 - **用户界面改进**: 更友好的装备管理界面
@@ -1165,6 +1186,101 @@ MIT License
 
 ---
 
+## 🆕 v5.0.0 新功能亮点 ⭐ Phase 5 数据分析和配置管理完成
+
+### 📈 数据分析报表系统
+**完整的业务数据分析功能**：
+- ✅ **装备数据统计**: 装备总量、分类统计、价格分布分析
+- ✅ **装备趋势分析**: 按月统计装备增长趋势，支持自定义时间范围（1-36个月）
+- ✅ **品牌排行分析**: Top N品牌统计，包含装备数量和市场占有率
+- ✅ **用户行为分析**: 用户活跃度统计、装备购买行为分析
+- ✅ **业务报表生成**: 支持装备报表、用户报表、综合业务报表
+- ✅ **报表导出功能**: PDF和Excel格式导出，支持自定义筛选条件
+
+**核心API端点**：
+- `GET /api/v1/admin/analytics/equipment/stats` - 装备数据统计总览
+- `GET /api/v1/admin/analytics/equipment/trends` - 装备数量趋势（按月）
+- `GET /api/v1/admin/analytics/equipment/price-distribution` - 价格分布统计
+- `GET /api/v1/admin/analytics/equipment/brand-stats` - 品牌统计排行
+- `GET /api/v1/admin/analytics/users/activity` - 用户活跃度统计
+- `POST /api/v1/admin/analytics/reports/generate` - 生成业务报表
+- `GET /api/v1/admin/analytics/reports/list` - 查询报表列表
+
+### ⚙️ 系统配置管理系统
+**完整的配置管理功能**：
+- ✅ **配置分类管理**: 支持agent、algorithm、api、system四种配置类型
+- ✅ **API密钥管理**: 安全存储和管理各类API密钥，支持加密存储
+- ✅ **配置版本控制**: 配置更新历史记录，支持回滚操作
+- ✅ **在线密钥测试**: 实时验证API密钥有效性，支持多平台测试
+- ✅ **批量配置操作**: 支持配置的批量导入导出
+- ✅ **权限控制**: 基于RBAC的配置管理权限（CONFIG_READ/CREATE/UPDATE/DELETE/TEST）
+
+**核心API端点**：
+- `GET /api/v1/admin/config/configs` - 查询配置列表
+- `GET /api/v1/admin/config/configs/{config_key}` - 获取配置
+- `POST /api/v1/admin/config/configs` - 创建配置
+- `PUT /api/v1/admin/config/configs/{config_key}` - 更新配置
+- `DELETE /api/v1/admin/config/configs/{config_key}` - 删除配置
+- `POST /api/v1/admin/config/configs/test-api-key` - 测试API密钥
+
+### 🖥️ React管理前端 ⭐ 新增
+**基于现代技术栈的管理界面**：
+- ✅ **React 19.2.0**: 最新版本的React框架
+- ✅ **TypeScript**: 类型安全的JavaScript超集
+- ✅ **Ant Design 5.22.0**: 企业级UI组件库
+- ✅ **Ant Design Pro**: 高级中后台前端解决方案
+- ✅ **Redux Toolkit**: 状态管理
+- ✅ **React Router 6.28.0**: 路由管理
+- ✅ **ECharts 5.5.0**: 数据可视化图表库
+
+**前端功能模块**：
+- 装备管理界面
+- 用户管理界面
+- 爬虫任务监控界面
+- 系统监控面板
+- 数据分析报表
+- 系统配置管理
+
+### 🔧 技术架构升级
+- ✅ **API版本升级**: v4.0.0 → v5.0.0
+- ✅ **新增服务**: AnalyticsService, ConfigService
+- ✅ **权限扩展**: 新增ANALYTICS_READ, CONFIG_*权限
+- ✅ **数据库扩展**: 新增报表和配置相关表结构
+- ✅ **前端架构**: 独立的React应用，支持前后端分离部署
+
+### 📊 文件结构新增
+```
+apps/api/
+├── routes/
+│   ├── analytics.py              # 数据分析路由 (120+ 行)
+│   └── config.py                 # 配置管理路由 (150+ 行)
+├── schemas/
+│   ├── analytics.py              # 数据分析Schema (100+ 行)
+│   └── config.py                 # 配置管理Schema (80+ 行)
+└── services/
+    ├── analytics_service.py      # 数据分析服务 (200+ 行)
+    └── config_service.py         # 配置管理服务 (180+ 行)
+
+apps/web-admin/                    # React管理前端 (新增)
+├── src/
+│   ├── components/               # 通用组件
+│   ├── pages/                    # 页面组件
+│   ├── services/                 # API服务
+│   ├── utils/                    # 工具函数
+│   └── types/                    # TypeScript类型定义
+├── package.json                  # 前端依赖配置
+└── vite.config.ts               # Vite构建配置
+```
+
+### 🎯 业务价值
+- **数据驱动决策**: 完整的数据分析支持业务决策
+- **配置灵活性**: 动态配置管理，无需重启服务
+- **运维效率**: 统一的配置中心，提升运维效率
+- **用户体验**: 现代化的管理界面，提升操作体验
+- **系统监控**: 实时监控系统状态和业务指标
+
+---
+
 ## 🎯 核心技术升级回顾
 
 ### 🎣 7因子科学评分体系 (v3.0.0)
@@ -1192,7 +1308,10 @@ MIT License
 
 > 🎣 智能分析，精准钓鱼！
 >
-> v4.0.0 全新升级：
+> v5.0.0 全新升级：
+> - 📈 **数据分析报表** - 装备统计、趋势分析、品牌排行、用户行为分析
+> - ⚙️ **系统配置管理** - API密钥管理、系统参数配置、配置加密存储
+> - 🖥️ **React管理前端** - 现代化的管理界面，基于React + TypeScript + Ant Design
 > - 🕷️ **爬虫任务管理** - 多平台爬虫、任务调度、实时进度监控
 > - 📊 **系统监控面板** - API统计、LLM统计、数据库性能监控
 > - 🔌 **WebSocket实时推送** - 爬虫进度和监控数据实时更新

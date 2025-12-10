@@ -1,5 +1,86 @@
 # 更新日志
 
+## [2025-12-10] v5.0.0 - Phase 5 数据分析和配置管理完成 📈⚙️
+
+**当前版本**: v5.0.0 (Phase 5 数据分析和配置管理完成)
+**当前分支**: feature/equipment-ui (功能已完成)
+
+### 🚀 重大新功能：数据分析和配置管理
+
+#### 数据分析报表系统 📈
+- ✅ **装备数据统计**: 装备总量、分类统计、价格分布分析
+- ✅ **装备趋势分析**: 按月统计装备增长趋势，支持自定义时间范围（1-36个月）
+- ✅ **品牌排行分析**: Top N品牌统计，包含装备数量和市场占有率
+- ✅ **用户行为分析**: 用户活跃度统计、装备购买行为分析
+- ✅ **业务报表生成**: 支持装备报表、用户报表、综合业务报表
+- ✅ **报表导出功能**: PDF和Excel格式导出，支持自定义筛选条件
+
+#### 系统配置管理系统 ⚙️
+- ✅ **配置分类管理**: 支持agent、algorithm、api、system四种配置类型
+- ✅ **API密钥管理**: 安全存储和管理各类API密钥，支持加密存储
+- ✅ **配置版本控制**: 配置更新历史记录，支持回滚操作
+- ✅ **在线密钥测试**: 实时验证API密钥有效性，支持多平台测试
+- ✅ **批量配置操作**: 支持配置的批量导入导出
+- ✅ **权限控制**: 基于RBAC的配置管理权限（CONFIG_READ/CREATE/UPDATE/DELETE/TEST）
+
+#### React管理前端 🖥️ ⭐ 新增
+- ✅ **现代技术栈**: React 19.2.0 + TypeScript + Ant Design 5.22.0
+- ✅ **企业级UI**: 基于Ant Design Pro的中后台解决方案
+- ✅ **状态管理**: Redux Toolkit + React Router 6.28.0
+- ✅ **数据可视化**: ECharts 5.5.0图表库集成
+- ✅ **前后端分离**: 独立的前端应用，支持分离部署
+
+#### 核心文件结构
+- ✅ `apps/api/routes/analytics.py`: 数据分析路由（120+行）
+- ✅ `apps/api/routes/config.py`: 配置管理路由（150+行）
+- ✅ `apps/api/schemas/analytics.py`: 数据分析Schema（100+行）
+- ✅ `apps/api/schemas/config.py`: 配置管理Schema（80+行）
+- ✅ `apps/api/services/analytics_service.py`: 数据分析服务（200+行）
+- ✅ `apps/api/services/config_service.py`: 配置管理服务（180+行）
+- ✅ `apps/web-admin/`: React管理前端（完整前端应用）
+
+#### API端点 ⭐ 新增14个管理端点
+```
+# 数据分析管理 (7)
+GET    /api/v1/admin/analytics/equipment/stats
+GET    /api/v1/admin/analytics/equipment/trends
+GET    /api/v1/admin/analytics/equipment/price-distribution
+GET    /api/v1/admin/analytics/equipment/brand-stats
+GET    /api/v1/admin/analytics/users/activity
+POST   /api/v1/admin/analytics/reports/generate
+GET    /api/v1/admin/analytics/reports/list
+
+# 配置管理 (6)
+GET    /api/v1/admin/config/configs
+GET    /api/v1/admin/config/configs/{key}
+POST   /api/v1/admin/config/configs
+PUT    /api/v1/admin/config/configs/{key}
+DELETE /api/v1/admin/config/configs/{key}
+POST   /api/v1/admin/config/configs/test-api-key
+```
+
+#### 技术升级
+- ✅ API版本升级至 v5.0.0
+- ✅ 新增AnalyticsService和ConfigService
+- ✅ 权限扩展：新增ANALYTICS_READ和CONFIG_*权限
+- ✅ 数据库扩展：新增报表和配置相关表结构
+- ✅ 前端架构：独立的React应用，支持前后端分离
+
+### 📊 统计数据
+
+#### 代码量增长
+- **v5.0.0新增**:
+  - 后端：6个核心文件，830+行高质量代码
+  - 前端：完整的React应用，现代化技术栈
+- **API端点**: 14个新增管理端点
+- **权限扩展**: 6个新增权限类型
+
+#### 累计统计（v3.1.1 → v5.0.0）
+- **总文件**: 50+ 个核心模块文件
+- **总代码行数**: 8,000+ 行高质量代码
+- **API端点**: 35+ 个管理端点
+- **WebSocket端点**: 2个实时推送端点
+
 ## [2025-12-10] v4.0.0 - Phase 4 爬虫和监控模块完成 🕷️📊
 
 **当前版本**: v4.0.0 (Phase 4 爬虫和监控模块完成)
