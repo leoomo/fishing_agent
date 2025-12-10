@@ -211,6 +211,10 @@ data/*.sqlite3
 # Exception: allow equipment database
 !packages/agent_fishing/tools/lure/data/equipment.db
 
+# SQLite temporary files
+*.db-shm
+*.db-wal
+
 # Cache directories
 cache/
 .cache/
