@@ -18,6 +18,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routes import fishing_router
 from .routes.user_equipment import router as user_equipment_router
 from .routes.auth import router as auth_router
+from .routes.equipment_admin import router as equipment_admin_router
+from .routes.user_admin import router as user_admin_router
+from .routes.import_export import router as import_export_router
 from .middleware import install_api_logging_middleware
 
 app = FastAPI(
@@ -45,6 +48,11 @@ install_api_logging_middleware(
 app.include_router(fishing_router, prefix="/api/v1/fishing", tags=["fishing"])
 app.include_router(user_equipment_router, prefix="/api/v1/user-equipment", tags=["user-equipment"])
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+
+# Phase 3 管理模块路由
+app.include_router(equipment_admin_router, prefix="/api/v1/admin", tags=["equipment-admin"])
+app.include_router(user_admin_router, prefix="/api/v1/admin", tags=["user-admin"])
+app.include_router(import_export_router, prefix="/api/v1/admin/import-export", tags=["import-export"])
 
 
 @app.get("/")
