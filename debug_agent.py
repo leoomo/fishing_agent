@@ -324,7 +324,7 @@ def main():
     # 解析命令行参数
     model_provider = "qwen"  # 默认使用通义千问
     mode = "direct"         # 默认直接查询模式
-    query = "推荐适用饵范围介于2-10克的鱼竿"  # 默认查询
+    query = "明天余杭区钓鱼什么情况？"  # 默认查询
 
     if len(sys.argv) > 1:
         model_provider = sys.argv[1]

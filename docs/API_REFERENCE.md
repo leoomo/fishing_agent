@@ -1,6 +1,6 @@
 # API 完整参考
 
-**版本**: v4.0.0
+**版本**: v5.0.0
 **基础URL**: `http://localhost:8000`
 **最后更新**: 2025-12-10
 
@@ -14,6 +14,8 @@
 - [用户装备管理 API](#用户装备管理-api)
 - [爬虫管理 API](#爬虫管理-api) ⭐ v4.0.0新增
 - [监控管理 API](#监控管理-api) ⭐ v4.0.0新增
+- [数据分析 API](#数据分析-api) ⭐ v5.0.0新增
+- [配置管理 API](#配置管理-api) ⭐ v5.0.0新增
 - [WebSocket API](#websocket-api) ⭐ v4.0.0新增
 - [数据模型](#数据模型)
 
@@ -21,7 +23,7 @@
 
 ## 概述
 
-智能钓鱼助手 API 提供五类接口：
+智能钓鱼助手 API 提供七类接口：
 
 1. **钓鱼助手 API** (`/api/v1/fishing/`)
    - Agent 对话接口
@@ -44,7 +46,20 @@
    - 数据库性能监控
    - 系统健康检查
 
-5. **WebSocket API** (`/ws/`) ⭐ v4.0.0新增
+5. **数据分析 API** (`/api/v1/admin/analytics/`) ⭐ v5.0.0新增
+   - 装备数据统计
+   - 趋势分析报表
+   - 品牌排行分析
+   - 用户行为分析
+   - 业务报表生成
+
+6. **配置管理 API** (`/api/v1/admin/config/`) ⭐ v5.0.0新增
+   - 系统配置管理
+   - API密钥管理
+   - 配置版本控制
+   - 密钥有效性测试
+
+7. **WebSocket API** (`/ws/`) ⭐ v4.0.0新增
    - 爬虫任务实时进度推送
    - 系统监控实时数据推送
 
@@ -1257,6 +1272,396 @@ GET /api/v1/admin/monitor/health-check
 
 ---
 
+## 数据分析 API ⭐ v5.0.0新增
+
+**基础路径**: `/api/v1/admin/analytics`
+
+### 权限要求
+- 需要 JWT Token 认证
+- 需要 `ANALYTICS_READ` 权限
+
+### 1. 装备数据统计总览
+
+```http
+GET /api/v1/admin/analytics/equipment/stats
+```
+
+**响应示例**:
+```json
+{
+  "total_equipment": 1250,
+  "by_category": {
+    "鱼竿": 450,
+    "渔轮": 320,
+    "鱼线": 280,
+    "拟饵": 200
+  },
+  "avg_price": 580.50,
+  "total_value": 725625.00
+}
+```
+
+### 2. 装备数量趋势
+
+```http
+GET /api/v1/admin/analytics/equipment/trends?months=12
+```
+
+**查询参数**:
+- `months` (int, optional): 统计月数，默认12，最大36
+
+**响应示例**:
+```json
+[
+  {
+    "month": "2025-01",
+    "equipment_count": 980,
+    "new_equipment": 45
+  },
+  {
+    "month": "2025-02",
+    "equipment_count": 1025,
+    "new_equipment": 52
+  }
+]
+```
+
+### 3. 价格分布统计
+
+```http
+GET /api/v1/admin/analytics/equipment/price-distribution?category=鱼竿
+```
+
+**查询参数**:
+- `category` (string, optional): 装备类别过滤
+
+**响应示例**:
+```json
+[
+  {
+    "price_range": "0-200",
+    "count": 120,
+    "percentage": 26.67
+  },
+  {
+    "price_range": "200-500",
+    "count": 180,
+    "percentage": 40.00
+  },
+  {
+    "price_range": "500-1000",
+    "count": 100,
+    "percentage": 22.22
+  },
+  {
+    "price_range": "1000+",
+    "count": 50,
+    "percentage": 11.11
+  }
+]
+```
+
+### 4. 品牌统计排行
+
+```http
+GET /api/v1/admin/analytics/equipment/brand-stats?top_n=10
+```
+
+**查询参数**:
+- `top_n` (int, optional): 返回前N个品牌，默认10
+
+**响应示例**:
+```json
+[
+  {
+    "brand_name": "禧玛诺",
+    "equipment_count": 156,
+    "market_share": 12.48,
+    "avg_price": 650.00
+  },
+  {
+    "brand_name": "达亿瓦",
+    "equipment_count": 125,
+    "market_share": 10.00,
+    "avg_price": 580.00
+  }
+]
+```
+
+### 5. 用户活跃度统计
+
+```http
+GET /api/v1/admin/analytics/users/activity?days=30
+```
+
+**查询参数**:
+- `days` (int, optional): 统计天数，默认30
+
+**响应示例**:
+```json
+[
+  {
+    "date": "2025-12-01",
+    "active_users": 245,
+    "new_users": 12,
+    "total_sessions": 892
+  },
+  {
+    "date": "2025-12-02",
+    "active_users": 268,
+    "new_users": 8,
+    "total_sessions": 956
+  }
+]
+```
+
+### 6. 生成业务报表
+
+```http
+POST /api/v1/admin/analytics/reports/generate
+```
+
+**请求体**:
+```json
+{
+  "report_type": "equipment_summary",
+  "start_date": "2025-11-01",
+  "end_date": "2025-12-01",
+  "format": "pdf",
+  "filters": {
+    "category": "鱼竿",
+    "brand_ids": [1, 2, 3]
+  }
+}
+```
+
+**参数说明**:
+- `report_type` (string): 报表类型（equipment_summary/user_activity/sales_analysis）
+- `start_date` (string): 开始日期（YYYY-MM-DD）
+- `end_date` (string): 结束日期（YYYY-MM-DD）
+- `format` (string): 导出格式（pdf/excel）
+- `filters` (object): 过滤条件
+
+**响应示例**:
+```json
+{
+  "report_id": "rpt_20251210_001",
+  "status": "generating",
+  "download_url": null,
+  "estimated_completion": "2025-12-10T15:30:00Z"
+}
+```
+
+### 7. 查询报表列表
+
+```http
+GET /api/v1/admin/analytics/reports/list?page=1&page_size=20
+```
+
+**查询参数**:
+- `page` (int): 页码，默认1
+- `page_size` (int): 每页数量，默认20
+- `report_type` (string, optional): 报表类型过滤
+
+**响应示例**:
+```json
+{
+  "items": [
+    {
+      "report_id": "rpt_20251210_001",
+      "report_type": "equipment_summary",
+      "status": "completed",
+      "generated_at": "2025-12-10T14:30:00Z",
+      "download_url": "/api/v1/admin/analytics/reports/download/rpt_20251210_001"
+    }
+  ],
+  "total": 15,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+---
+
+## 配置管理 API ⭐ v5.0.0新增
+
+**基础路径**: `/api/v1/admin/config`
+
+### 权限要求
+- 需要 JWT Token 认证
+- 需要 `CONFIG_READ/CREATE/UPDATE/DELETE/TEST` 权限
+
+### 1. 查询配置列表
+
+```http
+GET /api/v1/admin/config/configs?config_type=api
+```
+
+**查询参数**:
+- `config_type` (string, optional): 配置类型（agent/algorithm/api/system）
+
+**响应示例**:
+```json
+[
+  {
+    "config_key": "caiyun.api_key",
+    "config_type": "api",
+    "description": "彩云天气API密钥",
+    "is_encrypted": true,
+    "updated_at": "2025-12-10T10:30:00Z",
+    "updated_by": "admin"
+  },
+  {
+    "config_key": "openai.model",
+    "config_type": "agent",
+    "description": "OpenAI模型名称",
+    "is_encrypted": false,
+    "updated_at": "2025-12-09T15:20:00Z",
+    "updated_by": "admin"
+  }
+]
+```
+
+### 2. 获取配置
+
+```http
+GET /api/v1/admin/config/configs/{config_key}
+```
+
+**路径参数**:
+- `config_key` (string): 配置键
+
+**响应示例**:
+```json
+{
+  "config_key": "caiyun.api_key",
+  "config_value": "******************efgh",
+  "config_type": "api",
+  "description": "彩云天气API密钥",
+  "is_encrypted": true,
+  "created_at": "2025-12-01T00:00:00Z",
+  "updated_at": "2025-12-10T10:30:00Z",
+  "updated_by": "admin"
+}
+```
+
+### 3. 创建配置
+
+```http
+POST /api/v1/admin/config/configs
+```
+
+**请求体**:
+```json
+{
+  "config_key": "new_api_key",
+  "config_value": "sk-1234567890abcdef",
+  "config_type": "api",
+  "description": "新的API密钥",
+  "is_encrypted": true
+}
+```
+
+**参数说明**:
+- `config_key` (string): 配置键，唯一
+- `config_value` (string): 配置值
+- `config_type` (string): 配置类型
+- `description` (string): 描述
+- `is_encrypted` (boolean): 是否加密存储
+
+**响应示例**:
+```json
+{
+  "config_key": "new_api_key",
+  "config_type": "api",
+  "description": "新的API密钥",
+  "is_encrypted": true,
+  "created_at": "2025-12-10T11:00:00Z",
+  "updated_at": "2025-12-10T11:00:00Z",
+  "updated_by": "admin"
+}
+```
+
+### 4. 更新配置
+
+```http
+PUT /api/v1/admin/config/configs/{config_key}
+```
+
+**请求体**:
+```json
+{
+  "config_value": "sk-abcdef1234567890",
+  "description": "更新后的API密钥"
+}
+```
+
+**响应示例**:
+```json
+{
+  "config_key": "new_api_key",
+  "config_value": "******************7890",
+  "config_type": "api",
+  "description": "更新后的API密钥",
+  "is_encrypted": true,
+  "updated_at": "2025-12-10T11:30:00Z",
+  "updated_by": "admin"
+}
+```
+
+### 5. 删除配置
+
+```http
+DELETE /api/v1/admin/config/configs/{config_key}
+```
+
+**响应**: 204 No Content
+
+### 6. 测试API密钥
+
+```http
+POST /api/v1/admin/config/configs/test-api-key
+```
+
+**请求体**:
+```json
+{
+  "api_provider": "caiyun",
+  "api_key": "sk-1234567890abcdef"
+}
+```
+
+**参数说明**:
+- `api_provider` (string): API提供商（caiyun/amap/openai/zhipu/dashscope）
+- `api_key` (string): API密钥
+
+**响应示例**:
+```json
+{
+  "valid": true,
+  "message": "API密钥有效",
+  "test_details": {
+    "provider": "caiyun",
+    "response_time_ms": 245,
+    "test_result": "success"
+  }
+}
+```
+
+**错误响应示例**:
+```json
+{
+  "valid": false,
+  "message": "API密钥无效或网络错误",
+  "error_details": {
+    "error_code": "INVALID_KEY",
+    "error_message": "Authentication failed"
+  }
+}
+```
+
+---
+
 ## WebSocket API ⭐ v4.0.0新增
 
 ### 1. 爬虫任务进度推送
@@ -1297,6 +1702,32 @@ WS /api/v1/admin/monitor/ws/realtime-stats
 ---
 
 ## 更新日志
+
+### v5.0.0 (2025-12-10)
+
+**新增功能**:
+- 数据分析 API（7个端点）
+  - 装备数据统计总览
+  - 装备数量趋势分析
+  - 价格分布统计
+  - 品牌统计排行
+  - 用户活跃度统计
+  - 业务报表生成和查询
+- 配置管理 API（6个端点）
+  - 系统配置CRUD操作
+  - API密钥管理（加密存储）
+  - 配置版本控制
+  - API密钥有效性测试
+- React管理前端
+  - 基于React 19.2.0 + TypeScript
+  - Ant Design 5.22.0 企业级UI组件
+  - 数据可视化（ECharts 5.5.0）
+
+**技术升级**:
+- API版本升级至 v5.0.0
+- 新增AnalyticsService和ConfigService
+- 权限扩展：ANALYTICS_READ和CONFIG_*权限
+- 完整的数据分析和配置管理功能
 
 ### v4.0.0 (2025-12-10)
 
