@@ -1,21 +1,20 @@
-# Fishing Agent - 智能钓鱼助手 v3.2.0
+# Fishing Agent - 智能钓鱼助手 v3.1.1
 
 基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐、天气分析和路亚装备管理。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v3.2.0 + 用户装备管理 + 电商爬虫 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v3.1.1 + JWT认证系统 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
 
-> **当前版本**: v3.2.0 (用户装备管理 + 电商爬虫 + LLM优化)
-> **当前分支**: feature/user-equipment-info
-> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构 + 用户装备管理
+> **当前版本**: v3.1.1 (JWT认证系统 + 装备管理UI优化)
+> **当前分支**: feature/equipment-ui
+> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构 + JWT认证
 
-### 🌟 版本状态 (v3.2.0) ⭐ 新增用户装备管理 + 电商爬虫
-- ✅ **用户装备管理系统**: 完整的用户装备库管理，支持添加/查询/删除/统计/推荐功能
-- ✅ **电商爬虫模块**: 支持淘宝/京东/论坛装备数据爬取，自动数据去重和持久化
-- ✅ **智能推荐算法**: 基于用户装备的升级推荐、配置完善和搭配分析（3种推荐策略）
-- ✅ **RESTful API扩展**: 新增6个用户装备管理API端点，支持前端集成
-- ✅ **LangChain工具集成**: 4个新增@tool工具，Agent可直接调用用户装备功能
-- ✅ **反爬虫策略**: UA轮换、请求延迟、指数退避重试，确保数据获取稳定性
-- ✅ **数据去重系统**: 3级去重策略（精确匹配/模糊匹配/规格匹配），避免重复数据
+### 🌟 版本状态 (v3.1.1) ⭐ 新增JWT认证系统 + 装备管理UI优化
+- ✅ **JWT认证系统**: 完整的JWT Token认证，支持登录/注册/权限验证
+- ✅ **RBAC权限管理**: 基于角色的访问控制，支持管理员和普通用户
+- ✅ **认证中间件**: 自动Token验证和权限检查，API安全保护
+- ✅ **装备管理UI优化**: 改进的用户界面，更好的用户体验
+- ✅ **测试覆盖完善**: 新增JWT认证、权限管理、集成测试
+- ✅ **API安全增强**: 401/403错误处理，安全的密码哈希
 - ✅ **模块化架构重构**: 完全自包含的 Agent 包架构，packages/agent_fishing 独立发布
 - 🚀 **动态Prompt中间件**: 智能选择提示词，优化Token使用效率 (600-1200 tokens)
 - 🧠 **LLM优化系统**: 分层Prompt架构，Base/Fishing/Weather三层设计
@@ -25,43 +24,30 @@
 - 🚀 **向量存储系统**: 集成DashScope Embedding API和ChromaDB，支持路亚装备语义搜索
 - 📋 **CLI管理工具**: 新增向量存储管理CLI，支持索引重建和搜索测试
 
-## ✨ 核心功能（v3.2.0 用户装备管理 + v3.1.1 LLM优化 + v3.1.0 模块化架构重构 + v3.0.2 路亚装备集成）
+## ✨ 核心功能（v3.1.1 JWT认证 + v3.1.0 LLM优化 + v3.0.2 路亚装备集成）
 
-### 🎒 用户装备管理系统 ⭐ v3.2.0核心功能
-- **装备库管理**: 添加、查询、删除用户装备，支持收藏、备注、标签管理
-- **装备统计分析**: 按类别统计装备数量、总花费、平均价格、品牌分布
-- **智能推荐系统**: 3种推荐策略提供个性化建议
-  - **升级推荐**: 分析用户装备水平，推荐更高级装备替换薄弱环节
-  - **完善推荐**: 检查基础装备是否齐全，推荐缺失的装备类型
-  - **搭配推荐**: 分析装备兼容性，检查鱼竿/渔轮/鱼线是否匹配
-- **4个LangChain工具**: Agent可直接调用用户装备功能
-  - `list_my_equipment`: 查看装备库
-  - `add_equipment_to_profile`: 添加装备
-  - `remove_equipment_from_profile`: 删除装备
-  - `recommend_based_on_my_equipment`: 基于用户装备推荐
-- **6个RESTful API端点**: 支持前端集成和第三方调用
-- **用户上下文集成**: Agent对话支持用户ID传递，提供个性化服务
+### 🔐 JWT认证系统 ⭐ v3.1.1核心功能
+- **JWT Token认证**: 完整的用户登录、注册、token验证机制
+- **RBAC权限管理**: 基于角色的访问控制
+  - 管理员角色：访问所有功能，包括用户管理
+  - 普通用户：访问基础功能和用户装备管理
+- **认证中间件**: 自动Token验证和权限检查
+  - 请求头Token提取：`Authorization: Bearer <token>`
+  - 权限装饰器：`@require_permission("admin")`
+  - 错误处理：401未认证、403权限不足
+- **密码安全**: bcrypt哈希存储，安全的密码验证
+- **API端点**:
+  - `POST /auth/login`: 用户登录
+  - `POST /auth/register`: 用户注册
+  - `GET /auth/profile`: 获取用户信息
+  - `POST /auth/logout`: 用户登出
+- **完整测试覆盖**: JWT认证、权限管理、集成测试
 
-### 🕷️ 电商装备爬虫 ⭐ v3.2.0核心功能
-- **多源数据爬取**: 支持淘宝、京东、路亚论坛装备数据采集
-- **RPA自动化爬虫**（v3.2.1更新）:
-  - 基于Playwright的浏览器自动化
-  - 三种爬虫模式：关键词搜索、店铺分类、店铺爬取
-  - 交互式登录确认，解决登录页面刷新问题
-  - ariaTipText支持，提高商品名称提取准确率
-  - 新标签页处理优化，正确处理商品详情页
-  - 竖向滚动优化（渐进式滚动，测试期间注释）
-- **反爬虫策略**:
-  - UA轮换（10+真实浏览器User-Agent）
-  - 请求延迟（2-5秒随机）
-  - 指数退避重试（最多3次）
-- **智能数据去重**: 3级去重策略避免重复数据
-  - 精确匹配：品牌 + 型号
-  - 模糊匹配：品牌 + 名称相似度>80%
-  - 规格匹配：类别 + 关键规格参数
-- **数据持久化**: 自动保存到数据库，支持增量更新
-- **图片下载管理**: 自动下载装备图片，规范化命名和存储
-- **爬虫CLI工具**: 独立命令行工具支持批量爬取和定时同步
+### 🎒 装备管理UI优化 ⭐ v3.1.1更新
+- **用户界面改进**: 更友好的装备管理界面
+- **数据库结构优化**: 改进的装备数据存储
+- **API端点完善**: 更稳定的装备管理接口
+- **用户体验提升**: 更流畅的装备操作流程
 
 ### 🧠 动态Prompt中间件系统 ⭐ v3.1.1核心功能
 - **智能Prompt选择**: 根据查询类型动态选择系统提示词
@@ -134,10 +120,21 @@
 #### 🚀 应用层 (Apps)
 - **`apps/cli/`**: 命令行应用
   - `main.py`: CLI 入口点
-- **`apps/api/`**: FastAPI REST API 后端
-  - `main.py`: API 服务器
+- **`apps/api/`**: FastAPI REST API 后端 ⭐ v3.1.1 JWT认证增强
+  - `main.py`: API 服务器（集成认证中间件）
+  - `auth/`: JWT认证核心模块
+    - `dependencies.py`: 认证依赖注入
+    - `permissions.py`: RBAC权限管理
+    - `README.md`: 认证使用指南
+  - `middleware/`: 认证中间件
+    - `api_logger.py`: API日志记录
   - `routes/`: API 路由
+    - `auth.py`: 认证API端点
+    - `fishing.py`: 钓鱼API路由
+    - `user_equipment.py`: 用户装备API
   - `schemas/`: 数据模型
+    - `chat.py`: 对话数据模型（已扩展user_id）
+    - `user_equipment.py`: 装备数据模型
 
 #### 🔧 共享资源 (Shared)
 - **`shared/config/`**: 全局配置
@@ -155,6 +152,8 @@
 
 ### 核心特性
 - **📦 模块化 Agent**: 完全自包含的 Agent 包架构，支持独立发布和部署
+- **🔐 JWT认证系统**: 完整的用户认证和授权，支持RBAC权限管理 ⭐ v3.1.1新增
+- **🛡️ 安全中间件**: 自动Token验证、权限检查、API日志记录 ⭐ v3.1.1新增
 - **🧠 动态Prompt中间件**: 智能选择提示词，优化Token使用效率50%+
 - **🚀 FastAPI 后端**: REST API 支持，便于前端集成和部署
 - **🚀 LangChain 1.0+原生**: 移除LangGraph包装层，直接使用create_agent + middleware
@@ -170,6 +169,9 @@
 - **🎯 Prompt分层**: Base/Fishing/Weather三层提示词架构，智能切换
 
 ### 已修复的技术问题
+- ✅ **JWT认证集成**: 完整的JWT Token认证系统，支持登录/注册/权限验证 ⭐ v3.1.1新增
+- ✅ **RBAC权限管理**: 基于角色的访问控制，管理员和普通用户权限分离 ⭐ v3.1.1新增
+- ✅ **认证中间件**: 自动Token验证和权限检查装饰器 ⭐ v3.1.1新增
 - ✅ **数据库路径问题**: 修复相对路径导致的数据库连接失败
 - ✅ **中间件兼容性**: 解决AgentMiddleware基类属性设置冲突
 - ✅ **模型配置统一**: 统一GLM-4.6模型配置，支持智谱AI平台
@@ -334,7 +336,7 @@ curl -X POST http://localhost:8000/api/v1/fishing/chat \
   -H "Content-Type: application/json" \
   -d '{"query": "明天杭州钓鱼怎么样？"}'
 
-# 对话测试（带用户上下文）⭐ v3.2.0新增
+# 对话测试（带用户上下文）
 curl -X POST http://localhost:8000/api/v1/fishing/chat \
   -H "Content-Type: application/json" \
   -d '{"query": "推荐一个适合我的鱼竿", "user_id": 1, "model_provider": "zhipu"}'
@@ -342,7 +344,27 @@ curl -X POST http://localhost:8000/api/v1/fishing/chat \
 # 工具列表
 curl http://localhost:8000/api/v1/fishing/tools
 
-# ========== 用户装备管理API ⭐ v3.2.0新增 ==========
+# ========== JWT认证API ⭐ v3.1.1新增 ==========
+
+# 用户登录
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin123"}'
+
+# 用户注册
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "newuser", "password": "password123", "email": "user@example.com"}'
+
+# 获取用户信息（需要认证）
+curl -X GET http://localhost:8000/auth/profile \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# 用户登出
+curl -X POST http://localhost:8000/auth/logout \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# ========== 用户装备管理API ==========
 
 # 创建用户
 curl -X POST http://localhost:8000/api/v1/user-equipment/users \
@@ -372,21 +394,21 @@ curl -X POST http://localhost:8000/api/v1/user-equipment/users/1/recommend \
 curl http://localhost:8000/api/v1/user-equipment/users/1/statistics
 ```
 
-> ✅ **v3.1.0更新**: 全新的模块化 Agent 架构，独立 Agent 包支持！
-> 🚀 **v3.1.0新增**: FastAPI REST API 后端，便于前端集成！
+> ✅ **v3.1.1更新**: JWT认证系统和装备管理UI优化！
+> 🔐 **v3.1.1新增**: 完整的JWT Token认证 + RBAC权限管理！
+> 🎨 **v3.1.1新增**: 装备管理UI优化，提升用户体验！
 > ⏰ **保持功能**: 时间段意图理解功能，支持精准时段识别！
 > 🧠 **已集成**: LLM优化分支，提升推理质量和响应准确性！
 > 🚀 **7因子评分**: 科学评分体系，解决"86分问题"！
 
 ### 当前分支状态
-> ✅ **feature/user-equipment-info分支已完成** - 用户装备管理和电商爬虫系统已实现
-> - ✅ 用户装备管理：完整的装备库CRUD + 统计分析 + 智能推荐
-> - ✅ 电商爬虫模块：淘宝/京东/论坛多源爬取 + 反爬虫策略 + 数据去重
-> - ✅ API端点扩展：新增6个RESTful端点支持用户装备管理
-> - ✅ LangChain工具集成：4个@tool工具供Agent调用
-> - ✅ 推荐算法：升级/完善/搭配3种推荐策略
-> - ✅ 数据库扩展：users和user_equipment表，支持用户装备关联
-> - 当前状态：用户装备管理和爬虫系统已完全集成，功能稳定可用
+> ✅ **feature/equipment-ui分支已完成** - JWT认证系统和装备管理UI优化已实现
+> - ✅ JWT认证系统：完整的Token认证 + RBAC权限管理 + 认证中间件
+> - ✅ 装备管理UI：改进的用户界面 + 更好的用户体验
+> - ✅ API安全增强：401/403错误处理 + 安全的密码哈希
+> - ✅ 测试覆盖完善：JWT认证、权限管理、集成测试
+> - ✅ 数据库优化：admin_users表支持角色管理
+> - 当前状态：JWT认证系统已完全集成，功能稳定可用
 
 #### 方法四：激活虚拟环境
 ```bash
@@ -578,7 +600,7 @@ for result in results:
     print(f"[{result.score:.3f}] {result.title}")
 ```
 
-### 用户装备管理使用（v3.2.0新增）⭐
+### 用户装备管理使用（v3.1.1已集成）⭐
 ```python
 from packages.agent_fishing.tools.user_equipment import (
     UserEquipmentManager,
@@ -650,7 +672,7 @@ print(response)
 # {"query": "推荐一个鱼竿", "user_id": 1, "model_provider": "zhipu"}
 ```
 
-### 电商爬虫使用（v3.2.0新增）⭐
+### 电商爬虫使用（v3.1.1已集成）⭐
 ```python
 from packages.agent_fishing.tools.crawler import (
     TaobaoSpider,
@@ -703,7 +725,7 @@ for equipment in equipment_list:
 # 见下方CLI命令示例
 ```
 
-### 爬虫CLI工具使用（v3.2.0新增）
+### 爬虫CLI工具使用（v3.1.1已集成）
 ```bash
 # 1. 爬取淘宝装备数据
 uv run python -m packages.agent_fishing.tools.crawler.cli crawl \
@@ -800,7 +822,7 @@ fishing-agent/
 │       │   │   ├── database.py    # 数据库访问
 │       │   │   ├── cli.py         # CLI 管理工具
 │       │   │   └── ...            # 其他路亚模块
-│       │   ├── crawler/           # ⭐ v3.2.0新增：电商爬虫模块
+│       │   ├── crawler/           # ⭐ v3.1.1已集成：电商爬虫模块
 │       │   │   ├── base_spider.py     # 基础爬虫类
 │       │   │   ├── taobao_spider.py   # 淘宝爬虫
 │       │   │   ├── jd_spider.py       # 京东爬虫
@@ -810,7 +832,7 @@ fishing-agent/
 │       │   │   ├── downloader.py      # 图片下载器
 │       │   │   ├── data_persister.py  # 数据持久化
 │       │   │   └── cli.py             # 爬虫CLI工具
-│       │   ├── user_equipment/    # ⭐ v3.2.0新增：用户装备管理模块
+│       │   ├── user_equipment/    # ⭐ v3.1.1已集成：用户装备管理模块
 │       │   │   ├── manager.py         # 装备管理器（CRUD + 统计）
 │       │   │   ├── tools.py           # 4个LangChain工具
 │       │   │   └── recommender.py     # 推荐算法（3种策略）
@@ -824,14 +846,22 @@ fishing-agent/
 ├── apps/                          # 应用层
 │   ├── cli/                       # CLI 应用
 │   │   └── main.py
-│   └── api/                       # FastAPI 后端
-│       ├── main.py
-│       ├── routes/
+│   └── api/                       # FastAPI 后端 ⭐ v3.1.1 JWT认证增强
+│       ├── main.py                # API 服务器（集成认证中间件）
+│       ├── auth/                  # JWT认证核心模块
+│       │   ├── dependencies.py    # 认证依赖注入
+│       │   ├── permissions.py     # RBAC权限管理
+│       │   └── README.md          # 认证使用指南
+│       ├── middleware/            # 认证中间件
+│       │   ├── __init__.py
+│       │   └── api_logger.py      # API日志记录
+│       ├── routes/                # API 路由
+│       │   ├── auth.py            # 认证API端点 ⭐ v3.1.1新增
 │       │   ├── fishing.py         # 钓鱼API路由
-│       │   └── user_equipment.py  # ⭐ v3.2.0新增：用户装备API
-│       └── schemas/
+│       │   └── user_equipment.py  # 用户装备API
+│       └── schemas/               # 数据模型
 │           ├── chat.py            # 对话数据模型（已扩展user_id）
-│           └── user_equipment.py  # ⭐ v3.2.0新增：装备数据模型
+│           └── user_equipment.py  # 装备数据模型
 ├── shared/                        # 共享资源
 │   ├── config/                    # 全局配置
 │   │   └── service_config.py
@@ -844,18 +874,22 @@ fishing-agent/
 │   │   ├── test_time_period_intent.py
 │   │   ├── test_national_coverage.py
 │   │   └── test_tool_selection.py
-│   └── test_user_equipment_integration.py  # ⭐ v3.2.0新增：装备管理集成测试
+│   ├── test_auth/                 # ⭐ v3.1.1新增：JWT认证测试套件
+│   │   ├── test_login_routes.py    # 登录路由测试
+│   │   ├── test_permissions.py     # 权限管理测试
+│   │   └── test_integration.py     # 认证集成测试
+│   └── test_user_equipment_integration.py  # 装备管理集成测试
 ├── docs/                          # 文档目录
 │   ├── API.md                     # REST API 文档
-│   ├── API_REFERENCE.md           # ⭐ v3.2.0新增：完整API参考
+│   ├── API_REFERENCE.md           # ⭐ v3.1.1已集成：完整API参考
 │   ├── ARCHITECTURE.md            # 架构文档
 │   ├── BACKEND_ARCHITECTURE.md    # 后端架构详解 ⭐ v3.1.1新增
-│   ├── USER_EQUIPMENT_GUIDE.md    # ⭐ v3.2.0新增：用户装备使用指南
-│   ├── CRAWLER_GUIDE.md           # ⭐ v3.2.0新增：爬虫使用指南
-│   ├── RPA_CRAWLER_GUIDE.md       # ⭐ v3.2.1更新：RPA爬虫详细使用指南
+│   ├── USER_EQUIPMENT_GUIDE.md    # ⭐ v3.1.1已集成：用户装备使用指南
+│   ├── CRAWLER_GUIDE.md           # ⭐ v3.1.1已集成：爬虫使用指南
+│   ├── RPA_CRAWLER_GUIDE.md       # ⭐ v3.1.1已集成：RPA爬虫详细使用指南
 │   └── ...                        # 其他文档
 ├── examples/                      # 示例代码
-│   ├── user_equipment_example.py  # ⭐ v3.2.0新增：装备管理示例
+│   ├── user_equipment_example.py  # ⭐ v3.1.1已集成：装备管理示例
 │   └── vector_store_example.py    # 向量存储示例
 ├── main.py                        # CLI 入口
 ├── debug_agent.py                 # 调试工具 ⭐ v3.1.1新增
@@ -868,6 +902,8 @@ fishing-agent/
 
 ### 架构优势
 - **📦 模块化 Agent**: 完全自包含的 Agent 包架构，支持独立发布和部署
+- **🔐 JWT认证系统**: 完整的用户认证和授权，支持RBAC权限管理 ⭐ v3.1.1新增
+- **🛡️ 安全中间件**: 自动Token验证、权限检查、API日志记录 ⭐ v3.1.1新增
 - **🧠 动态Prompt中间件**: 智能选择提示词，优化Token使用效率50%+
 - **🚀 FastAPI 后端**: REST API 支持，便于前端集成和部署
 - **🚀 LangChain 1.0+原生**: 移除LangGraph包装层，直接使用create_agent + middleware
@@ -886,6 +922,25 @@ fishing-agent/
 - **数据存储**: 集成数据库和缓存系统，支持高并发访问
 - **完整测试**: 全面的测试覆盖，确保代码质量
 - **调试工具**: 新增debug_agent.py，支持多模型测试和环境检查
+
+## 📚 开发文档
+
+### 🚀 完整开发指南
+查看详细的[开发指南](docs/DEVELOPMENT_INSTRUCTIONS.md)，包含：
+- 12周完整开发计划
+- 各阶段详细实施方案
+- 开发环境设置指南
+- 代码规范和最佳实践
+
+### 📋 Phase详细计划
+- [Phase 1: 数据库ORM层](docs/dev-plans/phase1-database-orm.md) ✅ 已完成
+- [Phase 2: 认证授权中间件](docs/dev-plans/phase2-auth-middleware.md) ✅ 已完成
+- [Phase 3: 核心管理API](docs/dev-plans/phase3-core-api.md) 📋 规划中
+- [Phase 4: 爬虫监控](docs/dev-plans/phase4-crawler-monitor.md) 📋 规划中
+- [Phase 5: 数据分析配置](docs/dev-plans/phase5-analytics-config.md) 📋 规划中
+- [Phase 6-8: 前端开发](docs/dev-plans/phase6-8-frontend.md) 📋 规划中
+- [Phase 9: 测试优化](docs/dev-plans/phase9-testing-optimization.md) 📋 规划中
+- [Phase 10: 文档部署](docs/dev-plans/phase10-deployment-docs.md) 📋 规划中
 
 ## 🧪 测试
 
@@ -952,51 +1007,43 @@ MIT License
 
 ---
 
-## 🆕 v3.2.0 新功能亮点 ⭐ 用户装备管理 + 电商爬虫
+## 🆕 v3.1.1 新功能亮点 ⭐ JWT认证系统 + 装备管理UI优化
 
-### 🎒 用户装备管理系统
-**完整的装备库管理功能**：
-- ✅ **装备CRUD操作**: 添加、查询、删除用户装备，支持收藏和标签管理
-- ✅ **智能统计分析**: 按类别统计装备数量、总花费、平均价格、品牌分布
-- ✅ **3种推荐策略**:
-  - 升级推荐：分析用户装备水平，推荐更高级装备
-  - 完善推荐：检查基础装备是否齐全，推荐缺失装备
-  - 搭配推荐：分析装备兼容性，提供匹配建议
-- ✅ **Agent集成**: 4个LangChain工具无缝集成，Agent可直接调用
-- ✅ **RESTful API**: 6个API端点支持前端集成
-- ✅ **用户上下文**: 对话接口支持user_id传递，提供个性化服务
+### 🔐 JWT认证系统
+**完整的用户认证和授权功能**：
+- ✅ **JWT Token认证**: 用户登录、注册、token验证
+- ✅ **RBAC权限管理**: 基于角色的访问控制（管理员/普通用户）
+- ✅ **认证中间件**: 自动Token验证和权限检查
+- ✅ **密码安全**: bcrypt哈希存储，安全的密码验证
+- ✅ **API安全**: 401/403错误处理，请求头Token提取
+- ✅ **完整测试**: JWT认证、权限管理、集成测试
 
 **核心模块**：
-- `packages/agent_fishing/tools/user_equipment/manager.py`: 装备管理器
-- `packages/agent_fishing/tools/user_equipment/recommender.py`: 推荐算法
-- `packages/agent_fishing/tools/user_equipment/tools.py`: LangChain工具
-- `apps/api/routes/user_equipment.py`: RESTful API端点
-- `tests/test_user_equipment_integration.py`: 集成测试
+- `apps/api/auth/`: JWT认证核心模块
+- `apps/api/middleware/`: 认证中间件
+- `apps/api/routes/auth.py`: 认证API端点
+- `packages/agent_fishing/tools/lure/orm/repositories/admin_user_repo.py`: 用户管理
+- `tests/test_auth/`: 完整的认证测试套件
 
-### 🕷️ 电商装备爬虫系统
-**多源数据采集和智能去重**：
-- ✅ **多平台支持**: 淘宝、京东、路亚论坛装备数据爬取
-- ✅ **反爬虫策略**: UA轮换、请求延迟、指数退避重试
-- ✅ **智能去重**: 3级去重策略（精确/模糊/规格匹配）
-- ✅ **数据持久化**: 自动保存到数据库，支持增量更新
-- ✅ **图片管理**: 自动下载和规范化存储装备图片
-- ✅ **CLI工具**: 独立命令行工具支持批量爬取
+### 🎨 装备管理UI优化
+**改进的用户体验**：
+- ✅ **界面优化**: 更友好的装备管理界面
+- ✅ **数据库优化**: 改进的装备数据存储结构
+- ✅ **API完善**: 更稳定的装备管理接口
+- ✅ **用户体验**: 更流畅的装备操作流程
 
-**核心模块**：
-- `packages/agent_fishing/tools/crawler/base_spider.py`: 基础爬虫类
-- `packages/agent_fishing/tools/crawler/taobao_spider.py`: 淘宝爬虫
-- `packages/agent_fishing/tools/crawler/jd_spider.py`: 京东爬虫
-- `packages/agent_fishing/tools/crawler/deduplicator.py`: 数据去重器
-- `packages/agent_fishing/tools/crawler/data_persister.py`: 数据持久化
+**优化模块**：
+- `packages/agent_fishing/tools/lure/data/equipment.db`: 优化的数据库
+- `packages/agent_fishing/tools/lure/migrations.py`: 数据库迁移
+- 装备管理UI组件优化
 
 ### 📝 文档和测试
-**完善的文档和示例**：
-- ✅ **用户指南**: `docs/USER_EQUIPMENT_GUIDE.md` - 完整的装备管理使用指南
-- ✅ **爬虫指南**: `docs/CRAWLER_GUIDE.md` - 爬虫使用和最佳实践
-- ✅ **RPA爬虫指南**: `RPA_CRAWLER_GUIDE.md` - RPA自动化爬虫详细使用指南（v3.2.1更新）
-- ✅ **API文档**: `docs/API_REFERENCE.md` - 完整的API参考文档
-- ✅ **示例代码**: `examples/user_equipment_example.py` - 可运行的示例
-- ✅ **集成测试**: 完整的端到端测试覆盖
+**完善的文档和测试**：
+- ✅ **认证指南**: `apps/api/auth/README.md` - JWT认证使用指南
+- ✅ **API文档**: `docs/API_REFERENCE.md` - 更新的API参考文档
+- ✅ **架构文档**: `docs/ARCHITECTURE.md` - 包含认证层架构
+- ✅ **测试覆盖**: JWT认证、权限管理、集成测试
+- ✅ **安全最佳实践**: 完整的安全实现和测试
 
 ---
 
@@ -1050,12 +1097,12 @@ MIT License
 
 > 🎣 智能分析，精准钓鱼！
 >
-> v3.2.0 全新升级：
-> - 🎒 **用户装备管理系统** - 完整的装备库管理、智能推荐、统计分析
-> - 🕷️ **电商装备爬虫** - 多平台数据采集、智能去重、自动化入库
-> - 🤖 **Agent集成增强** - 4个新增LangChain工具，6个RESTful API端点
+> v3.1.1 全新升级：
+> - 🔐 **JWT认证系统** - 完整的用户认证、权限管理、安全保护
+> - 🎨 **装备管理UI优化** - 改进的用户界面、更好的用户体验
+> - 🛡️ **API安全增强** - Token认证、权限控制、错误处理
 > - 📊 **7因子科学评分** - 动态趋势分析、季节月相评分
 > - 🧠 **LLM优化** - 动态Prompt中间件、意图识别准确率98%+
 > - ⏰ **时间段意图理解** - 精准识别用户时间限定
 >
-> 立即开始：`uv run python main.py` 或查看 `docs/USER_EQUIPMENT_GUIDE.md`
+> 立即开始：`uv run python main.py` 或查看 `docs/API_REFERENCE.md`

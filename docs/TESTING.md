@@ -1,10 +1,10 @@
 # 智能钓鱼助手 - 测试文档 v3.1.1
 
-本文档描述智能钓鱼助手v3.1.1的测试体系，包括动态Prompt中间件、7因子科学评分系统、时间段意图理解、LLM优化功能、集成测试和性能测试。
+本文档描述智能钓鱼助手v3.1.1的测试体系，包括动态Prompt中间件、7因子科学评分系统、时间段意图理解、LLM优化功能、JWT认证系统、集成测试和性能测试。
 
 **当前版本**: v3.1.1
-**当前分支**: feature/llm-optimization (功能已完成)
-**核心优化**: 动态Prompt中间件、LLM提示工程优化、工具选择效率提升、推理质量改进
+**当前分支**: feature/equipment-ui
+**核心功能**: JWT认证系统、动态Prompt中间件、7因子科学评分、LLM优化、装备管理UI优化
 
 ## 🧪 测试概览
 
@@ -12,6 +12,7 @@
 
 | 测试模块 | 测试用例数 | 覆盖功能 | 状态 |
 |----------|------------|----------|------|
+| JWT认证系统 | 4个文件 | 登录/权限/Token验证 | ✅ 全部通过 |
 | 7因子科学评分系统 | 27个 | 季节/月相/趋势分析 | ✅ 全部通过 |
 | 时间段意图识别 | 19个 | 时间段标准化/过滤 | ✅ 全部通过 |
 | LLM优化功能 | 1个核心验证 | 工具选择效率/推理质量 | ✅ 通过 |
@@ -20,7 +21,142 @@
 | 集成测试 | 多个 | API集成/数据流 | ✅ 通过 |
 | 边界测试 | 多个 | 异常处理/容错 | ✅ 通过 |
 
-**总计**: 50+个测试用例，覆盖所有核心功能
+**总计**: 55+个测试用例，覆盖所有核心功能
+
+## 🔐 JWT认证系统测试 (v3.1.1新增)
+
+### 测试位置
+- **目录**: `tests/test_auth/`
+- **执行命令**: `uv run pytest tests/test_auth/ -v`
+
+### 测试文件结构
+
+#### 1. test_jwt.py - JWT核心功能测试
+```python
+def test_create_access_token():
+    """测试JWT Token生成"""
+    data = {"user_id": 1, "username": "admin", "role": "admin"}
+    token = create_access_token(data)
+    assert isinstance(token, str)
+    assert len(token) > 0
+
+def test_verify_token():
+    """测试JWT Token验证"""
+    # 先创建token
+    token = create_access_token({"user_id": 1})
+    # 验证token
+    payload = verify_token(token)
+    assert payload["user_id"] == 1
+    assert "exp" in payload
+
+def test_token_expiration():
+    """测试Token过期处理"""
+    # 创建已过期的token
+    expired_token = create_access_token({}, expires_delta=timedelta(seconds=-1))
+    # 验证应该抛出异常
+    with pytest.raises(ValueError):
+        verify_token(expired_token)
+```
+
+#### 2. test_login_routes.py - 登录接口测试
+```python
+def test_login_success():
+    """测试登录成功"""
+    response = client.post("/api/v1/auth/login", json={
+        "username": "admin",
+        "password": "admin123"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert data["user"]["username"] == "admin"
+
+def test_login_wrong_password():
+    """测试密码错误"""
+    response = client.post("/api/v1/auth/login", json={
+        "username": "admin",
+        "password": "wrong"
+    })
+    assert response.status_code == 401
+    assert "用户名或密码错误" in response.json()["detail"]
+
+def test_login_inactive_user():
+    """测试禁用用户登录"""
+    response = client.post("/api/v1/auth/login", json={
+        "username": "inactive_user",
+        "password": "password"
+    })
+    assert response.status_code == 403
+    assert "账户已被禁用" in response.json()["detail"]
+```
+
+#### 3. test_permissions.py - 权限管理测试
+```python
+def test_admin_permissions():
+    """测试管理员权限"""
+    permissions = get_role_permissions(RoleEnum.ADMIN)
+    assert "equipment:create" in permissions
+    assert "equipment:read" in permissions
+    assert "equipment:update" in permissions
+    assert "equipment:delete" in permissions
+
+def test_user_permissions():
+    """测试普通用户权限"""
+    permissions = get_role_permissions(RoleEnum.USER)
+    assert "equipment:read" in permissions
+    assert "equipment:create" not in permissions
+    assert "equipment:delete" not in permissions
+```
+
+#### 4. test_integration.py - 认证集成测试
+```python
+def test_protected_endpoint_without_token():
+    """测试未认证访问保护端点"""
+    response = client.get("/api/v1/auth/profile")
+    assert response.status_code == 401
+
+def test_protected_endpoint_with_token():
+    """测试使用Token访问保护端点"""
+    # 先登录获取token
+    login_response = client.post("/api/v1/auth/login", json={
+        "username": "admin",
+        "password": "admin123"
+    })
+    token = login_response.json()["access_token"]
+
+    # 使用token访问保护端点
+    response = client.get("/api/v1/auth/profile", headers={
+        "Authorization": f"Bearer {token}"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["user"]["username"] == "admin"
+```
+
+### 测试覆盖范围
+
+1. **JWT工具函数**:
+   - ✅ Token生成和验证
+   - ✅ Token过期处理
+   - ✅ 无效Token处理
+   - ✅ 密码哈希和验证
+
+2. **认证接口**:
+   - ✅ 成功登录流程
+   - ✅ 用户名密码错误处理
+   - ✅ 禁用用户处理
+   - ✅ 用户信息获取
+
+3. **权限系统**:
+   - ✅ 角色权限映射
+   - ✅ 权限检查逻辑
+   - ✅ 不同角色对比
+
+4. **集成测试**:
+   - ✅ 保护端点访问控制
+   - ✅ Token传递机制
+   - ✅ 认证中间件集成
 
 ## 🔬 7因子科学评分系统测试 (v3.0.0新增)
 
@@ -659,8 +795,8 @@ uv run python test_quick_validation.py
 2. **分支状态错误**
    ```bash
    # 确保在正确分支
-   git checkout feature/llm-optimization
-   git pull origin feature/llm-optimization
+   git checkout feature/equipment-ui
+   git pull origin feature/equipment-ui
    ```
 
 3. **网络连接问题**
@@ -782,7 +918,7 @@ uv run pytest tests/ --tb=long
 **测试框架**: pytest 9.0.1
 **覆盖率目标**: >85%
 **维护者**: 智能钓鱼助手项目
-**当前分支**: feature/llm-optimization
+**当前分支**: feature/equipment-ui
 
 **测试哲学**: "快速失败，快速修复" - 通过全面的测试覆盖确保系统的可靠性和稳定性，重点验证LLM优化功能的工具选择效率和推理质量改进。
 

@@ -13,6 +13,7 @@ Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推�
 ## 核心特性
 
 - 🚀 **FastAPI 后端**: 高性能异步 API 服务
+- 🔐 **JWT 认证**: 安全的用户认证和权限管理
 - 📦 **模块化 Agent**: 完全自包含的 Agent 包架构
 - 🧠 **动态Prompt中间件**: 智能选择提示词，优化Token使用效率50%+
 - 🎣 **智能推荐**: 7因子科学评分系统
@@ -56,7 +57,81 @@ Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推�
 }
 ```
 
-### 3. 钓鱼助手对话
+### 3. 认证管理
+
+#### POST `/api/v1/auth/login`
+管理员用户登录，获取 JWT 访问令牌。
+
+**请求体**:
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+**参数说明**:
+- `username` (string, required): 用户名（3-50字符）
+- `password` (string, required): 密码（6-100字符）
+
+**响应示例**:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "user_id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "role": "admin",
+    "full_name": "Administrator",
+    "is_active": true
+  },
+  "permissions": ["equipment:create", "equipment:read", "equipment:update", "equipment:delete"]
+}
+```
+
+#### GET `/api/v1/auth/profile`
+获取当前用户信息（需要认证）。
+
+**请求头**:
+```
+Authorization: Bearer <access_token>
+```
+
+**响应示例**:
+```json
+{
+  "user": {
+    "user_id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "role": "admin",
+    "full_name": "Administrator",
+    "is_active": true
+  },
+  "permissions": ["equipment:create", "equipment:read", "equipment:update", "equipment:delete"]
+}
+```
+
+#### POST `/api/v1/auth/logout`
+用户登出（需要认证）。
+
+**请求头**:
+```
+Authorization: Bearer <access_token>
+```
+
+**响应示例**:
+```json
+{
+  "message": "登出成功"
+}
+```
+
+**注意**: JWT 是无状态的，实际登出需要在客户端删除 token。
+
+### 4. 钓鱼助手对话
 
 #### POST `/api/v1/fishing/chat`
 与钓鱼助手进行对话交互。
@@ -88,7 +163,7 @@ Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推�
 - `400`: 请求参数错误
 - `500`: 服务器内部错误
 
-### 4. 工具列表
+### 5. 工具列表
 
 #### GET `/api/v1/fishing/tools`
 获取所有可用的 Agent 工具列表。
@@ -369,6 +444,12 @@ export MAX_CONCURRENT_REQUESTS="100"
 ```
 
 ## 更新日志
+
+### v3.1.1
+- 🔐 新增 JWT 认证系统，支持管理员登录
+- 👥 实现用户权限管理（RBAC）
+- 🛡️ 添加认证中间件和安全保护
+- 🔧 完善的测试覆盖和错误处理
 
 ### v3.1.0
 - 🚀 新增 FastAPI REST API 后端

@@ -11,8 +11,8 @@ git branch --show-current
 git status
 
 # 应显示：
-# * feature/llm-optimization (或 main)
-# LLM优化和动态Prompt中间件功能已完成并集成
+# * feature/equipment-ui
+# JWT认证系统和装备管理UI优化已完成
 ```
 
 ### 1. 环境检查
@@ -135,7 +135,7 @@ for location in test_locations:
 ## 📊 预期结果
 
 ### 成功标准
-- ✅ **分支状态**: feature/llm-optimization分支，5个文件已修改
+- ✅ **分支状态**: feature/equipment-ui分支，JWT认证系统和装备管理UI优化已完成
 - ✅ **工具加载**: 应显示3个工具
 - ✅ **季节评分**: 春季早晨应为100分
 - ✅ **气压趋势**: 快速下降应为1.2倍（钓鱼黄金期）

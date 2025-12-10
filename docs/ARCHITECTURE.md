@@ -1,9 +1,9 @@
 # 智能钓鱼助手 - 项目架构文档
 
 **版本**: v3.1.1
-**分支**: feature/llm-optimization (功能已完成)
+**分支**: feature/equipment-ui
 **目标**: 为大模型(LLM)提供完整的项目架构理解指南
-**架构**: 模块化 Agent 包 + FastAPI 后端 + 动态Prompt中间件
+**架构**: 模块化 Agent 包 + FastAPI 后端 + 动态Prompt中间件 + JWT 认证系统
 
 ---
 
@@ -256,8 +256,16 @@ fishing-agent/
 │   │   └── main.py
 │   └── api/                       # FastAPI 后端
 │       ├── main.py
-│       ├── routes/
-│       └── schemas/
+│       ├── auth/                   # JWT 认证模块
+│       │   ├── jwt.py            # JWT 工具
+│       │   ├── dependencies.py   # 认证依赖
+│       │   └── permissions.py    # 权限管理
+│       ├── middleware/            # API 中间件
+│       ├── routes/                # API 路由
+│       │   ├── auth.py           # 认证路由
+│       │   ├── fishing.py        # 钓鱼助手路由
+│       │   └── user_equipment.py # 用户装备路由
+│       └── schemas/               # 数据模型
 ├── shared/                        # 共享资源（新增）
 │   ├── config/                    # 全局配置
 │   └── data/                      # 共享数据
@@ -393,8 +401,12 @@ class FishingAgent:
 # apps/api/main.py
 from fastapi import FastAPI
 from packages.agent_fishing import create_agent
+from .routes import auth_router
 
 app = FastAPI(title="智能钓鱼助手 API", version="3.1.1")
+
+# 注册路由
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 
 @app.post("/api/v1/fishing/chat")
 async def fishing_chat(request: ChatRequest):
@@ -411,10 +423,40 @@ async def list_tools():
     return {"tools": [{"name": tool.name, "description": tool.description} for tool in tools]}
 ```
 
+#### **JWT 认证系统**
+```python
+# apps/api/auth/jwt.py
+from jose import jwt
+import bcrypt
+
+# JWT 配置
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def create_access_token(data: dict) -> str:
+    """生成 JWT 访问令牌"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=30)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def verify_token(token: str) -> dict:
+    """验证 JWT 令牌"""
+    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+```
+
 #### **API 端点**
 ```python
 GET  /                     # API 信息
 GET  /health               # 健康检查
+
+# 认证相关
+POST /api/v1/auth/login    # 管理员登录
+GET  /api/v1/auth/profile  # 获取用户信息（需认证）
+POST /api/v1/auth/logout   # 用户登出（需认证）
+
+# 钓鱼助手
 POST /api/v1/fishing/chat  # 钓鱼助手对话
 GET  /api/v1/fishing/tools # 工具列表
 ```

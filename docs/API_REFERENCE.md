@@ -1,14 +1,15 @@
 # API 完整参考
 
-**版本**: v3.2.0
+**版本**: v3.1.1
 **基础URL**: `http://localhost:8000`
-**最后更新**: 2024-12-03
+**最后更新**: 2024-12-10
 
 ## 目录
 
 - [概述](#概述)
 - [认证](#认证)
 - [错误处理](#错误处理)
+- [认证 API](#认证-api)
 - [钓鱼助手 API](#钓鱼助手-api)
 - [用户装备管理 API](#用户装备管理-api)
 - [数据模型](#数据模型)
@@ -46,12 +47,33 @@
 
 ## 认证
 
-当前版本暂未实现认证机制。所有接口均可直接访问。
+本版本已实现 **JWT Token 认证机制**，用于管理员用户认证。
+
+### 获取访问令牌
+
+1. 使用管理员账户调用登录接口获取 JWT Token
+2. 在需要认证的请求头中添加：`Authorization: Bearer <token>`
+
+### Token 有效期
+
+- **默认有效期**: 30分钟
+- **算法**: HS256
+- **编码**: Base64URL
+
+### 认证端点
+
+详细接口文档请参考 [认证 API](#认证-api) 部分。
+
+### 保护的端点
+
+以下端点需要认证：
+- `GET /api/v1/auth/profile` - 获取用户信息
+- `POST /api/v1/auth/logout` - 用户登出
 
 **未来版本**将支持：
-- JWT Token 认证
 - API Key 认证
 - OAuth 2.0
+- 刷新令牌机制
 
 ---
 
@@ -72,6 +94,8 @@
 | 200 | 成功 |
 | 201 | 创建成功 |
 | 400 | 请求参数错误 |
+| 401 | 未认证/认证失败 |
+| 403 | 禁止访问（权限不足） |
 | 404 | 资源不存在 |
 | 500 | 服务器内部错误 |
 
@@ -99,6 +123,161 @@
 {
   "detail": "数据库连接失败"
 }
+```
+
+---
+
+## 认证 API
+
+### POST /api/v1/auth/login
+
+管理员用户登录
+
+#### 请求
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**Body**:
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+**参数说明**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| username | string | 是 | 用户名（3-50字符） |
+| password | string | 是 | 密码（6-100字符） |
+
+#### 响应
+
+**200 OK**:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "user_id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "role": "admin",
+    "full_name": "Administrator",
+    "is_active": true,
+    "last_login": "2024-12-10T10:30:00",
+    "created_at": "2024-12-01T00:00:00"
+  },
+  "permissions": ["equipment:create", "equipment:read", "equipment:update", "equipment:delete"]
+}
+```
+
+**401 Unauthorized**:
+```json
+{
+  "detail": "用户名或密码错误"
+}
+```
+
+**403 Forbidden**:
+```json
+{
+  "detail": "账户已被禁用，请联系管理员"
+}
+```
+
+#### cURL 示例
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "admin123"
+  }'
+```
+
+---
+
+### GET /api/v1/auth/profile
+
+获取当前用户信息
+
+#### 请求
+
+**Headers**:
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+#### 响应
+
+**200 OK**:
+```json
+{
+  "user": {
+    "user_id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "role": "admin",
+    "full_name": "Administrator",
+    "is_active": true,
+    "last_login": "2024-12-10T10:30:00",
+    "created_at": "2024-12-01T00:00:00"
+  },
+  "permissions": ["equipment:create", "equipment:read", "equipment:update", "equipment:delete"]
+}
+```
+
+**401 Unauthorized**:
+```json
+{
+  "detail": "Token 验证失败"
+}
+```
+
+#### cURL 示例
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/auth/profile" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+---
+
+### POST /api/v1/auth/logout
+
+用户登出
+
+#### 请求
+
+**Headers**:
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+#### 响应
+
+**200 OK**:
+```json
+{
+  "message": "登出成功"
+}
+```
+
+**注意**: JWT 是无状态的，实际登出需要在客户端删除 token。
+
+#### cURL 示例
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/logout" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 ---

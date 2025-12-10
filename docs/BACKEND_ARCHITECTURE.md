@@ -1,8 +1,8 @@
 # 智能钓鱼助手后端架构详解
 
 **版本**: v3.1.1
-**架构**: 模块化 Agent 包 + FastAPI 后端 + 动态Prompt中间件
-**更新日期**: 2025-11-30
+**架构**: 模块化 Agent 包 + FastAPI 后端 + 动态Prompt中间件 + JWT 认证系统
+**更新日期**: 2024-12-10
 
 ---
 
@@ -29,15 +29,25 @@
 │                    FastAPI 网关层                        │
 │  🌐 REST API 接口 (端口 8000)                            │
 │  • CORS 中间件                                           │
+│  • API 日志中间件                                        │
 │  • 请求验证                                              │
 │  • 错误处理                                              │
 └─────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────┐
+│                   认证层 (auth/)                         │
+│  🔐 JWT 认证系统                                          │
+│  • 登录认证 (/api/v1/auth/login)                         │
+│  • Token 验证                                            │
+│  • 权限管理                                              │
+└─────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────┐
 │                   应用层 (apps/)                        │
-│  🚀 apps/api/routes/fishing.py                          │
-│  • 聊天接口 (/api/v1/fishing/chat)                       │
-│  • 工具列表 (/api/v1/fishing/tools)                      │
+│  🚀 apps/api/routes/                                    │
+│  • 认证路由 (auth.py)                                    │
+│  • 钓鱼助手 (fishing.py)                                │
+│  • 装备管理 (user_equipment.py)                          │
 │  • Agent 实例化                                          │
 └─────────────────────────────────────────────────────────┘
                               │
@@ -82,10 +92,19 @@ fishing-agent/
 │   └── utils/                       # 工具类
 ├── apps/api/                        # 🚀 FastAPI 后端
 │   ├── main.py                      # 应用入口
+│   ├── auth/                        # 🔐 认证模块
+│   │   ├── jwt.py                   # JWT 工具函数
+│   │   ├── dependencies.py          # 认证依赖
+│   │   └── permissions.py           # 权限管理
+│   ├── middleware/                  # 📡 中间件
+│   │   └── api_logger.py            # API 日志中间件
 │   ├── routes/                      # API 路由
-│   │   └── fishing.py               # 钓鱼 API
+│   │   ├── auth.py                  # 认证 API
+│   │   ├── fishing.py               # 钓鱼 API
+│   │   └── user_equipment.py        # 用户装备 API
 │   └── schemas/                     # 数据模型
-│       └── chat.py                  # 聊天模型
+│       ├── chat.py                  # 聊天模型
+│       └── user_equipment.py        # 用户装备模型
 ├── debug_agent.py                  # 🆕 调试工具 (5种模式)
 └── shared/                          # 🔧 共享资源
     ├── config/                      # 全局配置
@@ -122,10 +141,51 @@ app.add_middleware(
 )
 
 # 路由注册
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(fishing_router, prefix="/api/v1/fishing", tags=["fishing"])
+app.include_router(user_equipment_router, prefix="/api/v1/user-equipment", tags=["user-equipment"])
 ```
 
-### 2.2 路由处理层 (`apps/api/routes/fishing.py`)
+### 2.2 JWT 认证系统 (`apps/api/auth/`)
+
+**认证架构**：
+```python
+# JWT 配置
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# 认证流程
+1. 用户登录 → 验证用户名密码
+2. 生成 JWT Token → 包含 user_id, username, role
+3. 客户端请求 → 携带 Authorization: Bearer <token>
+4. 服务端验证 → 解析 Token，验证签名和有效期
+5. 权限检查 → 基于 RBAC 角色权限
+```
+
+**核心组件**：
+
+1. **JWT 工具** (`jwt.py`):
+   - `create_access_token()`: 生成访问令牌
+   - `verify_token()`: 验证令牌有效性
+   - `get_password_hash()`: bcrypt 密码哈希
+   - `verify_password()`: 密码验证
+
+2. **认证依赖** (`dependencies.py`):
+   - `get_current_user`: 从 JWT Token 提取用户信息
+   - 自动处理 Token 过期和无效情况
+
+3. **权限管理** (`permissions.py`):
+   - 基于角色的访问控制 (RBAC)
+   - 预定义角色权限映射
+
+**安全特性**：
+- 使用 bcrypt 进行密码哈希（加盐）
+- JWT Token 短期有效期（30分钟）
+- 无状态认证，支持水平扩展
+- 中间件级别的安全保护
+
+### 2.3 路由处理层 (`apps/api/routes/`)
 
 **聊天接口逻辑**：
 ```python

@@ -1,7 +1,7 @@
 [project]
 name = "fishing-agent"
-version = "3.2.0"
-description = "智能钓鱼助手 v3.2.0 - 基于 LangChain 1.0+ 的钓鱼时间推荐和天气分析系统（模块化 Agent 架构 + 动态Prompt中间件 + 7因子科学评分 + 电商装备爬虫 + 用户装备库管理 + FastAPI）"
+version = "3.1.1"
+description = "智能钓鱼助手 v3.1.1 - 基于 LangChain 1.0+ 的钓鱼时间推荐和天气分析系统（模块化 Agent 架构 + 动态Prompt中间件 + 7因子科学评分 + JWT认证系统 + RBAC权限管理 + 装备管理UI优化）"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
