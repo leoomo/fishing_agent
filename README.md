@@ -1,14 +1,17 @@
-# Fishing Agent - 智能钓鱼助手 v3.1.1
+# Fishing Agent - 智能钓鱼助手 v4.0.0
 
 基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐、天气分析和路亚装备管理。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v3.1.1 + JWT认证系统 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v4.0.0 + JWT认证系统 + 爬虫监控模块 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
 
-> **当前版本**: v3.1.1 (JWT认证系统 + 装备管理UI优化)
+> **当前版本**: v4.0.0 (Phase 4 爬虫和监控模块完成)
 > **当前分支**: feature/equipment-ui
-> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构 + JWT认证
+> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构 + JWT认证 + 爬虫监控
 
-### 🌟 版本状态 (v3.1.1) ⭐ 新增JWT认证系统 + 装备管理UI优化
+### 🌟 版本状态 (v4.0.0) ⭐ Phase 4 爬虫和监控模块完成
+- ✅ **爬虫任务管理**: 支持淘宝、京东、论坛三种爬虫，任务调度和监控
+- ✅ **系统监控面板**: API统计、LLM使用统计、数据库性能监控
+- ✅ **WebSocket实时推送**: 爬虫进度和系统监控实时数据
 - ✅ **JWT认证系统**: 完整的JWT Token认证，支持登录/注册/权限验证
 - ✅ **RBAC权限管理**: 基于角色的访问控制，支持管理员和普通用户
 - ✅ **认证中间件**: 自动Token验证和权限检查，API安全保护
@@ -24,7 +27,7 @@
 - 🚀 **向量存储系统**: 集成DashScope Embedding API和ChromaDB，支持路亚装备语义搜索
 - 📋 **CLI管理工具**: 新增向量存储管理CLI，支持索引重建和搜索测试
 
-## ✨ 核心功能（v3.1.1 JWT认证 + v3.1.0 LLM优化 + v3.0.2 路亚装备集成）
+## ✨ 核心功能（v4.0.0 Phase 4 爬虫监控 + v3.1.1 JWT认证 + v3.1.0 LLM优化 + v3.0.2 路亚装备集成）
 
 ### 🔐 JWT认证系统 ⭐ v3.1.1核心功能
 - **JWT Token认证**: 完整的用户登录、注册、token验证机制
@@ -42,6 +45,22 @@
   - `GET /auth/profile`: 获取用户信息
   - `POST /auth/logout`: 用户登出
 - **完整测试覆盖**: JWT认证、权限管理、集成测试
+
+### 🕷️ 爬虫任务管理 ⭐ v4.0.0新增
+- **多平台爬虫支持**: 淘宝、京东、钓鱼论坛三种数据源
+- **任务调度系统**: 创建、触发、重试、删除爬虫任务
+- **实时进度监控**: WebSocket推送爬虫进度和状态
+- **任务日志管理**: 详细的任务执行日志记录
+- **数据同步状态**: 装备数据同步统计和监控
+- **权限控制**: 基于RBAC的爬虫管理权限（CRAWLER_READ/EXECUTE/DELETE）
+
+### 📊 系统监控面板 ⭐ v4.0.0新增
+- **API调用统计**: 调用量、响应时间、错误率、Top端点分析
+- **LLM使用统计**: Token消耗、成本统计、成功率、按提供商分组
+- **数据库性能监控**: 查询时间、慢查询、连接池状态、表大小统计
+- **系统健康检查**: API/DB/LLM服务状态检查
+- **实时监控推送**: WebSocket每5秒推送实时统计数据
+- **权限控制**: 基于RBAC的监控权限（MONITOR_READ）
 
 ### 🎒 装备管理UI优化 ⭐ v3.1.1更新
 - **用户界面改进**: 更友好的装备管理界面
@@ -392,9 +411,56 @@ curl -X POST http://localhost:8000/api/v1/user-equipment/users/1/recommend \
 
 # 获取装备统计
 curl http://localhost:8000/api/v1/user-equipment/users/1/statistics
+
+# ========== 爬虫管理API ⭐ v4.0.0新增 ==========
+
+# 查询爬虫任务列表（需要认证）
+curl "http://localhost:8000/api/v1/admin/crawler/tasks?page=1&page_size=10" \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# 手动触发爬虫任务
+curl -X POST "http://localhost:8000/api/v1/admin/crawler/tasks/trigger" \
+  -H "Authorization: Bearer <your_jwt_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task_type": "taobao",
+    "keywords": ["路亚竿"],
+    "max_pages": 5
+  }'
+
+# 获取任务详情
+curl "http://localhost:8000/api/v1/admin/crawler/tasks/1" \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# 重试失败任务
+curl -X POST "http://localhost:8000/api/v1/admin/crawler/tasks/1/retry" \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# 获取数据同步状态
+curl "http://localhost:8000/api/v1/admin/crawler/sync-status" \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# ========== 监控管理API ⭐ v4.0.0新增 ==========
+
+# API调用统计
+curl "http://localhost:8000/api/v1/admin/monitor/api-stats" \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# LLM使用统计
+curl "http://localhost:8000/api/v1/admin/monitor/llm-stats" \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# 数据库性能监控
+curl "http://localhost:8000/api/v1/admin/monitor/db-performance" \
+  -H "Authorization: Bearer <your_jwt_token>"
+
+# 系统健康检查（无需认证）
+curl "http://localhost:8000/api/v1/admin/monitor/health-check"
 ```
 
-> ✅ **v3.1.1更新**: JWT认证系统和装备管理UI优化！
+> ✅ **v4.0.0更新**: Phase 4 爬虫和监控模块完成！
+> 🕷️ **v4.0.0新增**: 爬虫任务管理 + 实时进度推送！
+> 📊 **v4.0.0新增**: 系统监控面板 + WebSocket实时推送！
 > 🔐 **v3.1.1新增**: 完整的JWT Token认证 + RBAC权限管理！
 > 🎨 **v3.1.1新增**: 装备管理UI优化，提升用户体验！
 > ⏰ **保持功能**: 时间段意图理解功能，支持精准时段识别！
@@ -402,13 +468,14 @@ curl http://localhost:8000/api/v1/user-equipment/users/1/statistics
 > 🚀 **7因子评分**: 科学评分体系，解决"86分问题"！
 
 ### 当前分支状态
-> ✅ **feature/equipment-ui分支已完成** - JWT认证系统和装备管理UI优化已实现
+> ✅ **feature/equipment-ui分支已完成** - JWT认证系统、装备管理UI优化和Phase 4爬虫监控模块已实现
+> - ✅ Phase 4完成：爬虫任务管理 + 系统监控面板 + WebSocket实时推送
 > - ✅ JWT认证系统：完整的Token认证 + RBAC权限管理 + 认证中间件
 > - ✅ 装备管理UI：改进的用户界面 + 更好的用户体验
 > - ✅ API安全增强：401/403错误处理 + 安全的密码哈希
-> - ✅ 测试覆盖完善：JWT认证、权限管理、集成测试
+> - ✅ 测试覆盖完善：JWT认证、权限管理、集成测试，爬虫监控测试
 > - ✅ 数据库优化：admin_users表支持角色管理
-> - 当前状态：JWT认证系统已完全集成，功能稳定可用
+> - 当前状态：v4.0.0版本，所有功能稳定可用
 
 #### 方法四：激活虚拟环境
 ```bash
@@ -858,10 +925,17 @@ fishing-agent/
 │       ├── routes/                # API 路由
 │       │   ├── auth.py            # 认证API端点 ⭐ v3.1.1新增
 │       │   ├── fishing.py         # 钓鱼API路由
-│       │   └── user_equipment.py  # 用户装备API
-│       └── schemas/               # 数据模型
-│           ├── chat.py            # 对话数据模型（已扩展user_id）
-│           └── user_equipment.py  # 装备数据模型
+│       │   ├── user_equipment.py  # 用户装备API
+│       │   ├── crawler.py         # 爬虫管理API ⭐ v4.0.0新增
+│       │   └── monitor.py         # 监控管理API ⭐ v4.0.0新增
+│       ├── schemas/               # 数据模型
+│       │   ├── chat.py            # 对话数据模型（已扩展user_id）
+│       │   ├── user_equipment.py  # 装备数据模型
+│       │   ├── crawler.py         # 爬虫管理Schema ⭐ v4.0.0新增
+│       │   └── monitor.py         # 监控管理Schema ⭐ v4.0.0新增
+│       └── services/              # 业务服务层 ⭐ v4.0.0新增
+│           ├── crawler_service.py # 爬虫服务
+│           └── monitor_service.py # 监控服务
 ├── shared/                        # 共享资源
 │   ├── config/                    # 全局配置
 │   │   └── service_config.py
@@ -1007,6 +1081,27 @@ MIT License
 
 ---
 
+## 🆕 v4.0.0 新功能亮点 ⭐ Phase 4 爬虫和监控模块完成
+
+### 🕷️ 爬虫任务管理系统
+- ✅ **多平台爬虫**: 淘宝、京东、钓鱼论坛三种数据源
+- ✅ **任务调度**: 创建、触发、重试、删除爬虫任务
+- ✅ **实时进度**: WebSocket推送爬虫进度和状态
+- ✅ **任务日志**: 详细的任务执行日志记录
+- ✅ **权限控制**: 基于RBAC的爬虫管理权限
+
+### 📊 系统监控面板
+- ✅ **API统计**: 调用量、响应时间、错误率、Top端点
+- ✅ **LLM统计**: Token消耗、成本统计、成功率
+- ✅ **数据库监控**: 查询时间、慢查询、连接池状态
+- ✅ **健康检查**: API/DB/LLM服务状态
+- ✅ **实时推送**: WebSocket每5秒推送统计数据
+
+### 🔌 WebSocket实时通信
+- ✅ **实时监控**: 爬虫进度和系统监控实时推送
+- ✅ **连接管理**: 优雅的连接管理和错误处理
+- ✅ **推送频率**: 爬虫1秒/次，监控5秒/次
+
 ## 🆕 v3.1.1 新功能亮点 ⭐ JWT认证系统 + 装备管理UI优化
 
 ### 🔐 JWT认证系统
@@ -1097,7 +1192,10 @@ MIT License
 
 > 🎣 智能分析，精准钓鱼！
 >
-> v3.1.1 全新升级：
+> v4.0.0 全新升级：
+> - 🕷️ **爬虫任务管理** - 多平台爬虫、任务调度、实时进度监控
+> - 📊 **系统监控面板** - API统计、LLM统计、数据库性能监控
+> - 🔌 **WebSocket实时推送** - 爬虫进度和监控数据实时更新
 > - 🔐 **JWT认证系统** - 完整的用户认证、权限管理、安全保护
 > - 🎨 **装备管理UI优化** - 改进的用户界面、更好的用户体验
 > - 🛡️ **API安全增强** - Token认证、权限控制、错误处理

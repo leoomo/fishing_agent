@@ -1,8 +1,8 @@
 # API 完整参考
 
-**版本**: v3.1.1
+**版本**: v4.0.0
 **基础URL**: `http://localhost:8000`
-**最后更新**: 2024-12-10
+**最后更新**: 2025-12-10
 
 ## 目录
 
@@ -12,13 +12,16 @@
 - [认证 API](#认证-api)
 - [钓鱼助手 API](#钓鱼助手-api)
 - [用户装备管理 API](#用户装备管理-api)
+- [爬虫管理 API](#爬虫管理-api) ⭐ v4.0.0新增
+- [监控管理 API](#监控管理-api) ⭐ v4.0.0新增
+- [WebSocket API](#websocket-api) ⭐ v4.0.0新增
 - [数据模型](#数据模型)
 
 ---
 
 ## 概述
 
-智能钓鱼助手 API 提供两大类接口：
+智能钓鱼助手 API 提供五类接口：
 
 1. **钓鱼助手 API** (`/api/v1/fishing/`)
    - Agent 对话接口
@@ -29,6 +32,21 @@
    - 装备库管理
    - 推荐功能
    - 统计分析
+
+3. **爬虫管理 API** (`/api/v1/admin/crawler/`) ⭐ v4.0.0新增
+   - 爬虫任务管理
+   - 任务调度和监控
+   - 任务日志查询
+
+4. **监控管理 API** (`/api/v1/admin/monitor/`) ⭐ v4.0.0新增
+   - API调用统计
+   - LLM使用统计
+   - 数据库性能监控
+   - 系统健康检查
+
+5. **WebSocket API** (`/ws/`) ⭐ v4.0.0新增
+   - 爬虫任务实时进度推送
+   - 系统监控实时数据推送
 
 ### 技术栈
 
@@ -49,10 +67,53 @@
 
 本版本已实现 **JWT Token 认证机制**，用于管理员用户认证。
 
+### 创建管理员账户
+
+首次使用前需要创建管理员账户：
+
+```bash
+# 使用脚本创建管理员用户
+uv run python scripts/create_admin.py --username admin --password admin123
+
+# 或者手动注册（通过 API）
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "admin123",
+    "email": "admin@example.com"
+  }'
+```
+
 ### 获取访问令牌
 
-1. 使用管理员账户调用登录接口获取 JWT Token
-2. 在需要认证的请求头中添加：`Authorization: Bearer <token>`
+```bash
+# 登录获取 JWT Token
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "admin123"
+  }'
+
+# 响应示例
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "token_type": "bearer",
+  "expires_in": 3600
+}
+```
+
+### 使用 Token 访问 API
+
+```bash
+# 在请求头中添加 Token
+curl "http://localhost:8000/api/v1/admin/crawler/tasks" \
+  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+```
+
+### 令牌使用说明
+在需要认证的请求头中添加：`Authorization: Bearer <token>`
 
 ### Token 有效期
 
@@ -1023,7 +1084,232 @@ if __name__ == "__main__":
 
 ---
 
+## 爬虫管理 API ⭐ v4.0.0新增
+
+**基础路径**: `/api/v1/admin/crawler`
+
+### 权限要求
+- 需要 JWT Token 认证
+- 需要 `CRAWLER_READ`、`CRAWLER_EXECUTE`、`CRAWLER_DELETE` 权限
+
+### 1. 查询爬虫任务列表
+
+```http
+GET /api/v1/admin/crawler/tasks
+```
+
+**查询参数**:
+- `page` (int, optional): 页码，默认 1
+- `page_size` (int, optional): 每页数量，默认 20
+- `task_type` (str, optional): 任务类型过滤 (taobao/jd/forum)
+- `status` (str, optional): 状态过滤 (pending/running/success/failed)
+
+**响应示例**:
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "task_type": "taobao",
+      "keywords": ["路亚竿"],
+      "status": "success",
+      "total_items": 100,
+      "success_items": 95,
+      "failed_items": 5,
+      "start_time": "2025-12-10T10:00:00",
+      "end_time": "2025-12-10T10:05:00"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+### 2. 手动触发爬虫任务
+
+```http
+POST /api/v1/admin/crawler/tasks/trigger
+```
+
+**请求体**:
+```json
+{
+  "task_type": "taobao",
+  "keywords": ["路亚竿", "渔轮"],
+  "max_pages": 5,
+  "proxy": null
+}
+```
+
+**响应示例**:
+```json
+{
+  "task_id": 123,
+  "message": "爬虫任务已启动",
+  "status": "pending"
+}
+```
+
+### 3. 获取任务详情
+
+```http
+GET /api/v1/admin/crawler/tasks/{task_id}
+```
+
+### 4. 重试失败任务
+
+```http
+POST /api/v1/admin/crawler/tasks/{task_id}/retry
+```
+
+### 5. 获取任务日志
+
+```http
+GET /api/v1/admin/crawler/tasks/{task_id}/logs
+```
+
+### 6. 删除任务记录
+
+```http
+DELETE /api/v1/admin/crawler/tasks/{task_id}
+```
+
+### 7. 获取数据同步状态
+
+```http
+GET /api/v1/admin/crawler/sync-status
+```
+
+---
+
+## 监控管理 API ⭐ v4.0.0新增
+
+**基础路径**: `/api/v1/admin/monitor`
+
+### 权限要求
+- 需要 JWT Token 认证
+- 需要 `MONITOR_READ` 权限
+
+### 1. API调用统计
+
+```http
+GET /api/v1/admin/monitor/api-stats
+```
+
+**查询参数**:
+- `start_date` (date, optional): 开始日期
+- `end_date` (date, optional): 结束日期
+
+**响应示例**:
+```json
+{
+  "total_calls": 1250,
+  "avg_response_time": 45.3,
+  "error_rate": 2.4,
+  "top_endpoints": [
+    {
+      "endpoint": "/api/v1/fishing/chat",
+      "count": 350,
+      "avg_time": 120.5
+    }
+  ]
+}
+```
+
+### 2. LLM使用统计
+
+```http
+GET /api/v1/admin/monitor/llm-stats
+```
+
+**响应示例**:
+```json
+{
+  "total_calls": 450,
+  "total_tokens": 125000,
+  "total_cost": 15.75,
+  "avg_response_time": 1.2,
+  "success_rate": 98.5,
+  "by_provider": {
+    "qwen": {
+      "calls": 300,
+      "tokens": 80000,
+      "cost": 10.0
+    }
+  }
+}
+```
+
+### 3. 数据库性能监控
+
+```http
+GET /api/v1/admin/monitor/db-performance
+```
+
+### 4. 系统健康检查
+
+```http
+GET /api/v1/admin/monitor/health-check
+```
+
+**注意**: 此端点无需认证
+
+---
+
+## WebSocket API ⭐ v4.0.0新增
+
+### 1. 爬虫任务进度推送
+
+```
+WS /api/v1/admin/crawler/ws/crawler/{task_id}
+```
+
+**推送数据格式**:
+```json
+{
+  "task_id": 1,
+  "status": "running",
+  "progress": "50/100",
+  "success_items": 50,
+  "failed_items": 2,
+  "timestamp": "2025-12-10T10:30:45.123456"
+}
+```
+
+### 2. 系统监控实时推送
+
+```
+WS /api/v1/admin/monitor/ws/realtime-stats
+```
+
+**推送数据格式**:
+```json
+{
+  "timestamp": "2025-12-10T10:30:45.123456",
+  "api_calls_per_minute": 25,
+  "api_errors_per_minute": 1,
+  "llm_calls_per_minute": 5,
+  "llm_tokens_per_minute": 1200
+}
+```
+
+---
+
 ## 更新日志
+
+### v4.0.0 (2025-12-10)
+
+**新增功能**:
+- 爬虫管理 API（7个端点 + 1个WebSocket）
+- 监控管理 API（4个端点 + 1个WebSocket）
+- WebSocket 实时通信支持
+- 完整的 RBAC 权限控制
+
+**技术升级**:
+- API 版本升级至 v4.0.0
+- 实时数据推送
+- 完善的权限管理
 
 ### v3.2.0 (2024-12-03)
 

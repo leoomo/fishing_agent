@@ -21,12 +21,14 @@ from .routes.auth import router as auth_router
 from .routes.equipment_admin import router as equipment_admin_router
 from .routes.user_admin import router as user_admin_router
 from .routes.import_export import router as import_export_router
+from .routes.crawler import router as crawler_router
+from .routes.monitor import router as monitor_router
 from .middleware import install_api_logging_middleware
 
 app = FastAPI(
     title="智能钓鱼助手 API",
-    version="3.1.1",
-    description="基于 LangChain 的智能钓鱼助手 REST API"
+    version="4.0.0",
+    description="基于 LangChain 的智能钓鱼助手 REST API - 支持爬虫管理和系统监控"
 )
 
 # CORS 配置
@@ -54,13 +56,17 @@ app.include_router(equipment_admin_router, prefix="/api/v1/admin", tags=["equipm
 app.include_router(user_admin_router, prefix="/api/v1/admin", tags=["user-admin"])
 app.include_router(import_export_router, prefix="/api/v1/admin/import-export", tags=["import-export"])
 
+# Phase 4 爬虫和监控模块路由
+app.include_router(crawler_router, prefix="/api/v1/admin/crawler", tags=["crawler"])
+app.include_router(monitor_router, prefix="/api/v1/admin/monitor", tags=["monitor"])
+
 
 @app.get("/")
 async def root():
     """API 根路径"""
     return {
         "name": "智能钓鱼助手 API",
-        "version": "3.1.1",
+        "version": "4.0.0",
         "docs": "/docs"
     }
 

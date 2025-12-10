@@ -1,5 +1,76 @@
 # 更新日志
 
+## [2025-12-10] v4.0.0 - Phase 4 爬虫和监控模块完成 🕷️📊
+
+**当前版本**: v4.0.0 (Phase 4 爬虫和监控模块完成)
+**当前分支**: feature/equipment-ui (功能已完成)
+
+### 🚀 重大新功能：爬虫和监控模块
+
+#### 爬虫任务管理系统 🕷️
+- ✅ **多平台爬虫支持**: 淘宝、京东、钓鱼论坛三种数据源
+- ✅ **任务调度**: 创建、触发、重试、删除爬虫任务
+- ✅ **实时进度监控**: WebSocket推送爬虫进度和状态
+- ✅ **任务日志管理**: 详细的任务执行日志记录
+- ✅ **权限控制**: 基于RBAC的爬虫管理权限（CRAWLER_READ/EXECUTE/DELETE）
+
+#### 系统监控面板 📊
+- ✅ **API调用统计**: 调用量、响应时间、错误率、Top端点分析
+- ✅ **LLM使用统计**: Token消耗、成本统计、成功率、按提供商分组
+- ✅ **数据库性能监控**: 查询时间、慢查询、连接池状态、表大小统计
+- ✅ **系统健康检查**: API/DB/LLM服务状态检查
+- ✅ **实时监控推送**: WebSocket每5秒推送实时统计数据
+- ✅ **权限控制**: 基于RBAC的监控权限（MONITOR_READ）
+
+#### 核心文件结构
+- ✅ `apps/api/routes/crawler.py`: 爬虫管理路由（320+行）
+- ✅ `apps/api/routes/monitor.py`: 监控管理路由（180+行）
+- ✅ `apps/api/schemas/crawler.py`: 爬虫管理Schema（80+行）
+- ✅ `apps/api/schemas/monitor.py`: 监控管理Schema（40+行）
+- ✅ `apps/api/services/crawler_service.py`: 爬虫服务（160+行）
+- ✅ `apps/api/services/monitor_service.py`: 监控服务（280+行）
+- ✅ `packages/agent_fishing/tools/lure/orm/repositories/crawler_repo.py`: 爬虫Repository（150+行）
+- ✅ `tests/api/test_crawler_monitor.py`: 集成测试（280+行）
+
+#### API端点 ⭐ 新增12个管理端点
+```
+# 爬虫管理 (7 + 1 WebSocket)
+GET    /api/v1/admin/crawler/tasks
+GET    /api/v1/admin/crawler/tasks/{id}
+POST   /api/v1/admin/crawler/tasks/trigger
+POST   /api/v1/admin/crawler/tasks/{id}/retry
+GET    /api/v1/admin/crawler/tasks/{id}/logs
+DELETE /api/v1/admin/crawler/tasks/{id}
+GET    /api/v1/admin/crawler/sync-status
+WS     /api/v1/admin/crawler/ws/crawler/{id}
+
+# 监控管理 (4 + 1 WebSocket)
+GET    /api/v1/admin/monitor/api-stats
+GET    /api/v1/admin/monitor/llm-stats
+GET    /api/v1/admin/monitor/db-performance
+GET    /api/v1/admin/monitor/health-check (无需认证)
+WS     /api/v1/admin/monitor/ws/realtime-stats
+```
+
+#### WebSocket实时通信
+- ✅ 爬虫任务进度实时推送（每1秒更新）
+- ✅ 系统监控实时推送（每5秒更新）
+- ✅ 优雅的连接管理和错误处理
+
+#### 测试覆盖
+- ✅ 20+ 集成测试用例
+- ✅ 权限控制测试（401/403）
+- ✅ 边界测试（不存在的资源、无效数据）
+- ✅ 应用启动测试和Swagger文档验证
+
+### 🔧 技术优化
+- ✅ API版本升级至 v4.0.0
+- ✅ 完整的Type hints和文档字符串
+- ✅ 优雅的异常处理和日志记录
+- ✅ 遵循FastAPI最佳实践
+
+---
+
 ## [2025-12-10] v3.1.1 - JWT认证系统 + RBAC权限管理 🔐
 
 **当前版本**: v3.1.1 (JWT认证系统 + 装备管理UI优化)
