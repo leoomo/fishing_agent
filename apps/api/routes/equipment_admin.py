@@ -106,7 +106,7 @@ async def create_equipment(
                 model=equipment.model,
                 price_min=equipment.price_min,
                 price_max=equipment.price_max,
-                price_currency=equipment.price_currency,
+                price_currency="CNY",  # 默认使用人民币
                 description=equipment.description,
                 features=equipment.features,
                 user_level=equipment.user_level,
@@ -224,7 +224,7 @@ async def list_equipment(
                     model=eq.model,
                     price_min=eq.price_min,
                     price_max=eq.price_max,
-                    price_currency=eq.price_currency,
+                    price_currency="CNY",  # 默认使用人民币
                     description=eq.description,
                     features=eq.features,
                     user_level=eq.user_level,
@@ -331,7 +331,7 @@ async def get_equipment(equipment_id: int):
                 model=equipment.model,
                 price_min=equipment.price_min,
                 price_max=equipment.price_max,
-                price_currency=equipment.price_currency,
+                price_currency="CNY",  # 默认使用人民币
                 description=equipment.description,
                 features=equipment.features,
                 user_level=equipment.user_level,

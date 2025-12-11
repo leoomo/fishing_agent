@@ -2,9 +2,10 @@
 
 智能钓鱼助手 REST API 文档
 
-**版本**: v3.1.1
-**架构**: FastAPI 后端 + 模块化 Agent 包 + 动态Prompt中间件
+**版本**: v5.0.0
+**架构**: FastAPI 后端 + 模块化 Agent 包 + 动态Prompt中间件 + React管理前端
 **Base URL**: `http://localhost:8000`
+**前端地址**: `http://localhost:5174` (React管理界面)
 
 ## 概述
 
@@ -13,12 +14,18 @@ Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推�
 ## 核心特性
 
 - 🚀 **FastAPI 后端**: 高性能异步 API 服务
-- 🔐 **JWT 认证**: 安全的用户认证和权限管理
+- 🖥️ **React管理前端**: 现代化的管理界面，支持装备管理、数据分析、系统配置
+- 🔐 **JWT 认证**: 安全的用户认证和权限管理（RBAC）
 - 📦 **模块化 Agent**: 完全自包含的 Agent 包架构
 - 🧠 **动态Prompt中间件**: 智能选择提示词，优化Token使用效率50%+
 - 🎣 **智能推荐**: 7因子科学评分系统
 - 🌤️ **天气查询**: 实时天气数据和72小时预报
 - 🎯 **时段识别**: 精准的时间段意图理解（98%+准确率）
+- 🛠️ **数据分析报表**: 装备统计、趋势分析、品牌排行
+- ⚙️ **配置管理**: API密钥管理、系统参数配置
+- 🕷️ **爬虫管理**: 多平台爬虫任务调度和监控
+- 📊 **系统监控**: API统计、LLM使用统计、数据库性能监控
+- 🔌 **WebSocket**: 实时推送爬虫进度和监控数据
 - 🧠 **LLM 优化**: 高质量的自然语言处理
 - 🛠️ **调试工具**: 完整的开发调试支持
 
@@ -201,6 +208,153 @@ Authorization: Bearer <access_token>
       "description": "识别钓鱼相关图片"
     }
   ]
+}
+```
+
+### 6. 用户装备管理 ⭐ v3.1.1
+
+#### POST `/api/v1/user-equipment/users`
+创建新用户。
+
+**请求体**:
+```json
+{
+  "username": "test_user",
+  "nickname": "测试用户",
+  "user_level": "新手",
+  "fishing_experience_years": 2,
+  "preferred_fish": "鲈鱼,翘嘴"
+}
+```
+
+#### POST `/api/v1/user-equipment/users/{user_id}/equipment`
+添加装备到用户装备库。
+
+#### GET `/api/v1/user-equipment/users/{user_id}/equipment`
+查询用户装备列表，支持分类筛选。
+
+#### DELETE `/api/v1/user-equipment/users/{user_id}/equipment/{equipment_id}`
+删除用户装备。
+
+### 7. 爬虫管理 ⭐ v4.0.0
+
+#### GET `/api/v1/admin/crawler/tasks`
+获取爬虫任务列表（需要管理员权限）。
+
+#### POST `/api/v1/admin/crawler/tasks/trigger`
+手动触发爬虫任务。
+
+**请求体**:
+```json
+{
+  "task_type": "taobao",
+  "keywords": ["路亚竿"],
+  "max_pages": 5
+}
+```
+
+#### GET `/api/v1/admin/crawler/sync-status`
+获取数据同步状态。
+
+### 8. 系统监控 ⭐ v4.0.0
+
+#### GET `/api/v1/admin/monitor/api-stats`
+获取API调用统计。
+
+#### GET `/api/v1/admin/monitor/llm-stats`
+获取LLM使用统计。
+
+#### GET `/api/v1/admin/monitor/db-performance`
+获取数据库性能监控。
+
+#### GET `/api/v1/admin/monitor/health-check`
+系统健康检查（无需认证）。
+
+### 9. 数据分析报表 ⭐ v5.0.0
+
+#### GET `/api/v1/admin/analytics/equipment/stats`
+获取装备数据统计总览。
+
+#### GET `/api/v1/admin/analytics/equipment/trends`
+获取装备数量趋势（按月）。
+
+**查询参数**:
+- `months`: 时间范围（月数，默认12个月）
+
+#### GET `/api/v1/admin/analytics/equipment/price-distribution`
+获取价格分布统计。
+
+#### GET `/api/v1/admin/analytics/equipment/brand-stats`
+获取品牌统计排行。
+
+**查询参数**:
+- `top_n`: 返回Top N品牌（默认10）
+
+#### GET `/api/v1/admin/analytics/users/activity`
+获取用户活跃度统计。
+
+**查询参数**:
+- `days`: 统计天数（默认30天）
+
+#### POST `/api/v1/admin/analytics/reports/generate`
+生成业务报表。
+
+**请求体**:
+```json
+{
+  "report_type": "equipment",
+  "format": "pdf",
+  "filters": {
+    "category": "鱼竿",
+    "date_range": "2024-01-01,2024-12-31"
+  }
+}
+```
+
+#### GET `/api/v1/admin/analytics/reports/list`
+查询报表列表。
+
+### 10. 配置管理 ⭐ v5.0.0
+
+#### GET `/api/v1/admin/config/configs`
+查询配置列表。
+
+**查询参数**:
+- `type`: 配置类型（api/agent/algorithm/system）
+- `page`: 页码（默认1）
+- `page_size`: 每页大小（默认20）
+
+#### GET `/api/v1/admin/config/configs/{config_key}`
+获取特定配置。
+
+#### POST `/api/v1/admin/config/configs`
+创建配置。
+
+**请求体**:
+```json
+{
+  "config_key": "NEW_API_KEY",
+  "config_value": "your_api_key_value",
+  "config_type": "api",
+  "description": "新API密钥配置",
+  "is_encrypted": true
+}
+```
+
+#### PUT `/api/v1/admin/config/configs/{config_key}`
+更新配置。
+
+#### DELETE `/api/v1/admin/config/configs/{config_key}`
+删除配置。
+
+#### POST `/api/v1/admin/config/configs/test-api-key`
+测试API密钥有效性。
+
+**请求体**:
+```json
+{
+  "api_type": "caiyun",
+  "api_key": "test_api_key_value"
 }
 ```
 
@@ -444,6 +598,19 @@ export MAX_CONCURRENT_REQUESTS="100"
 ```
 
 ## 更新日志
+
+### v5.0.0 (2025-12-11)
+- 🖥️ **React管理前端**: 完整的管理界面，支持装备管理、数据分析、系统配置
+- 📈 **数据分析报表**: 装备统计、趋势分析、品牌排行、用户行为分析
+- ⚙️ **系统配置管理**: API密钥管理、系统参数配置、在线测试
+- 🛠️ **14个新增API端点**: 数据分析和配置管理相关接口
+- 🎯 **前端集成**: 前后端分离架构，独立部署支持
+
+### v4.0.0 (2025-12-10)
+- 🕷️ **爬虫任务管理**: 多平台爬虫（淘宝、京东、论坛）任务调度
+- 📊 **系统监控面板**: API统计、LLM使用统计、数据库性能监控
+- 🔌 **WebSocket实时推送**: 爬虫进度和监控数据实时更新
+- 🛡️ **权限扩展**: 新增CRAWLER_*和MONITOR_*权限
 
 ### v3.1.1
 - 🔐 新增 JWT 认证系统，支持管理员登录

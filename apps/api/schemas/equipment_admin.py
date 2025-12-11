@@ -100,7 +100,7 @@ class EquipmentUpdate(BaseModel):
     price_max: Optional[float] = Field(None, ge=0)
     description: Optional[str] = Field(None, max_length=2000)
     features: Optional[str] = Field(None, max_length=1000)
-    user_level: Optional[str] = Field(None, pattern="^(新手|进阶|高手)$")
+    user_level: Optional[str] = Field(None, pattern="^(入门|新手|进阶|高手)$")
     is_active: Optional[bool] = None
     specs: Optional[SpecsUnion] = None
 
@@ -118,7 +118,7 @@ class EquipmentResponse(BaseModel):
     price_currency: str
     description: Optional[str] = None
     features: Optional[str] = None
-    user_level: str
+    user_level: Optional[str] = Field(None, pattern="^(入门|新手|进阶|高手)$", description="适用水平")
     is_active: bool
     source: str
     source_url: Optional[str] = None

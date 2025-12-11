@@ -63,8 +63,7 @@ async def list_users(
             if fishing_experience_years is not None:
                 filters.append(User.fishing_experience_years == fishing_experience_years)
 
-            if location:
-                filters.append(User.location.like(f"%{location}%"))
+            # location 字段在当前数据库中不存在，暂时注释掉
 
             if filters:
                 query = query.filter(and_(*filters))
@@ -85,9 +84,9 @@ async def list_users(
                     phone=user.phone,
                     user_level=user.user_level,
                     fishing_experience_years=user.fishing_experience_years,
-                    favorite_fish_species=user.favorite_fish_species,
-                    preferred_fishing_method=user.preferred_fishing_method,
-                    location=user.location,
+                    favorite_fish_species=user.preferred_fish,
+                    preferred_fishing_method=user.preferred_scenarios,
+                    location=None,  # 数据库中暂无此字段
                     created_at=user.created_at.isoformat(),
                     updated_at=user.updated_at.isoformat()
                 ))

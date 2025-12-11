@@ -79,7 +79,7 @@ class ExportService:
                     'model': eq.model or '',
                     'price_min': eq.price_min or '',
                     'price_max': eq.price_max or '',
-                    'price_currency': eq.price_currency,
+                    'price_currency': 'CNY',  # 默认使用人民币
                     'description': eq.description or '',
                     'features': eq.features or '',
                     'user_level': eq.user_level,
@@ -136,7 +136,7 @@ class ExportService:
                     'model': eq.model,
                     'price_min': eq.price_min,
                     'price_max': eq.price_max,
-                    'price_currency': eq.price_currency,
+                    'price_currency': 'CNY',  # 默认使用人民币
                     'description': eq.description,
                     'features': eq.features,
                     'user_level': eq.user_level,
