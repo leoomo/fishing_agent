@@ -1,13 +1,35 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Provider } from 'react-redux'
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, Spin } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
+import { Suspense, lazy } from 'react'
 import { store } from '@/store/store'
 import { getToken } from '@/utils/auth'
 import MainLayout from '@/components/Layout/MainLayout'
-import Login from '@/pages/Login'
-import EquipmentList from '@/pages/Equipment/List'
-import EquipmentForm from '@/pages/Equipment/Form'
+
+// 懒加载页面组件（代码分割优化）
+const Login = lazy(() => import('@/pages/Login'))
+const EquipmentList = lazy(() => import('@/pages/Equipment/List'))
+const EquipmentForm = lazy(() => import('@/pages/Equipment/Form'))
+const UserList = lazy(() => import('@/pages/Users/List'))
+const UserDetail = lazy(() => import('@/pages/Users/Detail'))
+const Analytics = lazy(() => import('@/pages/Analytics'))
+const Settings = lazy(() => import('@/pages/Settings'))
+const Crawler = lazy(() => import('@/pages/Crawler'))
+const Monitor = lazy(() => import('@/pages/Monitor'))
+
+// 加载中组件
+const PageLoading = () => (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100%',
+    minHeight: '200px'
+  }}>
+    <Spin size="large" tip="Loading..." />
+  </div>
+)
 
 // 路由守卫组件
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -15,11 +37,11 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return token ? <>{children}</> : <Navigate to="/login" replace />
 }
 
-// 占位页面组件
-const PlaceholderPage = ({ title }: { title: string }) => (
+// 内容管理占位页面（Phase 6-8 后续扩展）
+const ContentPlaceholder = ({ title }: { title: string }) => (
   <div style={{ textAlign: 'center', padding: '50px' }}>
     <h2>{title}</h2>
-    <p style={{ color: '#999' }}>功能开发中...</p>
+    <p style={{ color: '#999' }}>Developing...</p>
   </div>
 )
 
@@ -28,46 +50,54 @@ const App = () => {
     <Provider store={store}>
       <ConfigProvider locale={zhCN}>
         <BrowserRouter>
-          <Routes>
-            {/* 登录页面 */}
-            <Route path="/login" element={<Login />} />
+          <Suspense fallback={<PageLoading />}>
+            <Routes>
+              {/* Login page */}
+              <Route path="/login" element={<Login />} />
 
-            {/* 需要登录的页面 */}
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <MainLayout />
-                </PrivateRoute>
-              }
-            >
-              {/* 默认重定向到装备管理 */}
-              <Route index element={<Navigate to="/equipment" replace />} />
+              {/* Protected routes */}
+              <Route
+                path="/"
+                element={
+                  <PrivateRoute>
+                    <MainLayout />
+                  </PrivateRoute>
+                }
+              >
+                {/* Default redirect to equipment */}
+                <Route index element={<Navigate to="/equipment" replace />} />
 
-              {/* 装备管理 */}
-              <Route path="equipment" element={<EquipmentList />} />
-              <Route path="equipment/create" element={<EquipmentForm />} />
-              <Route path="equipment/edit/:id" element={<EquipmentForm />} />
+                {/* Equipment Management */}
+                <Route path="equipment" element={<EquipmentList />} />
+                <Route path="equipment/create" element={<EquipmentForm />} />
+                <Route path="equipment/edit/:id" element={<EquipmentForm />} />
 
-              {/* 用户管理 - 占位 */}
-              <Route path="users" element={<PlaceholderPage title="用户管理" />} />
+                {/* User Management */}
+                <Route path="users" element={<UserList />} />
+                <Route path="users/:id" element={<UserDetail />} />
 
-              {/* 爬虫管理 - 占位 */}
-              <Route path="crawler" element={<PlaceholderPage title="爬虫管理" />} />
+                {/* Content Management - Placeholders */}
+                <Route path="content/fish" element={<ContentPlaceholder title="Fish Management" />} />
+                <Route path="content/rigs" element={<ContentPlaceholder title="Rig Management" />} />
+                <Route path="content/lures" element={<ContentPlaceholder title="Lure Management" />} />
 
-              {/* 系统监控 - 占位 */}
-              <Route path="monitor" element={<PlaceholderPage title="系统监控" />} />
+                {/* Crawler Management */}
+                <Route path="crawler" element={<Crawler />} />
 
-              {/* 数据分析 - 占位 */}
-              <Route path="analytics" element={<PlaceholderPage title="数据分析" />} />
+                {/* System Monitor */}
+                <Route path="monitor" element={<Monitor />} />
 
-              {/* 配置管理 - 占位 */}
-              <Route path="settings" element={<PlaceholderPage title="配置管理" />} />
-            </Route>
+                {/* Analytics */}
+                <Route path="analytics" element={<Analytics />} />
 
-            {/* 404 重定向 */}
-            <Route path="*" element={<Navigate to="/equipment" replace />} />
-          </Routes>
+                {/* Settings */}
+                <Route path="settings" element={<Settings />} />
+              </Route>
+
+              {/* 404 redirect */}
+              <Route path="*" element={<Navigate to="/equipment" replace />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </ConfigProvider>
     </Provider>

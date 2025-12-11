@@ -2,9 +2,12 @@
 装备管理 API 路由
 """
 
-from fastapi import APIRouter, HTTPException, Query, Depends, status
+from fastapi import APIRouter, HTTPException, Query, Depends, status, Response
 from typing import Optional
 import logging
+from functools import lru_cache
+import hashlib
+import json
 
 from packages.agent_fishing.tools.lure.orm.session import get_db_session
 from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
@@ -24,6 +27,13 @@ from apps.api.auth.permissions import PermissionEnum
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def add_cache_headers(response: Response, max_age: int = 60, etag: str = None):
+    """添加缓存控制头部"""
+    response.headers["Cache-Control"] = f"public, max-age={max_age}"
+    if etag:
+        response.headers["ETag"] = f'"{etag}"'
 
 
 # ========== 装备管理端点 ==========

@@ -1,0 +1,28 @@
+{
+  "name": "fishing_agent",
+  "version": "1.0.0",
+  "description": "基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐、天气分析和路亚装备管理。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leoomo/fishing_agent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/leoomo/fishing_agent/issues"
+  },
+  "homepage": "https://github.com/leoomo/fishing_agent#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.0"
+  }
+}

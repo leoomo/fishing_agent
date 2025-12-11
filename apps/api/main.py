@@ -13,8 +13,9 @@ warnings.filterwarnings("ignore", message="LangSmith now uses UUID v7")
 # 加载环境变量
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from .routes import fishing_router
 from .routes.user_equipment import router as user_equipment_router
 from .routes.auth import router as auth_router
@@ -32,6 +33,9 @@ app = FastAPI(
     version="5.0.0",
     description="基于 LangChain 的智能钓鱼助手 REST API - 支持数据分析和配置管理"
 )
+
+# GZip 压缩中间件（响应大于 500 字节时压缩）
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # CORS 配置
 app.add_middleware(

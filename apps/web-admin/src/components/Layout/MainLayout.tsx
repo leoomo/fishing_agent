@@ -4,6 +4,7 @@ import { Layout, Menu, Avatar, Dropdown, message } from 'antd'
 import {
   DatabaseOutlined,
   UserOutlined,
+  FileTextOutlined,
   RobotOutlined,
   MonitorOutlined,
   BarChartOutlined,
@@ -33,6 +34,16 @@ const MainLayout = () => {
       key: '/users',
       icon: <UserOutlined />,
       label: '用户管理',
+    },
+    {
+      key: '/content',
+      icon: <FileTextOutlined />,
+      label: '内容管理',
+      children: [
+        { key: '/content/fish', label: '鱼类管理' },
+        { key: '/content/rigs', label: '钓组管理' },
+        { key: '/content/lures', label: '拟饵管理' },
+      ],
     },
     {
       key: '/crawler',
