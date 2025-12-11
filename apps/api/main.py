@@ -5,6 +5,9 @@ FastAPI 后端入口 - 智能钓鱼助手 API
 import os
 import sys
 import warnings
+import asyncio
+import logging
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 # 抑制警告
@@ -16,6 +19,58 @@ load_dotenv()
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# 全局调度器实例
+scheduler = None
+workflow_scheduler = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    global scheduler, workflow_scheduler
+
+    # 启动时初始化
+    logger.info("正在启动应用...")
+
+    # 创建并启动调度器
+    scheduler = AsyncIOScheduler()
+    scheduler.start()
+    logger.info("APScheduler 已启动")
+
+    # 初始化工作流调度器
+    try:
+        from packages.agent_fishing.tools.crawler.scheduler.workflow_scheduler import WorkflowScheduler
+        workflow_scheduler = WorkflowScheduler(scheduler)
+        workflow_scheduler.load_schedules_from_db()
+        logger.info("工作流调度器初始化完成")
+    except Exception as e:
+        logger.error(f"工作流调度器初始化失败: {e}")
+
+    yield
+
+    # 关闭时清理
+    logger.info("正在关闭应用...")
+
+    if scheduler:
+        scheduler.shutdown(wait=False)
+        logger.info("APScheduler 已关闭")
+
+
+app = FastAPI(
+    title="智能钓鱼助手 API",
+    version="5.0.0",
+    description="基于 LangChain 的智能钓鱼助手 REST API - 支持数据分析和配置管理",
+    lifespan=lifespan
+)
 from .routes import fishing_router
 from .routes.user_equipment import router as user_equipment_router
 from .routes.auth import router as auth_router
