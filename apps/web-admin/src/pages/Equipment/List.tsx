@@ -121,11 +121,56 @@ const EquipmentList = () => {
           : '-',
     },
     {
+      title: '规格信息',
+      width: 250,
+      render: (_: unknown, record: Equipment) => {
+        const specs = record.specs as any
+        if (!specs) return '-'
+
+        switch (record.category) {
+          case '鱼竿':
+            const rodSpecs = []
+            if (specs.length) rodSpecs.push(`${specs.length}m`)
+            if (specs.power) rodSpecs.push(specs.power)
+            if (specs.weight) rodSpecs.push(`${specs.weight}g`)
+            if (specs.lure_weight_min && specs.lure_weight_max) {
+              rodSpecs.push(`${specs.lure_weight_min}-${specs.lure_weight_max}g饵`)
+            }
+            return rodSpecs.join(' | ') || '-'
+
+          case '渔轮':
+            const reelSpecs = []
+            if (specs.gear_ratio) reelSpecs.push(`齿比${specs.gear_ratio}`)
+            if (specs.bearings) reelSpecs.push(`${specs.bearings}+1BB`)
+            if (specs.weight) reelSpecs.push(`${specs.weight}g`)
+            return reelSpecs.join(' | ') || '-'
+
+          case '鱼线':
+            const lineSpecs = []
+            if (specs.diameter) lineSpecs.push(`${specs.diameter}mm`)
+            if (specs.strength) lineSpecs.push(`${specs.strength}kg`)
+            if (specs.type) lineSpecs.push(specs.type)
+            return lineSpecs.join(' | ') || '-'
+
+          case '拟饵':
+            const lureSpecs = []
+            if (specs.weight) lureSpecs.push(`${specs.weight}g`)
+            if (specs.type) lureSpecs.push(specs.type)
+            if (specs.diving_depth) lureSpecs.push(`${specs.diving_depth}m`)
+            return lureSpecs.join(' | ') || '-'
+
+          default:
+            return '-'
+        }
+      },
+    },
+    {
       title: '适用水平',
       dataIndex: 'user_level',
       width: 100,
       render: (level: string) => (
         <Tag color={
+          level === '入门' ? 'lime' :
           level === '新手' ? 'green' :
           level === '进阶' ? 'blue' :
           level === '高手' ? 'gold' : 'default'
@@ -184,7 +229,6 @@ const EquipmentList = () => {
             <Select.Option value="渔轮">渔轮</Select.Option>
             <Select.Option value="鱼线">鱼线</Select.Option>
             <Select.Option value="拟饵">拟饵</Select.Option>
-            <Select.Option value="路亚竿">路亚竿</Select.Option>
           </Select>
 
           <Search
