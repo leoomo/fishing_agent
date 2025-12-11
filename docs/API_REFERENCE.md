@@ -1,222 +1,134 @@
-# API 完整参考
+# API 参考文档
 
-**版本**: v5.0.0
-**基础URL**: `http://localhost:8000`
-**最后更新**: 2025-12-10
+本文档提供了智能钓鱼助手所有 REST API 的详细说明和示例。
 
 ## 目录
 
-- [概述](#概述)
-- [认证](#认证)
-- [错误处理](#错误处理)
+- [认证方式](#认证方式)
+- [基础信息](#基础信息)
+- [核心 API](#核心-api)
 - [认证 API](#认证-api)
-- [钓鱼助手 API](#钓鱼助手-api)
 - [用户装备管理 API](#用户装备管理-api)
-- [爬虫管理 API](#爬虫管理-api) ⭐ v4.0.0新增
-- [监控管理 API](#监控管理-api) ⭐ v4.0.0新增
-- [数据分析 API](#数据分析-api) ⭐ v5.0.0新增
-- [配置管理 API](#配置管理-api) ⭐ v5.0.0新增
-- [WebSocket API](#websocket-api) ⭐ v4.0.0新增
-- [数据模型](#数据模型)
+- [爬虫管理 API](#爬虫管理-api)
+- [监控管理 API](#监控管理-api)
+- [数据分析管理 API](#数据分析管理-api)
+- [配置管理 API](#配置管理-api)
 
----
+## 认证方式
 
-## 概述
+### JWT Token 认证
 
-智能钓鱼助手 API 提供七类接口：
-
-1. **钓鱼助手 API** (`/api/v1/fishing/`)
-   - Agent 对话接口
-   - 工具列表查询
-
-2. **用户装备管理 API** (`/api/v1/user-equipment/`)
-   - 用户管理
-   - 装备库管理
-   - 推荐功能
-   - 统计分析
-
-3. **爬虫管理 API** (`/api/v1/admin/crawler/`) ⭐ v4.0.0新增
-   - 爬虫任务管理
-   - 任务调度和监控
-   - 任务日志查询
-
-4. **监控管理 API** (`/api/v1/admin/monitor/`) ⭐ v4.0.0新增
-   - API调用统计
-   - LLM使用统计
-   - 数据库性能监控
-   - 系统健康检查
-
-5. **数据分析 API** (`/api/v1/admin/analytics/`) ⭐ v5.0.0新增
-   - 装备数据统计
-   - 趋势分析报表
-   - 品牌排行分析
-   - 用户行为分析
-   - 业务报表生成
-
-6. **配置管理 API** (`/api/v1/admin/config/`) ⭐ v5.0.0新增
-   - 系统配置管理
-   - API密钥管理
-   - 配置版本控制
-   - 密钥有效性测试
-
-7. **WebSocket API** (`/ws/`) ⭐ v4.0.0新增
-   - 爬虫任务实时进度推送
-   - 系统监控实时数据推送
-
-### 技术栈
-
-- **框架**: FastAPI
-- **文档**: OpenAPI 3.0 (Swagger UI)
-- **格式**: JSON
-- **编码**: UTF-8
-
-### 交互式文档
-
-启动服务后访问：
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
----
-
-## 认证
-
-本版本已实现 **JWT Token 认证机制**，用于管理员用户认证。
-
-### 创建管理员账户
-
-首次使用前需要创建管理员账户：
+大部分 API 需要使用 JWT Token 进行认证：
 
 ```bash
-# 使用脚本创建管理员用户
-uv run python scripts/create_admin.py --username admin --password admin123
-
-# 或者手动注册（通过 API）
-curl -X POST http://localhost:8000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "password": "admin123",
-    "email": "admin@example.com"
-  }'
-```
-
-### 获取访问令牌
-
-```bash
-# 登录获取 JWT Token
-curl -X POST http://localhost:8000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "password": "admin123"
-  }'
-
-# 响应示例
+# 获取 Token
+POST /api/v1/auth/login
 {
-  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-  "token_type": "bearer",
-  "expires_in": 3600
+  "username": "admin",
+  "password": "admin123"
 }
+
+# 在请求头中使用 Token
+Authorization: Bearer <your_jwt_token>
 ```
 
-### 使用 Token 访问 API
+### 权限说明
 
-```bash
-# 在请求头中添加 Token
-curl "http://localhost:8000/api/v1/admin/crawler/tasks" \
-  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+- **管理员权限**：可访问所有管理 API
+- **普通用户权限**：可访问用户装备相关 API
+
+## 基础信息
+
+- **Base URL**: `http://localhost:8000`
+- **API 版本**: `v1`
+- **数据格式**: `JSON`
+
+## 核心 API
+
+### 1. 健康检查
+
+检查 API 服务状态。
+
+```http
+GET /health
 ```
 
-### 令牌使用说明
-在需要认证的请求头中添加：`Authorization: Bearer <token>`
-
-### Token 有效期
-
-- **默认有效期**: 30分钟
-- **算法**: HS256
-- **编码**: Base64URL
-
-### 认证端点
-
-详细接口文档请参考 [认证 API](#认证-api) 部分。
-
-### 保护的端点
-
-以下端点需要认证：
-- `GET /api/v1/auth/profile` - 获取用户信息
-- `POST /api/v1/auth/logout` - 用户登出
-
-**未来版本**将支持：
-- API Key 认证
-- OAuth 2.0
-- 刷新令牌机制
-
----
-
-## 错误处理
-
-### 标准错误响应
-
+**响应示例**:
 ```json
 {
-  "detail": "错误描述信息"
+  "status": "ok"
 }
 ```
 
-### HTTP 状态码
+### 2. 智能对话
 
-| 状态码 | 说明 |
-|--------|------|
-| 200 | 成功 |
-| 201 | 创建成功 |
-| 400 | 请求参数错误 |
-| 401 | 未认证/认证失败 |
-| 403 | 禁止访问（权限不足） |
-| 404 | 资源不存在 |
-| 500 | 服务器内部错误 |
+核心的钓鱼推荐对话接口。
 
-### 常见错误示例
+```http
+POST /api/v1/fishing/chat
+```
 
-#### 400 Bad Request
-
+**请求体**:
 ```json
 {
-  "detail": "用户名已存在: fishing_lover_001"
+  "query": "明天杭州钓鱼怎么样？",
+  "model_provider": "zhipu",
+  "user_id": 1
 }
 ```
 
-#### 404 Not Found
-
+**响应示例**:
 ```json
 {
-  "detail": "用户不存在: 999"
+  "response": "根据天气分析，明天杭州白天钓鱼条件较好...",
+  "model_used": "zhipu",
+  "timestamp": "2024-12-11T12:00:00Z"
 }
 ```
 
-#### 500 Internal Server Error
+### 3. 工具列表
 
+获取所有可用的工具。
+
+```http
+GET /api/v1/fishing/tools
+```
+
+**响应示例**:
 ```json
 {
-  "detail": "数据库连接失败"
+  "tools": [
+    {
+      "name": "get_current_time",
+      "description": "获取当前时间",
+      "type": "basic"
+    },
+    {
+      "name": "get_weather",
+      "description": "获取天气信息",
+      "type": "weather"
+    },
+    {
+      "name": "query_fishing_recommendation",
+      "description": "查询钓鱼推荐",
+      "type": "fishing"
+    }
+  ],
+  "total": 3
 }
 ```
-
----
 
 ## 认证 API
 
-### POST /api/v1/auth/login
+### 1. 用户登录
 
-管理员用户登录
+获取访问 Token。
 
-#### 请求
-
-**Headers**:
-```
-Content-Type: application/json
+```http
+POST /api/v1/auth/login
 ```
 
-**Body**:
+**请求体**:
 ```json
 {
   "username": "admin",
@@ -224,927 +136,173 @@ Content-Type: application/json
 }
 ```
 
-**参数说明**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| username | string | 是 | 用户名（3-50字符） |
-| password | string | 是 | 密码（6-100字符） |
-
-#### 响应
-
-**200 OK**:
+**响应示例**:
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
   "user": {
-    "user_id": 1,
+    "user_id": 12,
     "username": "admin",
     "email": "admin@example.com",
-    "role": "admin",
-    "full_name": "Administrator",
-    "is_active": true,
-    "last_login": "2024-12-10T10:30:00",
-    "created_at": "2024-12-01T00:00:00"
-  },
-  "permissions": ["equipment:create", "equipment:read", "equipment:update", "equipment:delete"]
+    "role": "admin"
+  }
 }
 ```
 
-**401 Unauthorized**:
-```json
-{
-  "detail": "用户名或密码错误"
-}
+### 2. 获取用户信息
+
+获取当前登录用户的信息。
+
+```http
+GET /api/v1/auth/me
+Authorization: Bearer <token>
 ```
 
-**403 Forbidden**:
-```json
-{
-  "detail": "账户已被禁用，请联系管理员"
-}
+### 3. 用户登出
+
+使 Token 失效。
+
+```http
+POST /api/v1/auth/logout
+Authorization: Bearer <token>
 ```
-
-#### cURL 示例
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "password": "admin123"
-  }'
-```
-
----
-
-### GET /api/v1/auth/profile
-
-获取当前用户信息
-
-#### 请求
-
-**Headers**:
-```
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-
-#### 响应
-
-**200 OK**:
-```json
-{
-  "user": {
-    "user_id": 1,
-    "username": "admin",
-    "email": "admin@example.com",
-    "role": "admin",
-    "full_name": "Administrator",
-    "is_active": true,
-    "last_login": "2024-12-10T10:30:00",
-    "created_at": "2024-12-01T00:00:00"
-  },
-  "permissions": ["equipment:create", "equipment:read", "equipment:update", "equipment:delete"]
-}
-```
-
-**401 Unauthorized**:
-```json
-{
-  "detail": "Token 验证失败"
-}
-```
-
-#### cURL 示例
-
-```bash
-curl -X GET "http://localhost:8000/api/v1/auth/profile" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-```
-
----
-
-### POST /api/v1/auth/logout
-
-用户登出
-
-#### 请求
-
-**Headers**:
-```
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-
-#### 响应
-
-**200 OK**:
-```json
-{
-  "message": "登出成功"
-}
-```
-
-**注意**: JWT 是无状态的，实际登出需要在客户端删除 token。
-
-#### cURL 示例
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/logout" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-```
-
----
-
-## 钓鱼助手 API
-
-### POST /api/v1/fishing/chat
-
-与钓鱼助手对话
-
-#### 请求
-
-**Headers**:
-```
-Content-Type: application/json
-```
-
-**Body**:
-```json
-{
-  "query": "明天杭州西湖适合钓鱼吗？",
-  "model_provider": "zhipu",
-  "user_id": 1
-}
-```
-
-**参数说明**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| query | string | 是 | 用户查询内容 |
-| model_provider | string | 否 | LLM提供商（默认: "zhipu"） |
-| user_id | integer | 否 | 用户ID（用于用户装备管理） |
-
-**model_provider 可选值**:
-- `zhipu`: 智谱AI (推荐)
-- `dashscope`: 通义千问
-- `openai`: OpenAI
-
-#### 响应
-
-**200 OK**:
-```json
-{
-  "response": "根据明天的天气预报...\n\n钓鱼评分: 7.5分\n推荐时间: 06:00-09:00, 16:00-18:00",
-  "status": "success",
-  "error": null
-}
-```
-
-**500 Internal Server Error**:
-```json
-{
-  "detail": "Agent 执行失败: ..."
-}
-```
-
-#### cURL 示例
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/fishing/chat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "明天杭州西湖适合钓鱼吗？",
-    "model_provider": "zhipu",
-    "user_id": 1
-  }'
-```
-
-#### Python 示例
-
-```python
-import requests
-
-response = requests.post(
-    "http://localhost:8000/api/v1/fishing/chat",
-    json={
-        "query": "推荐一款入门级路亚竿",
-        "model_provider": "zhipu",
-        "user_id": 1
-    }
-)
-
-result = response.json()
-print(result["response"])
-```
-
----
-
-### GET /api/v1/fishing/tools
-
-获取所有可用工具列表
-
-#### 请求
-
-无需参数
-
-#### 响应
-
-**200 OK**:
-```json
-{
-  "tools": [
-    {
-      "name": "get_current_time",
-      "description": "获取当前时间和日期信息\n\nReturns:\n    当前的详细时间信息..."
-    },
-    {
-      "name": "get_weather",
-      "description": "获取指定位置的天气信息（纯天气查询专用工具）..."
-    },
-    {
-      "name": "list_my_equipment",
-      "description": "查看我的装备库\n\n触发关键词：我的装备、我有哪些..."
-    }
-  ]
-}
-```
-
-#### cURL 示例
-
-```bash
-curl "http://localhost:8000/api/v1/fishing/tools"
-```
-
----
 
 ## 用户装备管理 API
 
-### 用户管理
+### 1. 创建用户
 
-#### POST /api/v1/user-equipment/users
-
-创建新用户
-
-**请求**:
-```json
-{
-  "username": "fishing_lover_001",
-  "nickname": "路亚小白",
-  "email": "user@example.com",
-  "user_level": "新手",
-  "fishing_experience_years": 1,
-  "preferred_fish": "鲈鱼"
-}
-```
-
-**参数说明**:
-
-| 参数 | 类型 | 必填 | 约束 | 说明 |
-|------|------|------|------|------|
-| username | string | 是 | 3-50字符，唯一 | 用户名 |
-| nickname | string | 否 | 最多100字符 | 昵称 |
-| email | string | 否 | 邮箱格式 | 邮箱地址 |
-| user_level | string | 否 | 新手/进阶/高手 | 用户水平（默认：新手） |
-| fishing_experience_years | integer | 否 | 0-100 | 钓龄（年） |
-| preferred_fish | string | 否 | 最多200字符 | 偏好鱼种 |
-
-**响应 201 Created**:
-```json
-{
-  "success": true,
-  "message": "用户创建成功",
-  "data": {
-    "user_id": 1,
-    "username": "fishing_lover_001"
-  }
-}
-```
-
-**错误 400 Bad Request**:
-```json
-{
-  "detail": "用户名已存在: fishing_lover_001"
-}
-```
-
----
-
-#### GET /api/v1/user-equipment/users/{user_id}
-
-获取用户信息
-
-**路径参数**:
-- `user_id` (integer, 必填): 用户ID
-
-**响应 200 OK**:
-```json
-{
-  "user_id": 1,
-  "username": "fishing_lover_001",
-  "nickname": "路亚小白",
-  "email": "user@example.com",
-  "user_level": "新手",
-  "fishing_experience_years": 1,
-  "preferred_fish": "鲈鱼",
-  "created_at": "2024-01-15T10:30:00",
-  "updated_at": "2024-01-15T10:30:00"
-}
-```
-
-**错误 404 Not Found**:
-```json
-{
-  "detail": "用户不存在: 999"
-}
-```
-
----
-
-### 装备库管理
-
-#### POST /api/v1/user-equipment/users/{user_id}/equipment
-
-添加装备到用户库
-
-**路径参数**:
-- `user_id` (integer, 必填): 用户ID
-
-**请求**:
-```json
-{
-  "equipment_id": 1,
-  "purchase_price": 680.0,
-  "purchase_date": "2024-01-15",
-  "purchase_source": "淘宝旗舰店",
-  "notes": "第一把路亚竿",
-  "tags": ["入门", "ML调", "岸钓"]
-}
-```
-
-**参数说明**:
-
-| 参数 | 类型 | 必填 | 约束 | 说明 |
-|------|------|------|------|------|
-| equipment_id | integer | 是 | >0 | 装备ID |
-| purchase_price | number | 否 | ≥0 | 购买价格（元） |
-| purchase_date | string | 否 | YYYY-MM-DD | 购买日期 |
-| purchase_source | string | 否 | 最多200字符 | 购买渠道 |
-| notes | string | 否 | 最多500字符 | 备注 |
-| tags | array[string] | 否 | 最多10个 | 标签列表 |
-
-**响应 201 Created**:
-```json
-{
-  "success": true,
-  "message": "装备添加成功",
-  "data": {
-    "record_id": 1,
-    "equipment_id": 1
-  }
-}
-```
-
-**错误响应**:
-
-- **400 Bad Request** - 装备不存在或已添加:
-```json
-{
-  "detail": "装备已在装备库中: equipment_id=1"
-}
-```
-
-- **404 Not Found** - 用户不存在:
-```json
-{
-  "detail": "用户不存在: 999"
-}
-```
-
----
-
-#### GET /api/v1/user-equipment/users/{user_id}/equipment
-
-查询用户装备列表
-
-**路径参数**:
-- `user_id` (integer, 必填): 用户ID
-
-**查询参数**:
-- `category` (string, 可选): 装备类别过滤（鱼竿/渔轮/鱼线/拟饵）
-- `only_favorites` (boolean, 可选): 仅显示收藏装备（默认: false）
-
-**响应 200 OK**:
-```json
-{
-  "total": 3,
-  "equipment_list": [
-    {
-      "id": 1,
-      "user_id": 1,
-      "equipment_id": 1,
-      "equipment_name": "禧玛诺ZODIAS 264ML",
-      "category": "鱼竿",
-      "brand_name": "禧玛诺",
-      "model": "264ML",
-      "purchase_date": "2024-01-15",
-      "purchase_price": 680.0,
-      "purchase_source": "淘宝旗舰店",
-      "condition": "正常",
-      "usage_frequency": null,
-      "notes": "第一把路亚竿",
-      "is_favorite": true,
-      "tags": "[\"入门\", \"ML调\"]",
-      "created_at": "2024-01-15T10:35:00"
-    },
-    {
-      "id": 2,
-      "equipment_id": 2,
-      "equipment_name": "达亿瓦BASS X 662ML",
-      "category": "鱼竿",
-      "brand_name": "达亿瓦",
-      "purchase_price": 450.0,
-      "is_favorite": false,
-      "created_at": "2024-01-16T15:20:00"
-    }
-  ]
-}
-```
-
-**示例**:
-
-```bash
-# 查询所有装备
-curl "http://localhost:8000/api/v1/user-equipment/users/1/equipment"
-
-# 查询鱼竿类装备
-curl "http://localhost:8000/api/v1/user-equipment/users/1/equipment?category=鱼竿"
-
-# 查询收藏装备
-curl "http://localhost:8000/api/v1/user-equipment/users/1/equipment?only_favorites=true"
-```
-
----
-
-#### DELETE /api/v1/user-equipment/users/{user_id}/equipment/{equipment_id}
-
-删除装备
-
-**路径参数**:
-- `user_id` (integer, 必填): 用户ID
-- `equipment_id` (integer, 必填): 装备ID
-
-**响应 200 OK**:
-```json
-{
-  "success": true,
-  "message": "装备删除成功",
-  "data": {
-    "equipment_id": 1
-  }
-}
-```
-
-**错误 404 Not Found**:
-```json
-{
-  "detail": "装备不在用户库中: equipment_id=1"
-}
-```
-
-**示例**:
-
-```bash
-curl -X DELETE "http://localhost:8000/api/v1/user-equipment/users/1/equipment/1"
-```
-
----
-
-### 推荐功能
-
-#### POST /api/v1/user-equipment/users/{user_id}/recommend
-
-基于用户装备推荐
-
-**路径参数**:
-- `user_id` (integer, 必填): 用户ID
-
-**请求**:
-```json
-{
-  "need_type": "upgrade"
-}
-```
-
-**参数说明**:
-
-| 参数 | 类型 | 必填 | 可选值 | 说明 |
-|------|------|------|--------|------|
-| need_type | string | 是 | upgrade/complete/match | 推荐类型 |
-
-**need_type 说明**:
-- `upgrade`: 升级推荐 - 推荐更高级的同类装备
-- `complete`: 完善推荐 - 推荐缺失的装备类型
-- `match`: 搭配推荐 - 分析装备是否匹配
-
-**响应 200 OK**:
-```json
-{
-  "recommendation": "# 装备升级推荐\n\n分析您的 3 件装备后...",
-  "need_type": "upgrade"
-}
-```
-
-**示例**:
-
-```bash
-# 升级推荐
-curl -X POST "http://localhost:8000/api/v1/user-equipment/users/1/recommend" \
-  -H "Content-Type: application/json" \
-  -d '{"need_type": "upgrade"}'
-
-# 完善推荐
-curl -X POST "http://localhost:8000/api/v1/user-equipment/users/1/recommend" \
-  -H "Content-Type: application/json" \
-  -d '{"need_type": "complete"}'
-
-# 搭配推荐
-curl -X POST "http://localhost:8000/api/v1/user-equipment/users/1/recommend" \
-  -H "Content-Type: application/json" \
-  -d '{"need_type": "match"}'
-```
-
----
-
-### 统计功能
-
-#### GET /api/v1/user-equipment/users/{user_id}/statistics
-
-获取用户装备统计
-
-**路径参数**:
-- `user_id` (integer, 必填): 用户ID
-
-**响应 200 OK**:
-```json
-{
-  "user_id": 1,
-  "total_count": 5,
-  "total_spent": 2150.0,
-  "favorite_count": 2,
-  "by_category": [
-    {
-      "category": "鱼竿",
-      "count": 2,
-      "avg_price": 565.0,
-      "total_price": 1130.0
-    },
-    {
-      "category": "渔轮",
-      "count": 2,
-      "avg_price": 350.0,
-      "total_price": 700.0
-    },
-    {
-      "category": "拟饵",
-      "count": 1,
-      "avg_price": 120.0,
-      "total_price": 120.0
-    }
-  ]
-}
-```
-
-**示例**:
-
-```bash
-curl "http://localhost:8000/api/v1/user-equipment/users/1/statistics"
-```
-
----
-
-## 数据模型
-
-### UserCreate
-
-创建用户请求模型
-
-```typescript
-{
-  username: string;          // 3-50字符，唯一
-  nickname?: string;         // 最多100字符
-  email?: string;           // 邮箱格式
-  user_level?: "新手" | "进阶" | "高手";  // 默认：新手
-  fishing_experience_years?: number;  // 0-100
-  preferred_fish?: string;  // 最多200字符
-}
-```
-
-### UserResponse
-
-用户信息响应模型
-
-```typescript
-{
-  user_id: number;
-  username: string;
-  nickname: string | null;
-  email: string | null;
-  user_level: string;
-  fishing_experience_years: number | null;
-  preferred_fish: string | null;
-  created_at: string;      // ISO 8601 格式
-  updated_at: string;      // ISO 8601 格式
-}
-```
-
-### AddEquipmentRequest
-
-添加装备请求模型
-
-```typescript
-{
-  equipment_id: number;           // >0
-  purchase_price?: number;        // ≥0
-  purchase_date?: string;         // YYYY-MM-DD
-  purchase_source?: string;       // 最多200字符
-  notes?: string;                 // 最多500字符
-  tags?: string[];                // 最多10个
-}
-```
-
-### UserEquipmentResponse
-
-用户装备响应模型
-
-```typescript
-{
-  id: number;
-  user_id: number;
-  equipment_id: number;
-  equipment_name: string;
-  category: string;
-  brand_name: string | null;
-  model: string | null;
-  purchase_date: string | null;
-  purchase_price: number | null;
-  purchase_source: string | null;
-  condition: string;
-  usage_frequency: string | null;
-  notes: string | null;
-  is_favorite: boolean;
-  tags: string | null;            // JSON字符串
-  created_at: string;             // ISO 8601 格式
-}
-```
-
-### UserEquipmentListResponse
-
-用户装备列表响应模型
-
-```typescript
-{
-  total: number;
-  equipment_list: UserEquipmentResponse[];
-}
-```
-
-### RecommendRequest
-
-推荐请求模型
-
-```typescript
-{
-  need_type: "upgrade" | "complete" | "match";
-}
-```
-
-### RecommendResponse
-
-推荐响应模型
-
-```typescript
-{
-  recommendation: string;  // Markdown格式的推荐报告
-  need_type: string;
-}
-```
-
-### CategoryStatistics
-
-类别统计模型
-
-```typescript
-{
-  category: string;
-  count: number;
-  avg_price: number | null;
-  total_price: number | null;
-}
-```
-
-### UserStatisticsResponse
-
-用户装备统计响应模型
-
-```typescript
-{
-  user_id: number;
-  total_count: number;
-  total_spent: number;
-  favorite_count: number;
-  by_category: CategoryStatistics[];
-}
-```
-
-### ChatRequest
-
-对话请求模型
-
-```typescript
-{
-  query: string;
-  model_provider?: string;  // 默认："zhipu"
-  user_id?: number;
-}
-```
-
-### ChatResponse
-
-对话响应模型
-
-```typescript
-{
-  response: string;
-  status: string;           // "success" | "error"
-  error: string | null;
-}
-```
-
----
-
-## 完整示例
-
-### Python 客户端示例
-
-```python
-import requests
-
-class FishingAgentClient:
-    def __init__(self, base_url="http://localhost:8000"):
-        self.base_url = base_url
-        self.session = requests.Session()
-
-    def chat(self, query, model_provider="zhipu", user_id=None):
-        """与 Agent 对话"""
-        response = self.session.post(
-            f"{self.base_url}/api/v1/fishing/chat",
-            json={
-                "query": query,
-                "model_provider": model_provider,
-                "user_id": user_id
-            }
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def create_user(self, username, **kwargs):
-        """创建用户"""
-        response = self.session.post(
-            f"{self.base_url}/api/v1/user-equipment/users",
-            json={"username": username, **kwargs}
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def add_equipment(self, user_id, equipment_id, **kwargs):
-        """添加装备"""
-        response = self.session.post(
-            f"{self.base_url}/api/v1/user-equipment/users/{user_id}/equipment",
-            json={"equipment_id": equipment_id, **kwargs}
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def list_equipment(self, user_id, category=None, only_favorites=False):
-        """查询装备列表"""
-        params = {}
-        if category:
-            params["category"] = category
-        if only_favorites:
-            params["only_favorites"] = only_favorites
-
-        response = self.session.get(
-            f"{self.base_url}/api/v1/user-equipment/users/{user_id}/equipment",
-            params=params
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def get_recommendation(self, user_id, need_type):
-        """获取推荐"""
-        response = self.session.post(
-            f"{self.base_url}/api/v1/user-equipment/users/{user_id}/recommend",
-            json={"need_type": need_type}
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def get_statistics(self, user_id):
-        """获取统计"""
-        response = self.session.get(
-            f"{self.base_url}/api/v1/user-equipment/users/{user_id}/statistics"
-        )
-        response.raise_for_status()
-        return response.json()
-
-
-# 使用示例
-if __name__ == "__main__":
-    client = FishingAgentClient()
-
-    # 创建用户
-    user = client.create_user(
-        username="test_user",
-        nickname="测试用户",
-        user_level="新手"
-    )
-    user_id = user["data"]["user_id"]
-    print(f"创建用户: {user_id}")
-
-    # 添加装备
-    client.add_equipment(
-        user_id=user_id,
-        equipment_id=1,
-        purchase_price=680.0,
-        notes="第一把路亚竿"
-    )
-    print("添加装备成功")
-
-    # 查询装备列表
-    equipment_list = client.list_equipment(user_id)
-    print(f"装备总数: {equipment_list['total']}")
-
-    # 获取推荐
-    recommendation = client.get_recommendation(user_id, "complete")
-    print(recommendation["recommendation"][:200])
-
-    # 获取统计
-    stats = client.get_statistics(user_id)
-    print(f"总花费: ¥{stats['total_spent']:.2f}")
-```
-
----
-
-## 爬虫管理 API ⭐ v4.0.0新增
-
-**基础路径**: `/api/v1/admin/crawler`
-
-### 权限要求
-- 需要 JWT Token 认证
-- 需要 `CRAWLER_READ`、`CRAWLER_EXECUTE`、`CRAWLER_DELETE` 权限
-
-### 1. 查询爬虫任务列表
+创建新用户档案。
 
 ```http
-GET /api/v1/admin/crawler/tasks
+POST /api/v1/user-equipment/users
+Authorization: Bearer <token>
+```
+
+**请求体**:
+```json
+{
+  "username": "test_user",
+  "nickname": "测试用户",
+  "user_level": "新手",
+  "fishing_experience_years": 2,
+  "preferred_fish": "鲈鱼,翘嘴"
+}
+```
+
+### 2. 添加装备到用户库
+
+为用户添加装备记录。
+
+```http
+POST /api/v1/user-equipment/users/{user_id}/equipment
+Authorization: Bearer <token>
+```
+
+**请求体**:
+```json
+{
+  "equipment_id": 123,
+  "purchase_price": 599.99,
+  "purchase_date": "2024-01-15",
+  "notes": "我的第一支鱼竿",
+  "tags": ["入门", "鲈鱼专用"]
+}
+```
+
+### 3. 查询用户装备列表
+
+获取用户的装备清单。
+
+```http
+GET /api/v1/user-equipment/users/{user_id}/equipment?page=1&page_size=20&category=鱼竿
+Authorization: Bearer <token>
 ```
 
 **查询参数**:
-- `page` (int, optional): 页码，默认 1
-- `page_size` (int, optional): 每页数量，默认 20
-- `task_type` (str, optional): 任务类型过滤 (taobao/jd/forum)
-- `status` (str, optional): 状态过滤 (pending/running/success/failed)
+- `page`: 页码（默认 1）
+- `page_size`: 每页数量（默认 20）
+- `category`: 装备类别（可选）
+- `brand`: 品牌（可选）
+- `is_favorite`: 是否收藏（可选）
+
+### 4. 获取装备推荐
+
+为用户生成装备推荐。
+
+```http
+POST /api/v1/user-equipment/users/{user_id}/recommend
+Authorization: Bearer <token>
+```
+
+**请求体**:
+```json
+{
+  "recommendation_type": "upgrade",
+  "budget": 1000,
+  "target_fish": "鲈鱼"
+}
+```
+
+### 5. 获取装备统计
+
+获取用户的装备统计信息。
+
+```http
+GET /api/v1/user-equipment/users/{user_id}/statistics
+Authorization: Bearer <token>
+```
 
 **响应示例**:
 ```json
 {
-  "items": [
+  "total_count": 15,
+  "total_spent": 5280.50,
+  "category_counts": {
+    "鱼竿": 5,
+    "渔轮": 3,
+    "拟饵": 7
+  },
+  "favorite_count": 8
+}
+```
+
+## 爬虫管理 API
+
+### 1. 查询爬虫任务列表
+
+获取所有爬虫任务。
+
+```http
+GET /api/v1/admin/crawler/tasks?page=1&page_size=10
+Authorization: Bearer <token>
+```
+
+**响应示例**:
+```json
+{
+  "tasks": [
     {
       "id": 1,
       "task_type": "taobao",
-      "keywords": ["路亚竿"],
-      "status": "success",
-      "total_items": 100,
-      "success_items": 95,
-      "failed_items": 5,
-      "start_time": "2025-12-10T10:00:00",
-      "end_time": "2025-12-10T10:05:00"
+      "status": "running",
+      "created_at": "2024-12-11T10:00:00Z",
+      "progress": 45
     }
   ],
-  "total": 1,
+  "total": 25,
   "page": 1,
-  "page_size": 20
+  "page_size": 10
 }
 ```
 
 ### 2. 手动触发爬虫任务
 
+创建并执行新的爬虫任务。
+
 ```http
 POST /api/v1/admin/crawler/tasks/trigger
+Authorization: Bearer <token>
 ```
 
 **请求体**:
@@ -1153,104 +311,103 @@ POST /api/v1/admin/crawler/tasks/trigger
   "task_type": "taobao",
   "keywords": ["路亚竿", "渔轮"],
   "max_pages": 5,
-  "proxy": null
-}
-```
-
-**响应示例**:
-```json
-{
-  "task_id": 123,
-  "message": "爬虫任务已启动",
-  "status": "pending"
+  "category": "鱼竿"
 }
 ```
 
 ### 3. 获取任务详情
 
+查看特定任务的详细信息。
+
 ```http
 GET /api/v1/admin/crawler/tasks/{task_id}
+Authorization: Bearer <token>
 ```
 
 ### 4. 重试失败任务
 
+重新执行失败的任务。
+
 ```http
 POST /api/v1/admin/crawler/tasks/{task_id}/retry
+Authorization: Bearer <token>
 ```
 
-### 5. 获取任务日志
+### 5. 获取数据同步状态
 
-```http
-GET /api/v1/admin/crawler/tasks/{task_id}/logs
-```
-
-### 6. 删除任务记录
-
-```http
-DELETE /api/v1/admin/crawler/tasks/{task_id}
-```
-
-### 7. 获取数据同步状态
+查看爬虫数据同步统计。
 
 ```http
 GET /api/v1/admin/crawler/sync-status
+Authorization: Bearer <token>
 ```
-
----
-
-## 监控管理 API ⭐ v4.0.0新增
-
-**基础路径**: `/api/v1/admin/monitor`
-
-### 权限要求
-- 需要 JWT Token 认证
-- 需要 `MONITOR_READ` 权限
-
-### 1. API调用统计
-
-```http
-GET /api/v1/admin/monitor/api-stats
-```
-
-**查询参数**:
-- `start_date` (date, optional): 开始日期
-- `end_date` (date, optional): 结束日期
 
 **响应示例**:
 ```json
 {
-  "total_calls": 1250,
-  "avg_response_time": 45.3,
-  "error_rate": 2.4,
+  "total_equipment": 1500,
+  "last_sync": "2024-12-11T08:00:00Z",
+  "sync_status": "success",
+  "source_stats": {
+    "taobao": 800,
+    "jd": 500,
+    "forum": 200
+  }
+}
+```
+
+## 监控管理 API
+
+### 1. API 调用统计
+
+获取 API 使用统计。
+
+```http
+GET /api/v1/admin/monitor/api-stats
+Authorization: Bearer <token>
+```
+
+**响应示例**:
+```json
+{
+  "total_requests": 10000,
+  "average_response_time": 245,
+  "error_rate": 0.02,
   "top_endpoints": [
     {
-      "endpoint": "/api/v1/fishing/chat",
-      "count": 350,
-      "avg_time": 120.5
+      "path": "/api/v1/fishing/chat",
+      "count": 5000,
+      "avg_response_time": 320
     }
   ]
 }
 ```
 
-### 2. LLM使用统计
+### 2. LLM 使用统计
+
+获取 LLM 调用统计。
 
 ```http
 GET /api/v1/admin/monitor/llm-stats
+Authorization: Bearer <token>
 ```
 
 **响应示例**:
 ```json
 {
-  "total_calls": 450,
-  "total_tokens": 125000,
-  "total_cost": 15.75,
-  "avg_response_time": 1.2,
-  "success_rate": 98.5,
-  "by_provider": {
+  "total_tokens": 1500000,
+  "total_cost": 25.50,
+  "success_rate": 0.98,
+  "provider_stats": {
+    "zhipu": {
+      "tokens": 900000,
+      "cost": 15.30,
+      "requests": 4500
+    },
     "qwen": {
-      "calls": 300,
-      "tokens": 80000,
-      "cost": 10.0
+      "tokens": 600000,
+      "cost": 10.20,
+      "requests": 3000
     }
   }
 }
@@ -1258,513 +415,461 @@ GET /api/v1/admin/monitor/llm-stats
 
 ### 3. 数据库性能监控
 
+获取数据库性能指标。
+
 ```http
 GET /api/v1/admin/monitor/db-performance
+Authorization: Bearer <token>
+```
+
+**响应示例**:
+```json
+{
+  "connection_pool": {
+    "active": 5,
+    "idle": 15,
+    "total": 20
+  },
+  "slow_queries": [
+    {
+      "query": "SELECT * FROM equipment WHERE...",
+      "duration": 1250,
+      "count": 3
+    }
+  ],
+  "table_sizes": {
+    "equipment": "2.5MB",
+    "users": "0.5MB"
+  }
+}
 ```
 
 ### 4. 系统健康检查
+
+检查各服务状态。
 
 ```http
 GET /api/v1/admin/monitor/health-check
 ```
 
-**注意**: 此端点无需认证
+**响应示例**:
+```json
+{
+  "api": "healthy",
+  "database": "healthy",
+  "llm_services": {
+    "zhipu": "healthy",
+    "qwen": "degraded"
+  },
+  "external_apis": {
+    "caiyun": "healthy",
+    "amap": "healthy"
+  }
+}
+```
 
----
-
-## 数据分析 API ⭐ v5.0.0新增
-
-**基础路径**: `/api/v1/admin/analytics`
-
-### 权限要求
-- 需要 JWT Token 认证
-- 需要 `ANALYTICS_READ` 权限
+## 数据分析管理 API
 
 ### 1. 装备数据统计总览
 
+获取装备数据的统计概览。
+
 ```http
 GET /api/v1/admin/analytics/equipment/stats
+Authorization: Bearer <token>
 ```
 
 **响应示例**:
 ```json
 {
-  "total_equipment": 1250,
-  "by_category": {
-    "鱼竿": 450,
-    "渔轮": 320,
-    "鱼线": 280,
-    "拟饵": 200
+  "total_equipment": 1500,
+  "category_distribution": {
+    "鱼竿": 600,
+    "渔轮": 400,
+    "拟饵": 350,
+    "配件": 150
   },
-  "avg_price": 580.50,
-  "total_value": 725625.00
+  "price_ranges": {
+    "0-200": 400,
+    "200-500": 600,
+    "500-1000": 350,
+    "1000+": 150
+  },
+  "user_levels": {
+    "新手": 800,
+    "进阶": 500,
+    "高手": 200
+  }
 }
 ```
 
-### 2. 装备数量趋势
+### 2. 装备趋势分析
+
+按月统计装备增长趋势。
 
 ```http
 GET /api/v1/admin/analytics/equipment/trends?months=12
+Authorization: Bearer <token>
 ```
 
 **查询参数**:
-- `months` (int, optional): 统计月数，默认12，最大36
+- `months`: 统计月数（默认 12）
 
 **响应示例**:
 ```json
-[
-  {
-    "month": "2025-01",
-    "equipment_count": 980,
-    "new_equipment": 45
-  },
-  {
-    "month": "2025-02",
-    "equipment_count": 1025,
-    "new_equipment": 52
-  }
-]
+{
+  "monthly_data": [
+    {
+      "month": "2024-01",
+      "equipment_count": 1200,
+      "new_additions": 50
+    },
+    {
+      "month": "2024-02",
+      "equipment_count": 1250,
+      "new_additions": 50
+    }
+  ],
+  "growth_rate": 0.042
+}
 ```
 
 ### 3. 价格分布统计
 
-```http
-GET /api/v1/admin/analytics/equipment/price-distribution?category=鱼竿
-```
+获取装备价格分布情况。
 
-**查询参数**:
-- `category` (string, optional): 装备类别过滤
+```http
+GET /api/v1/admin/analytics/equipment/price-distribution
+Authorization: Bearer <token>
+```
 
 **响应示例**:
 ```json
-[
-  {
-    "price_range": "0-200",
-    "count": 120,
-    "percentage": 26.67
-  },
-  {
-    "price_range": "200-500",
-    "count": 180,
-    "percentage": 40.00
-  },
-  {
-    "price_range": "500-1000",
-    "count": 100,
-    "percentage": 22.22
-  },
-  {
-    "price_range": "1000+",
-    "count": 50,
-    "percentage": 11.11
-  }
-]
+{
+  "ranges": [
+    {
+      "range": "0-200",
+      "count": 400,
+      "percentage": 26.7
+    },
+    {
+      "range": "200-500",
+      "count": 600,
+      "percentage": 40.0
+    }
+  ],
+  "average_price": 485.50,
+  "median_price": 380.00
+}
 ```
 
 ### 4. 品牌统计排行
 
+获取品牌使用统计。
+
 ```http
 GET /api/v1/admin/analytics/equipment/brand-stats?top_n=10
+Authorization: Bearer <token>
 ```
 
 **查询参数**:
-- `top_n` (int, optional): 返回前N个品牌，默认10
+- `top_n`: 返回前 N 个品牌（默认 10）
 
 **响应示例**:
 ```json
-[
-  {
-    "brand_name": "禧玛诺",
-    "equipment_count": 156,
-    "market_share": 12.48,
-    "avg_price": 650.00
-  },
-  {
-    "brand_name": "达亿瓦",
-    "equipment_count": 125,
-    "market_share": 10.00,
-    "avg_price": 580.00
-  }
-]
+{
+  "brands": [
+    {
+      "brand": "禧玛诺",
+      "count": 300,
+      "percentage": 20.0
+    },
+    {
+      "brand": "达亿瓦",
+      "count": 250,
+      "percentage": 16.7
+    }
+  ]
+}
 ```
 
 ### 5. 用户活跃度统计
 
+获取用户活跃度分析。
+
 ```http
 GET /api/v1/admin/analytics/users/activity?days=30
+Authorization: Bearer <token>
 ```
 
 **查询参数**:
-- `days` (int, optional): 统计天数，默认30
+- `days`: 统计天数（默认 30）
 
 **响应示例**:
 ```json
-[
-  {
-    "date": "2025-12-01",
-    "active_users": 245,
-    "new_users": 12,
-    "total_sessions": 892
-  },
-  {
-    "date": "2025-12-02",
-    "active_users": 268,
-    "new_users": 8,
-    "total_sessions": 956
-  }
-]
+{
+  "active_users": 850,
+  "new_users": 45,
+  "daily_active": [
+    {
+      "date": "2024-12-10",
+      "active_count": 120
+    }
+  ],
+  "retention_rate": 0.78
+}
 ```
 
 ### 6. 生成业务报表
 
+生成各类业务报表。
+
 ```http
 POST /api/v1/admin/analytics/reports/generate
+Authorization: Bearer <token>
 ```
 
 **请求体**:
 ```json
 {
-  "report_type": "equipment_summary",
-  "start_date": "2025-11-01",
-  "end_date": "2025-12-01",
+  "report_type": "equipment",
   "format": "pdf",
   "filters": {
     "category": "鱼竿",
-    "brand_ids": [1, 2, 3]
-  }
+    "date_range": "2024-01-01,2024-12-31",
+    "price_min": 200,
+    "price_max": 1000
+  },
+  "include_charts": true
 }
 ```
-
-**参数说明**:
-- `report_type` (string): 报表类型（equipment_summary/user_activity/sales_analysis）
-- `start_date` (string): 开始日期（YYYY-MM-DD）
-- `end_date` (string): 结束日期（YYYY-MM-DD）
-- `format` (string): 导出格式（pdf/excel）
-- `filters` (object): 过滤条件
 
 **响应示例**:
 ```json
 {
-  "report_id": "rpt_20251210_001",
+  "report_id": "report_20241211_001",
   "status": "generating",
   "download_url": null,
-  "estimated_completion": "2025-12-10T15:30:00Z"
+  "estimated_completion": "2024-12-11T12:05:00Z"
 }
 ```
 
 ### 7. 查询报表列表
 
+获取已生成的报表列表。
+
 ```http
 GET /api/v1/admin/analytics/reports/list?page=1&page_size=20
+Authorization: Bearer <token>
 ```
 
-**查询参数**:
-- `page` (int): 页码，默认1
-- `page_size` (int): 每页数量，默认20
-- `report_type` (string, optional): 报表类型过滤
-
-**响应示例**:
-```json
-{
-  "items": [
-    {
-      "report_id": "rpt_20251210_001",
-      "report_type": "equipment_summary",
-      "status": "completed",
-      "generated_at": "2025-12-10T14:30:00Z",
-      "download_url": "/api/v1/admin/analytics/reports/download/rpt_20251210_001"
-    }
-  ],
-  "total": 15,
-  "page": 1,
-  "page_size": 20
-}
-```
-
----
-
-## 配置管理 API ⭐ v5.0.0新增
-
-**基础路径**: `/api/v1/admin/config`
-
-### 权限要求
-- 需要 JWT Token 认证
-- 需要 `CONFIG_READ/CREATE/UPDATE/DELETE/TEST` 权限
+## 配置管理 API
 
 ### 1. 查询配置列表
 
+获取系统配置项列表。
+
 ```http
-GET /api/v1/admin/config/configs?config_type=api
+GET /api/v1/admin/config/configs?type=api&page=1&page_size=20
+Authorization: Bearer <token>
 ```
 
 **查询参数**:
-- `config_type` (string, optional): 配置类型（agent/algorithm/api/system）
-
-**响应示例**:
-```json
-[
-  {
-    "config_key": "caiyun.api_key",
-    "config_type": "api",
-    "description": "彩云天气API密钥",
-    "is_encrypted": true,
-    "updated_at": "2025-12-10T10:30:00Z",
-    "updated_by": "admin"
-  },
-  {
-    "config_key": "openai.model",
-    "config_type": "agent",
-    "description": "OpenAI模型名称",
-    "is_encrypted": false,
-    "updated_at": "2025-12-09T15:20:00Z",
-    "updated_by": "admin"
-  }
-]
-```
-
-### 2. 获取配置
-
-```http
-GET /api/v1/admin/config/configs/{config_key}
-```
-
-**路径参数**:
-- `config_key` (string): 配置键
+- `type`: 配置类型（api, system, algorithm, agent）
+- `page`: 页码
+- `page_size`: 每页数量
 
 **响应示例**:
 ```json
 {
-  "config_key": "caiyun.api_key",
-  "config_value": "******************efgh",
+  "configs": [
+    {
+      "config_key": "CAIYUN_API_KEY",
+      "config_type": "api",
+      "description": "彩云天气API密钥",
+      "is_encrypted": true,
+      "updated_at": "2024-12-11T10:00:00Z"
+    }
+  ],
+  "total": 25
+}
+```
+
+### 2. 获取特定配置
+
+获取单个配置项的值。
+
+```http
+GET /api/v1/admin/config/configs/CAIYUN_API_KEY
+Authorization: Bearer <token>
+```
+
+**响应示例**:
+```json
+{
+  "config_key": "CAIYUN_API_KEY",
+  "config_value": "***",
   "config_type": "api",
   "description": "彩云天气API密钥",
-  "is_encrypted": true,
-  "created_at": "2025-12-01T00:00:00Z",
-  "updated_at": "2025-12-10T10:30:00Z",
-  "updated_by": "admin"
+  "is_encrypted": true
 }
 ```
 
 ### 3. 创建配置
 
+创建新的配置项。
+
 ```http
 POST /api/v1/admin/config/configs
+Authorization: Bearer <token>
 ```
 
 **请求体**:
 ```json
 {
-  "config_key": "new_api_key",
-  "config_value": "sk-1234567890abcdef",
+  "config_key": "NEW_API_KEY",
+  "config_value": "your_api_key_value",
   "config_type": "api",
-  "description": "新的API密钥",
+  "description": "新API密钥配置",
   "is_encrypted": true
-}
-```
-
-**参数说明**:
-- `config_key` (string): 配置键，唯一
-- `config_value` (string): 配置值
-- `config_type` (string): 配置类型
-- `description` (string): 描述
-- `is_encrypted` (boolean): 是否加密存储
-
-**响应示例**:
-```json
-{
-  "config_key": "new_api_key",
-  "config_type": "api",
-  "description": "新的API密钥",
-  "is_encrypted": true,
-  "created_at": "2025-12-10T11:00:00Z",
-  "updated_at": "2025-12-10T11:00:00Z",
-  "updated_by": "admin"
 }
 ```
 
 ### 4. 更新配置
 
+更新现有配置项。
+
 ```http
-PUT /api/v1/admin/config/configs/{config_key}
+PUT /api/v1/admin/config/configs/CAIYUN_API_KEY
+Authorization: Bearer <token>
 ```
 
 **请求体**:
 ```json
 {
-  "config_value": "sk-abcdef1234567890",
-  "description": "更新后的API密钥"
-}
-```
-
-**响应示例**:
-```json
-{
-  "config_key": "new_api_key",
-  "config_value": "******************7890",
-  "config_type": "api",
-  "description": "更新后的API密钥",
-  "is_encrypted": true,
-  "updated_at": "2025-12-10T11:30:00Z",
-  "updated_by": "admin"
+  "config_value": "new_api_key_value",
+  "description": "更新后的彩云天气API密钥"
 }
 ```
 
 ### 5. 删除配置
 
+删除配置项。
+
 ```http
-DELETE /api/v1/admin/config/configs/{config_key}
+DELETE /api/v1/admin/config/configs/OLD_CONFIG
+Authorization: Bearer <token>
 ```
 
-**响应**: 204 No Content
+### 6. 测试 API 密钥
 
-### 6. 测试API密钥
+验证 API 密钥的有效性。
 
 ```http
 POST /api/v1/admin/config/configs/test-api-key
+Authorization: Bearer <token>
 ```
 
 **请求体**:
 ```json
 {
-  "api_provider": "caiyun",
-  "api_key": "sk-1234567890abcdef"
+  "api_type": "caiyun",
+  "api_key": "test_api_key_value"
 }
 ```
-
-**参数说明**:
-- `api_provider` (string): API提供商（caiyun/amap/openai/zhipu/dashscope）
-- `api_key` (string): API密钥
 
 **响应示例**:
 ```json
 {
   "valid": true,
   "message": "API密钥有效",
-  "test_details": {
-    "provider": "caiyun",
-    "response_time_ms": 245,
-    "test_result": "success"
+  "response_time": 245
+}
+```
+
+## 错误处理
+
+### 标准错误响应
+
+```json
+{
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "请求参数无效",
+    "details": {
+      "field": "location",
+      "reason": "不能为空"
+    }
   }
 }
 ```
 
-**错误响应示例**:
-```json
-{
-  "valid": false,
-  "message": "API密钥无效或网络错误",
-  "error_details": {
-    "error_code": "INVALID_KEY",
-    "error_message": "Authentication failed"
+### 常见错误码
+
+| 状态码 | 错误码 | 说明 |
+|--------|--------|------|
+| 400 | INVALID_REQUEST | 请求参数错误 |
+| 401 | UNAUTHORIZED | 未认证或 Token 无效 |
+| 403 | FORBIDDEN | 权限不足 |
+| 404 | NOT_FOUND | 资源不存在 |
+| 429 | RATE_LIMITED | 请求频率超限 |
+| 500 | INTERNAL_ERROR | 服务器内部错误 |
+
+## 速率限制
+
+- 未认证用户：100 请求/小时
+- 普通用户：1000 请求/小时
+- 管理员：无限制
+
+## SDK 示例
+
+### Python
+
+```python
+import requests
+
+# 登录获取 token
+response = requests.post('http://localhost:8000/api/v1/auth/login', json={
+    'username': 'admin',
+    'password': 'admin123'
+})
+token = response.json()['access_token']
+
+# 使用 token 调用 API
+headers = {'Authorization': f'Bearer {token}'}
+response = requests.get(
+    'http://localhost:8000/api/v1/admin/analytics/equipment/stats',
+    headers=headers
+)
+```
+
+### JavaScript
+
+```javascript
+// 登录获取 token
+const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    username: 'admin',
+    password: 'admin123'
+  })
+});
+const {access_token} = await loginResponse.json();
+
+// 使用 token 调用 API
+const response = await fetch('http://localhost:8000/api/v1/admin/analytics/equipment/stats', {
+  headers: {
+    'Authorization': `Bearer ${access_token}`,
+    'Content-Type': 'application/json'
   }
-}
+});
+const data = await response.json();
 ```
 
 ---
 
-## WebSocket API ⭐ v4.0.0新增
-
-### 1. 爬虫任务进度推送
-
-```
-WS /api/v1/admin/crawler/ws/crawler/{task_id}
-```
-
-**推送数据格式**:
-```json
-{
-  "task_id": 1,
-  "status": "running",
-  "progress": "50/100",
-  "success_items": 50,
-  "failed_items": 2,
-  "timestamp": "2025-12-10T10:30:45.123456"
-}
-```
-
-### 2. 系统监控实时推送
-
-```
-WS /api/v1/admin/monitor/ws/realtime-stats
-```
-
-**推送数据格式**:
-```json
-{
-  "timestamp": "2025-12-10T10:30:45.123456",
-  "api_calls_per_minute": 25,
-  "api_errors_per_minute": 1,
-  "llm_calls_per_minute": 5,
-  "llm_tokens_per_minute": 1200
-}
-```
-
----
-
-## 更新日志
-
-### v5.0.0 (2025-12-10)
-
-**新增功能**:
-- 数据分析 API（7个端点）
-  - 装备数据统计总览
-  - 装备数量趋势分析
-  - 价格分布统计
-  - 品牌统计排行
-  - 用户活跃度统计
-  - 业务报表生成和查询
-- 配置管理 API（6个端点）
-  - 系统配置CRUD操作
-  - API密钥管理（加密存储）
-  - 配置版本控制
-  - API密钥有效性测试
-- React管理前端
-  - 基于React 19.2.0 + TypeScript
-  - Ant Design 5.22.0 企业级UI组件
-  - 数据可视化（ECharts 5.5.0）
-
-**技术升级**:
-- API版本升级至 v5.0.0
-- 新增AnalyticsService和ConfigService
-- 权限扩展：ANALYTICS_READ和CONFIG_*权限
-- 完整的数据分析和配置管理功能
-
-### v4.0.0 (2025-12-10)
-
-**新增功能**:
-- 爬虫管理 API（7个端点 + 1个WebSocket）
-- 监控管理 API（4个端点 + 1个WebSocket）
-- WebSocket 实时通信支持
-- 完整的 RBAC 权限控制
-
-**技术升级**:
-- API 版本升级至 v4.0.0
-- 实时数据推送
-- 完善的权限管理
-
-### v3.2.0 (2024-12-03)
-
-**新增功能**:
-- 用户装备管理 API（6个端点）
-- 用户管理（创建用户、获取用户信息）
-- 装备库管理（添加、查询、删除）
-- 推荐功能（升级/完善/搭配）
-- 统计功能（装备数量、花费、类别分布）
-
-**改进**:
-- 对话接口支持 `user_id` 参数
-- 完善错误处理和响应格式
-
-### v3.1.1 (2024-11-28)
-
-- 初始版本
-- 钓鱼助手对话接口
-- 工具列表查询接口
-
----
-
-## 联系支持
-
-- **项目地址**: https://github.com/anthropics/claude-code
-- **问题反馈**: https://github.com/anthropics/claude-code/issues
-- **文档**: [README](../README.md)
+更多信息请参考：
+- [快速入门](./GETTING_STARTED.md)
+- [用户指南](./USER_GUIDE.md)
+- [架构文档](./ARCHITECTURE.md)

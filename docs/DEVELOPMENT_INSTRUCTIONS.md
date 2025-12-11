@@ -11,7 +11,9 @@
 - **AI框架**: LangChain 1.0+, 多LLM支持（通义千问、智谱AI、OpenAI）
 - **数据库**: SQLite（开发）/ PostgreSQL（生产）
 - **认证**: JWT + RBAC权限系统
-- **前端**: React 19.2.0 + TypeScript + Ant Design 5.22.0 (v5.0.0新增)
+- **前端**: React 19.2.0 + TypeScript + Ant Design 5.22.0 + Vite 7.2.4
+- **状态管理**: Redux Toolkit + React Router 6.28.0
+- **数据可视化**: ECharts 5.5.0
 - **部署**: Docker, Docker Compose
 
 ## 🗺️ 开发路线图
@@ -217,13 +219,92 @@ uv run python -m packages.agent_fishing.tools.lure.alembic upgrade head
 uv run python scripts/create_admin.py
 
 # 6. 启动后端开发服务器
-uv run uvicorn apps.api.main:app --reload
+uv run uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
 
 # 7. 启动前端开发服务器（v5.0.0新增）
 cd apps/web-admin
 npm install
 npm run dev
+
+# 8. 访问系统
+# API文档: http://localhost:8000/docs
+# 管理前端: http://localhost:5174 (用户名: admin, 密码: admin123)
 ```
+
+### 前后端同时开发工作流 ⭐ v5.0.0
+
+```bash
+# Terminal 1 - 后端API服务
+uv run uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 - React前端服务
+cd apps/web-admin
+npm run dev
+
+# Terminal 3 - CLI应用（可选）
+uv run python main.py
+```
+
+### React前端开发详细指南 ⭐ v5.0.0
+
+#### 1. 环境准备
+```bash
+# 确保Node.js版本 >= 18
+node --version
+npm --version
+
+# 进入前端目录
+cd apps/web-admin
+
+# 安装依赖（首次运行）
+npm install
+
+# 查看项目依赖
+npm list --depth=0
+```
+
+#### 2. 前端环境变量配置
+创建 `.env` 文件：
+```bash
+# API地址
+VITE_API_BASE_URL=http://localhost:8000
+
+# 应用标题
+VITE_APP_TITLE=智能钓鱼助手管理后台
+
+# 是否启用Mock数据
+VITE_USE_MOCK=false
+```
+
+#### 3. 开发命令
+```bash
+# 开发模式（热更新）
+npm run dev
+
+# 类型检查
+npm run type-check
+
+# 代码检查
+npm run lint
+
+# 修复代码格式
+npm run lint:fix
+
+# 构建生产版本
+npm run build
+
+# 预览构建结果
+npm run preview
+```
+
+#### 4. 前端技术栈详情
+- **React 19.2.0**: 最新的React版本，支持并发特性
+- **TypeScript 5.9.3**: 类型安全的JavaScript超集
+- **Vite 7.2.4**: 现代化构建工具，极快的冷启动
+- **Ant Design 5.22.0**: 企业级UI组件库
+- **Redux Toolkit 2.2.7**: Redux状态管理工具
+- **React Router 6.28.0**: React路由管理
+- **ECharts 5.5.0**: 数据可视化图表库
 
 ### 环境变量配置
 
