@@ -33,6 +33,8 @@ class DatabaseMigrations:
             self._migration_001_add_crawler_fields,
             self._migration_002_add_user_tables,
             self._migration_003_add_admin_users_table,
+            self._migration_004_add_crawler_task_tables,
+            self._migration_005_add_workflow_support,
         ]
 
         for i, migration in enumerate(migrations, 1):
@@ -268,6 +270,204 @@ class DatabaseMigrations:
             "CREATE INDEX IF NOT EXISTS idx_analytics_reports_generated ON analytics_reports(generated_by)"
         )
         logger.info("  创建索引: idx_analytics_reports_*")
+
+    def _migration_004_add_crawler_task_tables(self):
+        """
+        迁移004: 创建爬虫任务相关表
+
+        创建表：
+        - crawler_tasks: 爬虫任务表
+        - crawler_logs: 爬虫任务日志表
+        """
+        logger.info("执行迁移004: 创建爬虫任务相关表")
+
+        # ========== crawler_tasks表 ==========
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crawler_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_type TEXT NOT NULL,
+                task_name TEXT,
+                status TEXT DEFAULT 'pending',
+                start_time TIMESTAMP,
+                end_time TIMESTAMP,
+                total_items INTEGER DEFAULT 0,
+                success_items INTEGER DEFAULT 0,
+                failed_items INTEGER DEFAULT 0,
+                error_message TEXT,
+                config TEXT,
+                result_summary TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        logger.info("  创建表: crawler_tasks")
+
+        # 创建索引
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_crawler_tasks_type ON crawler_tasks(task_type)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_crawler_tasks_status ON crawler_tasks(status)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_crawler_tasks_created ON crawler_tasks(created_at)"
+        )
+        logger.info("  创建索引: idx_crawler_tasks_*")
+
+        # ========== crawler_logs表 ==========
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crawler_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                level TEXT NOT NULL,
+                message TEXT NOT NULL,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (task_id) REFERENCES crawler_tasks(id) ON DELETE CASCADE
+            )
+        """)
+        logger.info("  创建表: crawler_logs")
+
+        # 创建索引
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_crawler_logs_task ON crawler_logs(task_id)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_crawler_logs_level ON crawler_logs(level)"
+        )
+        logger.info("  创建索引: idx_crawler_logs_*")
+
+    def _migration_005_add_workflow_support(self):
+        """
+        迁移005: 为crawler_tasks表添加工作流支持字段
+
+        添加字段：
+        - workflow_id: 工作流ID
+        - workflow_name: 工作流名称
+        - parent_task_id: 父任务ID
+        - step_order: 步骤顺序
+        - step_config: 步骤配置
+        - platform: 平台标识
+        - shop_url: 店铺URL
+        - retry_count: 重试次数
+        - max_retries: 最大重试次数
+        - timeout_seconds: 超时时间
+        - requires_intervention: 是否需要人工干预
+        - duplicate_items: 去重数量
+        - invalid_items: 无效数据量
+        """
+        logger.info("执行迁移005: 添加工作流支持字段到crawler_tasks表")
+
+        # 检查字段是否已存在
+        columns = self._get_table_columns("crawler_tasks")
+        column_names = [col[1] for col in columns]
+
+        # 工作流相关字段
+        workflow_fields = [
+            ("workflow_id", "TEXT"),
+            ("workflow_name", "TEXT"),
+            ("parent_task_id", "INTEGER"),
+            ("step_order", "INTEGER DEFAULT 0"),
+            ("step_config", "TEXT"),
+        ]
+
+        # 执行控制字段
+        control_fields = [
+            ("platform", "TEXT"),
+            ("shop_url", "TEXT"),
+            ("retry_count", "INTEGER DEFAULT 0"),
+            ("max_retries", "INTEGER DEFAULT 3"),
+            ("timeout_seconds", "INTEGER DEFAULT 3600"),
+            ("requires_intervention", "INTEGER DEFAULT 0"),
+        ]
+
+        # 数据质量字段
+        quality_fields = [
+            ("duplicate_items", "INTEGER DEFAULT 0"),
+            ("invalid_items", "INTEGER DEFAULT 0"),
+        ]
+
+        # 添加所有字段
+        all_fields = workflow_fields + control_fields + quality_fields
+
+        for field_name, field_type in all_fields:
+            if field_name not in column_names:
+                self.cursor.execute(
+                    f"ALTER TABLE crawler_tasks ADD COLUMN {field_name} {field_type}"
+                )
+                logger.info(f"  添加字段: {field_name}")
+
+        # 添加外键约束
+        try:
+            self.cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_crawler_task_parent ON crawler_tasks(parent_task_id)"
+            )
+            self.cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_crawler_task_workflow ON crawler_tasks(workflow_id)"
+            )
+            self.cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_crawler_task_platform ON crawler_tasks(platform)"
+            )
+            logger.info("  创建索引: idx_crawler_task_*")
+        except sqlite3.OperationalError:
+            pass  # 索引已存在
+
+        # ========== 创建工作流模板表 ==========
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crawler_workflow_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT,
+                template_json TEXT NOT NULL,
+                category TEXT,
+                is_system INTEGER DEFAULT 0,
+                created_by INTEGER,
+                usage_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        logger.info("  创建表: crawler_workflow_templates")
+
+        # 创建索引
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_workflow_templates_category ON crawler_workflow_templates(category)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_workflow_templates_system ON crawler_workflow_templates(is_system)"
+        )
+
+        # ========== 创建定时调度表 ==========
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crawler_schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                template_id INTEGER NOT NULL,
+                cron_expression TEXT NOT NULL,
+                timezone TEXT DEFAULT 'Asia/Shanghai',
+                is_enabled INTEGER DEFAULT 1,
+                config TEXT,
+                next_run_time TIMESTAMP,
+                last_run_time TIMESTAMP,
+                last_task_id INTEGER,
+                created_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (template_id) REFERENCES crawler_workflow_templates(id)
+            )
+        """)
+        logger.info("  创建表: crawler_schedules")
+
+        # 创建索引
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_schedules_template ON crawler_schedules(template_id)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_schedules_enabled ON crawler_schedules(is_enabled)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON crawler_schedules(next_run_time, is_enabled)"
+        )
+        logger.info("  创建索引: idx_schedules_*")
 
     def _get_table_columns(self, table_name: str) -> list:
         """
