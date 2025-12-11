@@ -2,11 +2,11 @@
 
 基于 LangChain 1.0+ 的智能钓鱼助手项目，专注于钓鱼时间推荐、天气分析和路亚装备管理。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v5.0.0 + JWT认证系统 + 爬虫监控模块 + 数据分析配置 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v5.0.0 + JWT认证系统 + 爬虫监控模块 + 数据分析配置 + React管理前端 + 动态Prompt中间件 + 7因子科学评分 + FastAPI 后端**
 
 > **当前版本**: v5.0.0 (Phase 5 数据分析和配置管理完成)
-> **当前分支**: feature/equipment-ui
-> **架构**: packages/agent_fishing 独立 Agent 包 + middleware 动态架构 + JWT认证 + 爬虫监控 + 数据分析配置
+> **当前分支**: feature/equipment-ui (功能已完成)
+> **架构**: packages/agent_fishing 独立 Agent 包 + React 管理前端 + JWT认证 + 爬虫监控 + 数据分析配置 + middleware 动态架构
 
 ### 🌟 版本状态 (v5.0.0) ⭐ Phase 5 数据分析和配置管理完成
 - ✅ **数据分析报表**: 装备数据统计、价格分布、品牌排行、用户行为分析
@@ -172,9 +172,31 @@
     - `auth.py`: 认证API端点
     - `fishing.py`: 钓鱼API路由
     - `user_equipment.py`: 用户装备API
+    - `crawler.py`: 爬虫管理API ⭐ v4.0.0新增
+    - `monitor.py`: 监控管理API ⭐ v4.0.0新增
+    - `analytics.py`: 数据分析路由 ⭐ v5.0.0新增
+    - `config.py`: 配置管理路由 ⭐ v5.0.0新增
   - `schemas/`: 数据模型
     - `chat.py`: 对话数据模型（已扩展user_id）
     - `user_equipment.py`: 装备数据模型
+    - `crawler.py`: 爬虫管理Schema ⭐ v4.0.0新增
+    - `monitor.py`: 监控管理Schema ⭐ v4.0.0新增
+    - `analytics.py`: 数据分析Schema ⭐ v5.0.0新增
+    - `config.py`: 配置管理Schema ⭐ v5.0.0新增
+  - `services/`: 业务服务层 ⭐ v4.0.0新增
+    - `crawler_service.py`: 爬虫服务
+    - `monitor_service.py`: 监控服务
+    - `analytics_service.py`: 数据分析服务 ⭐ v5.0.0新增
+    - `config_service.py`: 配置管理服务 ⭐ v5.0.0新增
+- **`apps/web-admin/`**: React 管理前端 ⭐ v5.0.0新增
+  - `package.json`: 前端依赖配置（React 19.2.0 + TypeScript + Ant Design 5.22.0）
+  - `src/`: 源代码
+    - `components/`: 通用组件
+    - `pages/`: 页面组件
+    - `services/`: API服务
+    - `utils/`: 工具函数
+    - `types/`: TypeScript类型定义
+  - `vite.config.ts`: Vite 构建配置
 
 #### 🔧 共享资源 (Shared)
 - **`shared/config/`**: 全局配置
@@ -344,7 +366,22 @@ uv run uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
 uv run fishing-api
 ```
 
-#### 方法三：直接运行 Agent
+#### 方法三：React 管理前端 ⭐ v5.0.0新增
+```bash
+# 进入前端目录
+cd apps/web-admin
+
+# 安装依赖（首次运行）
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 构建生产版本
+npm run build
+```
+
+#### 方法四：直接运行 Agent
 ```bash
 # 测试 Agent 导入和创建
 uv run python -c "from packages.agent_fishing import create_agent; print('Agent creation test passed')"
@@ -353,7 +390,7 @@ uv run python -c "from packages.agent_fishing import create_agent; print('Agent 
 uv run python -c "from packages.agent_fishing import get_all_tools; print(f'Tools: {len(get_all_tools())}')"
 ```
 
-#### 方法四：调试工具 ⭐ v3.1.1新增
+#### 方法五：调试工具 ⭐ v3.1.1新增
 ```bash
 # 运行调试工具（推荐用于开发测试）
 uv run python debug_agent.py
@@ -948,15 +985,31 @@ fishing-agent/
 │       │   ├── fishing.py         # 钓鱼API路由
 │       │   ├── user_equipment.py  # 用户装备API
 │       │   ├── crawler.py         # 爬虫管理API ⭐ v4.0.0新增
-│       │   └── monitor.py         # 监控管理API ⭐ v4.0.0新增
+│       │   ├── monitor.py         # 监控管理API ⭐ v4.0.0新增
+│       │   ├── analytics.py       # 数据分析路由 ⭐ v5.0.0新增
+│       │   └── config.py          # 配置管理路由 ⭐ v5.0.0新增
 │       ├── schemas/               # 数据模型
 │       │   ├── chat.py            # 对话数据模型（已扩展user_id）
 │       │   ├── user_equipment.py  # 装备数据模型
 │       │   ├── crawler.py         # 爬虫管理Schema ⭐ v4.0.0新增
-│       │   └── monitor.py         # 监控管理Schema ⭐ v4.0.0新增
+│       │   ├── monitor.py         # 监控管理Schema ⭐ v4.0.0新增
+│       │   ├── analytics.py       # 数据分析Schema ⭐ v5.0.0新增
+│       │   └── config.py          # 配置管理Schema ⭐ v5.0.0新增
 │       └── services/              # 业务服务层 ⭐ v4.0.0新增
 │           ├── crawler_service.py # 爬虫服务
-│           └── monitor_service.py # 监控服务
+│           ├── monitor_service.py # 监控服务
+│           ├── analytics_service.py # 数据分析服务 ⭐ v5.0.0新增
+│           └── config_service.py  # 配置管理服务 ⭐ v5.0.0新增
+│   └── web-admin/                 # React管理前端 ⭐ v5.0.0新增
+│       ├── src/                   # 源代码
+│       │   ├── components/        # 通用组件
+│       │   ├── pages/             # 页面组件
+│       │   ├── services/          # API服务
+│       │   ├── utils/             # 工具函数
+│       │   └── types/             # TypeScript类型定义
+│       ├── package.json           # 前端依赖配置
+│       ├── vite.config.ts         # Vite构建配置
+│       └── README.md              # 前端说明文档
 ├── shared/                        # 共享资源
 │   ├── config/                    # 全局配置
 │   │   └── service_config.py

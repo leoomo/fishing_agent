@@ -11,6 +11,7 @@
 - **AI框架**: LangChain 1.0+, 多LLM支持（通义千问、智谱AI、OpenAI）
 - **数据库**: SQLite（开发）/ PostgreSQL（生产）
 - **认证**: JWT + RBAC权限系统
+- **前端**: React 19.2.0 + TypeScript + Ant Design 5.22.0 (v5.0.0新增)
 - **部署**: Docker, Docker Compose
 
 ## 🗺️ 开发路线图
@@ -72,19 +73,19 @@ apps/api/
 
 ---
 
-### Phase 3: 核心管理模块API 📋 规划中
+### Phase 3: 核心管理模块API ✅ 已完成
 **周期**: 第4-5周 | **优先级**: P1
 
 #### Week 4: 装备 + 用户管理
-- [ ] 装备CRUD API（创建/查询/更新/删除）
-- [ ] 品牌管理API
-- [ ] 用户管理API（列表/详情/装备库）
-- [ ] 导入导出功能（CSV/JSON）
+- [x] 装备CRUD API（创建/查询/更新/删除）
+- [x] 品牌管理API
+- [x] 用户管理API（列表/详情/装备库）
+- [x] 导入导出功能（CSV/JSON）
 
 #### Week 5: 内容管理
-- [ ] 鱼类知识管理API
-- [ ] 钓组配置管理API
-- [ ] 拟饵类型管理API
+- [x] 鱼类知识管理API
+- [x] 钓组配置管理API
+- [x] 拟饵类型管理API
 
 #### API设计原则
 - RESTful设计规范
@@ -94,58 +95,60 @@ apps/api/
 
 ---
 
-### Phase 4: 爬虫 + 监控模块 📋 规划中
+### Phase 4: 爬虫 + 监控模块 ✅ 已完成
 **周期**: 第6周 | **优先级**: P1
 
 #### 核心功能
-- [ ] 多平台爬虫（淘宝/京东/论坛）
-- [ ] 反爬虫策略（UA轮换/延迟/重试）
-- [ ] 数据去重算法
-- [ ] 爬虫任务管理
+- [x] 多平台爬虫（淘宝/京东/论坛）
+- [x] 反爬虫策略（UA轮换/延迟/重试）
+- [x] 数据去重算法
+- [x] 爬虫任务管理
+- [x] WebSocket实时推送
 
 #### 监控系统
-- [ ] API性能监控
-- [ ] LLM使用统计
-- [ ] 错误追踪
-- [ ] 告警机制
+- [x] API性能监控
+- [x] LLM使用统计
+- [x] 错误追踪
+- [x] 告警机制
+- [x] 系统健康检查
 
 ---
 
-### Phase 5: 数据分析与配置 📋 规划中
+### Phase 5: 数据分析与配置 ✅ 已完成
 **周期**: 第7周 | **优先级**: P1
 
 #### 数据分析
-- [ ] 装备统计分析
-- [ ] 用户行为分析
-- [ ] 业务报表生成
-- [ ] 数据可视化
+- [x] 装备统计分析
+- [x] 用户行为分析
+- [x] 业务报表生成
+- [x] 数据可视化
 
 #### 配置管理
-- [ ] 动态配置系统
-- [ ] API密钥管理
-- [ ] 算法参数调整
-- [ ] 配置版本控制
+- [x] 动态配置系统
+- [x] API密钥管理
+- [x] 算法参数调整
+- [x] 配置版本控制
 
 ---
 
-### Phase 6-8: 前端开发 📋 规划中
+### Phase 6-8: 前端开发 ✅ 已完成
 **周期**: 第8-10周 | **优先级**: P1
 
 #### 技术栈
-- **框架**: React 18 + TypeScript
+- **框架**: React 19.2.0 + TypeScript
 - **状态管理**: Redux Toolkit
-- **UI组件**: Ant Design
-- **图表**: ECharts
-- **构建**: Vite
+- **UI组件**: Ant Design 5.22.0
+- **图表**: ECharts 5.5.0
+- **构建**: Vite 7.2.4
 
 #### 核心页面
-- [ ] 登录/认证页面
-- [ ] 装备管理（列表/详情/编辑）
-- [ ] 用户管理
-- [ ] 内容管理
-- [ ] 爬虫管理
-- [ ] 数据分析仪表板
-- [ ] 系统配置
+- [x] 登录/认证页面
+- [x] 装备管理（列表/详情/编辑）
+- [x] 用户管理
+- [x] 内容管理
+- [x] 爬虫管理
+- [x] 数据分析仪表板
+- [x] 系统配置
 
 ---
 
@@ -158,8 +161,9 @@ apps/api/
   - 集成测试（API测试）
   - 性能测试（负载测试）
 - **前端测试**:
-  - 组件测试（Jest）
-  - E2E测试（Playwright）
+  - 组件测试（Jest/React Testing Library）
+  - 手动测试（当前阶段）
+  - 未来可添加：Vitest + @testing-library/react
 
 #### 性能优化
 - [ ] 数据库查询优化
@@ -173,9 +177,9 @@ apps/api/
 **周期**: 第12周 | **优先级**: P0
 
 #### 文档完善
-- [ ] API文档（Swagger）
-- [ ] 用户使用手册
-- [ ] 开发者文档
+- [x] API文档（Swagger）
+- [x] 用户使用手册
+- [x] 开发者文档
 - [ ] 部署指南
 
 #### 部署配置
@@ -212,8 +216,13 @@ uv run python -m packages.agent_fishing.tools.lure.alembic upgrade head
 # 5. 创建管理员用户
 uv run python scripts/create_admin.py
 
-# 6. 启动开发服务器
+# 6. 启动后端开发服务器
 uv run uvicorn apps.api.main:app --reload
+
+# 7. 启动前端开发服务器（v5.0.0新增）
+cd apps/web-admin
+npm install
+npm run dev
 ```
 
 ### 环境变量配置
@@ -246,7 +255,21 @@ apps/
 │   ├── auth/               # JWT认证模块
 │   ├── middleware/         # 中间件
 │   ├── routes/            # API路由
-│   └── schemas/           # 数据模型
+│   │   ├── analytics.py   # 数据分析路由 (v5.0.0新增)
+│   │   ├── config.py      # 配置管理路由 (v5.0.0新增)
+│   │   ├── crawler.py     # 爬虫管理路由 (v4.0.0新增)
+│   │   ├── monitor.py     # 监控管理路由 (v4.0.0新增)
+│   │   └── auth.py        # 认证路由
+│   ├── schemas/           # 数据模型
+│   │   ├── analytics.py   # 数据分析Schema (v5.0.0新增)
+│   │   ├── config.py      # 配置管理Schema (v5.0.0新增)
+│   │   ├── crawler.py     # 爬虫管理Schema (v4.0.0新增)
+│   │   └── monitor.py     # 监控管理Schema (v4.0.0新增)
+│   └── services/          # 业务服务层 (v4.0.0新增)
+│       ├── analytics_service.py  # 数据分析服务 (v5.0.0新增)
+│       ├── config_service.py     # 配置管理服务 (v5.0.0新增)
+│       ├── crawler_service.py    # 爬虫服务 (v4.0.0新增)
+│       └── monitor_service.py    # 监控服务 (v4.0.0新增)
 └── cli/                   # CLI应用
 
 packages/
@@ -255,6 +278,16 @@ packages/
     ├── tools/            # LangChain工具
     ├── models/           # 数据模型
     └── orm/              # 数据访问层
+
+apps/web-admin/            # React管理前端 (v5.0.0新增)
+├── src/
+│   ├── components/       # 通用组件
+│   ├── pages/           # 页面组件
+│   ├── services/        # API服务
+│   ├── utils/           # 工具函数
+│   └── types/           # TypeScript类型定义
+├── package.json         # 前端依赖配置
+└── vite.config.ts       # Vite构建配置
 ```
 
 ### 数据库设计
@@ -296,6 +329,7 @@ git push origin feature/new-feature
 - [API参考文档](API_REFERENCE.md)
 - [架构设计文档](ARCHITECTURE.md)
 - [数据库设计](BACKEND_ARCHITECTURE.md)
+- [测试文档](TESTING.md)
 
 ### Phase详细计划
 - [Phase 1: 数据库ORM层](dev-plans/phase1-database-orm.md)
@@ -312,15 +346,15 @@ git push origin feature/new-feature
 ### Docker部署
 
 ```bash
-# 构建镜像
-docker build -t fishing-agent .
+# 构建后端镜像
+docker build -t fishing-agent-api .
+
+# 构建前端镜像
+cd apps/web-admin
+docker build -t fishing-agent-web .
 
 # 运行容器
-docker run -p 8000:8000 \
-  -e CAIYUN_API_KEY=$CAIYUN_API_KEY \
-  -e AMAP_API_KEY=$AMAP_API_KEY \
-  -e DASHSCOPE_API_KEY=$DASHSCOPE_API_KEY \
-  fishing-agent
+docker-compose up -d
 ```
 
 ### Docker Compose
@@ -340,6 +374,13 @@ services:
     depends_on:
       - postgres
       - redis
+
+  web:
+    build: ./apps/web-admin
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
 
   postgres:
     image: postgres:14
@@ -383,5 +424,6 @@ volumes:
 
 > 📌 **提示**: 本文档会随着项目进展持续更新，请定期查看最新版本。
 
-**最后更新**: 2025-01-10
-**文档版本**: v1.0.0
+**最后更新**: 2025-12-11
+**文档版本**: v5.0.0
+**当前状态**: Phase 5 数据分析配置已完成，React管理前端已集成
