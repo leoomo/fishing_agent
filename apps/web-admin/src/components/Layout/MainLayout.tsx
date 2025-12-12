@@ -6,6 +6,7 @@ import {
   UserOutlined,
   FileTextOutlined,
   RobotOutlined,
+  BranchesOutlined,
   MonitorOutlined,
   BarChartOutlined,
   SettingOutlined,
@@ -49,6 +50,11 @@ const MainLayout = () => {
       key: '/crawler',
       icon: <RobotOutlined />,
       label: '爬虫管理',
+    },
+    {
+      key: '/workflow',
+      icon: <BranchesOutlined />,
+      label: '工作流管理',
     },
     {
       key: '/monitor',
