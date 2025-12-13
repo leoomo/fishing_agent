@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import client from './client';
 
 // Types
 export interface WorkflowStep {
@@ -186,7 +186,7 @@ export const workflowApi = {
     is_active?: boolean;
     search?: string;
   }) => {
-    return apiClient.get<{
+    return client.get<{
       items: WorkflowTemplate[];
       total: number;
       page: number;
@@ -196,24 +196,24 @@ export const workflowApi = {
   },
 
   getTemplate: async (id: number) => {
-    return apiClient.get<WorkflowTemplate>(`/admin/crawler/workflow/templates/${id}`);
+    return client.get<WorkflowTemplate>(`/admin/crawler/workflow/templates/${id}`);
   },
 
   createTemplate: async (data: CreateWorkflowTemplateRequest) => {
-    return apiClient.post<WorkflowTemplate>('/admin/crawler/workflow/templates', data);
+    return client.post<WorkflowTemplate>('/admin/crawler/workflow/templates', data);
   },
 
   updateTemplate: async (id: number, data: UpdateWorkflowTemplateRequest) => {
-    return apiClient.put<WorkflowTemplate>(`/admin/crawler/workflow/templates/${id}`, data);
+    return client.put<WorkflowTemplate>(`/admin/crawler/workflow/templates/${id}`, data);
   },
 
   deleteTemplate: async (id: number) => {
-    return apiClient.delete<{ success: boolean; message: string }>(`/admin/crawler/workflow/templates/${id}`);
+    return client.delete<{ success: boolean; message: string }>(`/admin/crawler/workflow/templates/${id}`);
   },
 
   // Execution
   executeWorkflow: async (data: WorkflowExecutionRequest) => {
-    return apiClient.post<{
+    return client.post<{
       workflow_id: string;
       template_id: number;
       status: string;
@@ -227,19 +227,19 @@ export const workflowApi = {
   },
 
   getWorkflowStatus: async (workflowId: string) => {
-    return apiClient.get<WorkflowStatus>(`/admin/crawler/workflow/${workflowId}/status`);
+    return client.get<WorkflowStatus>(`/admin/crawler/workflow/${workflowId}/status`);
   },
 
   pauseWorkflow: async (workflowId: string) => {
-    return apiClient.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/${workflowId}/pause`);
+    return client.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/${workflowId}/pause`);
   },
 
   resumeWorkflow: async (workflowId: string) => {
-    return apiClient.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/${workflowId}/resume`);
+    return client.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/${workflowId}/resume`);
   },
 
   cancelWorkflow: async (workflowId: string) => {
-    return apiClient.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/${workflowId}/cancel`);
+    return client.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/${workflowId}/cancel`);
   },
 
   // Schedules
@@ -249,7 +249,7 @@ export const workflowApi = {
     template_id?: number;
     is_enabled?: boolean;
   }) => {
-    return apiClient.get<{
+    return client.get<{
       items: Schedule[];
       total: number;
       page: number;
@@ -259,27 +259,27 @@ export const workflowApi = {
   },
 
   getSchedule: async (id: number) => {
-    return apiClient.get<Schedule>(`/admin/crawler/workflow/schedules/${id}`);
+    return client.get<Schedule>(`/admin/crawler/workflow/schedules/${id}`);
   },
 
   createSchedule: async (data: CreateScheduleRequest) => {
-    return apiClient.post<Schedule>('/admin/crawler/workflow/schedules', data);
+    return client.post<Schedule>('/admin/crawler/workflow/schedules', data);
   },
 
   updateSchedule: async (id: number, data: UpdateScheduleRequest) => {
-    return apiClient.put<Schedule>(`/admin/crawler/workflow/schedules/${id}`, data);
+    return client.put<Schedule>(`/admin/crawler/workflow/schedules/${id}`, data);
   },
 
   deleteSchedule: async (id: number) => {
-    return apiClient.delete<{ success: boolean; message: string }>(`/admin/crawler/workflow/schedules/${id}`);
+    return client.delete<{ success: boolean; message: string }>(`/admin/crawler/workflow/schedules/${id}`);
   },
 
   enableSchedule: async (id: number) => {
-    return apiClient.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/schedules/${id}/enable`);
+    return client.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/schedules/${id}/enable`);
   },
 
   disableSchedule: async (id: number) => {
-    return apiClient.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/schedules/${id}/disable`);
+    return client.post<{ success: boolean; message: string }>(`/admin/crawler/workflow/schedules/${id}/disable`);
   },
 
   // Schedule tools
@@ -289,14 +289,14 @@ export const workflowApi = {
     start_time?: string;
     end_time?: string;
   }) => {
-    return apiClient.post<SchedulePreview>('/admin/crawler/workflow/schedules/preview', data);
+    return client.post<SchedulePreview>('/admin/crawler/workflow/schedules/preview', data);
   },
 
   generateCronExpression: async (data: CronExpressionRequest) => {
-    return apiClient.post<CronExpressionResponse>('/admin/crawler/workflow/schedules/cron/generate', data);
+    return client.post<CronExpressionResponse>('/admin/crawler/workflow/schedules/cron/generate', data);
   },
 
   getSchedulerStatus: async () => {
-    return apiClient.get<SchedulerStatus>('/admin/crawler/workflow/schedules/status');
+    return client.get<SchedulerStatus>('/admin/crawler/workflow/schedules/status');
   },
 };
