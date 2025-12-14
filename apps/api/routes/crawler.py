@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from packages.agent_fishing.tools.lure.orm.session import get_db_session
 from packages.agent_fishing.tools.lure.orm.repositories.crawler_repo import CrawlerRepository
-from packages.agent_fishing.tools.lure.models.system import CrawlerTask
+from packages.agent_fishing.tools.lure.models.system import CrawlerTask, TaskStatus
 
 from apps.api.schemas.crawler import (
     CrawlerTaskCreate,
@@ -228,7 +228,7 @@ async def retry_task(
             if not task:
                 raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
 
-            if task.status != 'failed':
+            if task.status != TaskStatus.FAILED:
                 raise HTTPException(
                     status_code=400,
                     detail=f"只能重试失败任务，当前状态: {task.status}"
@@ -333,7 +333,7 @@ async def delete_task(
             if not task:
                 raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
 
-            if task.status == 'running':
+            if task.status == TaskStatus.RUNNING:
                 raise HTTPException(
                     status_code=400,
                     detail="无法删除正在运行的任务"
@@ -415,7 +415,7 @@ async def websocket_crawler_progress(websocket: WebSocket, task_id: int):
                 })
 
                 # 任务结束时断开连接
-                if task.status in ['success', 'failed']:
+                if task.status in [TaskStatus.SUCCESS, TaskStatus.FAILED]:
                     logger.info(
                         f"任务已完成，关闭 WebSocket: task_id={task_id}, "
                         f"status={task.status}"
@@ -462,28 +462,26 @@ async def create_workflow_template(
         WorkflowTemplateResponse: 创建的模板
     """
     try:
-        db = get_db()
-        workflow_manager = WorkflowManager(db)
+        with get_db_session() as session:
+            workflow_manager = WorkflowManager(session)
 
-        # 转换为字典格式保存
-        workflow_def = template.workflow_def.dict()
+            # 转换为字典格式保存
+            workflow_def = template.workflow_def.dict()
 
-        template_id = workflow_manager.save_workflow_template(
-            name=template.name,
-            description=template.description,
-            workflow_def=workflow_def,
-            category=template.category,
-            tags=template.tags,
-            created_by=current_user.user_id
-        )
+            template_id = workflow_manager.save_workflow_template(
+                name=template.name,
+                description=template.description,
+                workflow_def=workflow_def,
+                category=template.category
+            )
 
-        if not template_id:
-            raise HTTPException(status_code=500, detail="创建工作流模板失败")
+            if not template_id:
+                raise HTTPException(status_code=500, detail="创建工作流模板失败")
 
-        # 获取创建的模板
-        created_template = db.query(CrawlerWorkflowTemplate).filter(
-            CrawlerWorkflowTemplate.id == template_id
-        ).first()
+            # 获取创建的模板
+            created_template = session.query(CrawlerWorkflowTemplate).filter(
+                CrawlerWorkflowTemplate.id == template_id
+            ).first()
 
         return _build_template_response(created_template)
 
@@ -729,10 +727,10 @@ async def execute_workflow(
         ).all()
 
         task_count = len(tasks)
-        completed_count = len([t for t in tasks if t.status == 'success'])
-        failed_count = len([t for t in tasks if t.status == 'failed'])
-        running_count = len([t for t in tasks if t.status == 'running'])
-        pending_count = len([t for t in tasks if t.status == 'pending'])
+        completed_count = len([t for t in tasks if t.status == TaskStatus.SUCCESS])
+        failed_count = len([t for t in tasks if t.status == TaskStatus.FAILED])
+        running_count = len([t for t in tasks if t.status == TaskStatus.RUNNING])
+        pending_count = len([t for t in tasks if t.status == TaskStatus.PENDING])
 
         # 获取模板信息
         template = db.query(CrawlerWorkflowTemplate).filter(
@@ -742,7 +740,7 @@ async def execute_workflow(
         return WorkflowExecutionResponse(
             workflow_id=workflow_id,
             template_id=request.template_id,
-            status='running',
+            status=TaskStatus.RUNNING,
             created_at=datetime.utcnow(),
             task_count=task_count,
             completed_count=completed_count,
@@ -794,14 +792,14 @@ async def get_workflow_status(
 
         # 计算整体状态
         statuses = [t.status for t in tasks]
-        if 'failed' in statuses:
-            status = 'failed'
-        elif 'running' in statuses:
-            status = 'running'
-        elif 'pending' in statuses:
-            status = 'running'
+        if TaskStatus.FAILED in statuses:
+            status = TaskStatus.FAILED
+        elif TaskStatus.RUNNING in statuses:
+            status = TaskStatus.RUNNING
+        elif TaskStatus.PENDING in statuses:
+            status = TaskStatus.RUNNING
         else:
-            status = 'success'
+            status = TaskStatus.SUCCESS
 
         # 构建任务状态列表
         task_statuses = []
@@ -823,7 +821,7 @@ async def get_workflow_status(
 
         # 计算进度
         total_tasks = len(tasks)
-        completed_tasks = len([t for t in tasks if t.status in ['success', 'failed']])
+        completed_tasks = len([t for t in tasks if t.status in [TaskStatus.SUCCESS, TaskStatus.FAILED]])
         progress = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
 
         return WorkflowStatusResponse(
@@ -891,11 +889,11 @@ async def cancel_workflow(
         # 取消所有未开始的任务
         tasks = db.query(CrawlerTask).filter(
             CrawlerTask.workflow_id == workflow_id,
-            CrawlerTask.status.in_(['pending', 'running'])
+            CrawlerTask.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING])
         ).all()
 
         for task in tasks:
-            task.status = 'failed'
+            task.status = TaskStatus.FAILED
             task.error_message = "用户取消"
             task.end_time = datetime.utcnow()
 

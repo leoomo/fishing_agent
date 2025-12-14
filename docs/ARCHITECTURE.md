@@ -1,6 +1,6 @@
 # 智能钓鱼助手 - 项目架构文档
 
-**版本**: v5.0.0
+**版本**: v5.0.1
 **分支**: feature/equipment-ui
 **目标**: 为大模型(LLM)提供完整的项目架构理解指南
 **架构**: 模块化 Agent 包 + FastAPI 后端 + React管理前端 + JWT认证系统 + 工作流管理系统 + 数据分析 + 配置管理
@@ -264,8 +264,16 @@ fishing-agent/
 │       ├── routes/                # API 路由
 │       │   ├── auth.py           # 认证路由
 │       │   ├── fishing.py        # 钓鱼助手路由
-│       │   └── user_equipment.py # 用户装备路由
-│       └── schemas/               # 数据模型
+│       │   ├── user_equipment.py # 用户装备路由
+│       │   ├── crawler.py        # 爬虫管理路由
+│       │   ├── analytics.py      # 数据分析路由
+│       │   ├── config.py         # 配置管理路由
+│       │   └── monitor.py        # 监控管理路由
+│       ├── schemas/               # 数据模型
+│       └── services/              # 业务服务层
+│           ├── analytics_service.py # 数据分析服务
+│           ├── config_service.py    # 配置管理服务
+│           └── crawler_service.py   # 爬虫管理服务
 ├── shared/                        # 共享资源（新增）
 │   ├── config/                    # 全局配置
 │   └── data/                      # 共享数据
@@ -824,7 +832,217 @@ echo "✅ v3.1.1 架构验证完成"
 
 ---
 
-## 8. LLM导航指南
+## 8. 工作流管理系统架构 (v5.0新增)
+
+### 🔄 工作流管理核心组件
+
+#### **系统架构**
+```python
+# 工作流核心组件
+packages/agent_fishing/tools/crawler/
+├── workflow/
+│   ├── manager.py          # 工作流管理器
+│   ├── executor.py         # 执行引擎
+│   ├── scheduler.py        # 任务调度器
+│   └── validator.py        # 工作流验证
+├── executor/
+│   ├── task_queue.py       # 任务队列
+│   └── workers.py          # 工作进程
+└── models/
+    └── workflow.py         # 工作流数据模型
+```
+
+#### **核心特性**
+1. **DAG执行引擎** - 支持复杂依赖关系的任务调度
+2. **可视化编排** - 基于React的拖拽式工作流设计器
+3. **实时监控** - WebSocket实时推送执行状态
+4. **版本管理** - 工作流模板版本控制和回滚
+5. **错误恢复** - 自动重试和断点续传
+
+#### **工作流执行流程**
+```python
+# 工作流执行示例
+from packages.agent_fishing.tools.crawler.workflow.manager import WorkflowManager
+
+workflow = WorkflowManager()
+execution = workflow.execute_template(
+    template_id=1,
+    params={"override_config": {...}}
+)
+
+# 执行状态监控
+while execution.status == "running":
+    status = workflow.get_status(execution.id)
+    print(f"进度: {status.progress}")
+    time.sleep(1)
+```
+
+#### **数据库模型**
+```python
+# 工作流相关表结构
+class CrawlerWorkflowTemplate(Base):
+    __tablename__ = "crawler_workflow_templates"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    steps = Column(JSON, nullable=False)  # DAG步骤定义
+    is_active = Column(Boolean, default=True)
+
+class CrawlerSchedule(Base):
+    __tablename__ = "crawler_schedules"
+
+    id = Column(Integer, primary_key=True)
+    template_id = Column(Integer, ForeignKey("crawler_workflow_templates.id"))
+    cron_expression = Column(String(100), nullable=False)
+    timezone = Column(String(50), default="Asia/Shanghai")
+```
+
+#### **API架构层**
+```python
+# apps/api/routes/crawler.py
+@router.post("/workflows/templates")
+async def create_workflow_template(
+    request: WorkflowTemplateCreate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_MANAGE))
+):
+    """创建工作流模板"""
+    service = CrawlerService(db)
+    return await service.create_workflow_template(request.dict())
+
+@router.post("/workflows/execute")
+async def execute_workflow(
+    request: WorkflowExecutionRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """执行工作流"""
+    manager = WorkflowManager(db)
+    execution = await manager.execute_template(
+        template_id=request.template_id,
+        params=request.params or {}
+    )
+    return execution
+```
+
+### 🌐 WebSocket实时推送
+
+#### **连接管理**
+```python
+# apps/api/websocket/manager.py
+class WebSocketManager:
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+
+    async def connect(self, websocket: WebSocket, client_id: str):
+        await websocket.accept()
+        self.active_connections[client_id] = websocket
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.values():
+            await connection.send_json(message)
+
+# 实时推送工作流状态
+async def push_workflow_status(execution_id: str, status: dict):
+    await websocket_manager.broadcast({
+        "type": "workflow_status",
+        "execution_id": execution_id,
+        "data": status
+    })
+```
+
+### 📱 React前端集成
+
+#### **工作流设计器组件**
+```typescript
+// apps/web-admin/src/components/WorkflowDesigner/index.tsx
+import { FlowEditor } from '@flow-designer/react';
+
+export const WorkflowDesigner: React.FC = () => {
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+
+  const handleSave = async () => {
+    const workflowData = {
+      name: workflowName,
+      steps: convertToWorkflowFormat(nodes, edges)
+    };
+
+    await api.post('/workflows/templates', workflowData);
+  };
+
+  return (
+    <FlowEditor
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={setNodes}
+      onEdgesChange={setEdges}
+    />
+  );
+};
+```
+
+#### **实时监控组件**
+```typescript
+// apps/web-admin/src/components/WorkflowMonitor/index.tsx
+export const WorkflowMonitor: React.FC = () => {
+  const [executions, setExecutions] = useState([]);
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8000/ws/monitor');
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'workflow_status') {
+        updateExecutionStatus(data.execution_id, data.data);
+      }
+    };
+
+    return () => ws.close();
+  }, []);
+
+  return (
+    <Table
+      dataSource={executions}
+      columns={workflowColumns}
+    />
+  );
+};
+```
+
+### 🛠️ 调度系统
+
+#### **APScheduler集成**
+```python
+# packages/agent_fishing/tools/crawler/scheduler.py
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+class WorkflowScheduler:
+    def __init__(self):
+        self.scheduler = AsyncIOScheduler()
+        self.scheduler.start()
+
+    def add_scheduled_job(
+        self,
+        schedule_id: int,
+        cron_expression: str,
+        timezone: str = "Asia/Shanghai"
+    ):
+        trigger = CronTrigger.from_crontab(cron_expression)
+        self.scheduler.add_job(
+            func=self.execute_scheduled_workflow,
+            trigger=trigger,
+            args=[schedule_id],
+            id=f"schedule_{schedule_id}",
+            timezone=timezone
+        )
+```
+
+---
+
+## 9. LLM导航指南
 
 ### 🎯 LLM理解辅助
 

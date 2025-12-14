@@ -10,6 +10,7 @@
 - [认证 API](#认证-api)
 - [用户装备管理 API](#用户装备管理-api)
 - [爬虫管理 API](#爬虫管理-api)
+- [工作流管理 API](#工作流管理-api)
 - [监控管理 API](#监控管理-api)
 - [数据分析管理 API](#数据分析管理-api)
 - [配置管理 API](#配置管理-api)
@@ -353,6 +354,295 @@ Authorization: Bearer <token>
     "jd": 500,
     "forum": 200
   }
+}
+```
+
+## 工作流管理 API
+
+### 1. 创建工作流模板
+
+创建新的工作流模板。
+
+```http
+POST /api/v1/admin/crawler/workflows/templates
+Authorization: Bearer <token>
+```
+
+**请求体**:
+```json
+{
+  "name": "商品数据爬取工作流",
+  "description": "定期爬取电商平台商品数据",
+  "steps": [
+    {
+      "name": "爬取淘宝商品",
+      "task_type": "taobao",
+      "config": {
+        "keywords": ["路亚竿", "渔轮"],
+        "max_pages": 5
+      },
+      "depends_on": []
+    },
+    {
+      "name": "爬取京东商品",
+      "task_type": "jd",
+      "config": {
+        "keywords": ["路亚竿", "渔轮"],
+        "max_pages": 3
+      },
+      "depends_on": []
+    },
+    {
+      "name": "数据整合",
+      "task_type": "data_merge",
+      "config": {},
+      "depends_on": ["爬取淘宝商品", "爬取京东商品"]
+    }
+  ]
+}
+```
+
+**响应示例**:
+```json
+{
+  "id": 1,
+  "name": "商品数据爬取工作流",
+  "description": "定期爬取电商平台商品数据",
+  "steps": [...],
+  "is_active": true,
+  "created_at": "2024-12-14T10:00:00Z",
+  "updated_at": "2024-12-14T10:00:00Z"
+}
+```
+
+### 2. 获取工作流模板列表
+
+查询所有工作流模板。
+
+```http
+GET /api/v1/admin/crawler/workflows/templates?page=1&page_size=10
+Authorization: Bearer <token>
+```
+
+**查询参数**:
+- `page`: 页码（默认 1）
+- `page_size`: 每页数量（默认 10）
+- `is_active`: 是否激活（可选）
+
+### 3. 更新工作流模板
+
+更新现有的工作流模板。
+
+```http
+PUT /api/v1/admin/crawler/workflows/templates/{template_id}
+Authorization: Bearer <token>
+```
+
+**请求体**: 与创建模板相同的结构
+
+### 4. 删除工作流模板
+
+删除指定的工作流模板。
+
+```http
+DELETE /api/v1/admin/crawler/workflows/templates/{template_id}
+Authorization: Bearer <token>
+```
+
+### 5. 执行工作流
+
+手动触发工作流执行。
+
+```http
+POST /api/v1/admin/crawler/workflows/execute
+Authorization: Bearer <token>
+```
+
+**请求体**:
+```json
+{
+  "template_id": 1,
+  "params": {
+    "override_config": {
+      "max_pages": 10
+    }
+  }
+}
+```
+
+**响应示例**:
+```json
+{
+  "execution_id": "exec_20241214_001",
+  "template_id": 1,
+  "status": "running",
+  "started_at": "2024-12-14T11:00:00Z"
+}
+```
+
+### 6. 查询工作流执行状态
+
+获取工作流的执行状态和进度。
+
+```http
+GET /api/v1/admin/crawler/workflows/status/{execution_id}
+Authorization: Bearer <token>
+```
+
+**响应示例**:
+```json
+{
+  "execution_id": "exec_20241214_001",
+  "template_id": 1,
+  "status": "running",
+  "progress": {
+    "total_steps": 3,
+    "completed_steps": 2,
+    "current_step": "数据整合"
+  },
+  "step_statuses": [
+    {
+      "step_name": "爬取淘宝商品",
+      "status": "completed",
+      "started_at": "2024-12-14T11:00:00Z",
+      "completed_at": "2024-12-14T11:05:00Z"
+    },
+    {
+      "step_name": "爬取京东商品",
+      "status": "completed",
+      "started_at": "2024-12-14T11:00:00Z",
+      "completed_at": "2024-12-14T11:04:00Z"
+    },
+    {
+      "step_name": "数据整合",
+      "status": "running",
+      "started_at": "2024-12-14T11:05:00Z"
+    }
+  ],
+  "logs": [
+    {
+      "timestamp": "2024-12-14T11:05:00Z",
+      "level": "INFO",
+      "message": "开始执行数据整合步骤"
+    }
+  ]
+}
+```
+
+### 7. 停止工作流执行
+
+停止正在执行的工作流。
+
+```http
+POST /api/v1/admin/crawler/workflows/stop/{execution_id}
+Authorization: Bearer <token>
+```
+
+### 8. 创建调度任务
+
+为工作流创建定时调度。
+
+```http
+POST /api/v1/admin/crawler/schedules
+Authorization: Bearer <token>
+```
+
+**请求体**:
+```json
+{
+  "name": "每日商品数据同步",
+  "template_id": 1,
+  "cron_expression": "0 2 * * *",
+  "timezone": "Asia/Shanghai",
+  "is_active": true,
+  "params": {
+    "notification_email": "admin@example.com"
+  }
+}
+```
+
+**Cron表达式说明**:
+- 格式: `分 时 日 月 周`
+- 示例: `0 2 * * *` (每天凌晨2点执行)
+
+### 9. 获取调度列表
+
+查询所有调度任务。
+
+```http
+GET /api/v1/admin/crawler/schedules?page=1&page_size=10
+Authorization: Bearer <token>
+```
+
+**响应示例**:
+```json
+{
+  "schedules": [
+    {
+      "id": 1,
+      "name": "每日商品数据同步",
+      "template_id": 1,
+      "template_name": "商品数据爬取工作流",
+      "cron_expression": "0 2 * * *",
+      "timezone": "Asia/Shanghai",
+      "is_active": true,
+      "last_run": "2024-12-14T02:00:00Z",
+      "next_run": "2024-12-15T02:00:00Z",
+      "created_at": "2024-12-10T10:00:00Z"
+    }
+  ],
+  "total": 5,
+  "page": 1,
+  "page_size": 10
+}
+```
+
+### 10. 更新调度任务
+
+修改调度任务配置。
+
+```http
+PUT /api/v1/admin/crawler/schedules/{schedule_id}
+Authorization: Bearer <token>
+```
+
+### 11. 删除调度任务
+
+删除指定的调度任务。
+
+```http
+DELETE /api/v1/admin/crawler/schedules/{schedule_id}
+Authorization: Bearer <token>
+```
+
+### 12. 预览调度时间
+
+预览Cron表达式的未来执行时间。
+
+```http
+POST /api/v1/admin/crawler/schedules/preview
+Authorization: Bearer <token>
+```
+
+**请求体**:
+```json
+{
+  "cron_expression": "0 2 * * *",
+  "timezone": "Asia/Shanghai",
+  "count": 5
+}
+```
+
+**响应示例**:
+```json
+{
+  "next_runs": [
+    "2024-12-15T02:00:00+08:00",
+    "2024-12-16T02:00:00+08:00",
+    "2024-12-17T02:00:00+08:00",
+    "2024-12-18T02:00:00+08:00",
+    "2024-12-19T02:00:00+08:00"
+  ]
 }
 ```
 

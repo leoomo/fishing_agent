@@ -279,11 +279,238 @@ cp .env.example .env
 # 重新编辑配置
 ```
 
+### 5. 初始化数据库（可选）
+
+系统会自动创建和初始化数据库，但如果需要重新初始化：
+
+```bash
+# 初始化装备数据库
+uv run python -c "
+from packages.agent_fishing.tools.lure.database import init_database
+init_database()
+print('数据库初始化完成')
+"
+```
+
+### 6. 创建管理员用户（生产环境）
+
+在生产环境中，需要创建管理员用户：
+
+```bash
+# 使用Python脚本创建
+uv run python -c "
+import bcrypt
+from packages.agent_fishing.tools.lure.database import get_db
+from packages.agent_fishing.tools.lure.models.system import AdminUser
+
+# 获取数据库连接
+db = get_db()
+
+# 创建管理员用户
+password = 'admin123'  # 请使用强密码
+hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+admin = AdminUser(
+    username='admin',
+    email='admin@example.com',
+    password_hash=hashed_password.decode('utf-8'),
+    role='admin',
+    is_active=True
+)
+
+db.add(admin)
+db.commit()
+print('管理员用户创建成功')
+"
+```
+
+## JWT认证配置
+
+### 生成安全的JWT密钥
+
+```bash
+# 生成32字符的随机密钥
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+将生成的密钥添加到 `.env` 文件：
+
+```bash
+JWT_SECRET_KEY=your-generated-secret-key-here
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+```
+
+### 测试JWT认证
+
+```bash
+# 1. 登录获取Token
+curl -X POST http://localhost:8000/api/v1/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{
+       "username": "admin",
+       "password": "admin123"
+     }'
+
+# 2. 使用Token访问受保护的API
+TOKEN="your-jwt-token-here"
+curl -X GET http://localhost:8000/api/v1/auth/me \
+     -H "Authorization: Bearer $TOKEN"
+```
+
+## 工作流管理系统
+
+### 创建第一个工作流
+
+```bash
+# 使用API创建工作流模板
+curl -X POST http://localhost:8000/api/v1/admin/crawler/workflows/templates \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "测试爬虫工作流",
+       "description": "简单的测试工作流",
+       "steps": [
+         {
+           "name": "爬取测试数据",
+           "task_type": "taobao",
+           "config": {
+             "keywords": ["路亚竿"],
+             "max_pages": 1
+           },
+           "depends_on": []
+         }
+       ]
+     }'
+```
+
+### 创建定时调度
+
+```bash
+# 创建每日执行的任务
+curl -X POST http://localhost:8000/api/v1/admin/crawler/schedules \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "每日数据同步",
+       "template_id": 1,
+       "cron_expression": "0 2 * * *",
+       "timezone": "Asia/Shanghai",
+       "is_active": true
+     }'
+```
+
+## React管理前端
+
+### 启动前端开发服务器
+
+```bash
+cd apps/web-admin
+
+# 安装依赖（首次运行）
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 访问 http://localhost:5173
+```
+
+### 前端功能概览
+
+1. **登录页面**
+   - 默认用户: `admin`
+   - 默认密码: `admin123`
+
+2. **仪表板**
+   - 系统概览
+   - 实时监控数据
+   - 快速操作入口
+
+3. **装备管理**
+   - 装备列表
+   - 添加/编辑装备
+   - 装备分类管理
+
+4. **爬虫管理**
+   - 任务列表
+   - 执行日志
+   - 工作流管理
+
+5. **数据分析**
+   - 装备统计
+   - 趋势分析
+   - 报表生成
+
+6. **系统配置**
+   - API密钥管理
+   - 系统参数设置
+   - 用户管理
+
+## 部署配置
+
+### Docker部署
+
+```dockerfile
+# Dockerfile示例
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 安装uv
+COPY pyproject.toml ./
+RUN pip install uv && uv sync --frozen
+
+# 复制源代码
+COPY . .
+
+# 运行应用
+CMD ["uv", "run", "uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+```bash
+# 构建和运行
+docker build -t fishing-agent .
+docker run -p 8000:8000 -v $(pwd)/.env:/app/.env fishing-agent
+```
+
+### 环境变量清单
+
+生产环境需要配置的所有环境变量：
+
+```bash
+# === 核心API服务 ===
+CAIYUN_API_KEY=xxx
+AMAP_API_KEY=xxx
+DASHSCOPE_API_KEY=xxx
+
+# === LLM提供商（至少配置一个） ===
+ANTHROPIC_AUTH_TOKEN=xxx  # 智谱AI
+OPENAI_API_KEY=xxx        # OpenAI
+
+# === JWT认证（必需） ===
+JWT_SECRET_KEY=xxx
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# === 可选配置 ===
+LOG_LEVEL=INFO
+CACHE_TTL=3600
+
+# === 向量存储 ===
+VECTOR_EMBEDDING_MODEL=text-embedding-v3
+VECTOR_AUTO_INDEX=true
+
+# === 数据库配置（使用SQLite默认值） ===
+DATABASE_URL=sqlite:///packages/agent_fishing/tools/lure/data/equipment.db
+```
+
 ## 下一步
 
 - 查看 [API 参考](./API_REFERENCE.md) 了解所有可用接口
 - 阅读 [用户指南](./USER_GUIDE.md) 学习高级功能
 - 浏览 [架构文档](./ARCHITECTURE.md) 理解系统设计
+- 查看 [故障排除指南](./TROUBLESHOOTING.md) 解决常见问题
 
 ## 获取帮助
 

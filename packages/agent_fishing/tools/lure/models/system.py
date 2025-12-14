@@ -13,10 +13,10 @@ from .base import Base, TimestampMixin
 # Enumerations
 class TaskStatus(str, enum.Enum):
     """Crawler task status"""
-    PENDING = "pending"
-    RUNNING = "running"
-    SUCCESS = "success"
-    FAILED = "failed"
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
 
 
 class LogLevel(str, enum.Enum):

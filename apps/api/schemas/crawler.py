@@ -3,7 +3,7 @@
 """
 
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
 
 
@@ -85,7 +85,8 @@ class WorkflowStepDefinition(BaseModel):
     depends_on: List[str] = Field(default_factory=list, description="依赖的步骤ID列表")
     condition: Optional[str] = Field(None, description="执行条件（可选）")
 
-    @validator('depends_on')
+    @field_validator('depends_on')
+    @classmethod
     def validate_dependencies(cls, v):
         """验证依赖关系不能循环"""
         # 这里可以添加更复杂的循环依赖检测
@@ -99,11 +100,13 @@ class WorkflowTemplateDefinition(BaseModel):
     version: str = "1.0"
     steps: List[WorkflowStepDefinition]
 
-    @validator('steps')
+    @field_validator('steps')
+    @classmethod
     def validate_steps(cls, v):
         """验证步骤定义"""
+        # 允许创建空的模板，后续可以添加步骤
         if not v:
-            raise ValueError("工作流必须包含至少一个步骤")
+            return v
 
         # 检查步骤ID唯一性
         step_ids = [step.id for step in v]
@@ -131,12 +134,13 @@ class WorkflowTemplateCreate(WorkflowTemplateBase):
     """创建工作流模板请求"""
     workflow_def: WorkflowTemplateDefinition
 
-    @validator('workflow_def')
-    def validate_workflow_consistency(cls, v, values):
+    @field_validator('workflow_def')
+    @classmethod
+    def validate_workflow_consistency(cls, v, info):
         """验证工作流定义与基本信息的一致性"""
-        if v.name != values.get('name'):
+        if v.name != info.data.get('name'):
             raise ValueError("工作流定义中的名称必须与模板名称一致")
-        if v.version != values.get('version'):
+        if v.version != info.data.get('version'):
             raise ValueError("工作流定义中的版本必须与模板版本一致")
         return v
 
@@ -231,7 +235,8 @@ class ScheduleCreate(ScheduleBase):
     """创建调度请求"""
     description: Optional[str] = Field(None, description="调度描述")
 
-    @validator('cron_expression')
+    @field_validator('cron_expression')
+    @classmethod
     def validate_cron(cls, v):
         """验证Cron表达式"""
         # 简单验证，实际使用时可以用croniter验证
