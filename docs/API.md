@@ -26,6 +26,7 @@ Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推�
 - 🕷️ **爬虫管理**: 多平台爬虫任务调度和监控
 - 📊 **系统监控**: API统计、LLM使用统计、数据库性能监控
 - 🔌 **WebSocket**: 实时推送爬虫进度和监控数据
+- 🔄 **工作流管理**: 可视化工作流编排、DAG依赖管理、任务调度系统
 - 🧠 **LLM 优化**: 高质量的自然语言处理
 - 🛠️ **调试工具**: 完整的开发调试支持
 
@@ -40,7 +41,7 @@ Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推�
 ```json
 {
   "name": "智能钓鱼助手 API",
-  "version": "3.1.1",
+  "version": "5.0.0",
   "description": "基于LangChain 1.0+和动态Prompt中间件的智能钓鱼助手",
   "features": [
     "动态Prompt中间件",
