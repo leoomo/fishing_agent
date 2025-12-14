@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Card, Typography, Tag, Space, Tooltip, Badge } from 'antd';
-import { WorkflowStep } from '../api/workflow';
+import type { WorkflowStep } from '../api/workflow';
 
 const { Title, Text } = Typography;
 

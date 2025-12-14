@@ -515,35 +515,35 @@ async def list_workflow_templates(
         PaginatedResponse: 模板列表
     """
     try:
-        db = get_db()
-        query = db.query(CrawlerWorkflowTemplate)
+        with get_db_session() as session:
+            query = session.query(CrawlerWorkflowTemplate)
 
-        # 筛选条件
-        if category:
-            query = query.filter(CrawlerWorkflowTemplate.category == category)
-        if is_active is not None:
-            query = query.filter(CrawlerWorkflowTemplate.is_active == is_active)
-        if search:
-            query = query.filter(
-                CrawlerWorkflowTemplate.name.contains(search) |
-                CrawlerWorkflowTemplate.description.contains(search)
+            # 筛选条件
+            if category:
+                query = query.filter(CrawlerWorkflowTemplate.category == category)
+            if is_active is not None:
+                query = query.filter(CrawlerWorkflowTemplate.is_active == is_active)
+            if search:
+                query = query.filter(
+                    CrawlerWorkflowTemplate.name.contains(search) |
+                    CrawlerWorkflowTemplate.description.contains(search)
+                )
+
+            # 计算总数
+            total = query.count()
+
+            # 分页
+            templates = query.order_by(CrawlerWorkflowTemplate.created_at.desc()).offset(
+                (page - 1) * page_size
+            ).limit(page_size).all()
+
+            return PaginatedResponse(
+                items=[_build_template_response(t) for t in templates],
+                total=total,
+                page=page,
+                size=page_size,
+                pages=(total + page_size - 1) // page_size
             )
-
-        # 计算总数
-        total = query.count()
-
-        # 分页
-        templates = query.order_by(CrawlerWorkflowTemplate.created_at.desc()).offset(
-            (page - 1) * page_size
-        ).limit(page_size).all()
-
-        return PaginatedResponse(
-            items=[_build_template_response(t) for t in templates],
-            total=total,
-            page=page,
-            size=page_size,
-            pages=(total + page_size - 1) // page_size
-        )
 
     except Exception as e:
         logger.error(f"查询工作流模板失败: {e}", exc_info=True)
@@ -1413,18 +1413,19 @@ def _build_task_response(task: CrawlerTask) -> CrawlerTaskResponse:
 
 def _build_template_response(template: CrawlerWorkflowTemplate) -> WorkflowTemplateResponse:
     """构造模板响应对象"""
+    workflow_def = json.loads(template.template_json) if template.template_json else {}
     return WorkflowTemplateResponse(
         id=template.id,
         name=template.name,
         description=template.description,
-        category=template.category,
-        version=template.version,
-        tags=template.tags,
-        workflow_def=json.loads(template.template_json) if template.template_json else {},
-        created_by=template.created_by,
+        category=template.category or 'custom',
+        version=workflow_def.get('version', '1.0'),
+        tags=workflow_def.get('tags', []),
+        workflow_def=workflow_def,
+        created_by=str(template.created_by) if template.created_by else None,
         created_at=template.created_at,
         updated_at=template.updated_at,
-        is_active=template.is_active,
+        is_active=not template.is_system,  # 非系统模板默认活跃
         usage_count=template.usage_count
     )
 

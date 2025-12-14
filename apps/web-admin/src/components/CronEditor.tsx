@@ -20,7 +20,8 @@ import {
   ClockCircleOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons';
-import { workflowApi, CronExpressionRequest, CronExpressionResponse } from '../api/workflow';
+import { workflowApi } from '../api/workflow';
+import type { CronExpressionRequest, CronExpressionResponse } from '../api/workflow';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;

@@ -28,7 +28,8 @@ import {
   EyeOutlined,
   BranchesOutlined,
 } from '@ant-design/icons';
-import { workflowApi, WorkflowTemplate, CreateWorkflowTemplateRequest } from '../../api/workflow';
+import { workflowApi } from '../../api/workflow';
+import type { WorkflowTemplate, CreateWorkflowTemplateRequest } from '../../api/workflow';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;

@@ -28,7 +28,8 @@ import {
   EyeOutlined,
   HistoryOutlined,
 } from '@ant-design/icons';
-import { workflowApi, Schedule, CreateScheduleRequest, WorkflowTemplate } from '../../api/workflow';
+import { workflowApi } from '../../api/workflow';
+import type { Schedule, CreateScheduleRequest, WorkflowTemplate } from '../../api/workflow';
 import CronEditor from '../../components/CronEditor';
 import { formatDateTime } from '../../utils/date';
 

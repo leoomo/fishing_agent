@@ -27,7 +27,8 @@ import {
   SearchOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
-import { workflowApi, WorkflowStatus, WorkflowTaskStatus } from '../../api/workflow';
+import { workflowApi } from '../../api/workflow';
+import type { WorkflowStatus, WorkflowTaskStatus } from '../../api/workflow';
 import { formatDateTime } from '../../utils/date';
 
 const { Title, Text } = Typography;
