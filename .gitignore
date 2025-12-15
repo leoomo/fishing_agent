@@ -242,6 +242,9 @@ logs/
 runtime/
 run/
 
+# Downloaded images from crawler
+shared/images/
+
 # Backup files
 *.bak
 *.backup

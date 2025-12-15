@@ -134,7 +134,7 @@ def main():
     total_success = 0
     total_fail = 0
     all_equipment_list = []
-
+ 
     # 根据模式执行不同的爬取逻辑
     if CRAWLER_MODE == "keyword_search":
         # 关键词搜索模式

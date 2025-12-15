@@ -273,7 +273,7 @@ class ImageDownloader:
         """
         try:
             # 获取完整路径
-            full_path = Path(self.storage.base_dir) / relative_path
+            full_path = Path(self.storage.base_path) / relative_path
             return full_path.exists() and full_path.is_file()
         except Exception:
             return False
