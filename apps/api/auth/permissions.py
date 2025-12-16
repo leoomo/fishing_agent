@@ -63,6 +63,9 @@ class PermissionEnum(str, Enum):
     DATA_IMPORT = "data:import"
     DATA_EXPORT = "data:export"
 
+    # OCR
+    OCR_USE = "ocr:use"
+
 
 # Role-permission mapping
 ROLE_PERMISSIONS: dict[RoleEnum, Set[PermissionEnum]] = {
@@ -100,6 +103,9 @@ ROLE_PERMISSIONS: dict[RoleEnum, Set[PermissionEnum]] = {
 
         # Export data
         PermissionEnum.DATA_EXPORT,
+
+        # OCR
+        PermissionEnum.OCR_USE,
     },
 
     RoleEnum.READONLY: {
@@ -112,6 +118,9 @@ ROLE_PERMISSIONS: dict[RoleEnum, Set[PermissionEnum]] = {
         PermissionEnum.MONITOR_READ,
         PermissionEnum.ANALYTICS_READ,
         PermissionEnum.CONFIG_READ,
+
+        # OCR
+        PermissionEnum.OCR_USE,
     }
 }
 

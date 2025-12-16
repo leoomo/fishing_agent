@@ -1,13 +1,14 @@
-# Fishing Agent - 智能钓鱼助手 v5.0.1
+# Fishing Agent - 智能钓鱼助手 v5.0.2
 
 基于 LangChain 1.0+ 的智能钓鱼助手，提供钓鱼时间推荐、天气分析和路亚装备管理功能。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v5.0.1 + JWT认证系统 + React管理前端 + 7因子科学评分 + 工作流管理系统**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v5.0.2 + JWT认证系统 + React管理前端 + 7因子科学评分 + 智能图片合并 + 工作流管理系统**
 
 ## 🌟 核心特性
 
 - **🎣 智能钓鱼推荐** - 基于7因子科学评分体系，准确推荐最佳钓鱼时间和地点
 - **🎒 路亚装备管理** - 智能装备推荐、用户装备库、电商数据同步、装备UI优化
+- **🖼️ 智能图片合并** - 自动检测图片下方文字，智能批量合并相关图片，本地处理无需外部API
 - **📊 数据分析报表** - 装备统计、趋势分析、用户行为洞察
 - **🔐 JWT认证系统** - 完整的用户认证和RBAC权限管理
 - **🖥️ 管理前端** - 基于React的现代化管理界面（http://localhost:5173）
@@ -48,6 +49,7 @@ cd apps/web-admin && npm install && npm run dev
 
 - [📖 快速入门](docs/GETTING_STARTED.md) - 详细的安装配置指南
 - [🔧 API 参考](docs/API_REFERENCE.md) - 完整的 REST API 文档
+- [🖼️ 图片处理](docs/IMAGE_PROCESSING.md) - 智能图片合并和处理功能
 - [👥 用户指南](docs/USER_GUIDE.md) - 详细的使用说明和示例
 - [🏗️ 架构文档](docs/ARCHITECTURE.md) - 系统架构说明
 - [🔄 更新日志](CHANGELOG.md) - 版本更新记录
@@ -102,7 +104,7 @@ MIT License
 
 > 🎣 智能分析，精准钓鱼！
 >
-> 当前版本：v5.0.1 (Phase 5 数据分析和配置管理 + Phase 4 爬虫监控模块 + Phase 3 React管理前端 + Phase 2 JWT认证系统 + Phase 1 模块化Agent架构)
+> 当前版本：v5.0.2 (Phase 6 智能图片合并 + Phase 5 数据分析和配置管理 + Phase 4 爬虫监控模块 + Phase 3 React管理前端 + Phase 2 JWT认证系统 + Phase 1 模块化Agent架构)
 
 ## 🔧 工作流管理系统
 
@@ -134,6 +136,57 @@ GET    /api/v1/admin/crawler/schedules                  # 获取调度列表
 PUT    /api/v1/admin/crawler/schedules/{id}             # 更新调度
 DELETE /api/v1/admin/crawler/schedules/{id}             # 删除调度
 ```
+
+## 🖼️ 智能图片合并系统
+
+### 核心功能
+
+智能图片合并系统能够自动检测图片下方是否有文字内容，并将需要合并的图片智能批量处理，无需外部API支持。
+
+### 主要特性
+
+- **智能文字检测** - 基于图像特征和文件名规则的双重检测机制
+- **本地处理** - 无需外部API，完全本地化处理，保护隐私
+- **批量处理** - 支持大量图片的并行处理和智能分组
+- **高质量输出** - 支持JPEG/PNG格式，可配置输出质量和尺寸
+- **元数据管理** - 自动生成合并元数据，记录处理过程和统计信息
+
+### 智能分组策略
+
+1. **文字检测** - 分析图片底部20%区域，检测是否有文字内容
+2. **文件名规则** - 识别奇数编号文件，自动与下一张合并
+3. **置信度评估** - 基于暗像素比例和标准差计算检测置信度
+4. **智能决策** - 综合多种因素决定是否合并相邻图片
+
+### 使用示例
+
+```python
+from packages.agent_fishing.tools.lure import BatchMergeProcessor
+
+# 创建批处理器
+processor = BatchMergeProcessor(
+    source_dir="./images",
+    output_dir="./merged",
+    quality=95,
+    bottom_detection_ratio=0.2,
+    ocr_confidence_threshold=0.5,
+    parallel_detection=True,
+    max_workers=4
+)
+
+# 执行批处理
+result = processor.process()
+if result["success"]:
+    print(f"处理完成: {result['statistics']}")
+```
+
+### 配置参数
+
+- `bottom_detection_ratio`: 底部检测区域比例 (默认: 0.2)
+- `ocr_confidence_threshold`: OCR置信度阈值 (默认: 0.5)
+- `min_text_length`: 最小文字长度 (默认: 2)
+- `parallel_detection`: 是否并行检测 (默认: True)
+- `max_workers`: 并行检测的最大线程数 (默认: 4)
 
 ## 🐛 最近修复 (v5.0.1)
 

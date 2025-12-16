@@ -81,6 +81,7 @@ from .routes.crawler import router as crawler_router
 from .routes.monitor import router as monitor_router
 from .routes.analytics import router as analytics_router
 from .routes.config import router as config_router
+from .routes.ocr import router as ocr_router
 from .middleware import install_api_logging_middleware
 
 app = FastAPI(
@@ -124,6 +125,9 @@ app.include_router(monitor_router, prefix="/api/v1/admin/monitor", tags=["monito
 # Phase 5 数据分析和配置管理模块路由
 app.include_router(analytics_router, prefix="/api/v1/admin/analytics", tags=["analytics"])
 app.include_router(config_router, prefix="/api/v1/admin/config", tags=["config"])
+
+# OCR 图片表格识别路由
+app.include_router(ocr_router, prefix="/api/v1/ocr", tags=["ocr"])
 
 
 @app.get("/")

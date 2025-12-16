@@ -15,6 +15,7 @@ Always open `@/openspec/AGENTS.md` when the request:
 ## 核心特性
 - JWT认证系统 (RBAC权限管理 + Token安全) + 模块化Agent包 + 7因子评分 (温度/天气/风力/气压/湿度/季节/月相)
 - 时间段意图识别 (98%+准确率) + 动态Prompt中间件 + 装备管理UI优化
+- 智能图片合并 (自动检测文字 + 批量处理 + 本地化处理) + 路亚装备管理系统
 - 数据分析报表 (装备统计/趋势分析/品牌排行) + 系统配置管理 (API密钥/参数配置)
 - React管理前端 (React 19.2.0 + TypeScript + Ant Design 5.22.0) + 爬虫监控模块
 
@@ -24,6 +25,9 @@ packages/agent_fishing/     # 自包含Agent包
 ├── core/                   # agent.py, model_factory.py, prompts.py, callbacks.py
 │   └── middleware/         # dynamic_prompt.py
 ├── tools/                  # basic, weather, fishing, lure_tools, lure/, scoring/
+│   └── lure/               # 路亚装备工具
+│       ├── image_merger.py      # 图片合并核心模块 ⭐ 新增
+│       └── batch_merge_processor.py  # 批量智能合并处理器 ⭐ 新增
 └── utils/
 apps/                       # 应用层
 ├── cli/                    # CLI应用 (main.py)
@@ -64,6 +68,9 @@ from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
 from packages.agent_fishing.core import ModelFactory
 from packages.agent_fishing.tools import get_weather, query_fishing_recommendation
 from packages.agent_fishing.utils import get_coordinates, parse_date_input
+
+# 图片合并功能 ⭐ 新增
+from packages.agent_fishing.tools.lure import BatchMergeProcessor, ImageMerger
 ```
 
 ## API端点

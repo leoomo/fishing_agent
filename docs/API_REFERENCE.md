@@ -9,6 +9,7 @@
 - [核心 API](#核心-api)
 - [认证 API](#认证-api)
 - [用户装备管理 API](#用户装备管理-api)
+- [图片处理 API](#图片处理-api)
 - [爬虫管理 API](#爬虫管理-api)
 - [工作流管理 API](#工作流管理-api)
 - [监控管理 API](#监控管理-api)
@@ -168,6 +169,121 @@ Authorization: Bearer <token>
 POST /api/v1/auth/logout
 Authorization: Bearer <token>
 ```
+
+## 图片处理 API
+
+图片处理 API 提供智能图片合并和 OCR 表格识别功能。
+
+### 1. 识别图片中的表格
+
+上传装备规格表图片，自动合并多张图片并返回 Markdown 格式的表格内容。
+
+```http
+POST /api/v1/ocr/recognize-table
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+```
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| files | File[] | 否 | 图片文件列表（支持多张，自动合并） |
+| image_url | string | 否 | 图片 URL（与 files 二选一） |
+
+**支持格式**: PNG, JPG, JPEG, WebP
+**最大文件大小**: 10MB
+
+**响应示例**：
+```json
+{
+  "success": true,
+  "markdown": "| 品牌 | 型号 | 价格 |\n|------|------|------|\n| 达亿瓦 | 1000 | ¥299 |",
+  "metadata": {
+    "model": "Qwen/Qwen2-VL-72B-Instruct",
+    "processing_time_ms": 1500,
+    "images_merged": 2,
+    "image_size_bytes": 1024000
+  }
+}
+```
+
+**错误响应**：
+```json
+{
+  "success": false,
+  "error": "请提供图片文件或图片URL",
+  "error_code": "OCR_NO_INPUT"
+}
+```
+
+### 2. 检查 OCR 服务状态
+
+检查 OCR 服务是否正常配置。
+
+```http
+GET /api/v1/ocr/status
+Authorization: Bearer <token>
+```
+
+**响应示例**：
+```json
+{
+  "service": "ocr",
+  "model": "Qwen/Qwen2-VL-72B-Instruct",
+  "api_key_configured": true,
+  "timeout": 30,
+  "max_size_mb": 10,
+  "supported_formats": ["png", "jpg", "jpeg", "webp"]
+}
+```
+
+### 3. 批量智能图片合并（CLI）
+
+使用命令行工具进行批量图片合并处理。
+
+```bash
+# 安装依赖
+uv sync
+
+# 运行批处理器
+uv run python -m packages.agent_fishing.tools.lure.batch_merge_processor <source_directory>
+```
+
+**配置选项**：
+- `--output-dir`: 输出目录（默认: source_dir/merged）
+- `--quality`: 输出质量 1-100（默认: 95）
+- `--bottom-detection-ratio`: 底部检测区域比例（默认: 0.2）
+- `--ocr-confidence-threshold`: OCR置信度阈值（默认: 0.5）
+- `--parallel-detection`: 启用并行检测（默认: True）
+- `--max-workers`: 最大线程数（默认: 4）
+
+**示例**：
+```bash
+uv run python -m packages.agent_fishing.tools.lure.batch_merge_processor \
+  ./images \
+  --output-dir ./merged \
+  --quality 98 \
+  --parallel-detection \
+  --max-workers 8
+```
+
+### 智能合并功能说明
+
+1. **自动文字检测**：
+   - 分析图片底部区域，检测是否有文字内容
+   - 基于文件名规则识别奇偶编号
+   - 综合判断是否需要与下一张图片合并
+
+2. **批量处理**：
+   - 支持多线程并行处理
+   - 自动缓存检测结果
+   - 生成详细的处理元数据
+
+3. **高质量输出**：
+   - 支持 JPEG/PNG 格式
+   - 可配置输出质量和尺寸
+   - 居中对齐，白色背景
 
 ## 用户装备管理 API
 
