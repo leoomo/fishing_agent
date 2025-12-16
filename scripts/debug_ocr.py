@@ -60,28 +60,88 @@ def print_status():
     """打印 OCR 服务状态"""
     print(f"\n{Fore.CYAN}========== OCR 服务状态 =========={Style.RESET_ALL}\n")
 
-    api_key = os.getenv("SILICONFLOW_API_KEY")
-    timeout = os.getenv("SILICONFLOW_OCR_TIMEOUT", "30")
-    max_size = os.getenv("SILICONFLOW_OCR_MAX_SIZE", str(10 * 1024 * 1024))
+    # 获取当前配置的提供商
+    provider = os.getenv("OCR_PROVIDER", "ollama")
+    print(f"{Fore.YELLOW}当前提供商: {provider.upper()}{Style.RESET_ALL}")
 
-    if api_key:
-        # 隐藏部分密钥
-        masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
-        print(f"{Fore.GREEN}API 密钥: {masked_key}{Style.RESET_ALL}")
+    if provider == "ollama":
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        model = os.getenv("OLLAMA_MODEL", "deepseek-ocr")
+        timeout = os.getenv("OLLAMA_TIMEOUT", "120")
+        max_size = os.getenv("OLLAMA_MAX_SIZE", str(20 * 1024 * 1024))
+
+        print(f"服务地址: {base_url}")
+        print(f"模型: {model}")
+        print(f"超时时间: {timeout}秒")
+        print(f"最大文件大小: {int(max_size) / 1024 / 1024:.1f}MB")
+        print(f"类型: 本地OCR")
+
+        # 检查服务可用性
+        try:
+            from apps.api.services.ocr import OCRProviderFactory
+            ollama_provider = OCRProviderFactory.create_provider("ollama")
+            if ollama_provider.is_available():
+                print(f"{Fore.GREEN}状态: 可用 ✓{Style.RESET_ALL}")
+                model_info = ollama_provider.get_model_info()
+                print(f"模型详情: {model_info}")
+            else:
+                print(f"{Fore.RED}状态: 不可用 ✗{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}状态: 检查失败 - {e}{Style.RESET_ALL}")
+
+    elif provider == "siliconflow":
+        api_key = os.getenv("SILICONFLOW_API_KEY")
+        timeout = os.getenv("SILICONFLOW_OCR_TIMEOUT", "30")
+        max_size = os.getenv("SILICONFLOW_OCR_MAX_SIZE", str(10 * 1024 * 1024))
+
+        if api_key:
+            # 隐藏部分密钥
+            masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
+            print(f"{Fore.GREEN}API 密钥: {masked_key}{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.RED}API 密钥: 未配置{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}  请在 .env 中设置 SILICONFLOW_API_KEY{Style.RESET_ALL}")
+
+        print(f"模型: deepseek-ai/DeepSeek-OCR")
+        print(f"超时时间: {timeout}秒")
+        print(f"最大文件大小: {int(max_size) / 1024 / 1024:.1f}MB")
+        print(f"类型: 云端OCR")
+
+        # 检查API密钥有效性
+        try:
+            from apps.api.services.ocr import OCRProviderFactory
+            siliconflow_provider = OCRProviderFactory.create_provider("siliconflow")
+            if siliconflow_provider.is_available():
+                print(f"{Fore.GREEN}状态: 可用 ✓{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.RED}状态: 不可用 ✗{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}状态: 检查失败 - {e}{Style.RESET_ALL}")
     else:
-        print(f"{Fore.RED}API 密钥: 未配置{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}  请在 .env 中设置 SILICONFLOW_API_KEY{Style.RESET_ALL}")
+        print(f"{Fore.RED}错误: 未知的提供商 '{provider}'{Style.RESET_ALL}")
+        print(f"支持的提供商: ollama, siliconflow")
 
-    print(f"超时时间: {timeout}秒")
-    print(f"最大文件大小: {int(max_size) / 1024 / 1024:.1f}MB")
+    print(f"\n{Fore.CYAN}通用信息:{Style.RESET_ALL}")
     print(f"支持格式: PNG, JPG, JPEG, WebP")
-    print(f"模型: deepseek-ai/DeepSeek-OCR")
+    print()
+
+    # 显示所有提供商的可用性
+    try:
+        from apps.api.services.ocr import OCRProviderFactory
+        availability = OCRProviderFactory.get_available_providers()
+        print(f"{Fore.CYAN}所有提供商可用性:{Style.RESET_ALL}")
+        for provider_name, available in availability.items():
+            status = f"{Fore.GREEN}✓ 可用{Style.RESET_ALL}" if available else f"{Fore.RED}✗ 不可用{Style.RESET_ALL}"
+            print(f"  {provider_name}: {status}")
+    except Exception as e:
+        print(f"获取提供商状态失败: {e}")
+
     print()
 
 
 def batch_recognize(
     image_dir: str,
-    batch_size: int = 5,
+    batch_size: int = 2,
     output_file: str = None,
     verbose: bool = False
 ):
@@ -89,36 +149,44 @@ def batch_recognize(
     批量处理目录中的图片
 
     流程:
-    1. 使用 BatchMergeProcessor 合并图片到 merged/ 子目录
-    2. 扫描 merged/ 目录
+    1. 使用 BatchMergeProcessor 智能合并图片
+    2. 扫描合并后的图片
     3. 逐个识别合并后的图片（间隔2秒）
     4. 汇总结果输出到 Markdown
 
     Args:
         image_dir: 源图片目录
-        batch_size: 每组合并的图片数量
+        batch_size: 传统分组的大小（备用）
         output_file: 输出文件路径
         verbose: 详细日志
     """
     from apps.api.services.ocr_service import OCRService
     from packages.agent_fishing.tools.lure.batch_merge_processor import BatchMergeProcessor
 
-    print(f"\n{Fore.CYAN}========== OCR 批量处理 =========={Style.RESET_ALL}\n")
+    print(f"\n{Fore.CYAN}========== OCR 批量处理（智能合并） =========={Style.RESET_ALL}\n")
 
     image_dir = Path(image_dir)
     if not image_dir.exists():
         print(f"{Fore.RED}错误: 目录不存在 {image_dir}{Style.RESET_ALL}")
         return
 
-    # Step 1: 合并阶段
-    print(f"{Fore.YELLOW}Step 1: 合并图片{Style.RESET_ALL}")
+    # Step 1: 智能合并阶段
+    print(f"{Fore.YELLOW}Step 1: 智能合并图片{Style.RESET_ALL}")
     print(f"  源目录: {image_dir}")
-    print(f"  每组合并: {batch_size} 张")
+    print(f"  检测策略: 自动检测图片下方是否有文字")
+    print(f"  检测区域: 底部20%")
+    print(f"  置信度阈值: 0.2")
 
     try:
+        # 使用智能分组
         processor = BatchMergeProcessor(
             source_dir=str(image_dir),
-            merge_batch_size=batch_size
+            bottom_detection_ratio=0.2,
+            ocr_confidence_threshold=0.2,
+            min_text_length=1,
+            parallel_detection=True,
+            max_workers=4,
+            quality=95
         )
         result = processor.process()
 
@@ -128,17 +196,55 @@ def batch_recognize(
 
         merged_dir = processor.output_dir
         merged_files = sorted(merged_dir.glob("*.jpg"))
-        print(f"{Fore.GREEN}  合并完成: {result['statistics']['original_count']} 张 → {len(merged_files)} 张{Style.RESET_ALL}")
+        stats = result['statistics']
+
+        print(f"{Fore.GREEN}  智能合并完成:{Style.RESET_ALL}")
+        print(f"    原始图片: {stats.get('original_count', 0)} 张")
+        print(f"    合并后: {len(merged_files)} 张")
+        print(f"    检测到文字的图片: {stats.get('text_detections', 0)} 张")
+        print(f"    减少比例: {stats.get('reduction_ratio', 0):.1%}")
         print(f"  输出目录: {merged_dir}")
+
+        # 显示合并策略详情
+        print(f"\n{Fore.CYAN}合并策略详情:{Style.RESET_ALL}")
+        if 'metadata_path' in result and result['metadata_path']:
+            import json
+            with open(result['metadata_path'], 'r') as f:
+                metadata = json.load(f)
+
+            groups = metadata.get('merge_groups', [])
+            for i, group in enumerate(groups[:10]):  # 显示前10个
+                source_files = group.get('source_files', [])
+                reason = group.get('reason', '')
+                if len(source_files) > 1:
+                    print(f"  组{i+1}: {' + '.join(source_files)}")
+                    print(f"       {reason}")
+                else:
+                    print(f"  组{i+1}: {source_files[0]}")
+
+            if len(groups) > 10:
+                print(f"  ... 还有 {len(groups) - 10} 个组")
 
     except Exception as e:
         print(f"{Fore.RED}合并异常: {e}{Style.RESET_ALL}")
+        import traceback
+        traceback.print_exc()
         return
 
     # Step 2: 识别阶段
     print(f"\n{Fore.YELLOW}Step 2: OCR 识别{Style.RESET_ALL}")
     print(f"  待识别: {len(merged_files)} 张合并图片")
-    print(f"  请求间隔: 2 秒")
+
+    # 检查OCR提供商类型
+    provider_type = os.getenv("OCR_PROVIDER", "ollama")
+    is_api_mode = provider_type == "siliconflow"
+
+    if is_api_mode:
+        print(f"  模式: API模式 (SiliconFlow)")
+        print(f"  请求间隔: 3 秒（防止请求过快）")
+    else:
+        print(f"  模式: 本地模式 (Ollama)")
+        print(f"  请求间隔: 无延迟")
     print()
 
     service = OCRService()
@@ -166,9 +272,9 @@ def batch_recognize(
             })
             print(f"{Fore.RED}失败{Style.RESET_ALL}: {ocr_result.get('error')}")
 
-        # 请求间隔 2 秒
-        if i < len(merged_files):
-            time.sleep(2)
+        # 仅在API模式下添加请求间隔
+        if is_api_mode and i < len(merged_files):
+            time.sleep(3)
 
     # Step 3: 汇总结果
     success_count = sum(1 for r in all_results if r["success"])
@@ -298,6 +404,9 @@ def main():
 
   # 自定义每组合并数量
   uv run python scripts/debug_ocr.py --batch shared/images/851749152448 --batch-size 3 --output result.md
+
+  # 默认模式（合并并识别，输出到 debug_rs.md）
+  uv run python scripts/debug_ocr.py
         """
     )
 
@@ -339,6 +448,29 @@ def main():
     # 检查状态
     if args.status:
         print_status()
+        return
+
+    # 默认模式：如果没有提供任何参数，使用默认图片目录并输出到 debug_rs.md
+    if not args.images and not args.batch:
+        default_dir = "shared/images/851749152448"
+        output_file = "debug_rs.md"
+
+        # 检查默认目录是否存在
+        if Path(default_dir).exists():
+            print(f"{Fore.CYAN}使用默认配置:{Style.RESET_ALL}")
+            print(f"  图片目录: {default_dir}")
+            print(f"  输出文件: {output_file}")
+            print()
+
+            batch_recognize(
+                image_dir=default_dir,
+                batch_size=2,  # 默认两张合并
+                output_file=output_file,
+                verbose=args.verbose
+            )
+        else:
+            print(f"{Fore.RED}默认图片目录不存在: {default_dir}{Style.RESET_ALL}")
+            print(f"请指定图片路径或使用 --batch 指定目录")
         return
 
     # 批量处理模式
