@@ -2,7 +2,14 @@
 
 ## 概述
 
-智能图片处理系统是智能钓鱼助手的核心功能之一，专门用于自动检测和合并带有文字说明的图片。该系统完全本地化运行，无需外部API支持，保护用户隐私的同时提供高效的批处理能力。
+智能图片处理系统是智能钓鱼助手的核心功能之一，专门用于自动检测和合并带有文字说明的图片。系统支持本地和云端双OCR提供商，可根据需求灵活配置。
+
+### 核心特性
+- **多OCR提供商支持**：支持Ollama本地OCR和SiliconFlow云端OCR
+- **智能文字检测**：基于图像特征和文件名规则的双重检测机制
+- **完全本地化处理**（使用Ollama时）：保护数据隐私，无API调用成本
+- **高效批处理**：支持多线程并行处理和智能分组
+- **灵活配置**：丰富的配置选项，适应不同使用场景
 
 ## 核心功能
 
@@ -26,15 +33,24 @@
 ### 核心组件
 
 ```
-packages/agent_fishing/tools/lure/
-├── image_merger.py           # 图片合并核心模块
-│   ├── ImageMerger           # 图片合并器类
-│   ├── merge_vertically()    # 垂直合并方法
-│   └── merge_with_text_overlay() # 带文字覆盖的合并
-└── batch_merge_processor.py  # 批量智能合并处理器
-    ├── BatchMergeProcessor   # 批处理管理器
-    ├── MergeGroup           # 合并组数据结构
-    └── 智能检测算法实现
+图片处理系统架构：
+├── OCR服务层 (apps/api/services/ocr/)
+│   ├── base.py              # OCR提供商抽象基类
+│   ├── factory.py           # OCR提供商工厂
+│   ├── siliconflow_provider.py  # SiliconFlow云端OCR实现
+│   ├── ollama_provider.py   # Ollama本地OCR实现
+│   └── exceptions.py        # OCR异常定义
+├── 图片合并层 (packages/agent_fishing/tools/lure/)
+│   ├── image_merger.py      # 图片合并核心模块
+│   │   ├── ImageMerger      # 图片合并器类
+│   │   ├── merge_vertically()  # 垂直合并方法
+│   │   └── merge_with_text_overlay() # 带文字覆盖的合并
+│   └── batch_merge_processor.py  # 批量智能合并处理器
+│       ├── BatchMergeProcessor # 批处理管理器
+│       ├── MergeGroup       # 合并组数据结构
+│       └── 智能检测算法实现
+└── 服务集成层 (apps/api/services/)
+    └── ocr_service.py       # OCR服务集成和封装
 ```
 
 ### 检测算法详解
@@ -81,7 +97,69 @@ confidence = min(0.8, dark_ratio * 8 + std_dev / 40)
 confidence = max(0.2, 1.0 - (dark_ratio * 5 + std_dev / 50))
 ```
 
-## 使用指南
+## OCR提供商配置
+
+### 1. Ollama本地OCR（推荐）
+
+**优势**：
+- 完全本地处理，保护数据隐私
+- 无API调用成本
+- 可自定义模型
+
+**配置**：
+```bash
+# .env 文件
+OCR_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=deepseek-ocr
+OLLAMA_TIMEOUT=120
+OLLAMA_MAX_SIZE=20971520  # 20MB
+```
+
+**前提条件**：
+```bash
+# 安装Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# 下载OCR模型
+ollama pull deepseek-ocr
+```
+
+### 2. SiliconFlow云端OCR
+
+**优势**：
+- 识别精度高
+- 无需本地计算资源
+- 快速部署
+
+**配置**：
+```bash
+# .env 文件
+OCR_PROVIDER=siliconflow
+SILICONFLOW_API_KEY=your-api-key-here
+SILICONFLOW_OCR_TIMEOUT=30
+SILICONFLOW_OCR_MAX_SIZE=10485760  # 10MB
+```
+
+### 3. 使用示例
+
+```python
+from apps.api.services.ocr_service import OCRService
+
+# 创建OCR服务（自动使用配置的提供商）
+service = OCRService()
+
+# 单图识别
+result = service.recognize_table("image.jpg", verbose=True)
+
+# 批量识别（自动合并）
+result = service.recognize_table_from_paths(
+    ["img1.jpg", "img2.jpg"],
+    verbose=True
+)
+```
+
+## 图片合并使用指南
 
 ### 基本用法
 
@@ -242,7 +320,33 @@ merge_003_004.jpg  # 合并第3-4张图片
 
 ## 故障排除
 
-### 常见问题
+### OCR相关
+
+1. **Ollama服务未启动**
+   ```bash
+   # 启动Ollama服务
+   ollama serve
+   ```
+
+2. **OCR模型未下载**
+   ```bash
+   # 下载deepseek-ocr模型
+   ollama pull deepseek-ocr
+
+   # 查看已安装模型
+   ollama list
+   ```
+
+3. **SiliconFlow API密钥无效**
+   - 检查`.env`文件中的`SILICONFLOW_API_KEY`
+   - 访问 https://siliconflow.cn/ 获取有效API密钥
+
+4. **OCR识别失败**
+   - 检查图片格式是否支持（PNG/JPG/JPEG/WebP）
+   - 检查图片大小是否超限
+   - 查看服务日志获取详细错误信息
+
+### 图片合并相关
 
 1. **PIL/Pillow 未安装**
    ```bash
@@ -345,11 +449,19 @@ async def merge_images(files: List[UploadFile] = File(...)):
 
 ## 版本历史
 
+### 图片合并功能
 - **v1.0** - 基础图片合并功能
 - **v1.1** - 添加智能文字检测
 - **v1.2** - 支持并行处理
 - **v1.3** - 优化检测算法，添加文件名规则
 - **v1.4** - 完善元数据管理和错误处理
+
+### OCR服务
+- **v2.0** - 重构OCR服务架构（v5.0.2）
+  - 新增多提供商支持（Ollama + SiliconFlow）
+  - 实现Factory模式设计
+  - 添加提供商自动检测和切换
+  - 完善异常处理和错误恢复机制
 
 ## 许可证
 

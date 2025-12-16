@@ -192,7 +192,9 @@ Content-Type: multipart/form-data
 | image_url | string | 否 | 图片 URL（与 files 二选一） |
 
 **支持格式**: PNG, JPG, JPEG, WebP
-**最大文件大小**: 10MB
+**最大文件大小**:
+- Ollama提供商: 20MB
+- SiliconFlow提供商: 10MB
 
 **响应示例**：
 ```json
@@ -200,7 +202,8 @@ Content-Type: multipart/form-data
   "success": true,
   "markdown": "| 品牌 | 型号 | 价格 |\n|------|------|------|\n| 达亿瓦 | 1000 | ¥299 |",
   "metadata": {
-    "model": "Qwen/Qwen2-VL-72B-Instruct",
+    "provider": "ollama",
+    "model": "deepseek-ocr",
     "processing_time_ms": 1500,
     "images_merged": 2,
     "image_size_bytes": 1024000
@@ -226,15 +229,32 @@ GET /api/v1/ocr/status
 Authorization: Bearer <token>
 ```
 
-**响应示例**：
+**响应示例（Ollama提供商）**：
 ```json
 {
   "service": "ocr",
-  "model": "Qwen/Qwen2-VL-72B-Instruct",
+  "provider": "ollama",
+  "model": "deepseek-ocr",
+  "base_url": "http://localhost:11434",
+  "api_key_configured": false,
+  "timeout": 120,
+  "max_size_mb": 20,
+  "supported_formats": ["png", "jpg", "jpeg", "webp"],
+  "available": true
+}
+```
+
+**响应示例（SiliconFlow提供商）**：
+```json
+{
+  "service": "ocr",
+  "provider": "siliconflow",
+  "model": "deepseek-ai/DeepSeek-OCR",
   "api_key_configured": true,
   "timeout": 30,
   "max_size_mb": 10,
-  "supported_formats": ["png", "jpg", "jpeg", "webp"]
+  "supported_formats": ["png", "jpg", "jpeg", "webp"],
+  "available": true
 }
 ```
 
