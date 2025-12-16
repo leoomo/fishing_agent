@@ -5,7 +5,7 @@ description = "智能钓鱼助手 v5.0.0 - 基于 LangChain 1.0+ 的钓鱼时间
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "langchain>=0.3.0",
+    "langchain>=1.0.0",
     "langgraph-cli[inmem]>=0.4.7",
     "langchain-anthropic>=0.3.0",
     "langchain-community>=0.3.0",
@@ -16,7 +16,7 @@ dependencies = [
     "anthropic>=0.20.0",
     "langchain-openai>=1.0.1",
     "python-dotenv>=1.1.1",
-    "pandas>=2.3.3",
+    "pandas>=1.5.0",
     "pytz>=2025.2",
     "dashscope>=1.25.1",
     "aiohttp>=3.13.2",
@@ -47,6 +47,7 @@ dependencies = [
     "playwright>=1.56.0",
     "apscheduler>=3.11.1",
     "croniter>=6.0.0",
+    "Pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
