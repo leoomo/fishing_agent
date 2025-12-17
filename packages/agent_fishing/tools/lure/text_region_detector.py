@@ -35,17 +35,37 @@ def _lazy_import():
     return _cv2, _np
 
 
-def _get_ocr_instance():
-    """获取 PaddleOCR 单例实例"""
+def _get_ocr_instance(with_rec: bool = False):
+    """获取 PaddleOCR 单例实例
+
+    Args:
+        with_rec: 是否启用文字识别（默认只检测位置）
+    """
     global _ocr_instance
+
+    # 如果需要识别功能，创建新实例
+    if with_rec:
+        from paddleocr import PaddleOCR
+        ocr = PaddleOCR(
+            use_angle_cls=False,
+            lang="ch",
+            show_log=False,
+            use_gpu=False,
+            det=True,
+            rec=True,  # 启用识别
+            cls=False
+        )
+        logger.info("PaddleOCR 检测+识别模型已加载")
+        return ocr
+
+    # 只检测模式（单例）
     if _ocr_instance is None:
         from paddleocr import PaddleOCR
-        # 只使用检测模型，不识别文字，速度极快
         _ocr_instance = PaddleOCR(
             use_angle_cls=False,
             lang="ch",
             show_log=False,
-            use_gpu=False,  # CPU 模式，兼容性更好
+            use_gpu=False,
             det=True,
             rec=False,
             cls=False
@@ -62,6 +82,8 @@ class TextBox:
     x_max: int
     y_max: int
     confidence: float = 1.0
+    text: str = ""  # 识别的文字内容
+    char_count: int = 0  # 文字数量
 
     @property
     def width(self) -> int:
@@ -78,6 +100,23 @@ class TextBox:
     @property
     def center(self) -> Tuple[int, int]:
         return ((self.x_min + self.x_max) // 2, (self.y_min + self.y_max) // 2)
+
+
+@dataclass
+class HorizontalRegion:
+    """横向区域（按y坐标分组的文字行）"""
+    y_min: int
+    y_max: int
+    text_boxes: List[TextBox]
+    total_chars: int = 0  # 该行总文字数
+
+    @property
+    def height(self) -> int:
+        return self.y_max - self.y_min
+
+    @property
+    def center_y(self) -> int:
+        return (self.y_min + self.y_max) // 2
 
 
 @dataclass
@@ -178,6 +217,183 @@ class TextRegionDetector:
 
         logger.info(f"检测到 {len(text_boxes)} 个文字框: {Path(image_path).name}")
         return text_boxes
+
+    def detect_text_with_content(self, image_path: str) -> List[TextBox]:
+        """
+        检测图片中所有文字框并识别文字内容
+
+        Args:
+            image_path: 图片路径
+
+        Returns:
+            List[TextBox]: 包含文字内容的文字框列表
+        """
+        cv2, np = _lazy_import()
+        ocr = _get_ocr_instance(with_rec=True)  # 启用识别
+
+        img = cv2.imread(image_path)
+        if img is None:
+            logger.error(f"无法读取图片: {image_path}")
+            return []
+
+        # 运行 OCR 检测+识别
+        result = ocr.ocr(img, det=True, rec=True, cls=False)
+
+        if not result or result[0] is None:
+            logger.info(f"未检测到文字: {image_path}")
+            return []
+
+        text_boxes = []
+
+        for item in result[0]:
+            # item 格式: [box, (text, confidence)]
+            box = item[0]
+            text_info = item[1]
+            text = text_info[0] if text_info else ""
+            confidence = text_info[1] if text_info and len(text_info) > 1 else 1.0
+
+            points = np.array(box).astype(np.int32)
+            x_min = int(np.min(points[:, 0]))
+            y_min = int(np.min(points[:, 1]))
+            x_max = int(np.max(points[:, 0]))
+            y_max = int(np.max(points[:, 1]))
+
+            text_box = TextBox(
+                x_min=x_min,
+                y_min=y_min,
+                x_max=x_max,
+                y_max=y_max,
+                confidence=confidence,
+                text=text,
+                char_count=len(text)
+            )
+
+            if text_box.area >= self.min_text_area:
+                text_boxes.append(text_box)
+
+        logger.info(f"检测到 {len(text_boxes)} 个文字框（含内容）: {Path(image_path).name}")
+        return text_boxes
+
+    def analyze_horizontal_regions(
+        self,
+        text_boxes: List[TextBox],
+        image_height: int,
+        row_merge_threshold: int = 30
+    ) -> List[HorizontalRegion]:
+        """
+        分析横向区域，按y坐标将文字框分组成行
+
+        Args:
+            text_boxes: 文字框列表（需包含文字内容）
+            image_height: 图片高度
+            row_merge_threshold: 行合并阈值，y坐标差小于此值认为是同一行
+
+        Returns:
+            List[HorizontalRegion]: 横向区域列表（按y坐标排序）
+        """
+        if not text_boxes:
+            return []
+
+        # 按y坐标排序
+        sorted_boxes = sorted(text_boxes, key=lambda b: b.y_min)
+
+        regions = []
+        current_boxes = [sorted_boxes[0]]
+        current_y_min = sorted_boxes[0].y_min
+        current_y_max = sorted_boxes[0].y_max
+
+        for box in sorted_boxes[1:]:
+            # 判断是否属于同一行
+            if box.y_min <= current_y_max + row_merge_threshold:
+                # 同一行，合并
+                current_boxes.append(box)
+                current_y_max = max(current_y_max, box.y_max)
+            else:
+                # 新行，保存当前行
+                total_chars = sum(b.char_count for b in current_boxes)
+                regions.append(HorizontalRegion(
+                    y_min=current_y_min,
+                    y_max=current_y_max,
+                    text_boxes=current_boxes,
+                    total_chars=total_chars
+                ))
+                # 开始新行
+                current_boxes = [box]
+                current_y_min = box.y_min
+                current_y_max = box.y_max
+
+        # 保存最后一行
+        if current_boxes:
+            total_chars = sum(b.char_count for b in current_boxes)
+            regions.append(HorizontalRegion(
+                y_min=current_y_min,
+                y_max=current_y_max,
+                text_boxes=current_boxes,
+                total_chars=total_chars
+            ))
+
+        logger.info(f"分析出 {len(regions)} 个横向区域")
+        return regions
+
+    def find_sparse_text_regions(
+        self,
+        image_path: str,
+        min_chars: int = 5
+    ) -> Dict[str, Any]:
+        """
+        查找文字数量少于指定值的横向区域
+
+        Args:
+            image_path: 图片路径
+            min_chars: 最小文字数量阈值
+
+        Returns:
+            Dict: {
+                "sparse_regions": List[HorizontalRegion],  # 文字少的区域
+                "dense_regions": List[HorizontalRegion],   # 文字多的区域
+                "all_regions": List[HorizontalRegion],     # 所有区域
+                "image_size": (width, height),
+                "total_chars": int
+            }
+        """
+        cv2, np = _lazy_import()
+
+        img = cv2.imread(image_path)
+        if img is None:
+            return {"error": f"无法读取图片: {image_path}"}
+
+        h, w = img.shape[:2]
+
+        # 检测文字内容
+        text_boxes = self.detect_text_with_content(image_path)
+
+        if not text_boxes:
+            return {
+                "sparse_regions": [],
+                "dense_regions": [],
+                "all_regions": [],
+                "image_size": (w, h),
+                "total_chars": 0
+            }
+
+        # 分析横向区域
+        regions = self.analyze_horizontal_regions(text_boxes, h)
+
+        # 按文字数量分类
+        sparse_regions = [r for r in regions if r.total_chars < min_chars]
+        dense_regions = [r for r in regions if r.total_chars >= min_chars]
+
+        total_chars = sum(r.total_chars for r in regions)
+
+        logger.info(f"文字稀疏区域: {len(sparse_regions)}, 文字密集区域: {len(dense_regions)}")
+
+        return {
+            "sparse_regions": sparse_regions,
+            "dense_regions": dense_regions,
+            "all_regions": regions,
+            "image_size": (w, h),
+            "total_chars": total_chars
+        }
 
     def get_union_box(
         self,

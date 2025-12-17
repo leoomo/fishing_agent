@@ -76,6 +76,8 @@ class OCRMergeProcessor:
         # 其他参数
         keep_empty_images: bool = False,
         skip_pure_images: bool = True,  # 跳过纯图片（无文字）
+        skip_sparse_regions: bool = True,  # 跳过文字稀疏区域
+        min_chars_per_region: int = 5,  # 区域最小文字数量
         verbose: bool = False
     ):
         """
@@ -93,6 +95,8 @@ class OCRMergeProcessor:
             max_segment_height: 最大片段高度
             keep_empty_images: 是否保留无文字的图片（即使没有文字也合并）
             skip_pure_images: 跳过纯图片（无文字的图片不参与合并）
+            skip_sparse_regions: 跳过文字稀疏区域（文字数少于阈值的横向区域）
+            min_chars_per_region: 区域最小文字数量阈值
             verbose: 详细日志
         """
         self.source_dir = Path(source_dir).resolve()
@@ -112,6 +116,8 @@ class OCRMergeProcessor:
         self.max_segment_height = max_segment_height
         self.keep_empty_images = keep_empty_images
         self.skip_pure_images = skip_pure_images
+        self.skip_sparse_regions = skip_sparse_regions
+        self.min_chars_per_region = min_chars_per_region
         self.verbose = verbose
 
         # 延迟初始化的组件
@@ -125,6 +131,7 @@ class OCRMergeProcessor:
             "images_with_text": 0,
             "images_without_text": 0,
             "images_skipped": 0,  # 跳过的纯图片数量
+            "sparse_regions_skipped": 0,  # 跳过的稀疏区域数量
             "total_text_boxes": 0,
             "original_total_height": 0,
             "cropped_total_height": 0,
@@ -205,6 +212,7 @@ class OCRMergeProcessor:
     def crop_single_image(self, image_path: str) -> ProcessedImage:
         """
         裁剪单张图片的文字区域（只裁剪上下，保留原始宽度）
+        支持跳过文字稀疏区域
 
         Args:
             image_path: 图片路径
@@ -226,8 +234,14 @@ class OCRMergeProcessor:
             h, w = img.shape[:2]
             result.original_size = (w, h)
 
-            # 检测文字框
-            text_boxes = self.detector.detect_text_boxes(image_path)
+            # 根据是否跳过稀疏区域选择检测方法
+            if self.skip_sparse_regions:
+                # 使用带内容识别的检测方法
+                text_boxes = self.detector.detect_text_with_content(image_path)
+            else:
+                # 只检测位置，不识别内容（更快）
+                text_boxes = self.detector.detect_text_boxes(image_path)
+
             result.text_boxes_count = len(text_boxes)
 
             if not text_boxes:
@@ -238,9 +252,33 @@ class OCRMergeProcessor:
 
             result.has_text = True
 
-            # 只计算 y 方向的裁剪范围（保留原始宽度）
-            y_min = min(box.y_min for box in text_boxes)
-            y_max = max(box.y_max for box in text_boxes)
+            # 如果启用跳过稀疏区域，分析横向区域
+            if self.skip_sparse_regions:
+                regions = self.detector.analyze_horizontal_regions(text_boxes, h)
+
+                # 过滤掉文字稀疏的区域
+                dense_regions = [r for r in regions if r.total_chars >= self.min_chars_per_region]
+                sparse_count = len(regions) - len(dense_regions)
+
+                if sparse_count > 0:
+                    self.stats["sparse_regions_skipped"] += sparse_count
+                    if self.verbose:
+                        logger.info(f"跳过 {sparse_count} 个稀疏区域: {Path(image_path).name}")
+
+                if not dense_regions:
+                    # 所有区域都是稀疏的
+                    result.has_text = False
+                    if self.verbose:
+                        logger.info(f"全部为稀疏区域，跳过: {Path(image_path).name}")
+                    return result
+
+                # 根据密集区域计算裁剪范围
+                y_min = min(r.y_min for r in dense_regions)
+                y_max = max(r.y_max for r in dense_regions)
+            else:
+                # 不跳过稀疏区域，使用所有文字框
+                y_min = min(box.y_min for box in text_boxes)
+                y_max = max(box.y_max for box in text_boxes)
 
             # 应用 padding 并防止越界
             y1 = max(0, y_min - self.padding)
@@ -473,7 +511,9 @@ class OCRMergeProcessor:
                 "spacing": self.spacing,
                 "enable_split": self.enable_split,
                 "keep_empty_images": self.keep_empty_images,
-                "skip_pure_images": self.skip_pure_images
+                "skip_pure_images": self.skip_pure_images,
+                "skip_sparse_regions": self.skip_sparse_regions,
+                "min_chars_per_region": self.min_chars_per_region
             },
             "statistics": self.stats,
             "files": {

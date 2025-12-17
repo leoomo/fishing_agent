@@ -87,6 +87,7 @@ from .text_region_detector import (
     TextRegionCropper,
     TextBox,
     CropRegion,
+    HorizontalRegion,
     crop_text_area,
     detect_text_boxes
 )
@@ -188,6 +189,7 @@ __all__ = [
     'TextRegionCropper',
     'TextBox',
     'CropRegion',
+    'HorizontalRegion',
     'crop_text_area',
     'detect_text_boxes',
     # OCR Merge Processor
