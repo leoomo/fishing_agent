@@ -35,12 +35,16 @@ class MergeGroup:
         self.reason = reason
         self.source_files = []
         self.output_file = ""
+        # 分割相关属性
+        self.was_split = False
+        self.split_files = []
 
     def __len__(self):
         return len(self.indices)
 
     def __str__(self):
-        return f"MergeGroup({self.indices}, reason='{self.reason}')"
+        split_info = f", split={self.was_split}" if self.was_split else ""
+        return f"MergeGroup({self.indices}, reason='{self.reason}'{split_info})"
 
 
 class BatchMergeProcessor:
@@ -63,7 +67,14 @@ class BatchMergeProcessor:
         ocr_confidence_threshold: float = 0.5,  # OCR置信度阈值
         min_text_length: int = 2,  # 最小文字长度
         parallel_detection: bool = True,  # 是否并行检测
-        max_workers: int = 4  # 并行检测的最大线程数
+        max_workers: int = 4,  # 并行检测的最大线程数
+        # 分割配置参数
+        enable_split: bool = True,  # 是否启用合并后分割
+        min_split_height: int = 800,  # 最小分割高度（像素）
+        split_min_ratio: float = 0.3,  # 分割点最小位置比例
+        split_max_ratio: float = 0.7,  # 分割点最大位置比例
+        # 合并限制参数
+        max_merge_count: int = 3  # 每组最多合并的图片数量
     ):
         """
         初始化批处理管理器
@@ -77,6 +88,11 @@ class BatchMergeProcessor:
             min_text_length: 最小文字长度
             parallel_detection: 是否并行检测
             max_workers: 并行检测的最大线程数
+            enable_split: 是否启用合并后分割
+            min_split_height: 最小分割高度（像素），低于此高度不分割
+            split_min_ratio: 分割点最小位置比例（0-1）
+            split_max_ratio: 分割点最大位置比例（0-1）
+            max_merge_count: 每组最多合并的图片数量（默认3张）
         """
         self.source_dir = Path(source_dir).resolve()
         if not self.source_dir.exists():
@@ -96,6 +112,15 @@ class BatchMergeProcessor:
         self.parallel_detection = parallel_detection
         self.max_workers = max_workers
 
+        # 分割配置
+        self.enable_split = enable_split
+        self.min_split_height = min_split_height
+        self.split_min_ratio = split_min_ratio
+        self.split_max_ratio = split_max_ratio
+
+        # 合并限制
+        self.max_merge_count = max_merge_count
+
         # 缓存检测结果
         self._text_detection_cache = {}
 
@@ -107,7 +132,11 @@ class BatchMergeProcessor:
             "output_count": 0,
             "smart_grouping_enabled": True,
             "text_detections": 0,
-            "cache_hits": 0
+            "cache_hits": 0,
+            "split_enabled": enable_split,
+            "images_split": 0,
+            "split_skipped_table": 0,
+            "split_skipped_no_point": 0
         }
 
         logger.info(f"BatchMergeProcessor initialized")
@@ -116,6 +145,10 @@ class BatchMergeProcessor:
         logger.info(f"Smart grouping: ENABLED")
         logger.info(f"Bottom detection ratio: {self.bottom_detection_ratio}")
         logger.info(f"OCR confidence threshold: {self.ocr_confidence_threshold}")
+        logger.info(f"Post-merge split: {'ENABLED' if enable_split else 'DISABLED'}")
+        if enable_split:
+            logger.info(f"Min split height: {min_split_height}px")
+        logger.info(f"Max merge count per group: {max_merge_count}")
 
     def _detect_text_by_filename(self, image_path: str) -> dict:
         """
@@ -465,36 +498,69 @@ class BatchMergeProcessor:
         while i < n:
             group_start = i
             group_end = i + 1  # 至少包含当前图片
+            merge_reasons = []
 
-            # 检查当前图片底部是否有文字
-            current_bottom_has_text = (bottom_results[i] and
-                                       bottom_results[i].get("has_text", False) and
-                                       not bottom_results[i].get("error"))
+            # 使用 while 循环检测连续合并链
+            # 每次检测当前组最后一张图片的底部和下一张图片的顶部
+            # 但限制最大合并数量
+            while group_end < n and (group_end - group_start) < self.max_merge_count:
+                current_last_idx = group_end - 1  # 当前组的最后一张图片
+                next_idx = group_end  # 下一张图片
 
-            # 检查下一张图片头部是否有文字
-            next_top_has_text = False
-            if i < n - 1:
-                next_top_has_text = (top_results[i + 1] and
-                                     top_results[i + 1].get("has_text", False) and
-                                     not top_results[i + 1].get("error"))
+                # 检测当前组最后一张的底部
+                current_bottom_has_text = (bottom_results[current_last_idx] and
+                                           bottom_results[current_last_idx].get("has_text", False) and
+                                           not bottom_results[current_last_idx].get("error"))
 
-            # 只有当底部和头部都有文字时才合并
-            if current_bottom_has_text and next_top_has_text and i < n - 1:
-                group_end = i + 2
-                reason = f"smart merge: image {i+1} bottom + image {i+2} top both have text"
-                logger.info(reason)
+                # 检测下一张的顶部
+                next_top_has_text = (top_results[next_idx] and
+                                     top_results[next_idx].get("has_text", False) and
+                                     not top_results[next_idx].get("error"))
+
+                # 只有当底部和头部都有文字时才扩展合并链
+                if current_bottom_has_text and next_top_has_text:
+                    merge_reasons.append(f"image {current_last_idx + 1} bottom + image {next_idx + 1} top")
+                    group_end += 1  # 扩展组
+                    logger.info(f"Extending merge chain: image {current_last_idx + 1} -> image {next_idx + 1}")
+                else:
+                    # 记录为什么停止扩展
+                    if current_bottom_has_text and not next_top_has_text:
+                        logger.debug(f"Stop chain: image {current_last_idx + 1} has text at bottom, but image {next_idx + 1} has no text at top")
+                    elif not current_bottom_has_text and next_top_has_text:
+                        logger.debug(f"Stop chain: image {current_last_idx + 1} has no text at bottom, but image {next_idx + 1} has text at top")
+                    break  # 停止扩展
+
+            # 如果达到最大合并数量，记录日志
+            if (group_end - group_start) >= self.max_merge_count:
+                logger.info(f"Reached max merge count ({self.max_merge_count}) for group starting at image {group_start + 1}")
+
+            # 生成原因描述
+            if len(merge_reasons) > 0:
+                reason = f"smart merge chain ({len(merge_reasons)} connections): " + " -> ".join(merge_reasons)
+                logger.info(f"Created merge group: images {group_start + 1} to {group_end} ({group_end - group_start} images)")
             else:
                 reason = f"single image: {Path(image_files[i]).name}"
                 if bottom_results[i] and bottom_results[i].get("error"):
                     reason += " (bottom detection error)"
                 elif i < n - 1 and top_results[i + 1] and top_results[i + 1].get("error"):
                     reason += " (next top detection error)"
-                elif current_bottom_has_text and not next_top_has_text:
-                    reason += " (bottom has text, next top no text)"
-                elif not current_bottom_has_text and next_top_has_text:
-                    reason += " (bottom no text, next top has text)"
-                elif not current_bottom_has_text:
-                    reason += " (no text at bottom)"
+                else:
+                    # 检查为什么没有合并
+                    current_bottom = (bottom_results[i] and
+                                     bottom_results[i].get("has_text", False) and
+                                     not bottom_results[i].get("error"))
+                    next_top = False
+                    if i < n - 1:
+                        next_top = (top_results[i + 1] and
+                                   top_results[i + 1].get("has_text", False) and
+                                   not top_results[i + 1].get("error"))
+
+                    if current_bottom and not next_top:
+                        reason += " (bottom has text, next top no text)"
+                    elif not current_bottom and next_top:
+                        reason += " (bottom no text, next top has text)"
+                    elif not current_bottom:
+                        reason += " (no text at bottom)"
 
             # 创建合并组
             indices = list(range(group_start, group_end))
@@ -510,13 +576,77 @@ class BatchMergeProcessor:
 
         return groups
 
+    def _split_merged_image(self, image_path: str, group: MergeGroup) -> List[str]:
+        """
+        对合并后的图片进行智能分割
+
+        Args:
+            image_path: 合并后的图片路径
+            group: 合并组信息
+
+        Returns:
+            List[str]: 分割后的文件路径列表（如果未分割则返回原路径）
+        """
+        if not self.enable_split:
+            return [image_path]
+
+        try:
+            # 先分析图片的分割潜力
+            analysis = self.image_merger.analyze_split_potential(image_path)
+
+            if analysis.get("error"):
+                logger.warning(f"Failed to analyze split potential: {analysis['error']}")
+                return [image_path]
+
+            # 检查是否大部分是表格
+            if analysis.get("is_mostly_table"):
+                logger.info(f"Skip split for {Path(image_path).name}: mostly table content")
+                self.stats["split_skipped_table"] += 1
+                return [image_path]
+
+            # 检查是否可以分割
+            if not analysis.get("can_split"):
+                logger.info(f"Skip split for {Path(image_path).name}: no suitable split point")
+                self.stats["split_skipped_no_point"] += 1
+                return [image_path]
+
+            # 执行分割
+            split_results = self.image_merger.split_horizontally(
+                image_path,
+                output_dir=str(self.output_dir),
+                min_split_height=self.min_split_height
+            )
+
+            # 如果成功分割（返回2个文件），删除原始合并文件
+            if len(split_results) == 2:
+                self.stats["images_split"] += 1
+                # 删除原始合并文件
+                try:
+                    os.remove(image_path)
+                    logger.info(f"Removed original merged file: {Path(image_path).name}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove original file: {e}")
+
+                # 更新组信息
+                group.split_files = [Path(f).name for f in split_results]
+                group.was_split = True
+
+                return split_results
+            else:
+                group.was_split = False
+                return [image_path]
+
+        except Exception as e:
+            logger.error(f"Error during split: {e}")
+            return [image_path]
+
     def execute_merge(
         self,
         image_files: List[str],
         merge_groups: List[MergeGroup]
     ) -> List[str]:
         """
-        执行图片合并
+        执行图片合并（及可选的分割）
 
         Args:
             image_files: 图片文件列表
@@ -528,6 +658,8 @@ class BatchMergeProcessor:
         output_files = []
 
         logger.info(f"Executing merge for {len(merge_groups)} groups")
+        if self.enable_split:
+            logger.info(f"Post-merge split is ENABLED (min height: {self.min_split_height}px)")
 
         for i, group in enumerate(merge_groups):
             # 准备输入文件路径
@@ -565,14 +697,27 @@ class BatchMergeProcessor:
                     logger.error(f"Failed to merge group {i+1}")
                     continue
 
-            output_files.append(str(output_path))
+            # 对合并后的图片进行分割（如果启用）
+            if self.enable_split and len(group.indices) > 1:
+                # 只对合并后的图片进行分割，单张图片不分割
+                split_results = self._split_merged_image(str(output_path), group)
+                output_files.extend(split_results)
+            else:
+                group.was_split = False
+                output_files.append(str(output_path))
+
             logger.debug(f"Created: {output_name}")
 
         self.stats["output_count"] = len(output_files)
+        self.stats["merge_groups"] = len(merge_groups)
         reduction_ratio = (len(image_files) - len(output_files)) / len(image_files) if len(image_files) > 0 else 0
         self.stats["reduction_ratio"] = reduction_ratio
 
         logger.info(f"Merge completed: {len(image_files)} -> {len(output_files)} files (reduced by {reduction_ratio:.1%})")
+        if self.enable_split:
+            logger.info(f"Split stats: {self.stats['images_split']} split, "
+                       f"{self.stats['split_skipped_table']} skipped (table), "
+                       f"{self.stats['split_skipped_no_point']} skipped (no point)")
 
         return output_files
 
@@ -601,7 +746,12 @@ class BatchMergeProcessor:
                 "ocr_confidence_threshold": self.ocr_confidence_threshold,
                 "min_text_length": self.min_text_length,
                 "parallel_detection": self.parallel_detection,
-                "max_workers": self.max_workers
+                "max_workers": self.max_workers,
+                # 分割配置
+                "split_enabled": self.enable_split,
+                "min_split_height": self.min_split_height,
+                "split_min_ratio": self.split_min_ratio,
+                "split_max_ratio": self.split_max_ratio
             },
             "statistics": self.stats,
             "files": {
@@ -619,7 +769,10 @@ class BatchMergeProcessor:
                 "source_files": group.source_files,
                 "file_count": len(group.indices),
                 "indices": group.indices,
-                "reason": group.reason
+                "reason": group.reason,
+                # 分割信息
+                "was_split": group.was_split,
+                "split_files": group.split_files if group.was_split else []
             }
             metadata["merge_groups"].append(group_info)
 
