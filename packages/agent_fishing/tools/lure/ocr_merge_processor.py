@@ -132,6 +132,7 @@ class OCRMergeProcessor:
             "images_without_text": 0,
             "images_skipped": 0,  # 跳过的纯图片数量
             "sparse_regions_skipped": 0,  # 跳过的稀疏区域数量
+            "empty_images_skipped": 0,  # 跳过的空白图片数量
             "total_text_boxes": 0,
             "original_total_height": 0,
             "cropped_total_height": 0,
@@ -344,75 +345,289 @@ class OCRMergeProcessor:
 
         return results
 
-    def merge_cropped_images(
+    def _should_merge_with_next(
+        self,
+        processed_images: List[ProcessedImage],
+        index: int
+    ) -> bool:
+        """
+        判断当前图片是否应该与下一张合并
+
+        合并条件：
+        1. 当前图片尾部有文字 AND 下一张图片头部有文字
+        2. 或者表格跨行等特殊情况
+
+        Args:
+            processed_images: 处理后的图片列表
+            index: 当前图片索引
+
+        Returns:
+            bool: 是否应该与下一张合并
+        """
+        # 如果是最后一张，不能合并
+        if index >= len(processed_images) - 1:
+            return False
+
+        current = processed_images[index]
+        next_img = processed_images[index + 1]
+
+        # 必须两张图片都有文字才考虑合并
+        if not (current.has_text and next_img.has_text):
+            return False
+
+        # 检测当前图片底部是否有文字
+        current_has_bottom_text = self._detect_text_at_edge(
+            current.original_path if not current.cropped_path else current.cropped_path,
+            edge="bottom"
+        )
+
+        # 检测下一张图片头部是否有文字
+        next_has_top_text = self._detect_text_at_edge(
+            next_img.original_path if not next_img.cropped_path else next_img.cropped_path,
+            edge="top"
+        )
+
+        # 合并条件1：底部+头部都有文字
+        if current_has_bottom_text and next_has_top_text:
+            if self.verbose:
+                logger.info(
+                    f"图片 {index + 1} 底部有文字 AND 图片 {index + 2} 头部有文字，需要合并"
+                )
+            return True
+
+        # 合并条件2：两张图片文字框都很多（>30），可能是一个连续文档
+        if current.text_boxes_count > 30 and next_img.text_boxes_count > 5:
+            if self.verbose:
+                logger.info(
+                    f"图片 {index + 1}({current.text_boxes_count}框) + 图片 {index + 2}({next_img.text_boxes_count}框) 文字框较多，可能需要合并"
+                )
+            return True
+
+        # 合并条件3：高图片+矮图片的组合（常见于表格跨页）
+        current_height = current.original_size[1]
+        next_height = next_img.original_size[1]
+        if (current_height > 2000 and next_height < 500 and
+            current.text_boxes_count > 10 and next_img.text_boxes_count > 3):
+            if self.verbose:
+                logger.info(
+                    f"高图片 {index + 1}({current_height}px)+矮图片 {index + 2}({next_height}px)组合，需要合并"
+                )
+            return True
+
+        if current_has_bottom_text and not next_has_top_text:
+            if self.verbose:
+                logger.debug(
+                    f"图片 {index + 1} 底部有文字，但图片 {index + 2} 头部无文字，不合并"
+                )
+        elif not current_has_bottom_text and next_has_top_text:
+            if self.verbose:
+                logger.debug(
+                    f"图片 {index + 1} 底部无文字，图片 {index + 2} 头部有文字，不合并"
+                )
+
+        return False
+
+    def _detect_text_at_edge(self, image_path: str, edge: str = "bottom") -> bool:
+        """
+        检测图片边缘是否有文字
+
+        Args:
+            image_path: 图片路径
+            edge: 边缘位置，"bottom" 或 "top"
+
+        Returns:
+            bool: 是否有文字
+        """
+        import cv2
+        import numpy as np
+
+        try:
+            # 读取图片
+            img = cv2.imread(image_path)
+            if img is None:
+                return False
+
+            h, w = img.shape[:2]
+
+            # 检测区域比例（使用底部20%区域）
+            edge_ratio = 0.2
+            edge_height = int(h * edge_ratio)
+
+            if edge == "bottom":
+                # 裁剪底部区域
+                region = img[h - edge_height:h, 0:w]
+            else:
+                # 裁剪顶部区域
+                region = img[0:edge_height, 0:w]
+
+            # 转换为灰度
+            gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+
+            # 使用 OCR 检测文字（如果有文字检测器）
+            if hasattr(self.detector, 'detect_text_boxes'):
+                temp_path = f"/tmp/temp_edge_{Path(image_path).stem}.jpg"
+                cv2.imwrite(temp_path, region)
+                text_boxes = self.detector.detect_text_boxes(temp_path)
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                return len(text_boxes) > 0
+
+            # 回退到像素统计方法
+            # 计算暗像素比例（文字通常是暗色）
+            dark_pixels = np.sum(gray < 200)  # 200以下的认为是暗像素
+            dark_ratio = dark_pixels / (edge_height * w)
+
+            # 计算标准差（有文字的区域变化更丰富）
+            std_dev = np.std(gray)
+
+            # 判断规则（更宽松）
+            has_text = dark_ratio > 0.02 or std_dev > 10
+
+            if self.verbose and has_text:
+                logger.debug(
+                    f"检测 {edge} 边缘文字: {Path(image_path).name} "
+                    f"暗像素: {dark_ratio:.2%}, 标准差: {std_dev:.1f}"
+                )
+
+            return has_text
+
+        except Exception as e:
+            logger.error(f"检测边缘文字失败 {image_path}: {e}")
+            return False
+
+    def generate_smart_merge_groups(
         self,
         processed_images: List[ProcessedImage]
-    ) -> Optional[str]:
+    ) -> List[List[int]]:
         """
-        合并裁剪后的图片
+        生成智能合并分组
 
-        逻辑：
-        - 只合并有文字的图片（裁剪后的版本）
-        - 跳过纯图片（无文字的图片）
-        - 合并时使用间距避免内容重叠
+        只合并相邻且有上下文关系的图片
+        过滤掉无文字的图片（不保留）
 
         Args:
             processed_images: 处理后的图片列表
 
         Returns:
-            str: 合并后的图片路径，失败返回 None
+            List[List[int]]: 分组列表，每个组包含要合并的图片索引
         """
-        # 收集要合并的图片
-        images_to_merge = []
-        skipped_count = 0
+        groups = []
+        i = 0
+        n = len(processed_images)
 
-        for result in processed_images:
-            if result.cropped_path and os.path.exists(result.cropped_path):
-                # 有文字的图片，使用裁剪后的版本
-                images_to_merge.append(result.cropped_path)
-            elif result.has_text and result.original_path:
-                # 有文字但裁剪失败，使用原图
-                images_to_merge.append(result.original_path)
-            elif not self.skip_pure_images and result.original_path:
-                # 不跳过纯图片模式：保留无文字的原图
-                images_to_merge.append(result.original_path)
-            elif self.keep_empty_images and result.original_path:
-                # 保留空图片模式：保留无文字的原图
-                images_to_merge.append(result.original_path)
-            else:
-                # 跳过纯图片
-                skipped_count += 1
+        while i < n:
+            # 当前图片
+            current = processed_images[i]
+
+            # 如果当前图片没有文字，跳过（不保留到输出）
+            if not current.has_text:
+                self.stats["empty_images_skipped"] += 1
                 if self.verbose:
-                    logger.info(f"跳过纯图片: {Path(result.original_path).name}")
+                    logger.info(f"跳过无文字图片: {Path(current.original_path).name}")
+                i += 1
+                continue
 
-        self.stats["images_skipped"] = skipped_count
+            # 如果有文字但文字框太少，可能是误检，跳过
+            if current.text_boxes_count < 1:
+                self.stats["empty_images_skipped"] += 1
+                if self.verbose:
+                    logger.info(f"跳过疑似误检图片: {Path(current.original_path).name} (文字框数: {current.text_boxes_count})")
+                i += 1
+                continue
 
-        if not images_to_merge:
-            logger.warning("没有可合并的图片（所有图片都是纯图片）")
-            return None
+            # 检查是否应该与下一张合并
+            if self._should_merge_with_next(processed_images, i):
+                # 创建合并组（当前+下一张）
+                groups.append([i, i + 1])
+                i += 2  # 跳过下一张
+            else:
+                # 单独一组
+                groups.append([i])
+                i += 1
 
-        # 计算间距总高度
-        self.stats["spacing_total"] = self.spacing * (len(images_to_merge) - 1) if len(images_to_merge) > 1 else 0
+        return groups
 
-        if len(images_to_merge) == 1:
-            # 只有一张图，直接复制
-            output_path = str(self.output_dir / "merged.jpg")
-            import shutil
-            shutil.copy(images_to_merge[0], output_path)
-            logger.info(f"只有一张有文字的图片，直接输出")
-            return output_path
+    def merge_cropped_images(
+        self,
+        processed_images: List[ProcessedImage]
+    ) -> List[str]:
+        """
+        智能合并裁剪后的图片
 
-        # 合并图片（使用间距）
-        output_path = str(self.output_dir / "merged.jpg")
-        success = self.merger.merge_vertically(images_to_merge, output_path)
+        新逻辑：
+        1. 检测图片间的上下文关系（当前底部+下一张头部）
+        2. 只合并有上下文关系的相邻图片（如表格跨行）
+        3. 其他图片保持独立
 
-        if success:
-            logger.info(f"合并完成: {len(images_to_merge)} 张图片 (跳过 {skipped_count} 张纯图片)")
-            logger.info(f"  间距: {self.spacing}px × {len(images_to_merge) - 1} = {self.stats['spacing_total']}px")
-            return output_path
-        else:
-            logger.error("图片合并失败")
-            return None
+        Args:
+            processed_images: 处理后的图片列表
+
+        Returns:
+            List[str]: 输出文件路径列表
+        """
+        output_files = []
+
+        # 生成智能合并分组
+        merge_groups = self.generate_smart_merge_groups(processed_images)
+
+        logger.info(f"生成了 {len(merge_groups)} 个合并组")
+        logger.info(f"合并策略: {len([g for g in merge_groups if len(g) > 1])} 组需要合并")
+
+        for group_idx, group in enumerate(merge_groups):
+            # 准备输入图片
+            group_images = []
+            group_names = []
+
+            for idx in group:
+                result = processed_images[idx]
+                if result.cropped_path and os.path.exists(result.cropped_path):
+                    group_images.append(result.cropped_path)
+                elif result.original_path:
+                    group_images.append(result.original_path)
+                group_names.append(Path(result.original_path).name)
+
+            # 生成输出文件名
+            if len(group) == 1:
+                # 单张图片，直接复制
+                output_name = f"page_{group_idx + 1:03d}.jpg"
+                reason = f"单页: {group_names[0]}"
+            else:
+                # 多张图片合并
+                output_name = f"page_{group_idx + 1:03d}_merged.jpg"
+                start_idx = group[0] + 1
+                end_idx = group[-1] + 1
+                reason = f"合并图片 {start_idx}-{end_idx}: {', '.join(group_names)}"
+
+            output_path = self.output_dir / output_name
+
+            logger.info(f"处理组 {group_idx + 1}/{len(merge_groups)}: {reason}")
+
+            # 执行合并或复制
+            if len(group_images) == 1:
+                # 单张图片直接复制
+                import shutil
+                shutil.copy2(group_images[0], output_path)
+            else:
+                # 多张图片合并
+                success = self.merger.merge_vertically(group_images, str(output_path))
+                if not success:
+                    logger.error(f"合并失败: 组 {group_idx + 1}")
+                    continue
+
+            output_files.append(str(output_path))
+
+        # 更新统计
+        merged_groups = len([g for g in merge_groups if len(g) > 1])
+        self.stats["merge_groups"] = merged_groups
+        self.stats["output_count"] = len(output_files)
+        self.stats["spacing_total"] = self.spacing * merged_groups if merged_groups > 0 else 0
+
+        logger.info(f"智能合并完成: {len(processed_images)} -> {len(output_files)} 文件")
+        logger.info(f"  合并组数: {merged_groups}")
+
+        return output_files
 
     def split_merged_image(self, merged_path: str) -> List[str]:
         """
@@ -574,22 +789,20 @@ class OCRMergeProcessor:
                     statistics=self.stats
                 )
 
-            # 3. 合并图片
-            logger.info("Step 3: 合并图片...")
-            merged_path = self.merge_cropped_images(processed_images)
-            if not merged_path:
+            # 3. 智能合并图片
+            logger.info("Step 3: 智能合并图片...")
+            output_files = self.merge_cropped_images(processed_images)
+            if not output_files:
                 return ProcessingResult(
                     success=False,
                     error="图片合并失败",
                     statistics=self.stats
                 )
 
-            # 4. 可选：分割图片
-            if self.enable_split:
+            # 4. 可选：分割图片（如果只输出一个文件且启用了分割）
+            if self.enable_split and len(output_files) == 1:
                 logger.info("Step 4: 分割图片...")
-                output_files = self.split_merged_image(merged_path)
-            else:
-                output_files = [merged_path]
+                output_files = self.split_merged_image(output_files[0])
 
             # 5. 清理临时文件
             logger.info("Step 5: 清理临时文件...")
