@@ -22,7 +22,7 @@ class OllamaProvider(BaseOCRProvider):
     """Ollama OCR 提供商"""
 
     DEFAULT_MODEL = "deepseek-ocr"
-    DEFAULT_TIMEOUT = 120  # Ollama本地处理可能需要更长时间
+    DEFAULT_TIMEOUT = 60  # Ollama本地处理可能需要更长时间
 
     SUPPORTED_FORMATS = {'.png', '.jpg', '.jpeg', '.webp'}
     MIME_TYPES = {
@@ -51,8 +51,16 @@ class OllamaProvider(BaseOCRProvider):
         if self._client is None:
             try:
                 import ollama
-                self._client = ollama.Client(host=self.base_url)
-                logger.info(f"已连接到Ollama服务: {self.base_url}")
+                from httpx import Timeout
+                # 设置超时：连接超时10秒，读取超时使用配置值
+                timeout = Timeout(
+                    connect=10.0,
+                    read=float(self.timeout),
+                    write=30.0,
+                    pool=15.0
+                )
+                self._client = ollama.Client(host=self.base_url, timeout=timeout)
+                logger.info(f"已连接到Ollama服务: {self.base_url}, timeout={self.timeout}s")
             except ImportError as e:
                 raise OCRConfigurationError(
                     "未安装ollama包，请运行: pip install ollama",
@@ -288,7 +296,33 @@ class OllamaProvider(BaseOCRProvider):
 
         except Exception as e:
             processing_time_ms = int((time.time() - start_time) * 1000)
-            logger.error(f"未知错误: {e}")
+            error_str = str(e)
+            error_type = type(e).__name__
+
+            # 检查是否为超时错误（httpx.TimeoutException 或其子类）
+            is_timeout = (
+                "timeout" in error_str.lower() or
+                "timed out" in error_str.lower() or
+                "TimeoutException" in error_type or
+                "ReadTimeout" in error_type or
+                "ConnectTimeout" in error_type
+            )
+
+            if is_timeout:
+                logger.error(f"Ollama OCR 超时 (>{self.timeout}s): {error_type}: {e}")
+                return self._format_response(
+                    success=False,
+                    error=f"Ollama处理超时（>{self.timeout}秒），请稍后重试或增加OLLAMA_TIMEOUT配置",
+                    error_code="OCR_TIMEOUT",
+                    metadata={
+                        "model": self._model,
+                        "processing_time_ms": processing_time_ms,
+                        "images_merged": images_merged,
+                        "timeout_seconds": self.timeout
+                    }
+                )
+
+            logger.error(f"未知错误 ({error_type}): {e}")
             return self._format_response(
                 success=False,
                 error=str(e),

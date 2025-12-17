@@ -156,9 +156,13 @@ class BatchMergeProcessor:
                 "error": str(e)
             }
 
-    def _detect_text_by_image_features(self, image_path: str) -> dict:
+    def _detect_text_in_region(self, image_path: str, region: str = "bottom") -> dict:
         """
-        基于图像特征检测底部是否有文字
+        基于图像特征检测指定区域是否有文字
+
+        Args:
+            image_path: 图片路径
+            region: 检测区域，"bottom"表示底部，"top"表示头部
         """
         if not HAS_PIL:
             return {
@@ -175,12 +179,17 @@ class BatchMergeProcessor:
 
                 width, height = img.size
 
-                # 裁剪底部20%区域
-                bottom_height = int(height * self.bottom_detection_ratio)
-                bottom_region = img.crop((0, height - bottom_height, width, height))
+                # 根据区域裁剪
+                region_height = int(height * self.bottom_detection_ratio)
+                if region == "bottom":
+                    # 裁剪底部区域
+                    crop_region = img.crop((0, height - region_height, width, height))
+                else:
+                    # 裁剪头部区域
+                    crop_region = img.crop((0, 0, width, region_height))
 
                 # 转换为灰度
-                gray = bottom_region.convert('L')
+                gray = crop_region.convert('L')
 
                 # 计算统计信息
                 stat = ImageStat.Stat(gray)
@@ -207,7 +216,7 @@ class BatchMergeProcessor:
                 return {
                     "has_text": has_text,
                     "confidence": confidence,
-                    "text": f"暗像素: {dark_ratio:.2%}, 标准差: {std_dev:.1f}",
+                    "text": f"{region}区域 - 暗像素: {dark_ratio:.2%}, 标准差: {std_dev:.1f}",
                     "error": None
                 }
 
@@ -218,6 +227,12 @@ class BatchMergeProcessor:
                 "text": "",
                 "error": str(e)
             }
+
+    def _detect_text_by_image_features(self, image_path: str) -> dict:
+        """
+        基于图像特征检测底部是否有文字（向后兼容方法）
+        """
+        return self._detect_text_in_region(image_path, region="bottom")
 
     def scan_images(self) -> List[str]:
         """
@@ -254,12 +269,13 @@ class BatchMergeProcessor:
             return (path.suffix, int(numbers[-1]))
         return (path.suffix, path.name)
 
-    def _detect_text_below_image(self, image_path: str) -> dict:
+    def _detect_text_in_image(self, image_path: str, region: str = "bottom") -> dict:
         """
-        检测图片下方是否有文字
+        检测图片指定区域是否有文字
 
         Args:
             image_path: 图片路径
+            region: 检测区域，"bottom"表示底部，"top"表示头部
 
         Returns:
             dict: {"has_text": bool, "confidence": float, "text": str, "error": str}
@@ -267,22 +283,22 @@ class BatchMergeProcessor:
         # 检查缓存
         try:
             mtime = Path(image_path).stat().st_mtime
-            cache_key = f"{image_path}_{mtime}"
+            cache_key = f"{image_path}_{mtime}_{region}"
             if cache_key in self._text_detection_cache:
                 self.stats["cache_hits"] += 1
-                logger.debug(f"Using cached detection result for {Path(image_path).name}")
+                logger.debug(f"Using cached {region} detection result for {Path(image_path).name}")
                 return self._text_detection_cache[cache_key]
         except:
             pass
 
         try:
-            logger.debug(f"Detecting text below image {Path(image_path).name}")
+            logger.debug(f"Detecting text at {region} of image {Path(image_path).name}")
 
-            # 方法1: 基于图像特征检测
-            result = self._detect_text_by_image_features(image_path)
+            # 基于图像特征检测指定区域
+            result = self._detect_text_in_region(image_path, region=region)
 
-            # 如果特征检测失败或置信度低，回退到文件名规则
-            if not result["has_text"] and result["confidence"] < 0.3:
+            # 如果特征检测失败或置信度低，且是底部检测，回退到文件名规则
+            if region == "bottom" and not result["has_text"] and result["confidence"] < 0.3:
                 filename_result = self._detect_text_by_filename(image_path)
                 if filename_result["has_text"]:
                     result = filename_result
@@ -291,12 +307,12 @@ class BatchMergeProcessor:
             if result["has_text"] and result["confidence"] >= self.ocr_confidence_threshold:
                 self.stats["text_detections"] += 1
                 if result.get("text"):
-                    logger.info(f"Text detected below image {Path(image_path).name}: '{result['text'][:50]}...'")
+                    logger.info(f"Text detected at {region} of {Path(image_path).name}: '{result['text'][:50]}...'")
                 else:
-                    logger.info(f"Text detected below image {Path(image_path).name}")
+                    logger.info(f"Text detected at {region} of {Path(image_path).name}")
             elif result["has_text"]:
                 result["has_text"] = False
-                logger.debug(f"Low confidence text detection in {Path(image_path).name}: {result['confidence']}")
+                logger.debug(f"Low confidence {region} text detection in {Path(image_path).name}: {result['confidence']}")
 
             # 缓存结果
             try:
@@ -307,13 +323,27 @@ class BatchMergeProcessor:
             return result
 
         except Exception as e:
-            logger.error(f"Failed to detect text below image {image_path}: {e}")
+            logger.error(f"Failed to detect text at {region} of image {image_path}: {e}")
             # 发生错误时返回默认值，不中断流程
             return {"has_text": False, "confidence": 0.0, "text": "", "error": str(e)}
+
+    def _detect_text_below_image(self, image_path: str) -> dict:
+        """
+        检测图片底部是否有文字（向后兼容方法）
+        """
+        return self._detect_text_in_image(image_path, region="bottom")
+
+    def _detect_text_above_image(self, image_path: str) -> dict:
+        """
+        检测图片头部是否有文字
+        """
+        return self._detect_text_in_image(image_path, region="top")
 
     def _should_merge_with_next(self, image_files: List[str], index: int) -> bool:
         """
         判断当前图片是否应该与下一张合并
+
+        合并条件：当前图片底部有文字 AND 下一张图片头部有文字
 
         Args:
             image_files: 图片文件列表
@@ -326,19 +356,30 @@ class BatchMergeProcessor:
         if index >= len(image_files) - 1:
             return False
 
-        # 智能分组：检测当前图片下方是否有文字
         current_image = image_files[index]
-        detection_result = self._detect_text_below_image(current_image)
+        next_image = image_files[index + 1]
 
-        if detection_result.get("error"):
-            logger.warning(f"Text detection failed for {Path(current_image).name}, keeping separate")
-            # 检测失败时保持独立
+        # 检测当前图片底部是否有文字
+        bottom_result = self._detect_text_below_image(current_image)
+        if bottom_result.get("error"):
+            logger.warning(f"Bottom text detection failed for {Path(current_image).name}, keeping separate")
             return False
 
-        # 如果下方有文字，与下一张合并
-        if detection_result["has_text"]:
-            logger.info(f"Image {index + 1} has text below, will merge with next image")
+        # 检测下一张图片头部是否有文字
+        top_result = self._detect_text_above_image(next_image)
+        if top_result.get("error"):
+            logger.warning(f"Top text detection failed for {Path(next_image).name}, keeping separate")
+            return False
+
+        # 只有当底部和头部都有文字时才合并
+        if bottom_result["has_text"] and top_result["has_text"]:
+            logger.info(f"Image {index + 1} bottom has text AND image {index + 2} top has text, will merge")
             return True
+
+        if bottom_result["has_text"] and not top_result["has_text"]:
+            logger.debug(f"Image {index + 1} has text below, but image {index + 2} has no text at top, skip merge")
+        elif not bottom_result["has_text"] and top_result["has_text"]:
+            logger.debug(f"Image {index + 1} has no text below, but image {index + 2} has text at top, skip merge")
 
         return False
 
@@ -347,7 +388,7 @@ class BatchMergeProcessor:
         生成分组合并策略
 
         策略：
-        - 检测图片下方是否有文字，有则与下一张合并
+        - 只有当当前图片底部有文字 AND 下一张图片头部有文字时，才合并
 
         Args:
             image_files: 图片文件列表
@@ -361,6 +402,8 @@ class BatchMergeProcessor:
         """
         基于内容检测的智能分组
 
+        合并条件：当前图片底部有文字 AND 下一张图片头部有文字
+
         Args:
             image_files: 图片文件列表
 
@@ -371,54 +414,87 @@ class BatchMergeProcessor:
         i = 0
         n = len(image_files)
 
-        # 如果启用并行检测，先检测所有图片
-        text_results = []
+        # 如果启用并行检测，先检测所有图片的底部和头部
+        bottom_results = []
+        top_results = []
+
         if self.parallel_detection and n > 1:
-            logger.info(f"Parallel text detection for {n} images using {self.max_workers} workers")
+            logger.info(f"Parallel text detection (bottom + top) for {n} images using {self.max_workers} workers")
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                # 提交所有检测任务
-                future_to_index = {
-                    executor.submit(self._detect_text_below_image, image_files[i]): i
+                # 提交所有底部检测任务
+                bottom_futures = {
+                    executor.submit(self._detect_text_below_image, image_files[i]): ("bottom", i)
+                    for i in range(n)
+                }
+                # 提交所有头部检测任务
+                top_futures = {
+                    executor.submit(self._detect_text_above_image, image_files[i]): ("top", i)
                     for i in range(n)
                 }
 
                 # 初始化结果列表
-                text_results = [None] * n
+                bottom_results = [None] * n
+                top_results = [None] * n
+
+                # 合并所有任务
+                all_futures = {**bottom_futures, **top_futures}
 
                 # 收集结果
-                for future in as_completed(future_to_index):
-                    index = future_to_index[future]
+                for future in as_completed(all_futures):
+                    region, index = all_futures[future]
                     try:
-                        text_results[index] = future.result()
+                        result = future.result()
+                        if region == "bottom":
+                            bottom_results[index] = result
+                        else:
+                            top_results[index] = result
                     except Exception as e:
-                        logger.error(f"Parallel detection failed for image {index}: {e}")
-                        text_results[index] = {"has_text": False, "error": str(e)}
+                        logger.error(f"Parallel {region} detection failed for image {index}: {e}")
+                        error_result = {"has_text": False, "error": str(e)}
+                        if region == "bottom":
+                            bottom_results[index] = error_result
+                        else:
+                            top_results[index] = error_result
         else:
             # 串行检测
-            logger.info(f"Serial text detection for {n} images")
-            text_results = [self._detect_text_below_image(img) for img in image_files]
+            logger.info(f"Serial text detection (bottom + top) for {n} images")
+            bottom_results = [self._detect_text_below_image(img) for img in image_files]
+            top_results = [self._detect_text_above_image(img) for img in image_files]
 
         # 根据检测结果生成分组
         while i < n:
             group_start = i
             group_end = i + 1  # 至少包含当前图片
 
-            # 检查当前图片是否需要与下一张合并
-            current_has_text = (text_results[i] and
-                               text_results[i].get("has_text", False) and
-                               not text_results[i].get("error"))
+            # 检查当前图片底部是否有文字
+            current_bottom_has_text = (bottom_results[i] and
+                                       bottom_results[i].get("has_text", False) and
+                                       not bottom_results[i].get("error"))
 
-            if current_has_text and i < n - 1:
-                # 当前图片有文字，与下一张合并
+            # 检查下一张图片头部是否有文字
+            next_top_has_text = False
+            if i < n - 1:
+                next_top_has_text = (top_results[i + 1] and
+                                     top_results[i + 1].get("has_text", False) and
+                                     not top_results[i + 1].get("error"))
+
+            # 只有当底部和头部都有文字时才合并
+            if current_bottom_has_text and next_top_has_text and i < n - 1:
                 group_end = i + 2
-                reason = f"smart merge: image {i+1} has text below, merging with image {i+2}"
+                reason = f"smart merge: image {i+1} bottom + image {i+2} top both have text"
                 logger.info(reason)
             else:
                 reason = f"single image: {Path(image_files[i]).name}"
-                if text_results[i] and text_results[i].get("error"):
-                    reason += " (detection error)"
-                elif not current_has_text and self.smart_grouping_enabled:
-                    reason += " (no text detected)"
+                if bottom_results[i] and bottom_results[i].get("error"):
+                    reason += " (bottom detection error)"
+                elif i < n - 1 and top_results[i + 1] and top_results[i + 1].get("error"):
+                    reason += " (next top detection error)"
+                elif current_bottom_has_text and not next_top_has_text:
+                    reason += " (bottom has text, next top no text)"
+                elif not current_bottom_has_text and next_top_has_text:
+                    reason += " (bottom no text, next top has text)"
+                elif not current_bottom_has_text:
+                    reason += " (no text at bottom)"
 
             # 创建合并组
             indices = list(range(group_start, group_end))
