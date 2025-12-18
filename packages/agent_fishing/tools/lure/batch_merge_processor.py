@@ -245,6 +245,12 @@ class BatchMergeProcessor:
                 row_stds = np.std(pixels, axis=1)  # 每行的标准差
                 avg_row_std = np.mean(row_stds)
 
+                # 4. 深色背景检测：灰色/深色背景上的文字（如表格标题行）
+                dark_pixel_ratio = np.sum(pixels < 100) / pixels.size
+                light_pixel_ratio = np.sum(pixels > 200) / pixels.size
+                # 如果大部分是深色但有少量亮色（文字），可能是深色背景文字
+                has_dark_bg_text = dark_pixel_ratio > 0.5 and light_pixel_ratio > 0.05
+
                 # 综合评分判断
                 text_score = 0
 
@@ -254,7 +260,9 @@ class BatchMergeProcessor:
                 elif edge_density > 0.10:
                     text_score += 30
                 elif edge_density > 0.05:
-                    text_score += 15
+                    text_score += 20
+                elif edge_density > 0.03:
+                    text_score += 10
 
                 # 强边缘比例评分（0-30分）
                 if strong_edge_ratio > 0.10:
@@ -272,8 +280,8 @@ class BatchMergeProcessor:
                 elif avg_row_std > 20:
                     text_score += 10
 
-                # 判断阈值：总分超过45认为有文字
-                has_text = text_score >= 45
+                # 判断阈值：总分超过40认为有文字
+                has_text = text_score >= 40
                 # 置信度计算：确保达到阈值的评分置信度不低于0.5
                 confidence = min(0.95, max(0.5, text_score / 100)) if has_text else text_score / 100
 
