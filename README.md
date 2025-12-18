@@ -191,7 +191,7 @@ SILICONFLOW_OCR_TIMEOUT=30
 ### 使用示例
 
 ```python
-from packages.agent_fishing.tools.lure import BatchMergeProcessor
+from packages.data_processing.image import BatchMergeProcessor
 
 # 创建批处理器
 processor = BatchMergeProcessor(

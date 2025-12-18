@@ -34,21 +34,20 @@
 
 ```
 图片处理系统架构：
+├── 数据处理层 (packages/data_processing/)
+│   ├── image/               # 图片处理模块
+│   │   ├── merger.py        # 图片合并核心模块
+│   │   ├── batch_processor.py # 批量智能合并处理器
+│   │   └── splitter.py      # 图片分割模块
+│   └── ocr/                 # OCR处理模块
+│       ├── text_detector.py # 文字区域检测
+│       └── ocr_processor.py # OCR合并处理器
 ├── OCR服务层 (apps/api/services/ocr/)
 │   ├── base.py              # OCR提供商抽象基类
 │   ├── factory.py           # OCR提供商工厂
 │   ├── siliconflow_provider.py  # SiliconFlow云端OCR实现
 │   ├── ollama_provider.py   # Ollama本地OCR实现
 │   └── exceptions.py        # OCR异常定义
-├── 图片合并层 (packages/agent_fishing/tools/lure/)
-│   ├── image_merger.py      # 图片合并核心模块
-│   │   ├── ImageMerger      # 图片合并器类
-│   │   ├── merge_vertically()  # 垂直合并方法
-│   │   └── merge_with_text_overlay() # 带文字覆盖的合并
-│   └── batch_merge_processor.py  # 批量智能合并处理器
-│       ├── BatchMergeProcessor # 批处理管理器
-│       ├── MergeGroup       # 合并组数据结构
-│       └── 智能检测算法实现
 └── 服务集成层 (apps/api/services/)
     └── ocr_service.py       # OCR服务集成和封装
 ```
@@ -164,7 +163,7 @@ result = service.recognize_table_from_paths(
 ### 基本用法
 
 ```python
-from packages.agent_fishing.tools.lure import BatchMergeProcessor
+from packages.data_processing.image import BatchMergeProcessor
 
 # 创建批处理器
 processor = BatchMergeProcessor(
@@ -208,7 +207,7 @@ processor = BatchMergeProcessor(
 ### 单独使用图片合并器
 
 ```python
-from packages.agent_fishing.tools.lure import ImageMerger
+from packages.data_processing.image import ImageMerger
 
 # 创建合并器
 merger = ImageMerger(
@@ -425,7 +424,7 @@ class CustomBatchMergeProcessor(BatchMergeProcessor):
 ```python
 # FastAPI 集成示例
 from fastapi import FastAPI, UploadFile, File
-from packages.agent_fishing.tools.lure import BatchMergeProcessor
+from packages.data_processing.image import BatchMergeProcessor
 import tempfile
 import shutil
 

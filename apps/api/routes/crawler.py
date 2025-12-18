@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from packages.agent_fishing.tools.lure.orm.session import get_db_session
 from packages.agent_fishing.tools.lure.orm.repositories.crawler_repo import CrawlerRepository
-from packages.agent_fishing.tools.lure.models.system import CrawlerTask, TaskStatus
+from packages.scraper.models import CrawlerTask, TaskStatus
 
 from apps.api.schemas.crawler import (
     CrawlerTaskCreate,
@@ -45,10 +45,10 @@ from apps.api.services.crawler_service import CrawlerService
 
 # Workflow imports
 from packages.agent_fishing.tools.lure.database import get_db
-from packages.agent_fishing.tools.lure.models.system import CrawlerWorkflowTemplate, CrawlerSchedule, CrawlerLog
-from packages.agent_fishing.tools.crawler.workflow.manager import WorkflowManager
-from packages.agent_fishing.tools.crawler.executor.task_queue import CrawlerTaskQueue
-from packages.agent_fishing.tools.crawler.scheduler.workflow_scheduler import WorkflowScheduler
+from packages.scraper.models import CrawlerWorkflowTemplate, CrawlerSchedule, CrawlerLog
+from packages.scraper.workflow.manager import WorkflowManager
+from packages.scraper.executor.task_queue import CrawlerTaskQueue, configure_database
+from packages.scraper.scheduler.workflow_scheduler import WorkflowScheduler
 
 # Scheduler imports
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

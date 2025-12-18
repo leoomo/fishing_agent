@@ -14,6 +14,9 @@
 - knowledge_indexer.py: 知识索引管理
 - knowledge_search.py: 知识搜索服务
 - cli.py: CLI管理工具
+
+注意：图片处理和OCR模块位于 packages/data_processing
+爬虫模块位于 packages/scraper
 """
 
 from .database import LureDatabase, get_db, reset_db
@@ -67,63 +70,6 @@ from .knowledge_search import (
     create_search_service
 )
 
-# Image Processing
-from .image_merger import ImageMerger, create_image_merger
-from .batch_merge_processor import (
-    BatchMergeProcessor,
-    MergeGroup,
-    create_batch_processor
-)
-from .merge_split_processor import (
-    MergeAndSplitProcessor,
-    BlankRowDetector,
-    ImageSplitter,
-    BlankRegion,
-    ContentRegion,
-    create_merge_split_processor
-)
-from .text_region_detector import (
-    TextRegionDetector,
-    TextRegionCropper,
-    TextBox,
-    CropRegion,
-    HorizontalRegion,
-    crop_text_area,
-    detect_text_boxes
-)
-from .ocr_merge_processor import (
-    OCRMergeProcessor,
-    ProcessedImage,
-    ProcessingResult,
-    create_ocr_merge_processor
-)
-
-
-def create_processor(
-    source_dir: str,
-    strategy: str = "smart_group",
-    **kwargs
-):
-    """
-    创建图片处理器
-
-    Args:
-        source_dir: 源图片目录
-        strategy: 处理策略
-            - "smart_group": 原有策略（底部+头部文字检测，智能分组合并）
-            - "merge_split": 先合并所有图片，再按空白切割
-            - "ocr_crop": 使用 PaddleOCR 精准裁剪文字区域后合并（推荐）
-
-    Returns:
-        处理器实例
-    """
-    if strategy == "ocr_crop":
-        return OCRMergeProcessor(source_dir, **kwargs)
-    elif strategy == "merge_split":
-        return MergeAndSplitProcessor(source_dir, **kwargs)
-    else:
-        return BatchMergeProcessor(source_dir, **kwargs)
-
 
 __all__ = [
     # Database
@@ -171,30 +117,4 @@ __all__ = [
     'RigSearchResult',
     'ImageSearchResult',
     'create_search_service',
-    # Image Processing
-    'ImageMerger',
-    'create_image_merger',
-    'BatchMergeProcessor',
-    'MergeGroup',
-    'create_batch_processor',
-    'MergeAndSplitProcessor',
-    'BlankRowDetector',
-    'ImageSplitter',
-    'BlankRegion',
-    'ContentRegion',
-    'create_merge_split_processor',
-    'create_processor',
-    # Text Region Detection (PaddleOCR)
-    'TextRegionDetector',
-    'TextRegionCropper',
-    'TextBox',
-    'CropRegion',
-    'HorizontalRegion',
-    'crop_text_area',
-    'detect_text_boxes',
-    # OCR Merge Processor
-    'OCRMergeProcessor',
-    'ProcessedImage',
-    'ProcessingResult',
-    'create_ocr_merge_processor',
 ]

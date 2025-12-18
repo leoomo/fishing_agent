@@ -82,3 +82,8 @@ fishing-api = "apps.api.main:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["packages*", "apps*", "shared*"]
+
+# 本地包依赖（workspace 模式）
+[tool.uv.sources]
+scraper = { path = "packages/scraper", editable = true }
+data-processing = { path = "packages/data_processing", editable = true }

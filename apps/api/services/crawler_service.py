@@ -10,7 +10,7 @@ from datetime import datetime
 
 from packages.agent_fishing.tools.lure.orm.session import get_db_session
 from packages.agent_fishing.tools.lure.orm.repositories.crawler_repo import CrawlerRepository
-from packages.agent_fishing.tools.lure.models.system import CrawlerTask, CrawlerLog
+from packages.scraper.models import CrawlerTask, CrawlerLog
 
 logger = logging.getLogger(__name__)
 

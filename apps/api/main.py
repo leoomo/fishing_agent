@@ -137,8 +137,15 @@ async def lifespan(app: FastAPI):
 
     # 初始化工作流调度器
     try:
-        from packages.agent_fishing.tools.crawler.scheduler.workflow_scheduler import WorkflowScheduler
-        workflow_scheduler = WorkflowScheduler(scheduler)
+        from packages.scraper.scheduler.workflow_scheduler import WorkflowScheduler
+        from packages.scraper.executor.task_queue import configure_database
+        from packages.agent_fishing.tools.lure.database import get_db
+
+        # 配置 scraper 包的数据库连接（依赖注入）
+        configure_database(get_db)
+
+        # 初始化工作流调度器（传入 get_db 函数）
+        workflow_scheduler = WorkflowScheduler(scheduler, get_db)
         workflow_scheduler.load_schedules_from_db()
         logger.info("工作流调度器初始化完成")
     except Exception as e:

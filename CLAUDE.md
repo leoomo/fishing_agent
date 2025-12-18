@@ -25,9 +25,7 @@ packages/agent_fishing/     # 自包含Agent包
 ├── core/                   # agent.py, model_factory.py, prompts.py, callbacks.py
 │   └── middleware/         # dynamic_prompt.py
 ├── tools/                  # basic, weather, fishing, lure_tools, lure/, scoring/
-│   └── lure/               # 路亚装备工具
-│       ├── image_merger.py      # 图片合并核心模块 ⭐ 新增
-│       └── batch_merge_processor.py  # 批量智能合并处理器 ⭐ 新增
+│   └── lure/               # 路亚装备工具（装备推荐、对比、知识查询）
 └── utils/
 apps/                       # 应用层
 ├── cli/                    # CLI应用 (main.py)
@@ -69,8 +67,8 @@ from packages.agent_fishing.core import ModelFactory
 from packages.agent_fishing.tools import get_weather, query_fishing_recommendation
 from packages.agent_fishing.utils import get_coordinates, parse_date_input
 
-# 图片合并功能 ⭐ 新增
-from packages.agent_fishing.tools.lure import BatchMergeProcessor, ImageMerger
+# 图片合并功能（位于 data_processing 包）
+from packages.data_processing.image import BatchMergeProcessor, ImageMerger
 ```
 
 ## API端点

@@ -3,7 +3,7 @@
 **版本**: v5.0.2
 **分支**: feature/equipment-ui
 **目标**: 为大模型(LLM)提供完整的项目架构理解指南
-**架构**: 模块化 Agent 包 + FastAPI 后端 + React管理前端 + JWT认证系统 + 工作流管理系统 + 数据分析 + 配置管理 + OCR多提供商系统
+**架构**: 模块化 Agent 包 + FastAPI 后端 + React管理前端 + JWT认证系统 + 工作流管理系统 + 数据分析 + 配置管理 + OCR多提供商系统 + 智能图片合并系统
 
 ---
 
@@ -23,7 +23,7 @@
 ## 1. 项目概览与架构哲学
 
 ### 🎯 项目定位
-智能钓鱼助手 v3.1.1 是基于 **LangChain 1.0+** 的模块化智能代理系统，采用全新包架构和动态Prompt中间件，专门为路亚钓鱼爱好者提供：
+智能钓鱼助手 v5.0.2 是基于 **LangChain 1.0+** 的模块化智能代理系统，采用全新包架构和动态Prompt中间件，专门为路亚钓鱼爱好者提供：
 - **动态Prompt中间件**，智能选择提示词，优化Token使用效率50%+
 - **实时天气分析**和钓鱼条件评估
 - **7因子科学评分系统**（温度、天气、风力、气压、湿度、季节、月相）
@@ -35,17 +35,24 @@
 - **完全自包含的 Agent 包**架构
 - **调试工具**支持多模型测试和环境检查
 - **动态Prompt中间件**系统，智能选择提示词
+- **React管理前端**（React 19.2.0 + TypeScript + Ant Design 5.22.0）⭐ v5.0新增
+- **JWT认证系统**（RBAC权限管理 + Token安全）⭐ v3.1.1新增
+- **智能图片合并**（自动检测文字 + 批量处理 + 本地化处理）⭐ v5.0新增
+- **OCR多提供商支持**（Ollama本地 + SiliconFlow云端）⭐ v5.0新增
+- **路亚装备管理系统**和数据分析报表 ⭐ v5.0新增
+- **爬虫监控模块**和工作流管理系统 ⭐ v4.0新增
+- **系统配置管理**（API密钥/参数配置）⭐ v5.0新增
 
 ### 🏗️ 核心架构哲学
 
 #### **模块化包架构 (Modular Package Architecture)**
 ```python
-# v3.1.1: 完全自包含的 Agent 包 + 动态Prompt中间件
+# v5.0.2: 完全自包含的 Agent 包 + 动态Prompt中间件 + 智能图片合并
 from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
 
 # 每个包都是独立可发布的单元
 packages/
-├── agent_fishing/          # 钓鱼 Agent 包
+├── agent_fishing/          # 钓鱼 Agent 包（已完成）
 ├── agent_weather/          # 天气 Agent 包（未来）
 └── agent_location/         # 地理 Agent 包（未来）
 ```
@@ -221,11 +228,11 @@ async def chat(request: ChatRequest):
 
 ## 3. 模块组织
 
-### 📁 核心目录结构 (v3.1.1)
+### 📁 核心目录结构 (v5.0.2)
 
 ```
 fishing-agent/
-├── packages/                      # Agent 包目录（新增）
+├── packages/                      # Agent 包目录
 │   └── agent_fishing/             # 钓鱼 Agent（完全自包含）
 │       ├── __init__.py           # 包入口和 LangGraph 兼容
 │       ├── core/                  # Agent 核心
@@ -233,56 +240,127 @@ fishing-agent/
 │       │   ├── agent.py           # FishingAgent 实现
 │       │   ├── model_factory.py   # LLM 工厂
 │       │   ├── prompts.py         # 提示词
-│       │   ├── callbacks.py       # 回调系统
-│       │   └── middleware/         # v3.1.1新增：动态Prompt中间件
-│       │       ├── __init__.py
-│       │       └── dynamic_prompt.py # 智能Prompt选择系统
-│       ├── tools/                 # Agent 工具
+│       │   └── callbacks.py       # 回调系统
+│       ├── middleware/            # 动态Prompt中间件
 │       │   ├── __init__.py
-│       │   ├── basic.py           # 基础工具
+│       │   └── dynamic_prompt.py  # 智能Prompt选择系统
+│       ├── tools/                 # Agent 工具集
+│       │   ├── __init__.py
+│       │   ├── basic.py           # 基础工具（时间功能）
 │       │   ├── weather.py         # 天气工具
 │       │   ├── fishing_tool.py    # 钓鱼工具
-│       │   ├── lure_tools.py      # 路亚工具
+│       │   ├── lure_tools.py      # 路亚装备工具
 │       │   ├── lure/              # 路亚子模块
+│       │   │   ├── embeddings.py  # DashScope嵌入服务
+│       │   │   ├── vector_store.py # ChromaDB向量存储
+│       │   │   └── knowledge_search.py # 语义搜索
+│       │   ├── fishing/           # 钓鱼评分子模块
+│       │   │   ├── weather_api.py # 天气API集成
+│       │   │   ├── weather_parser.py # 天气数据解析
+│       │   │   ├── time_optimizer.py # 时间优化器
+│       │   │   ├── report_generator.py # 报告生成器
+│       │   │   ├── enhanced_scorer.py # 增强7因子评分
+│       │   │   └── scorer.py      # 基础评分器
+│       │   ├── crawler/           # 爬虫工具模块 ⭐ v4.0新增
+│       │   │   ├── downloader.py  # 下载器
+│       │   │   ├── deduplicator.py # 去重器
+│       │   │   ├── rpa/           # RPA爬虫核心
+│       │   │   │   ├── captcha_solver.py # 验证码解决
+│       │   │   │   ├── session_storage.py # 会话存储
+│       │   │   │   ├── core/      # 核心模块
+│       │   │   │   ├── taobao_rpa.py # 淘宝RPA
+│       │   │   │   └── extractors/ # 数据提取器
+│       │   │   └── workflow/      # 工作流管理 ⭐ v5.0新增
+│       │   │       ├── manager.py  # 工作流管理器
+│       │   │       ├── executor.py # 执行引擎
+│       │   │       └── scheduler.py # 任务调度器
 │       │   └── scoring/           # 评分系统
 │       │       └── enhanced_scorer.py
 │       └── utils/                 # Agent 工具类
 │           ├── __init__.py
-│           ├── api_client.py
-│           ├── coordinate_utils.py
-│           └── date_utils.py
-├── apps/                          # 应用层（新增）
+│           ├── api_client.py      # API客户端
+│           ├── coordinate_utils.py # 坐标工具
+│           └── date_utils.py      # 日期工具
+├── apps/                          # 应用层
 │   ├── cli/                       # CLI 应用
-│   │   └── main.py
-│   └── api/                       # FastAPI 后端
-│       ├── main.py
-│       ├── auth/                   # JWT 认证模块
-│       │   ├── jwt.py            # JWT 工具
-│       │   ├── dependencies.py   # 认证依赖
-│       │   └── permissions.py    # 权限管理
-│       ├── middleware/            # API 中间件
-│       ├── routes/                # API 路由
-│       │   ├── auth.py           # 认证路由
-│       │   ├── fishing.py        # 钓鱼助手路由
-│       │   ├── user_equipment.py # 用户装备路由
-│       │   ├── crawler.py        # 爬虫管理路由
-│       │   ├── analytics.py      # 数据分析路由
-│       │   ├── config.py         # 配置管理路由
-│       │   └── monitor.py        # 监控管理路由
-│       ├── schemas/               # 数据模型
-│       └── services/              # 业务服务层
-│           ├── analytics_service.py # 数据分析服务
-│           ├── config_service.py    # 配置管理服务
-│           └── crawler_service.py   # 爬虫管理服务
-├── shared/                        # 共享资源（新增）
+│   │   └── main.py                # CLI主程序
+│   ├── api/                       # FastAPI 后端
+│   │   ├── main.py                # API服务器 (v5.0.0)
+│   │   ├── auth/                  # JWT认证模块 ⭐ v3.1.1新增
+│   │   │   ├── jwt.py             # JWT工具
+│   │   │   ├── dependencies.py    # 认证依赖
+│   │   │   └── permissions.py     # 权限管理
+│   │   ├── middleware/            # API中间件
+│   │   │   └── cors.py            # CORS中间件
+│   │   ├── routes/                # API路由
+│   │   │   ├── auth.py            # 认证路由
+│   │   │   ├── fishing.py         # 钓鱼助手路由
+│   │   │   ├── user_equipment.py  # 用户装备路由
+│   │   │   ├── analytics.py       # 数据分析路由 ⭐ v5.0新增
+│   │   │   ├── config.py          # 配置管理路由 ⭐ v5.0新增
+│   │   │   ├── crawler.py         # 爬虫管理路由 ⭐ v4.0新增
+│   │   │   └── monitor.py         # 监控管理路由 ⭐ v4.0新增
+│   │   ├── schemas/               # 数据模型
+│   │   │   ├── auth.py            # 认证相关模型
+│   │   │   ├── fishing.py         # 钓鱼相关模型
+│   │   │   └── equipment.py       # 装备相关模型
+│   │   ├── services/              # 业务服务层 ⭐ v5.0新增
+│   │   │   ├── analytics_service.py # 数据分析服务
+│   │   │   ├── config_service.py    # 配置管理服务
+│   │   │   └── crawler_service.py   # 爬虫管理服务
+│   │   ├── utils/                 # API工具
+│   │   │   └── security.py        # 安全工具
+│   │   └── websocket/             # WebSocket管理 ⭐ v5.0新增
+│   │       └── manager.py         # 连接管理器
+│   └── web-admin/                 # React管理前端 ⭐ v5.0新增
+│       ├── public/                # 静态资源
+│       ├── src/                   # 源代码
+│       │   ├── components/        # 通用组件
+│       │   │   ├── Layout/        # 布局组件
+│       │   │   ├── AuthGuard/     # 认证守卫
+│       │   │   └── Charts/        # 图表组件
+│       │   ├── pages/             # 页面组件
+│       │   │   ├── Dashboard/     # 仪表盘
+│       │   │   ├── Equipment/     # 装备管理
+│       │   │   ├── Analytics/     # 数据分析
+│       │   │   ├── Crawler/       # 爬虫管理
+│       │   │   ├── Config/        # 配置管理
+│       │   │   └── Monitor/       # 监控中心
+│       │   ├── services/          # API服务
+│       │   │   ├── api.ts         # API客户端
+│       │   │   └── auth.ts        # 认证服务
+│       │   ├── store/             # Redux状态管理
+│       │   │   ├── index.ts       # Store配置
+│       │   │   └── slices/        # 状态切片
+│       │   ├── utils/             # 工具函数
+│       │   ├── types/             # TypeScript类型定义
+│       │   └── App.tsx            # 主应用组件
+│       ├── package.json           # 前端依赖
+│       └── vite.config.ts         # Vite配置
+├── shared/                        # 共享资源
 │   ├── config/                    # 全局配置
-│   └── data/                      # 共享数据
+│   │   ├── database.py            # 数据库配置
+│   │   └── settings.py            # 应用设置
+│   ├── data/                      # 共享数据
+│   │   ├── equipment/             # 装备数据
+│   │   └── templates/             # 模板文件
+│   └── images/                    # 共享图片
+├── scripts/                       # 脚本目录
+│   ├── debug_ocr.py              # OCR调试脚本
+│   └── setup_db.py               # 数据库初始化
+├── logs/                          # 日志目录
 ├── tests/                         # 测试
-│   └── agent_fishing/
+│   ├── agent_fishing/            # Agent测试
+│   └── api/                      # API测试
+├── docs/                          # 文档
+│   ├── ARCHITECTURE.md           # 架构文档
+│   ├── API.md                    # API文档
+│   └── DEPLOYMENT.md             # 部署文档
 ├── main.py                        # CLI 入口（兼容层）
-├── debug_agent.py                 # v3.1.1新增：调试工具
+├── debug_agent.py                 # 调试工具
 ├── langgraph.json                 # LangGraph 配置
-└── pyproject.toml                 # 项目配置
+├── pyproject.toml                 # 项目配置 (uv)
+└── package.json                   # 根级npm配置
 ```
 
 ### 🔧 模块职责边界
@@ -304,7 +382,7 @@ fishing-agent/
 
 ### 🎯 入口点与接口
 
-#### **主要入口点 (v3.1.1)**
+#### **主要入口点 (v5.0.2)**
 ```python
 # 1. CLI 命令行
 fishing                        # 新版本 CLI 命令
@@ -314,13 +392,23 @@ python main.py                 # 兼容旧版本
 fishing-api                    # 启动 REST API 服务
 uvicorn apps.api.main:app --reload
 
-# 3. 编程接口 - 使用新包结构
+# 3. React管理前端 ⭐ v5.0新增
+cd apps/web-admin
+npm run dev                    # 启动开发服务器
+npm run build                  # 构建生产版本
+
+# 4. 编程接口 - 使用新包结构
 from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
 agent = create_agent(model_provider="zhipu")
 
-# 4. LangGraph 兼容
+# 5. LangGraph 兼容
 from packages.agent_fishing import get_agent
 agent = get_agent()  # LangGraph Studio 兼容
+
+# 6. 图片合并功能（位于 data_processing 包）
+from packages.data_processing.image import BatchMergeProcessor, ImageMerger
+processor = BatchMergeProcessor(source_dir="./images")
+result = processor.process()
 ```
 
 #### **工具访问模式**
@@ -337,7 +425,7 @@ from packages.agent_fishing.tools.fishing_tool import query_fishing_recommendati
 
 ## 4. 核心组件分析
 
-### 🔧 调试工具系统 (v3.1.1新增)
+### 🔧 调试工具系统 (v3.1.1新增，持续更新)
 
 #### **debug_agent.py - 综合调试工具**
 ```python
@@ -356,10 +444,12 @@ uv run python debug_agent.py --test-all
 - **完整性检查**: 验证工具列表和功能完整性
 
 **技术特性**:
-- 支持所有v3.1.1支持的LLM提供商
+- 支持所有v5.0.2支持的LLM提供商（智谱AI、通义千问、豆包、OpenAI等）
 - 集成动态Prompt中间件测试
 - 实时性能统计和错误追踪
 - 环境配置自动检测
+- OCR多提供商测试（Ollama本地、SiliconFlow云端）⭐ v5.0新增
+- 图片合并功能调试 ⭐ v5.0新增
 
 ### 🤖 模块化 FishingAgent
 
@@ -410,8 +500,9 @@ class FishingAgent:
 from fastapi import FastAPI
 from packages.agent_fishing import create_agent
 from .routes import auth_router
+from .websocket import manager as websocket_manager
 
-app = FastAPI(title="智能钓鱼助手 API", version="3.1.1")
+app = FastAPI(title="智能钓鱼助手 API", version="5.0.2")
 
 # 注册路由
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
@@ -459,7 +550,7 @@ def verify_token(token: str) -> dict:
 GET  /                     # API 信息
 GET  /health               # 健康检查
 
-# 认证相关
+# 认证相关 ⭐ v3.1.1新增
 POST /api/v1/auth/login    # 管理员登录
 GET  /api/v1/auth/profile  # 获取用户信息（需认证）
 POST /api/v1/auth/logout   # 用户登出（需认证）
@@ -467,6 +558,33 @@ POST /api/v1/auth/logout   # 用户登出（需认证）
 # 钓鱼助手
 POST /api/v1/fishing/chat  # 钓鱼助手对话
 GET  /api/v1/fishing/tools # 工具列表
+
+# 用户装备管理 ⭐ v5.0新增
+GET  /api/v1/equipment     # 获取装备列表
+POST /api/v1/equipment     # 添加装备
+PUT  /api/v1/equipment/{id} # 更新装备
+DELETE /api/v1/equipment/{id} # 删除装备
+
+# 数据分析报表 ⭐ v5.0新增
+GET  /api/v1/admin/analytics/equipment/stats  # 装备统计
+GET  /api/v1/admin/analytics/equipment/trends # 趋势分析
+POST /api/v1/admin/analytics/reports/generate # 生成报表
+
+# 配置管理 ⭐ v5.0新增
+GET  /api/v1/admin/config/configs # 查询配置
+POST /api/v1/admin/config/configs # 创建配置
+POST /api/v1/admin/config/configs/test-api-key # 测试API密钥
+
+# 爬虫管理 ⭐ v4.0新增
+GET  /api/v1/admin/crawler/tasks # 爬虫任务列表
+POST /api/v1/admin/crawler/tasks/trigger # 触发爬虫
+
+# 监控管理 ⭐ v4.0新增
+GET  /api/v1/admin/monitor/api-stats # API统计
+GET  /api/v1/admin/monitor/llm-stats  # LLM统计
+
+# WebSocket ⭐ v5.0新增
+WS   /ws/monitor           # 实时监控推送
 ```
 
 ### 🛠️ 工具系统架构
@@ -475,16 +593,36 @@ GET  /api/v1/fishing/tools # 工具列表
 ```python
 # packages/agent_fishing/tools/
 tools/
-├── __init__.py           # 统一工具导出
-├── basic.py             # 基础工具（时间功能）
-├── weather.py           # 天气查询工具
-├── fishing_tool.py      # 钓鱼推荐工具
-├── lure_tools.py        # 路亚装备工具
-├── lure/                # 路亚装备子模块
-│   ├── embeddings.py    # DashScope嵌入服务
-│   ├── vector_store.py  # ChromaDB向量存储
-│   └── knowledge_search.py # 语义搜索服务
-└── scoring/             # 评分系统
+├── __init__.py                    # 统一工具导出
+├── basic.py                      # 基础工具（时间功能）
+├── weather.py                    # 天气查询工具
+├── fishing_tool.py               # 钓鱼推荐工具
+├── lure_tools.py                 # 路亚装备工具
+├── lure/                         # 路亚装备子模块
+│   ├── embeddings.py            # DashScope嵌入服务
+│   ├── vector_store.py          # ChromaDB向量存储
+│   └── knowledge_search.py      # 语义搜索服务
+├── fishing/                      # 钓鱼评分子模块 ⭐ v4.0新增
+│   ├── weather_api.py           # 天气API集成
+│   ├── weather_parser.py        # 天气数据解析
+│   ├── time_optimizer.py        # 时间优化器
+│   ├── report_generator.py      # 报告生成器
+│   ├── enhanced_scorer.py       # 增强7因子评分
+│   └── scorer.py                # 基础评分器
+├── crawler/                      # 爬虫工具模块 ⭐ v4.0新增
+│   ├── downloader.py            # 下载器
+│   ├── deduplicator.py          # 去重器
+│   ├── rpa/                     # RPA爬虫核心
+│   │   ├── captcha_solver.py    # 验证码解决
+│   │   ├── session_storage.py   # 会话存储
+│   │   ├── core/                # 核心模块
+│   │   ├── taobao_rpa.py        # 淘宝RPA
+│   │   └── extractors/          # 数据提取器
+│   └── workflow/                # 工作流管理 ⭐ v5.0新增
+│       ├── manager.py           # 工作流管理器
+│       ├── executor.py          # 执行引擎
+│       └── scheduler.py         # 任务调度器
+└── scoring/                      # 评分系统
     └── enhanced_scorer.py
 ```
 
@@ -495,6 +633,8 @@ BASIC_TOOLS = [get_current_time]                    # 通用工具
 WEATHER_TOOLS = [get_weather_by_date]              # 纯天气查询
 FISHING_TOOLS = [query_fishing_recommendation]     # 钓鱼+天气分析
 LURE_TOOLS = [query_lure_recommendation]           # 装备数据库
+CRAWLER_TOOLS = [run_crawler_workflow]             # 爬虫工作流 ⭐ v4.0新增
+OCR_TOOLS = [extract_text_from_image]              # OCR文字提取 ⭐ v5.0新增
 ```
 
 ### 📊 评分算法系统
@@ -523,6 +663,98 @@ def calculate_fishing_score(weather_data, location_data) -> dict:
 ---
 
 ## 5. 开发模式
+
+### 🖼️ 智能图片合并系统
+
+图片处理和OCR功能已迁移到独立的 `packages/data_processing` 包。
+
+```python
+# 图片合并功能
+from packages.data_processing.image import BatchMergeProcessor, ImageMerger
+
+# OCR功能
+from packages.data_processing.ocr import OCRMergeProcessor
+```
+
+详细使用说明请参考 [图片处理文档](./IMAGE_PROCESSING.md)。
+
+### 🖥️ React管理前端架构 (v5.0新增) ⭐
+
+#### **技术栈**
+```typescript
+// 前端核心技术栈
+{
+  "react": "19.2.0",           // React 19 最新版本
+  "typescript": "^5.9.3",      // TypeScript
+  "antd": "5.22.0",           // Ant Design UI库
+  "react-router-dom": "6.28.0", // 路由管理
+  "@reduxjs/toolkit": "2.3.0", // Redux状态管理
+  "echarts": "5.5.0",         // 图表可视化
+  "axios": "1.7.0",           // HTTP客户端
+  "vite": "7.2.4"            // 构建工具
+}
+```
+
+#### **组件架构**
+```typescript
+// apps/web-admin/src/components/
+├── Layout/                    # 布局组件
+│   ├── AppHeader.tsx         # 顶部导航
+│   ├── AppSider.tsx          # 侧边栏
+│   └── AppContent.tsx        # 内容区域
+├── AuthGuard/                 # 认证守卫
+│   ├── PrivateRoute.tsx      # 路由保护
+│   └── PermissionCheck.tsx   # 权限检查
+├── Charts/                    # 图表组件
+│   ├── LineChart.tsx         # 折线图
+│   ├── BarChart.tsx          # 柱状图
+│   └── PieChart.tsx          # 饼图
+└── Forms/                     # 表单组件
+    ├── EquipmentForm.tsx     # 装备表单
+    └── ConfigForm.tsx        # 配置表单
+```
+
+#### **页面模块**
+```typescript
+// apps/web-admin/src/pages/
+├── Dashboard/                 # 仪表盘
+│   ├── index.tsx             # 概览页面
+│   └── components/           # 仪表盘组件
+├── Equipment/                 # 装备管理
+│   ├── List.tsx              # 装备列表
+│   ├── Edit.tsx              # 编辑装备
+│   └── Category.tsx          # 分类管理
+├── Analytics/                 # 数据分析
+│   ├── Reports.tsx           # 报表中心
+│   ├── Trends.tsx            # 趋势分析
+│   └── Statistics.tsx        # 统计图表
+├── Crawler/                   # 爬虫管理
+│   ├── Tasks.tsx             # 任务列表
+│   └── Monitor.tsx           # 实时监控
+├── Config/                    # 配置管理
+│   ├── ApiKeys.tsx           # API密钥配置
+│   └── System.tsx            # 系统配置
+└── Monitor/                   # 监控中心
+    ├── ApiStats.tsx          # API统计
+    └── LlmStats.tsx          # LLM统计
+```
+
+#### **状态管理**
+```typescript
+// apps/web-admin/src/store/
+import { configureStore } from '@reduxjs/toolkit'
+
+export const store = configureStore({
+  reducer: {
+    auth: authSlice,           // 认证状态
+    equipment: equipmentSlice, // 装备数据
+    analytics: analyticsSlice, // 分析数据
+    config: configSlice,       // 配置信息
+    crawler: crawlerSlice,     // 爬虫状态
+    monitor: monitorSlice,     // 监控数据
+  },
+})
+```
 
 ### 🏭 模块化包模式 (Modular Package Pattern)
 
@@ -757,7 +989,8 @@ VECTOR_AUTO_INDEX=true                        # 懒加载索引
 #### **环境设置**
 ```bash
 # 1. 依赖安装
-uv sync                    # 安装所有依赖
+uv sync                    # 安装Python依赖
+cd apps/web-admin && npm install  # 安装前端依赖
 
 # 2. 环境变量配置
 cp .env.example .env       # 复制环境变量模板
@@ -772,6 +1005,11 @@ uv run python main.py      # 兼容旧版本
 # 5. 运行 API 服务
 uv run fishing-api          # 启动 REST API
 uv run uvicorn apps.api.main:app --reload  # 开发模式
+
+# 6. 运行 React 前端 ⭐ v5.0新增
+cd apps/web-admin
+npm run dev                # 启动开发服务器
+npm run build              # 构建生产版本
 ```
 
 #### **测试执行**
@@ -1191,33 +1429,53 @@ def get_weather_cached(location: str) -> dict:
 
 ## 🎯 总结
 
-### v3.1.1 架构优势
+### v5.0.2 架构优势
 - **模块化包架构**: 完全自包含的 Agent 包，支持独立发布
-- **应用层分离**: CLI 和 FastAPI 分离，职责清晰
+- **全栈应用架构**: CLI、FastAPI 后端、React 前端三端分离
 - **LangGraph 兼容**: 原生支持 LangGraph Studio
 - **统一接口**: 一致的包导入和创建模式
 - **向后兼容**: 保持旧版本入口点可用
 - **扩展性强**: 易于添加新 Agent 包和应用
+- **智能化功能**: 智能图片合并、OCR多提供商、工作流管理 ⭐ v5.0新增
+
+### 核心技术演进
+```python
+# v3.1.1 → v5.0.2 主要升级
+1. v3.1.1: 模块化包架构 + 动态Prompt中间件
+2. v4.0.0: 爬虫监控模块 + RPA自动化
+3. v5.0.0: React管理前端 + JWT认证 + 数据分析配置
+4. v5.0.2: 智能图片合并 + OCR多提供商 + 工作流管理
+```
+
+### 关键特性对比
+| 版本 | 核心特性 | 新增功能 |
+|------|----------|----------|
+| v3.1.1 | 模块化包架构 | 动态Prompt中间件 |
+| v4.0.0 | + RPA爬虫 | 爬虫监控模块 |
+| v5.0.0 | + React前端 | JWT认证、数据分析 |
+| v5.0.2 | + 智能处理 | 图片合并、OCR系统 |
 
 ### 迁移指南
-从 v3.0.2.1 到 v3.1.1 的主要变化：
+从 v3.0.2.1 到 v5.0.2 的主要变化：
 - **src/** → **packages/agent_fishing/**: 模块化包结构
-- **新增 apps/**: CLI 和 FastAPI 应用层
+- **新增 apps/**: CLI、API、React 三端应用
 - **新增 shared/**: 共享配置和资源
 - **CLI 命令**: `fishing` 替代直接运行 `main.py`
 - **API 服务**: `fishing-api` 启动 FastAPI 后端
+- **前端服务**: `cd apps/web-admin && npm run dev` 启动 React
 
 ### LLM导航价值
-v3.1.1 架构特别针对LLM理解需求优化：
+v5.0.2 架构特别针对LLM理解需求优化：
 - **清晰边界**: 包、应用层、共享层分离明确
 - **一致模式**: 统一的包结构模式便于理解和扩展
 - **扩展指南**: 详细的包创建和应用扩展指南
 - **最佳实践**: 模块化开发规范和模式
+- **完整生态**: 从 Agent 包到全栈应用的完整解决方案
 
-这个 v3.1.1 架构优先考虑**模块化**、**可维护性**和**扩展性**，同时为智能钓鱼助手提供现代化、可扩展的包架构支持。
+这个 v5.0.2 架构优先考虑**模块化**、**智能化**、**全栈化**和**扩展性**，为智能钓鱼助手提供现代化、可扩展的完整解决方案。
 
 ---
 
-**文档版本**: v3.1.1
-**最后更新**: 2025-11-30
+**文档版本**: v5.0.2
+**最后更新**: 2025-12-19
 **维护者**: 智能钓鱼助手开发团队
