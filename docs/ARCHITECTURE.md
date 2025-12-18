@@ -676,6 +676,35 @@ from packages.data_processing.image import BatchMergeProcessor, ImageMerger
 from packages.data_processing.ocr import OCRMergeProcessor
 ```
 
+#### **两种图片合并方案对比**
+
+系统提供两种图片合并方案，适用于不同场景：
+
+| 特性 | BatchMergeProcessor | MergeAndSplitProcessor |
+|------|---------------------|------------------------|
+| 位置 | `batch_processor.py` | `splitter.py` |
+| 合并策略 | 智能分组，基于内容感知 | 全部合并后按空白区域分割 |
+| 文字检测 | OCR + 文字密度分析 | 无（基于亮度检测） |
+| 表格检测 | 支持 | 不支持 |
+| 分割方式 | 按内容语义分组 | 按空白行/区域分割 |
+| 适用场景 | 复杂文档、混合内容、需要OCR | 简单图片序列、无需OCR |
+| 依赖 | OCR服务（Ollama/SiliconFlow） | 仅图片处理库（Pillow） |
+| 性能 | 较慢（需OCR识别） | 较快（纯图像处理） |
+
+**使用示例**：
+
+```python
+# 方案一：智能内容感知合并（推荐用于复杂文档）
+from packages.data_processing.image import BatchMergeProcessor
+processor = BatchMergeProcessor(source_dir="./images")
+result = processor.process()
+
+# 方案二：简单合并分割（适合简单场景，无需OCR）
+from packages.data_processing.image import MergeAndSplitProcessor
+processor = MergeAndSplitProcessor(source_dir="./images")
+result = processor.process()
+```
+
 详细使用说明请参考 [图片处理文档](./IMAGE_PROCESSING.md)。
 
 ### 🖥️ React管理前端架构 (v5.0新增) ⭐

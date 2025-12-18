@@ -158,7 +158,37 @@ result = service.recognize_table_from_paths(
 )
 ```
 
-## 图片合并使用指南
+## 图片合并方案选择
+
+系统提供两种图片合并方案，根据使用场景选择：
+
+### 方案对比
+
+| 特性 | BatchMergeProcessor | MergeAndSplitProcessor |
+|------|---------------------|------------------------|
+| **设计理念** | 先检测内容，再智能分组合并 | 先全部合并，再按空白区域分割 |
+| **文字检测** | OCR + 文字密度分析 | 基于亮度的空白行检测 |
+| **表格检测** | 支持 | 不支持 |
+| **依赖** | OCR服务（Ollama/SiliconFlow） | 仅Pillow |
+| **性能** | 较慢（需OCR） | 较快（纯图像处理） |
+| **适用场景** | 复杂文档、混合内容 | 简单图片序列 |
+
+### 选择建议
+
+- **选择 BatchMergeProcessor**：
+  - 图片包含表格、文字等复杂内容
+  - 需要精确识别内容边界
+  - 有OCR服务可用（Ollama本地或SiliconFlow云端）
+
+- **选择 MergeAndSplitProcessor**：
+  - 简单的图片序列合并
+  - 无需OCR服务
+  - 追求处理速度
+  - 图片间有明显的空白区域分隔
+
+---
+
+## 方案一：BatchMergeProcessor（智能合并）
 
 ### 基本用法
 
@@ -224,6 +254,80 @@ success = merger.merge_vertically(
     output_format="JPEG"
 )
 ```
+
+---
+
+## 方案二：MergeAndSplitProcessor（简单合并分割）
+
+适用于简单图片序列的快速合并，无需OCR服务。
+
+### 基本用法
+
+```python
+from packages.data_processing.image import MergeAndSplitProcessor
+
+# 创建处理器
+processor = MergeAndSplitProcessor(
+    source_dir="./input_images",     # 输入目录
+    output_dir="./merged_images",    # 输出目录（可选）
+    quality=95                       # 输出质量
+)
+
+# 执行处理
+result = processor.process()
+
+if result["success"]:
+    print(f"处理成功!")
+    print(f"输出图片数: {result['output_count']}")
+else:
+    print(f"处理失败: {result['error']}")
+```
+
+### 工作原理
+
+1. **合并阶段**：将所有输入图片按顺序垂直合并成一张长图
+2. **检测阶段**：扫描合并图片，检测空白行/区域
+3. **分割阶段**：根据检测到的空白区域，将长图分割成多个内容块
+4. **输出阶段**：保存分割后的图片
+
+### 配置参数
+
+```python
+processor = MergeAndSplitProcessor(
+    source_dir="./images",
+    output_dir="./output",
+    quality=95,                    # 输出质量 (1-100)
+    blank_threshold=250,           # 空白判定阈值（像素亮度）
+    min_blank_height=20,           # 最小空白区域高度
+    min_content_height=50          # 最小内容区域高度
+)
+```
+
+### 参数说明
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `source_dir` | str | - | 源图片目录（必需） |
+| `output_dir` | str | "source_dir/split" | 输出目录 |
+| `quality` | int | 95 | JPEG输出质量 (1-100) |
+| `blank_threshold` | int | 250 | 空白判定阈值，像素亮度大于此值视为空白 |
+| `min_blank_height` | int | 20 | 最小空白区域高度（像素） |
+| `min_content_height` | int | 50 | 最小内容区域高度（像素） |
+
+### 适用场景
+
+- 截图序列合并（如聊天记录、网页长截图）
+- 扫描文档合并
+- 连续图片拼接
+- 无需文字识别的简单处理
+
+### 注意事项
+
+- 依赖图片间存在明显的空白区域进行分割
+- 不进行OCR识别，仅基于像素亮度检测
+- 处理速度快，但精确度不如 BatchMergeProcessor
+
+---
 
 ## 配置参数详解
 
