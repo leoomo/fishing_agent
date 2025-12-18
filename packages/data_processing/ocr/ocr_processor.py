@@ -149,7 +149,7 @@ class OCRMergeProcessor:
     def detector(self):
         """延迟加载文字区域检测器"""
         if self._detector is None:
-            from .text_region_detector import TextRegionDetector
+            from .text_detector import TextRegionDetector
             self._detector = TextRegionDetector(
                 padding=self.padding,
                 min_text_area=self.min_text_area

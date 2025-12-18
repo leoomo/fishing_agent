@@ -591,7 +591,7 @@ class BatchMergeProcessor:
             int: 总字符数
         """
         try:
-            from .text_region_detector import TextRegionDetector
+            from packages.data_processing.ocr.text_detector import TextRegionDetector
             detector = TextRegionDetector()
             boxes = detector.detect_text_with_content(image_path)
             total_chars = sum(len(box.text) for box in boxes if box.text)
@@ -649,7 +649,7 @@ class BatchMergeProcessor:
             height = img.height
 
         try:
-            from .text_region_detector import TextRegionDetector
+            from packages.data_processing.ocr.text_detector import TextRegionDetector
             detector = TextRegionDetector()
             boxes = detector.detect_text_boxes(image_path)
 
