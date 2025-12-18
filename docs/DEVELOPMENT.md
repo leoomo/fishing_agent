@@ -669,7 +669,7 @@ services:
     image: node:18-alpine
     working_dir: /app
     ports:
-      - "5174:5174"
+      - "5173:5173"
     volumes:
       - ./apps/web-admin:/app
     command: npm run dev
@@ -697,7 +697,7 @@ class Settings:
 
     # CORS配置
     BACKEND_CORS_ORIGINS: list = [
-        "http://localhost:5174",
+        "http://localhost:5173",
         "https://admin.fishing.com"
     ]
 

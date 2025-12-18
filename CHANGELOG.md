@@ -5,7 +5,7 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [5.0.2] - 2024-12-17
+## [5.0.2] - 2024-12-18
 
 ### 新增
 - 🔍 **OCR多提供商支持** - 重构OCR服务架构，支持Ollama本地和SiliconFlow云端双提供商

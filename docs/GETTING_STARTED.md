@@ -143,6 +143,13 @@ cd ../..
 
 - `CONFIG_ENCRYPTION_KEY`: 配置加密密钥（32字符），用于加密敏感配置
 
+#### OCR配置（可选）
+
+- `OCR_PROVIDER`: OCR提供商，可选 `ollama`（本地）或 `siliconflow`（云端）
+- `OLLAMA_BASE_URL`: Ollama服务地址，默认 `http://localhost:11434`
+- `OLLAMA_MODEL`: Ollama OCR模型，默认 `deepseek-ocr`
+- `SILICONFLOW_API_KEY`: SiliconFlow API密钥（云端OCR使用）
+
 ### 数据库配置
 
 项目使用 SQLite 数据库，默认位置：
@@ -180,7 +187,7 @@ cd apps/web-admin
 # 启动开发服务器
 npm run dev
 
-# 访问 http://localhost:5174
+# 访问 http://localhost:5173
 ```
 
 ### 方式四：Docker 部署
@@ -219,7 +226,7 @@ curl http://localhost:8000/health
 
 打开浏览器访问：
 - API 文档：http://localhost:8000/docs
-- React 前端：http://localhost:5174（需要先启动前端服务）
+- React 前端：http://localhost:5173（需要先启动前端服务）
 
 ## 常见问题
 

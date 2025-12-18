@@ -2,10 +2,10 @@
 
 智能钓鱼助手 REST API 文档
 
-**版本**: v5.0.0
-**架构**: FastAPI 后端 + 模块化 Agent 包 + 动态Prompt中间件 + React管理前端
+**版本**: v5.0.2
+**架构**: FastAPI 后端 + 模块化 Agent 包 + 动态Prompt中间件 + React管理前端 + OCR多提供商系统
 **Base URL**: `http://localhost:8000`
-**前端地址**: `http://localhost:5174` (React管理界面)
+**前端地址**: `http://localhost:5173` (React管理界面)
 
 ## 概述
 
@@ -18,6 +18,9 @@ Fishing Agent API 提供智能钓鱼助手的 RESTful 接口，支持钓鱼推�
 - 🔐 **JWT 认证**: 安全的用户认证和权限管理（RBAC）
 - 📦 **模块化 Agent**: 完全自包含的 Agent 包架构
 - 🧠 **动态Prompt中间件**: 智能选择提示词，优化Token使用效率50%+
+- 🔍 **OCR多提供商系统**: 支持Ollama本地OCR和SiliconFlow云端OCR
+- 🖼️ **智能图片合并**: 自动检测文字区域，批量智能合并处理
+- 🔄 **工作流管理**: 可视化工作流编排、DAG依赖管理、任务调度
 - 🎣 **智能推荐**: 7因子科学评分系统
 - 🌤️ **天气查询**: 实时天气数据和72小时预报
 - 🎯 **时段识别**: 精准的时间段意图理解（98%+准确率）

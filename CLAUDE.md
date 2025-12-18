@@ -6,18 +6,18 @@ Always open `@/openspec/AGENTS.md` when the request:
 - Sounds ambiguous and you need the authoritative spec before coding
 <!-- OPENSPEC:END -->
 
-# 智能钓鱼助手 v5.0.0
+# 智能钓鱼助手 v5.0.2
 
 模块化 Agent 架构 + JWT认证系统 + React管理前端，基于 LangChain 1.0+ 和 7 因子科学评分系统。
 
-**当前版本**: v5.0.0 | **当前分支**: feature/equipment-ui (功能已完成)
+**当前版本**: v5.0.2 | **当前分支**: feature/equipment-ui (功能已完成)
 
 ## 核心特性
 - JWT认证系统 (RBAC权限管理 + Token安全) + 模块化Agent包 + 7因子评分 (温度/天气/风力/气压/湿度/季节/月相)
 - 时间段意图识别 (98%+准确率) + 动态Prompt中间件 + 装备管理UI优化
-- 智能图片合并 (自动检测文字 + 批量处理 + 本地化处理) + 路亚装备管理系统
-- 数据分析报表 (装备统计/趋势分析/品牌排行) + 系统配置管理 (API密钥/参数配置)
-- React管理前端 (React 19.2.0 + TypeScript + Ant Design 5.22.0) + 爬虫监控模块
+- 智能图片合并 (自动检测文字 + 批量处理 + 本地化处理) + OCR多提供商支持 (Ollama本地 + SiliconFlow云端)
+- 路亚装备管理系统 + 数据分析报表 (装备统计/趋势分析/品牌排行) + 系统配置管理 (API密钥/参数配置)
+- React管理前端 (React 19.2.0 + TypeScript + Ant Design 5.22.0) + 爬虫监控模块 + 工作流管理系统
 
 ## 架构
 ```

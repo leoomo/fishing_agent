@@ -228,7 +228,7 @@ npm run dev
 
 # 8. 访问系统
 # API文档: http://localhost:8000/docs
-# 管理前端: http://localhost:5174 (用户名: admin, 密码: admin123)
+# 管理前端: http://localhost:5173 (用户名: admin, 密码: admin123)
 ```
 
 ### 前后端同时开发工作流 ⭐ v5.0.0
