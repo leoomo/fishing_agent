@@ -15,7 +15,7 @@ import requests
 
 from .base import BaseOCRProvider
 from .exceptions import SiliconFlowError, OCRConfigurationError
-from packages.agent_fishing.tools.lure.image_merger import ImageMerger
+from packages.data_processing.image import ImageMerger
 
 # 导入PIL用于图片处理
 try:

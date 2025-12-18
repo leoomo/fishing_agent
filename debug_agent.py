@@ -356,7 +356,7 @@ def create_crawler_task(task_type: str = "taobao", keywords: list = None, max_pa
     print(f"\n🕷️ 创建{task_type}爬虫任务...")
 
     try:
-        from packages.agent_fishing.tools.lure.models.system import CrawlerTask
+        from packages.scraper.models import CrawlerTask
         from packages.agent_fishing.tools.lure.orm.session import get_db_session
         from datetime import datetime
 
@@ -418,9 +418,9 @@ def execute_crawler_task(task_id: int):
     print(f"\n🚀 执行爬虫任务 {task_id}...")
 
     try:
-        from packages.agent_fishing.tools.crawler.executor.task_queue import CrawlerTaskQueue
+        from packages.scraper.executor.task_queue import CrawlerTaskQueue
         from packages.agent_fishing.tools.lure.orm.session import get_db_session
-        from packages.agent_fishing.tools.lure.models.system import CrawlerTask, TaskStatus
+        from packages.scraper.models import CrawlerTask, TaskStatus
 
         # 获取任务
         with get_db_session() as session:
@@ -455,7 +455,7 @@ def monitor_crawler_task(task_id: int, timeout: int = 60):
     print(f"\n👀 监控爬虫任务 {task_id} (超时: {timeout}秒)...")
 
     from packages.agent_fishing.tools.lure.orm.session import get_db_session
-    from packages.agent_fishing.tools.lure.models.system import CrawlerTask, TaskStatus
+    from packages.scraper.models import CrawlerTask, TaskStatus
     import time
 
     start_time = time.time()
@@ -501,7 +501,7 @@ def list_crawler_tasks(limit: int = 10):
 
     try:
         from packages.agent_fishing.tools.lure.orm.session import get_db_session
-        from packages.agent_fishing.tools.lure.models.system import CrawlerTask
+        from packages.scraper.models import CrawlerTask
 
         with get_db_session() as session:
             tasks = session.query(CrawlerTask).order_by(CrawlerTask.created_at.desc()).limit(limit).all()
@@ -531,7 +531,7 @@ def clean_crawler_tasks(status: str = None, days: int = 7):
 
     try:
         from packages.agent_fishing.tools.lure.orm.session import get_db_session
-        from packages.agent_fishing.tools.lure.models.system import CrawlerTask, TaskStatus
+        from packages.scraper.models import CrawlerTask, TaskStatus
         from datetime import datetime, timedelta
 
         with get_db_session() as session:
@@ -638,7 +638,7 @@ def execute_rpa_crawler(task_id: int):
 
     try:
         from packages.agent_fishing.tools.lure.orm.session import get_db_session
-        from packages.agent_fishing.tools.lure.models.system import CrawlerTask, TaskStatus
+        from packages.scraper.models import CrawlerTask, TaskStatus
         from datetime import datetime
 
         # 获取任务
@@ -707,8 +707,8 @@ def test_rpa_login():
     print("\n🔐 测试RPA登录状态...")
 
     try:
-        from packages.agent_fishing.tools.crawler.rpa.login_manager import LoginManager
-        from packages.agent_fishing.tools.crawler.rpa.config import RPAConfig
+        from packages.scraper.rpa.login_manager import LoginManager
+        from packages.scraper.rpa.config import RPAConfig
 
         # 加载配置
         config = RPAConfig.from_env()

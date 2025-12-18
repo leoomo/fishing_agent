@@ -18,7 +18,7 @@ from .ocr import (
     OCRConfigurationError,
     OCRProviderNotAvailableError
 )
-from packages.agent_fishing.tools.lure.image_merger import ImageMerger
+from packages.data_processing.image import ImageMerger
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple, Dict, Any
 
 from .base import BaseOCRProvider
 from .exceptions import OllamaError, OCRModelNotFoundError, OCRConfigurationError
-from packages.agent_fishing.tools.lure.image_merger import ImageMerger
+from packages.data_processing.image import ImageMerger
 
 logger = logging.getLogger(__name__)
 
