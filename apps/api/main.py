@@ -26,6 +26,95 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# 设置分类日志
+if os.getenv("LOG_TO_FILE", "true").lower() == "true":
+    # 导入轮转文件处理器
+    from logging.handlers import RotatingFileHandler
+
+    # 创建logs目录结构
+    log_dir = "logs"
+    os.makedirs(f"{log_dir}/api", exist_ok=True)
+    os.makedirs(f"{log_dir}/agent", exist_ok=True)
+    os.makedirs(f"{log_dir}/crawler", exist_ok=True)
+
+    # 通用格式
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+    # 1. API主应用日志
+    api_app_handler = RotatingFileHandler(
+        'logs/api/app.log',
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5,
+        encoding='utf-8'
+    )
+    api_app_handler.setFormatter(formatter)
+    logging.getLogger('apps.api').addHandler(api_app_handler)
+
+    # 2. API认证日志
+    api_auth_handler = RotatingFileHandler(
+        'logs/api/auth.log',
+        maxBytes=10*1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+    api_auth_handler.setFormatter(formatter)
+    logging.getLogger('apps.api.auth').addHandler(api_auth_handler)
+    logging.getLogger('apps.api.middleware').addHandler(api_auth_handler)
+
+    # 3. OCR服务日志
+    ocr_handler = RotatingFileHandler(
+        'logs/api/ocr.log',
+        maxBytes=10*1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+    ocr_handler.setFormatter(formatter)
+    logging.getLogger('apps.api.services.ocr').addHandler(ocr_handler)
+
+    # 4. Agent核心日志
+    agent_fishing_handler = RotatingFileHandler(
+        'logs/agent/fishing.log',
+        maxBytes=10*1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+    agent_fishing_handler.setFormatter(formatter)
+    logging.getLogger('packages.agent_fishing.core').addHandler(agent_fishing_handler)
+    logging.getLogger('packages.agent_fishing.utils').addHandler(agent_fishing_handler)
+
+    # 5. Agent工具日志
+    agent_tools_handler = RotatingFileHandler(
+        'logs/agent/tools.log',
+        maxBytes=10*1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+    agent_tools_handler.setFormatter(formatter)
+    logging.getLogger('packages.agent_fishing.tools').addHandler(agent_tools_handler)
+
+    # 6. 爬虫RPA日志
+    crawler_handler = RotatingFileHandler(
+        'logs/crawler/rpa.log',
+        maxBytes=10*1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+    crawler_handler.setFormatter(formatter)
+    logging.getLogger('packages.agent_fishing.tools.crawler').addHandler(crawler_handler)
+
+    # 7. 默认日志（其他未分类的日志）
+    default_handler = RotatingFileHandler(
+        'logs/api/app.log',
+        maxBytes=10*1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+    default_handler.setFormatter(formatter)
+    logging.getLogger().addHandler(default_handler)
+
 logger = logging.getLogger(__name__)
 
 # 全局调度器实例
