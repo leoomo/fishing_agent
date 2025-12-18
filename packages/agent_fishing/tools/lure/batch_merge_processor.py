@@ -193,6 +193,11 @@ class BatchMergeProcessor:
         """
         基于图像特征检测指定区域是否有文字
 
+        使用边缘检测来识别文字特征：
+        - 文字区域有较高的边缘密度
+        - 文字边缘通常是细密的、高对比度的
+        - 纯图片区域边缘更平滑或不规则
+
         Args:
             image_path: 图片路径
             region: 检测区域，"bottom"表示底部，"top"表示头部
@@ -206,6 +211,8 @@ class BatchMergeProcessor:
             }
 
         try:
+            from PIL import ImageFilter
+
             with Image.open(image_path) as img:
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
@@ -223,33 +230,62 @@ class BatchMergeProcessor:
 
                 # 转换为灰度
                 gray = crop_region.convert('L')
-
-                # 计算统计信息
-                stat = ImageStat.Stat(gray)
-
-                # 计算暗像素比例
                 pixels = np.array(gray)
-                dark_pixels = np.sum(pixels < 180)  # 180以下的认为是暗像素
-                dark_ratio = dark_pixels / pixels.size
 
-                # 计算标准差
-                std_dev = stat.stddev[0]
+                # 1. 边缘检测：检测文字的边缘特征
+                edges = gray.filter(ImageFilter.FIND_EDGES)
+                edge_pixels = np.array(edges)
+                edge_density = np.mean(edge_pixels) / 255  # 边缘密度 0-1
 
-                # 判断规则（更宽松）
-                # 1. 如果暗像素比例超过5%
-                # 2. 或者标准差较大（表示有变化）
-                has_text = dark_ratio > 0.05 or std_dev > 25
+                # 2. 强边缘比例：文字有更多清晰的边缘
+                strong_edges = np.sum(edge_pixels > 50)
+                strong_edge_ratio = strong_edges / edge_pixels.size
 
-                # 计算置信度
-                if has_text:
-                    confidence = min(0.8, dark_ratio * 8 + std_dev / 40)
-                else:
-                    confidence = max(0.2, 1.0 - (dark_ratio * 5 + std_dev / 50))
+                # 3. 行变化分析：文字区域每行的变化较大
+                row_stds = np.std(pixels, axis=1)  # 每行的标准差
+                avg_row_std = np.mean(row_stds)
+
+                # 综合评分判断
+                text_score = 0
+
+                # 边缘密度评分（0-40分）
+                if edge_density > 0.15:
+                    text_score += 40
+                elif edge_density > 0.10:
+                    text_score += 30
+                elif edge_density > 0.05:
+                    text_score += 15
+
+                # 强边缘比例评分（0-30分）
+                if strong_edge_ratio > 0.10:
+                    text_score += 30
+                elif strong_edge_ratio > 0.05:
+                    text_score += 20
+                elif strong_edge_ratio > 0.02:
+                    text_score += 10
+
+                # 行变化评分（0-30分）
+                if avg_row_std > 50:
+                    text_score += 30
+                elif avg_row_std > 35:
+                    text_score += 20
+                elif avg_row_std > 20:
+                    text_score += 10
+
+                # 判断阈值：总分超过45认为有文字
+                has_text = text_score >= 45
+                # 置信度计算：确保达到阈值的评分置信度不低于0.5
+                confidence = min(0.95, max(0.5, text_score / 100)) if has_text else text_score / 100
+
+                detail = (f"{region}区域 - 边缘密度: {edge_density:.2%}, "
+                         f"强边缘: {strong_edge_ratio:.2%}, "
+                         f"行变化: {avg_row_std:.1f}, "
+                         f"评分: {text_score}")
 
                 return {
                     "has_text": has_text,
                     "confidence": confidence,
-                    "text": f"{region}区域 - 暗像素: {dark_ratio:.2%}, 标准差: {std_dev:.1f}",
+                    "text": detail,
                     "error": None
                 }
 
