@@ -161,7 +161,7 @@ def batch_recognize(
         verbose: 详细日志
     """
     from apps.api.services.ocr_service import OCRService
-    from packages.agent_fishing.tools.lure.batch_merge_processor import BatchMergeProcessor
+    from packages.data_processing.image import BatchMergeProcessor
 
     print(f"\n{Fore.CYAN}========== OCR 批量处理（智能合并） =========={Style.RESET_ALL}\n")
 
