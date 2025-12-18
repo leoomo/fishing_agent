@@ -422,10 +422,11 @@ class ImageMerger:
         row_mean: np.ndarray,
         variance_threshold: float = 100,
         brightness_threshold: int = 240,
-        min_height: int = 5
+        min_height: int = 5,
+        row_edge_density: np.ndarray = None
     ) -> List[Tuple[int, int, float]]:
         """
-        寻找空白/低变化区域
+        寻找空白/低变化区域（无文字的安全分割区域）
 
         Args:
             row_variance: 每行的方差数组
@@ -433,6 +434,7 @@ class ImageMerger:
             variance_threshold: 方差阈值，低于此值认为是低变化区域
             brightness_threshold: 亮度阈值，高于此值认为是浅色/空白
             min_height: 最小区域高度
+            row_edge_density: 每行的边缘密度数组（用于检测文字）
 
         Returns:
             List[Tuple[int, int, float]]: 空白区域列表 [(start_y, end_y, score), ...]
@@ -444,8 +446,18 @@ class ImageMerger:
         blank_start = 0
 
         for y in range(height):
-            is_blank = (row_variance[y] < variance_threshold and
-                       row_mean[y] > brightness_threshold)
+            # 亮色背景的空白区域：高亮度 + 低方差
+            is_light_blank = (row_variance[y] < variance_threshold and
+                             row_mean[y] > brightness_threshold)
+
+            # 深色背景的空白区域：低亮度 + 低方差 + 低边缘密度（无文字）
+            is_dark_blank = False
+            if row_edge_density is not None:
+                is_dark_blank = (row_variance[y] < variance_threshold * 0.5 and
+                                row_mean[y] < 80 and
+                                row_edge_density[y] < 0.05)  # 边缘密度低表示无文字
+
+            is_blank = is_light_blank or is_dark_blank
 
             if is_blank and not in_blank:
                 # 进入空白区域
@@ -454,11 +466,26 @@ class ImageMerger:
             elif not is_blank and in_blank:
                 # 离开空白区域
                 if y - blank_start >= min_height:
-                    # 计算分数：区域高度 + 亮度 - 方差
+                    # 计算分数：区域高度 + 亮度因子 - 方差
                     region_height = y - blank_start
                     avg_brightness = np.mean(row_mean[blank_start:y])
                     avg_variance = np.mean(row_variance[blank_start:y])
-                    score = region_height * 0.5 + (avg_brightness / 255) * 30 - (avg_variance / 100) * 10
+
+                    # 边缘密度惩罚：如果有边缘则降低分数
+                    edge_penalty = 0
+                    if row_edge_density is not None:
+                        avg_edge = np.mean(row_edge_density[blank_start:y])
+                        edge_penalty = avg_edge * 50  # 边缘越多，惩罚越大
+
+                    # 亮度因子：亮色和深色背景都可以得分
+                    if avg_brightness > 200:
+                        brightness_score = 30  # 亮色背景
+                    elif avg_brightness < 50:
+                        brightness_score = 20  # 深色背景（均匀）
+                    else:
+                        brightness_score = 10  # 中间亮度
+
+                    score = region_height * 0.5 + brightness_score - (avg_variance / 100) * 10 - edge_penalty
                     blank_regions.append((blank_start, y, score))
                 in_blank = False
 
@@ -467,10 +494,52 @@ class ImageMerger:
             region_height = height - blank_start
             avg_brightness = np.mean(row_mean[blank_start:height])
             avg_variance = np.mean(row_variance[blank_start:height])
-            score = region_height * 0.5 + (avg_brightness / 255) * 30 - (avg_variance / 100) * 10
+
+            edge_penalty = 0
+            if row_edge_density is not None:
+                avg_edge = np.mean(row_edge_density[blank_start:height])
+                edge_penalty = avg_edge * 50
+
+            if avg_brightness > 200:
+                brightness_score = 30
+            elif avg_brightness < 50:
+                brightness_score = 20
+            else:
+                brightness_score = 10
+
+            score = region_height * 0.5 + brightness_score - (avg_variance / 100) * 10 - edge_penalty
             blank_regions.append((blank_start, height, score))
 
         return blank_regions
+
+    def _compute_row_edge_density(self, img_array: np.ndarray) -> np.ndarray:
+        """
+        计算每行的边缘密度（用于检测文字）
+
+        Args:
+            img_array: 灰度图片数组
+
+        Returns:
+            np.ndarray: 每行的边缘密度 (0-1)
+        """
+        from PIL import Image, ImageFilter
+
+        # 转换为PIL图像进行边缘检测
+        img_pil = Image.fromarray(img_array)
+        edges = img_pil.filter(ImageFilter.FIND_EDGES)
+        edge_array = np.array(edges)
+
+        # 计算每行的边缘密度（边缘像素占比）
+        height = edge_array.shape[0]
+        row_edge_density = np.zeros(height)
+
+        for y in range(height):
+            row = edge_array[y, :]
+            # 边缘像素：亮度 > 30
+            edge_pixels = np.sum(row > 30)
+            row_edge_density[y] = edge_pixels / len(row)
+
+        return row_edge_density
 
     def _is_mostly_table(
         self,
@@ -673,6 +742,321 @@ class ImageMerger:
         except Exception as e:
             logger.error(f"Error splitting image: {e}")
             return [image_path]
+
+    def split_into_parts(
+        self,
+        image_path: str,
+        num_parts: int,
+        output_dir: str = None,
+        output_format: str = 'JPEG',
+        min_part_height: int = 300
+    ) -> List[str]:
+        """
+        将图片分割成指定数量的部分
+
+        在均匀分布的位置附近寻找最佳空白区域作为分割点，
+        避免在表格内部分割。
+
+        Args:
+            image_path: 输入图片路径
+            num_parts: 目标分割数量
+            output_dir: 输出目录（默认与输入同目录）
+            output_format: 输出格式
+            min_part_height: 每部分的最小高度
+
+        Returns:
+            List[str]: 输出文件路径列表
+        """
+        if num_parts < 2:
+            logger.info(f"num_parts={num_parts} < 2, no split needed")
+            return [image_path]
+
+        if not os.path.exists(image_path):
+            logger.error(f"Image not found: {image_path}")
+            return [image_path]
+
+        try:
+            with Image.open(image_path) as img:
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+
+                width, height = img.size
+
+                # 检查最小高度要求
+                if height < min_part_height * num_parts:
+                    logger.info(f"Image height {height} too small for {num_parts} parts (min {min_part_height}px each)")
+                    return [image_path]
+
+                # 转换为灰度进行分析
+                gray = img.convert('L')
+                img_array = np.array(gray)
+
+                # 分析行特征
+                row_variance, row_mean = self._analyze_row_characteristics(img_array)
+
+                # 计算边缘密度（用于检测文字区域）
+                row_edge_density = self._compute_row_edge_density(img_array)
+
+                # 检测表格区域
+                table_regions = self._detect_table_regions(img_array)
+
+                # 查找空白区域（使用边缘密度避免切到文字）
+                blank_regions = self._find_blank_regions(
+                    row_variance, row_mean, row_edge_density=row_edge_density
+                )
+
+                # 计算理想的均匀分割点位置
+                ideal_split_points = []
+                for i in range(1, num_parts):
+                    ideal_y = int(height * i / num_parts)
+                    ideal_split_points.append(ideal_y)
+
+                logger.info(f"Ideal split points for {num_parts} parts: {ideal_split_points}")
+
+                # 为每个理想位置找到最佳实际分割点
+                actual_split_points = []
+                search_range = height // (num_parts * 2)  # 在理想位置附近的搜索范围
+
+                for ideal_y in ideal_split_points:
+                    best_point = self._find_split_point_near(
+                        ideal_y,
+                        search_range,
+                        height,
+                        blank_regions,
+                        table_regions,
+                        actual_split_points,  # 已确定的分割点，避免太近
+                        row_edge_density=row_edge_density  # 传入边缘密度用于避开文字
+                    )
+                    if best_point is not None:
+                        actual_split_points.append(best_point)
+                    else:
+                        # 如果找不到合适的分割点，使用边缘密度寻找最安全的位置
+                        min_y = max(0, ideal_y - search_range)
+                        max_y = min(height, ideal_y + search_range)
+
+                        # 在搜索范围内找边缘密度最低的位置
+                        best_edge_y = ideal_y
+                        best_edge_score = float('inf')
+
+                        for y in range(min_y, max_y):
+                            if self._is_in_table(y, table_regions):
+                                continue
+                            too_close = any(abs(y - ep) < 100 for ep in actual_split_points)
+                            if too_close:
+                                continue
+
+                            # 计算该位置附近的平均边缘密度
+                            start = max(0, y - 10)
+                            end = min(len(row_edge_density), y + 10)
+                            avg_edge = np.mean(row_edge_density[start:end])
+
+                            if avg_edge < best_edge_score:
+                                best_edge_score = avg_edge
+                                best_edge_y = y
+
+                        actual_split_points.append(best_edge_y)
+                        logger.info(f"Fallback split point: y={best_edge_y} (edge_density={best_edge_score:.4f})")
+
+                # 排序分割点
+                actual_split_points.sort()
+
+                # 确保有足够的分割点
+                if len(actual_split_points) < num_parts - 1:
+                    logger.warning(f"Only found {len(actual_split_points)} split points, need {num_parts - 1}")
+                    # 补充缺失的分割点
+                    while len(actual_split_points) < num_parts - 1:
+                        # 找到最大的间隔并在中间添加分割点
+                        points = [0] + actual_split_points + [height]
+                        max_gap = 0
+                        max_gap_idx = 0
+                        for i in range(len(points) - 1):
+                            gap = points[i + 1] - points[i]
+                            if gap > max_gap:
+                                max_gap = gap
+                                max_gap_idx = i
+                        new_point = (points[max_gap_idx] + points[max_gap_idx + 1]) // 2
+                        actual_split_points.append(new_point)
+                        actual_split_points.sort()
+
+                logger.info(f"Actual split points: {actual_split_points}")
+
+                # 执行分割
+                img_rgb = img.copy()
+                parts = []
+                prev_y = 0
+
+                for i, split_y in enumerate(actual_split_points):
+                    part = img_rgb.crop((0, prev_y, width, split_y))
+                    parts.append(part)
+                    prev_y = split_y
+
+                # 最后一部分
+                parts.append(img_rgb.crop((0, prev_y, width, height)))
+
+                # 准备输出路径
+                input_path = Path(image_path)
+                if output_dir:
+                    out_dir = Path(output_dir)
+                else:
+                    out_dir = input_path.parent
+                out_dir.mkdir(parents=True, exist_ok=True)
+
+                stem = input_path.stem
+                ext = '.jpg' if output_format.upper() == 'JPEG' else '.png'
+
+                # 保存各部分
+                output_paths = []
+                save_kwargs = {}
+                if output_format.upper() == 'JPEG':
+                    save_kwargs['quality'] = self.quality
+                    save_kwargs['optimize'] = True
+
+                for i, part in enumerate(parts):
+                    part_path = out_dir / f"{stem}_part{i+1}{ext}"
+                    part.save(str(part_path), format=output_format, **save_kwargs)
+                    output_paths.append(str(part_path))
+                    logger.info(f"Saved part {i+1}/{len(parts)}: {part_path.name} ({part.height}px)")
+                    part.close()
+
+                return output_paths
+
+        except Exception as e:
+            logger.error(f"Error splitting image into parts: {e}")
+            import traceback
+            traceback.print_exc()
+            return [image_path]
+
+    def _find_split_point_near(
+        self,
+        target_y: int,
+        search_range: int,
+        height: int,
+        blank_regions: List[Tuple[int, int, float]],
+        table_regions: List[Tuple[int, int]],
+        existing_points: List[int],
+        min_distance: int = 100,
+        row_edge_density: np.ndarray = None
+    ) -> Optional[int]:
+        """
+        在目标位置附近寻找最佳分割点
+
+        Args:
+            target_y: 目标Y位置
+            search_range: 搜索范围
+            height: 图片高度
+            blank_regions: 空白区域列表
+            table_regions: 表格区域列表
+            existing_points: 已确定的分割点
+            min_distance: 与已有分割点的最小距离
+            row_edge_density: 每行的边缘密度（用于避开文字）
+
+        Returns:
+            Optional[int]: 最佳分割点，None表示没找到合适的
+        """
+        min_y = max(0, target_y - search_range)
+        max_y = min(height, target_y + search_range)
+
+        best_point = None
+        best_score = float('-inf')
+
+        # 首先尝试从空白区域找
+        for start_y, end_y, region_score in blank_regions:
+            split_y = (start_y + end_y) // 2
+
+            # 检查是否在搜索范围内
+            if split_y < min_y or split_y > max_y:
+                continue
+
+            # 检查是否在表格内
+            if self._is_in_table(split_y, table_regions):
+                continue
+
+            # 检查与已有分割点的距离
+            too_close = any(abs(split_y - ep) < min_distance for ep in existing_points)
+            if too_close:
+                continue
+
+            # 计算分数：区域分数 + 接近目标位置的加分
+            distance_penalty = abs(split_y - target_y) / search_range * 20
+            total_score = region_score - distance_penalty
+
+            if total_score > best_score:
+                best_score = total_score
+                best_point = split_y
+
+        # 如果没有从空白区域找到合适的分割点，使用边缘密度寻找安全点
+        if best_point is None and row_edge_density is not None:
+            # 在搜索范围内找边缘密度最低的位置（最少文字的地方）
+            best_edge_score = float('inf')
+            for y in range(min_y, max_y):
+                # 跳过表格区域
+                if self._is_in_table(y, table_regions):
+                    continue
+
+                # 跳过已有分割点附近
+                too_close = any(abs(y - ep) < min_distance for ep in existing_points)
+                if too_close:
+                    continue
+
+                # 计算该位置附近的平均边缘密度（上下各5像素）
+                start = max(0, y - 5)
+                end = min(len(row_edge_density), y + 5)
+                avg_edge = np.mean(row_edge_density[start:end])
+
+                # 距离目标的惩罚
+                distance_factor = abs(y - target_y) / search_range
+
+                # 综合分数：边缘密度 + 距离惩罚
+                edge_score = avg_edge + distance_factor * 0.1
+
+                if edge_score < best_edge_score:
+                    best_edge_score = edge_score
+                    best_point = y
+
+            if best_point is not None:
+                logger.debug(f"Found split point by edge density: y={best_point}, edge_score={best_edge_score:.4f}")
+
+        return best_point
+
+    def _is_in_table(self, y: int, table_regions: List[Tuple[int, int]]) -> bool:
+        """检查Y坐标是否在表格区域内"""
+        for start, end in table_regions:
+            if start <= y <= end:
+                return True
+        return False
+
+    def _find_table_boundary(
+        self,
+        target_y: int,
+        table_regions: List[Tuple[int, int]],
+        search_range: int
+    ) -> Optional[int]:
+        """
+        在目标位置附近寻找表格边界
+
+        Args:
+            target_y: 目标Y位置
+            table_regions: 表格区域列表
+            search_range: 搜索范围
+
+        Returns:
+            Optional[int]: 表格边界位置，None表示没找到
+        """
+        best_boundary = None
+        best_distance = float('inf')
+
+        for start, end in table_regions:
+            # 检查表格开始位置
+            if abs(start - target_y) < search_range and abs(start - target_y) < best_distance:
+                best_boundary = start
+                best_distance = abs(start - target_y)
+
+            # 检查表格结束位置
+            if abs(end - target_y) < search_range and abs(end - target_y) < best_distance:
+                best_boundary = end
+                best_distance = abs(end - target_y)
+
+        return best_boundary
 
     def analyze_split_potential(self, image_path: str) -> dict:
         """

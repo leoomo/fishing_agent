@@ -333,6 +333,140 @@ class BatchMergeProcessor:
                 "error": str(e)
             }
 
+    def _detect_table_in_region(self, image_path: str, region: str = "bottom") -> dict:
+        """
+        检测指定区域是否包含表格内容
+
+        表格特征：
+        - 有规则的水平线条
+        - 行与行之间有均匀的间隔
+        - 垂直方向上有重复的结构
+
+        Args:
+            image_path: 图片路径
+            region: 检测区域，"bottom"表示底部，"top"表示头部
+
+        Returns:
+            dict: {"is_table": bool, "confidence": float, "detail": str, "error": str}
+        """
+        if not HAS_PIL:
+            return {
+                "is_table": False,
+                "confidence": 0.0,
+                "detail": "",
+                "error": "PIL not available"
+            }
+
+        try:
+            from PIL import ImageFilter
+
+            with Image.open(image_path) as img:
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+
+                width, height = img.size
+
+                # 使用更大的检测区域比例来检测表格（表格通常占据更大区域）
+                table_detection_ratio = min(0.35, self.bottom_detection_ratio * 1.5)
+                region_height = int(height * table_detection_ratio)
+
+                if region == "bottom":
+                    crop_region = img.crop((0, height - region_height, width, height))
+                else:
+                    crop_region = img.crop((0, 0, width, region_height))
+
+                # 转换为灰度
+                gray = crop_region.convert('L')
+                pixels = np.array(gray)
+
+                # 1. 检测水平线条：表格有明显的行分隔
+                # 计算每行的平均亮度变化
+                row_means = np.mean(pixels, axis=1)
+                row_diffs = np.abs(np.diff(row_means))
+
+                # 检测明显的行边界（亮度突变）
+                threshold = np.std(row_means) * 0.5
+                line_positions = np.where(row_diffs > threshold)[0]
+
+                # 2. 检测行间距的规律性
+                if len(line_positions) >= 3:
+                    line_gaps = np.diff(line_positions)
+                    gap_std = np.std(line_gaps)
+                    gap_mean = np.mean(line_gaps)
+                    # 间距规律性：标准差与均值的比值越小越规律
+                    regularity = 1 - min(1, gap_std / (gap_mean + 1))
+                else:
+                    regularity = 0
+
+                # 3. 检测垂直结构：表格列有重复的垂直线
+                col_means = np.mean(pixels, axis=0)
+                col_diffs = np.abs(np.diff(col_means))
+                col_threshold = np.std(col_means) * 0.3
+                vertical_lines = np.sum(col_diffs > col_threshold)
+                vertical_density = vertical_lines / len(col_diffs)
+
+                # 4. 检测深色背景行（表格标题行常见）
+                dark_rows = np.sum(row_means < 100)
+                has_header_row = dark_rows >= 1 and dark_rows <= region_height * 0.3
+
+                # 综合评分
+                table_score = 0
+
+                # 水平线条数量评分（0-35分）
+                num_lines = len(line_positions)
+                if num_lines >= 5:
+                    table_score += 35
+                elif num_lines >= 3:
+                    table_score += 25
+                elif num_lines >= 2:
+                    table_score += 15
+
+                # 行间距规律性评分（0-30分）
+                if regularity > 0.7:
+                    table_score += 30
+                elif regularity > 0.5:
+                    table_score += 20
+                elif regularity > 0.3:
+                    table_score += 10
+
+                # 垂直结构评分（0-20分）
+                if vertical_density > 0.05:
+                    table_score += 20
+                elif vertical_density > 0.02:
+                    table_score += 10
+
+                # 标题行加分（0-15分）
+                if has_header_row:
+                    table_score += 15
+
+                # 判断阈值：总分超过50认为是表格
+                is_table = table_score >= 50
+                confidence = min(0.95, table_score / 100)
+
+                detail = (f"{region}区域 - 水平线: {num_lines}, "
+                         f"规律性: {regularity:.2f}, "
+                         f"垂直密度: {vertical_density:.2%}, "
+                         f"标题行: {has_header_row}, "
+                         f"评分: {table_score}")
+
+                logger.debug(f"Table detection for {Path(image_path).name}: {detail}")
+
+                return {
+                    "is_table": is_table,
+                    "confidence": confidence,
+                    "detail": detail,
+                    "error": None
+                }
+
+        except Exception as e:
+            logger.warning(f"Table detection failed for {image_path}: {e}")
+            return {
+                "is_table": False,
+                "confidence": 0.0,
+                "detail": "",
+                "error": str(e)
+            }
+
     def _detect_text_by_image_features(self, image_path: str) -> dict:
         """
         基于图像特征检测底部是否有文字（向后兼容方法）
@@ -699,10 +833,13 @@ class BatchMergeProcessor:
 
             # 使用 while 循环检测连续合并链
             # 每次检测当前组最后一张图片的底部和下一张图片的顶部
-            # 但限制最大合并数量
-            while group_end < n and (group_end - group_start) < self.max_merge_count:
+            # 但限制最大合并数量（表格内容除外）
+            while group_end < n:
                 current_last_idx = group_end - 1  # 当前组的最后一张图片
                 next_idx = group_end  # 下一张图片
+
+                # 检查是否达到 max_merge_count 限制
+                reached_limit = (group_end - group_start) >= self.max_merge_count
 
                 # 检测当前组最后一张的底部
                 current_bottom_has_text = (bottom_results[current_last_idx] and
@@ -713,6 +850,32 @@ class BatchMergeProcessor:
                 next_top_has_text = (top_results[next_idx] and
                                      top_results[next_idx].get("has_text", False) and
                                      not top_results[next_idx].get("error"))
+
+                # 如果达到限制，检测是否是表格连续性情况
+                if reached_limit:
+                    # 检测当前图片底部和下一张图片顶部是否都是表格
+                    current_bottom_table = self._detect_table_in_region(
+                        image_files[current_last_idx], region="bottom"
+                    )
+                    next_top_table = self._detect_table_in_region(
+                        image_files[next_idx], region="top"
+                    )
+
+                    is_table_continuation = (
+                        current_bottom_table.get("is_table", False) and
+                        next_top_table.get("is_table", False)
+                    )
+
+                    if is_table_continuation and current_bottom_has_text and next_top_has_text:
+                        # 表格连续，忽略 max_merge_count 限制
+                        merge_reasons.append(f"image {current_last_idx + 1} bottom + image {next_idx + 1} top (table continuation)")
+                        group_end += 1
+                        logger.info(f"Extending merge chain (table continuation): image {current_last_idx + 1} -> image {next_idx + 1}")
+                        continue
+                    else:
+                        # 达到限制且不是表格连续，停止扩展
+                        logger.info(f"Reached max merge count ({self.max_merge_count}) for group starting at image {group_start + 1}")
+                        break
 
                 # 只有当底部和头部都有文字时才扩展合并链
                 if current_bottom_has_text and next_top_has_text:
@@ -726,10 +889,6 @@ class BatchMergeProcessor:
                     elif not current_bottom_has_text and next_top_has_text:
                         logger.debug(f"Stop chain: image {current_last_idx + 1} has no text at bottom, but image {next_idx + 1} has text at top")
                     break  # 停止扩展
-
-            # 如果达到最大合并数量，记录日志
-            if (group_end - group_start) >= self.max_merge_count:
-                logger.info(f"Reached max merge count ({self.max_merge_count}) for group starting at image {group_start + 1}")
 
             # 生成原因描述
             if len(merge_reasons) > 0:
@@ -777,6 +936,8 @@ class BatchMergeProcessor:
         """
         对合并后的图片进行智能分割
 
+        分割数量与合并的原始图片数量一致。
+
         Args:
             image_path: 合并后的图片路径
             group: 合并组信息
@@ -787,35 +948,26 @@ class BatchMergeProcessor:
         if not self.enable_split:
             return [image_path]
 
+        # 获取合并的图片数量作为目标分割数量
+        num_parts = len(group.indices)
+
+        # 如果只有1张图片，不需要分割
+        if num_parts < 2:
+            return [image_path]
+
         try:
-            # 先分析图片的分割潜力
-            analysis = self.image_merger.analyze_split_potential(image_path)
+            logger.info(f"Splitting {Path(image_path).name} into {num_parts} parts (matching merge count)")
 
-            if analysis.get("error"):
-                logger.warning(f"Failed to analyze split potential: {analysis['error']}")
-                return [image_path]
-
-            # 检查是否大部分是表格
-            if analysis.get("is_mostly_table"):
-                logger.info(f"Skip split for {Path(image_path).name}: mostly table content")
-                self.stats["split_skipped_table"] += 1
-                return [image_path]
-
-            # 检查是否可以分割
-            if not analysis.get("can_split"):
-                logger.info(f"Skip split for {Path(image_path).name}: no suitable split point")
-                self.stats["split_skipped_no_point"] += 1
-                return [image_path]
-
-            # 执行分割
-            split_results = self.image_merger.split_horizontally(
+            # 使用新的 split_into_parts 方法，按合并数量分割
+            split_results = self.image_merger.split_into_parts(
                 image_path,
+                num_parts=num_parts,
                 output_dir=str(self.output_dir),
-                min_split_height=self.min_split_height
+                min_part_height=self.min_split_height // 2  # 每部分的最小高度
             )
 
-            # 如果成功分割（返回2个文件），删除原始合并文件
-            if len(split_results) == 2:
+            # 如果成功分割（返回多个文件），删除原始合并文件
+            if len(split_results) >= 2:
                 self.stats["images_split"] += 1
                 # 删除原始合并文件
                 try:
