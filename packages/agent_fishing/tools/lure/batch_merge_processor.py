@@ -74,7 +74,13 @@ class BatchMergeProcessor:
         split_min_ratio: float = 0.3,  # 分割点最小位置比例
         split_max_ratio: float = 0.7,  # 分割点最大位置比例
         # 合并限制参数
-        max_merge_count: int = 3  # 每组最多合并的图片数量
+        max_merge_count: int = 3,  # 每组最多合并的图片数量
+        # 文字过滤参数
+        skip_low_text_images: bool = True,  # 是否跳过文字过少的图片
+        min_char_threshold: int = 3,  # 最小字符数阈值，≤此值的图片将被丢弃
+        # 空白区域裁剪参数
+        crop_blank_regions: bool = True,  # 是否裁剪空白区域
+        crop_padding: int = 20  # 裁剪保留的边距（像素）
     ):
         """
         初始化批处理管理器
@@ -93,6 +99,10 @@ class BatchMergeProcessor:
             split_min_ratio: 分割点最小位置比例（0-1）
             split_max_ratio: 分割点最大位置比例（0-1）
             max_merge_count: 每组最多合并的图片数量（默认3张）
+            skip_low_text_images: 是否跳过文字过少的图片
+            min_char_threshold: 最小字符数阈值，≤此值的图片将被丢弃
+            crop_blank_regions: 是否裁剪空白区域
+            crop_padding: 裁剪保留的边距（像素）
         """
         self.source_dir = Path(source_dir).resolve()
         if not self.source_dir.exists():
@@ -121,6 +131,14 @@ class BatchMergeProcessor:
         # 合并限制
         self.max_merge_count = max_merge_count
 
+        # 文字过滤配置
+        self.skip_low_text_images = skip_low_text_images
+        self.min_char_threshold = min_char_threshold
+
+        # 空白区域裁剪配置
+        self.crop_blank_regions = crop_blank_regions
+        self.crop_padding = crop_padding
+
         # 缓存检测结果
         self._text_detection_cache = {}
 
@@ -136,7 +154,11 @@ class BatchMergeProcessor:
             "split_enabled": enable_split,
             "images_split": 0,
             "split_skipped_table": 0,
-            "split_skipped_no_point": 0
+            "split_skipped_no_point": 0,
+            # 新增统计
+            "images_discarded_low_text": 0,  # 因文字过少被丢弃的图片数
+            "images_cropped": 0,  # 被裁剪的图片数
+            "crop_saved_height": 0  # 裁剪节省的总高度（像素）
         }
 
         logger.info(f"BatchMergeProcessor initialized")
@@ -149,6 +171,12 @@ class BatchMergeProcessor:
         if enable_split:
             logger.info(f"Min split height: {min_split_height}px")
         logger.info(f"Max merge count per group: {max_merge_count}")
+        logger.info(f"Skip low text images: {'ENABLED' if skip_low_text_images else 'DISABLED'}")
+        if skip_low_text_images:
+            logger.info(f"Min char threshold: {min_char_threshold}")
+        logger.info(f"Crop blank regions: {'ENABLED' if crop_blank_regions else 'DISABLED'}")
+        if crop_blank_regions:
+            logger.info(f"Crop padding: {crop_padding}px")
 
     def _detect_text_by_filename(self, image_path: str) -> dict:
         """
@@ -415,6 +443,131 @@ class BatchMergeProcessor:
         检测图片头部是否有文字
         """
         return self._detect_text_in_image(image_path, region="top")
+
+    def _count_text_chars(self, image_path: str) -> int:
+        """
+        统计图片中的文字字符数
+
+        使用 PaddleOCR 检测并识别文字内容，返回总字符数
+
+        Args:
+            image_path: 图片路径
+
+        Returns:
+            int: 总字符数
+        """
+        try:
+            from .text_region_detector import TextRegionDetector
+            detector = TextRegionDetector()
+            boxes = detector.detect_text_with_content(image_path)
+            total_chars = sum(len(box.text) for box in boxes if box.text)
+            logger.debug(f"文字字符数统计: {Path(image_path).name} = {total_chars} 字符")
+            return total_chars
+        except Exception as e:
+            logger.warning(f"OCR字符计数失败 {Path(image_path).name}: {e}")
+            return 999  # 返回大值，避免误删
+
+    def _filter_low_text_images(self, image_files: List[str]) -> Tuple[List[str], List[str]]:
+        """
+        过滤文字过少的图片
+
+        Args:
+            image_files: 图片文件列表
+
+        Returns:
+            Tuple[List[str], List[str]]: (保留的图片列表, 被丢弃的图片列表)
+        """
+        if not self.skip_low_text_images:
+            return image_files, []
+
+        logger.info(f"开始过滤文字过少的图片（阈值: ≤{self.min_char_threshold}字符）")
+
+        kept = []
+        discarded = []
+
+        for img_path in image_files:
+            char_count = self._count_text_chars(img_path)
+            if char_count <= self.min_char_threshold:
+                discarded.append(img_path)
+                logger.info(f"丢弃图片(文字≤{self.min_char_threshold}): {Path(img_path).name} ({char_count}字符)")
+            else:
+                kept.append(img_path)
+                logger.debug(f"保留图片: {Path(img_path).name} ({char_count}字符)")
+
+        self.stats["images_discarded_low_text"] = len(discarded)
+        logger.info(f"文字过滤完成: 保留 {len(kept)} 张, 丢弃 {len(discarded)} 张")
+
+        return kept, discarded
+
+    def _get_text_vertical_bounds(self, image_path: str) -> Tuple[int, int, int]:
+        """
+        获取文字区域的垂直边界
+
+        Args:
+            image_path: 图片路径
+
+        Returns:
+            Tuple[int, int, int]: (y_min, y_max, image_height)
+        """
+        from PIL import Image
+
+        with Image.open(image_path) as img:
+            height = img.height
+
+        try:
+            from .text_region_detector import TextRegionDetector
+            detector = TextRegionDetector()
+            boxes = detector.detect_text_boxes(image_path)
+
+            if not boxes:
+                logger.debug(f"未检测到文字框: {Path(image_path).name}")
+                return 0, height, height
+
+            y_min = min(box.y_min for box in boxes)
+            y_max = max(box.y_max for box in boxes)
+            logger.debug(f"文字边界: {Path(image_path).name} y=[{y_min}, {y_max}] / {height}")
+            return y_min, y_max, height
+        except Exception as e:
+            logger.warning(f"获取文字边界失败 {Path(image_path).name}: {e}")
+            return 0, height, height
+
+    def _crop_to_text_region(self, image_path: str, output_path: str) -> Tuple[bool, int]:
+        """
+        裁剪图片到文字区域
+
+        Args:
+            image_path: 原图片路径
+            output_path: 输出路径
+
+        Returns:
+            Tuple[bool, int]: (是否成功裁剪, 节省的高度)
+        """
+        if not self.crop_blank_regions:
+            return False, 0
+
+        y_min, y_max, height = self._get_text_vertical_bounds(image_path)
+
+        # 添加边距
+        y_min = max(0, y_min - self.crop_padding)
+        y_max = min(height, y_max + self.crop_padding)
+
+        # 如果裁剪区域和原图差不多（超过90%），不裁剪
+        if y_max - y_min >= height * 0.9:
+            logger.debug(f"无需裁剪（文字区域≥90%）: {Path(image_path).name}")
+            return False, 0
+
+        try:
+            from PIL import Image
+            with Image.open(image_path) as img:
+                cropped = img.crop((0, y_min, img.width, y_max))
+                cropped.save(output_path, quality=95)
+
+            saved_height = height - (y_max - y_min)
+            logger.info(f"裁剪成功: {Path(image_path).name} {height}px → {y_max - y_min}px (节省 {saved_height}px)")
+            return True, saved_height
+        except Exception as e:
+            logger.warning(f"裁剪失败 {Path(image_path).name}: {e}")
+            return False, 0
 
     def _should_merge_with_next(self, image_files: List[str], index: int) -> bool:
         """
@@ -846,6 +999,9 @@ class BatchMergeProcessor:
         Returns:
             Dict[str, Any]: 处理结果和元数据
         """
+        import shutil
+
+        temp_dir = None
         try:
             # 1. 扫描图片
             image_files = self.scan_images()
@@ -853,17 +1009,52 @@ class BatchMergeProcessor:
                 logger.warning("No images found in source directory")
                 return {"error": "No images found"}
 
-            # 2. 生成分组策略
+            # 2. [新增] 过滤文字过少的图片
+            original_image_files = image_files.copy()
+            image_files, discarded = self._filter_low_text_images(image_files)
+            if not image_files:
+                logger.warning("All images discarded due to low text")
+                return {"error": "All images discarded due to low text"}
+
+            # 3. [新增] 裁剪空白区域
+            working_files = image_files  # 默认使用过滤后的原图
+
+            if self.crop_blank_regions:
+                temp_dir = self.output_dir / "temp_cropped"
+                temp_dir.mkdir(exist_ok=True)
+                logger.info(f"开始裁剪空白区域，临时目录: {temp_dir}")
+
+                cropped_files = []
+                for img_path in image_files:
+                    temp_path = temp_dir / Path(img_path).name
+                    success, saved = self._crop_to_text_region(img_path, str(temp_path))
+                    if success:
+                        cropped_files.append(str(temp_path))
+                        self.stats["images_cropped"] += 1
+                        self.stats["crop_saved_height"] += saved
+                    else:
+                        cropped_files.append(img_path)  # 使用原图
+
+                working_files = cropped_files
+                logger.info(f"裁剪完成: {self.stats['images_cropped']} 张图片被裁剪, 节省 {self.stats['crop_saved_height']}px")
+
+            # 4. 生成分组策略（使用原始图片进行文字检测，避免裁剪影响合并判断）
             merge_groups = self.generate_merge_groups(image_files)
 
-            # 3. 执行合并
-            output_files = self.execute_merge(image_files, merge_groups)
+            # 5. 执行合并（使用裁剪后的图片）
+            output_files = self.execute_merge(working_files, merge_groups)
 
-            # 4. 生成元数据
-            metadata = self.generate_metadata(image_files, merge_groups)
+            # 6. [新增] 清理临时文件
+            if temp_dir and temp_dir.exists():
+                shutil.rmtree(temp_dir)
+                logger.info(f"已清理临时目录: {temp_dir}")
+
+            # 7. 生成元数据（使用原始文件名）
+            metadata = self.generate_metadata(original_image_files, merge_groups)
             metadata["output_files"] = [Path(f).name for f in output_files]
+            metadata["discarded_files"] = [Path(f).name for f in discarded]
 
-            # 5. 保存元数据
+            # 8. 保存元数据
             metadata_path = self.save_metadata(metadata)
 
             logger.info("Batch processing completed successfully")
@@ -872,11 +1063,15 @@ class BatchMergeProcessor:
                 "success": True,
                 "metadata_path": metadata_path,
                 "statistics": self.stats,
-                "output_files": output_files
+                "output_files": output_files,
+                "discarded_files": discarded
             }
 
         except Exception as e:
             logger.error(f"Batch processing failed: {e}")
+            # 清理临时目录
+            if temp_dir and temp_dir.exists():
+                shutil.rmtree(temp_dir)
             return {
                 "success": False,
                 "error": str(e)
