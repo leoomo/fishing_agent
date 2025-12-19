@@ -83,14 +83,13 @@
           </view>
           <view class="message-content">
             <view class="message-bubble">
-              <text v-if="!streamingMessage" class="typing-text">路亚小助理正在思考中...</text>
-              <text v-else class="message-text" user-select="text">{{ streamingMessage }}</text>
+              <text v-if="!streamingMessage" class="typing-text">路亚小助理正在思考中...</text><text v-else class="message-text" user-select="text">{{ streamingMessage }}</text>
               <text class="typing-cursor">|</text>
             </view>
           </view>
         </view>
         
-        <!-- 加载中 -->
+        <!-- 加载中状态 -->
         <view v-if="sending && !streaming" class="message-item ai-message">
           <view class="message-avatar">
             <image class="avatar-img" src="/static/icons/chat.png" mode="aspectFit"></image>
@@ -101,6 +100,7 @@
             </view>
           </view>
         </view>
+
       </view>
     </scroll-view>
 
