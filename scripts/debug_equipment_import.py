@@ -4,8 +4,15 @@
 
 使用方法:
     PYTHONPATH=. uv run python scripts/debug_equipment_import.py
+
+该脚本会：
+1. 加载 OCR 文本
+2. 使用文本压缩中间件压缩长文本
+3. 批量提取所有型号的装备信息
+4. 保存到待审核表
 """
 
+import argparse
 import json
 import logging
 import sys
@@ -25,64 +32,113 @@ def load_ocr_text(file_path: str) -> str:
         return f.read()
 
 
-def extract_product_sections(text: str) -> list[dict]:
-    """
-    从 OCR 文本中提取各个产品区块
+def test_compression(text: str):
+    """测试文本压缩效果"""
+    from packages.agent_equipment_import.middleware import TextCompressor
 
-    根据 markdown 结构，每个 merge_xxx.jpg 开始一个新区块
-    """
-    sections = []
-    current_section = None
-    current_lines = []
+    print("\n" + "=" * 60)
+    print("测试文本压缩效果")
+    print("=" * 60)
 
-    for line in text.split("\n"):
-        # 检测新的图片区块
-        if line.startswith("## merge_") and line.endswith(".jpg"):
-            # 保存上一个区块
-            if current_section and current_lines:
-                sections.append({
-                    "image": current_section,
-                    "content": "\n".join(current_lines).strip()
-                })
-            current_section = line.replace("## ", "").strip()
-            current_lines = []
-        elif current_section:
-            current_lines.append(line)
+    compressor = TextCompressor()
+    result = compressor.compress(text)
 
-    # 保存最后一个区块
-    if current_section and current_lines:
-        sections.append({
-            "image": current_section,
-            "content": "\n".join(current_lines).strip()
-        })
+    print(f"\n原始长度: {result.original_length} 字符")
+    print(f"压缩后长度: {result.compressed_length} 字符")
+    print(f"压缩率: {result.compression_ratio:.1%}")
 
-    return sections
+    if result.metadata:
+        print(f"\n检测到的元信息:")
+        if result.metadata.get("brands"):
+            print(f"  品牌: {result.metadata['brands']}")
+        if result.metadata.get("series"):
+            print(f"  系列: {result.metadata['series']}")
+        if result.metadata.get("model_count"):
+            print(f"  型号数量: {result.metadata['model_count']}")
+        if result.metadata.get("models"):
+            print(f"  型号列表: {result.metadata['models'][:10]}...")
+
+    # 显示压缩后文本的前 1000 字符
+    print(f"\n压缩后文本预览 (前 1000 字符):")
+    print("-" * 40)
+    print(result.content[:1000])
+    print("-" * 40)
+
+    return result
 
 
-def find_spec_tables(sections: list[dict]) -> list[dict]:
-    """
-    找出包含规格参数表的区块
+def test_batch_extraction(agent, text: str):
+    """测试批量提取效果"""
+    print("\n" + "=" * 60)
+    print("测试批量提取 (从完整文本提取所有型号)")
+    print("=" * 60)
 
-    这些区块通常包含具体的产品参数，是我们需要提取的主要内容
-    """
-    spec_sections = []
+    # 批量提取（不保存）
+    extracted_list = agent.batch_extract_only(
+        text=text,
+        source_type="ecommerce"
+    )
 
-    for section in sections:
-        content = section["content"]
-        # 检测是否包含规格表（markdown 表格）
-        if "| 规格" in content or "| 型号" in content:
-            spec_sections.append(section)
-        # 检测是否包含详细参数
-        elif "详细参数" in content or "产品参数" in content:
-            spec_sections.append(section)
+    print(f"\n提取到 {len(extracted_list)} 个型号:")
+    print("-" * 40)
 
-    return spec_sections
+    for i, extracted in enumerate(extracted_list, 1):
+        print(f"\n[{i}] {extracted.brand_name or '未知品牌'} - {extracted.model or '未知型号'}")
+        print(f"    类型: {extracted.equipment_type}")
+        if extracted.specs:
+            specs_summary = []
+            if extracted.specs.get("length"):
+                specs_summary.append(f"长度:{extracted.specs['length']}m")
+            if extracted.specs.get("power"):
+                specs_summary.append(f"硬度:{extracted.specs['power']}")
+            if extracted.specs.get("action"):
+                specs_summary.append(f"调性:{extracted.specs['action']}")
+            if specs_summary:
+                print(f"    规格: {', '.join(specs_summary)}")
+        print(f"    置信度: {extracted.confidence:.0%}")
+
+    return extracted_list
+
+
+def test_batch_save(agent, text: str, source_url: str):
+    """测试批量提取并保存"""
+    print("\n" + "=" * 60)
+    print("测试批量提取并保存到待审核表")
+    print("=" * 60)
+
+    results = agent.batch_extract_and_save(
+        text=text,
+        source_type="ecommerce",
+        source_url=source_url
+    )
+
+    success_count = sum(1 for r in results if r.success)
+    fail_count = len(results) - success_count
+
+    print(f"\n批量保存结果:")
+    print(f"  成功: {success_count} 个")
+    print(f"  失败: {fail_count} 个")
+
+    if fail_count > 0:
+        print(f"\n失败详情:")
+        for r in results:
+            if not r.success:
+                model = r.extracted.model if r.extracted else "未知"
+                print(f"  - {model}: {r.message}")
+
+    return results
 
 
 def main():
     """主函数"""
+    parser = argparse.ArgumentParser(description="测试装备导入 Agent")
+    parser.add_argument("--save", action="store_true", help="自动保存到待审核表")
+    parser.add_argument("--no-save", action="store_true", help="跳过保存确认")
+    parser.add_argument("--file", type=str, default="debug_rs.md", help="OCR 文件路径")
+    args = parser.parse_args()
+
     # 加载 OCR 文本
-    ocr_file = Path("debug_rs.md")
+    ocr_file = Path(args.file)
     if not ocr_file.exists():
         logger.error(f"文件不存在: {ocr_file}")
         sys.exit(1)
@@ -91,27 +147,8 @@ def main():
     ocr_text = load_ocr_text(str(ocr_file))
     logger.info(f"文本长度: {len(ocr_text)} 字符")
 
-    # 提取产品区块
-    sections = extract_product_sections(ocr_text)
-    logger.info(f"提取到 {len(sections)} 个图片区块")
-
-    # 找出包含规格表的区块
-    spec_sections = find_spec_tables(sections)
-    logger.info(f"其中 {len(spec_sections)} 个包含规格参数表")
-
-    # 显示找到的规格区块
-    print("\n" + "=" * 60)
-    print("包含规格参数的区块:")
-    print("=" * 60)
-    for i, section in enumerate(spec_sections, 1):
-        print(f"\n[{i}] {section['image']}")
-        print("-" * 40)
-        # 只显示前 500 字符
-        content = section["content"]
-        if len(content) > 500:
-            print(content[:500] + "...")
-        else:
-            print(content)
+    # 测试文本压缩
+    compressed = test_compression(ocr_text)
 
     # 初始化装备导入 Agent
     print("\n" + "=" * 60)
@@ -121,8 +158,12 @@ def main():
     try:
         from packages.agent_equipment_import import EquipmentImportAgent
 
-        # 使用 qwen 模型（更稳定）
-        agent = EquipmentImportAgent(model_provider="qwen", enable_logging=True)
+        # 使用 qwen 模型，启用压缩
+        agent = EquipmentImportAgent(
+            model_provider="qwen",
+            enable_logging=True,
+            enable_compression=True
+        )
         logger.info("Agent 初始化成功")
 
     except Exception as e:
@@ -131,98 +172,34 @@ def main():
         traceback.print_exc()
         sys.exit(1)
 
-    # 选择一个包含完整规格的区块进行测试
-    # merge_011_012 包含详细参数表
-    test_section = None
-    for section in spec_sections:
-        if "详细参数" in section["content"] or "C631ML" in section["content"]:
-            test_section = section
-            break
+    # 测试批量提取
+    extracted_list = test_batch_extraction(agent, ocr_text)
 
-    if not test_section:
-        # 使用第一个规格区块
-        test_section = spec_sections[0] if spec_sections else sections[0]
+    # 处理保存逻辑
+    if extracted_list:
+        should_save = False
+        if args.save:
+            should_save = True
+        elif args.no_save:
+            should_save = False
+        else:
+            # 交互式询问
+            print("\n" + "-" * 40)
+            try:
+                user_input = input("是否保存到待审核表? (y/n): ").strip().lower()
+                should_save = user_input == "y"
+            except EOFError:
+                print("非交互模式，跳过保存 (使用 --save 自动保存)")
+                should_save = False
 
-    print("\n" + "=" * 60)
-    print(f"测试提取: {test_section['image']}")
-    print("=" * 60)
-    print(test_section["content"][:1000])
-
-    # 使用 extract_only 仅提取不保存
-    print("\n" + "=" * 60)
-    print("开始提取装备信息...")
-    print("=" * 60)
-
-    try:
-        extracted = agent.extract_only(
-            text=test_section["content"],
-            source_type="ecommerce"
-        )
-
-        print("\n提取结果:")
-        print("-" * 40)
-        print(f"装备类型: {extracted.equipment_type}")
-        print(f"品牌: {extracted.brand_name}")
-        print(f"型号: {extracted.model}")
-        print(f"名称: {extracted.name}")
-        print(f"价格: {extracted.price_min} - {extracted.price_max}")
-        print(f"置信度: {extracted.confidence:.0%}")
-        print(f"提取备注: {extracted.extraction_notes}")
-
-        print("\n规格参数:")
-        print(json.dumps(extracted.specs, ensure_ascii=False, indent=2))
-
-        print("\n特点:")
-        for feature in extracted.features:
-            print(f"  - {feature}")
-
-        print("\n目标鱼种:")
-        for fish in extracted.target_fish:
-            print(f"  - {fish}")
-
-        # 保存到待审核表
-        print("\n" + "=" * 60)
-        print("保存到待审核表...")
-        print("=" * 60)
-
-        result = agent.extract_and_save(
-            text=test_section["content"],
-            source_type="ecommerce",
-            source_url="https://item.taobao.com/item.htm?id=851749152448"
-        )
-
-        print(f"保存结果: {'成功' if result.success else '失败'}")
-        print(f"消息: {result.message}")
-        if result.pending_id:
-            print(f"待审核 ID: {result.pending_id}")
-
-    except Exception as e:
-        logger.error(f"提取失败: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-
-    # 批量测试多个区块
-    print("\n" + "=" * 60)
-    print("批量测试其他规格区块...")
-    print("=" * 60)
-
-    for i, section in enumerate(spec_sections[:5], 1):  # 最多测试 5 个
-        if section == test_section:
-            continue
-
-        print(f"\n[{i}] {section['image']}")
-        try:
-            extracted = agent.extract_only(
-                text=section["content"],
-                source_type="ecommerce"
+        if should_save:
+            test_batch_save(
+                agent,
+                ocr_text,
+                source_url="https://item.taobao.com/item.htm?id=851749152448"
             )
-            print(f"   类型: {extracted.equipment_type}")
-            print(f"   品牌: {extracted.brand_name}")
-            print(f"   型号: {extracted.model}")
-            print(f"   置信度: {extracted.confidence:.0%}")
-        except Exception as e:
-            print(f"   提取失败: {e}")
+        else:
+            print("跳过保存")
 
     print("\n" + "=" * 60)
     print("测试完成!")

@@ -10,7 +10,7 @@ import re
 from typing import Optional, Any
 
 from ..schemas.extracted import ExtractedEquipment
-from .prompts import get_extraction_prompt
+from .prompts import get_extraction_prompt, get_batch_extraction_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -147,13 +147,127 @@ class EquipmentExtractor:
             "extraction_notes": f"JSON 解析失败，原始响应: {content[:500]}"
         }
 
+    def extract_multiple(
+        self,
+        text: str,
+        source_type: str = "unknown"
+    ) -> list[ExtractedEquipment]:
+        """
+        从单个长文本中提取多个装备型号
+
+        使用批量提取提示词，让 LLM 返回 JSON 数组格式，
+        一次调用提取所有型号的信息。
+
+        Args:
+            text: 包含多个装备型号的长文本
+            source_type: 来源类型 (ecommerce/official/forum/unknown)
+
+        Returns:
+            list[ExtractedEquipment]: 提取的装备信息列表
+        """
+        if not text or not text.strip():
+            return []
+
+        try:
+            # 获取批量提取提示词
+            prompt = get_batch_extraction_prompt(source_type)
+
+            # 构建消息
+            messages = [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"请从以下文本中提取所有装备型号的信息：\n\n{text}"}
+            ]
+
+            # 调用 LLM
+            logger.info(f"开始批量提取，文本长度: {len(text)} 字符")
+            response = self.model.invoke(messages)
+
+            # 提取响应内容
+            content = self._extract_content(response)
+
+            # 解析 JSON 数组
+            extracted_list = self._parse_json_array_response(content)
+
+            # 转换为 ExtractedEquipment 列表
+            results = []
+            for data in extracted_list:
+                try:
+                    equipment = ExtractedEquipment.from_dict(data)
+                    results.append(equipment)
+                except Exception as e:
+                    logger.warning(f"转换装备数据失败: {e}, data={data}")
+
+            logger.info(f"批量提取完成，共提取 {len(results)} 个型号")
+            return results
+
+        except Exception as e:
+            logger.error(f"批量提取装备信息失败: {e}")
+            return []
+
+    def _parse_json_array_response(self, content: str) -> list[dict]:
+        """
+        解析 LLM 返回的 JSON 数组内容
+
+        Args:
+            content: LLM 返回的文本内容
+
+        Returns:
+            list[dict]: 解析后的字典列表
+        """
+        # 尝试直接解析
+        try:
+            result = json.loads(content)
+            if isinstance(result, list):
+                return result
+            elif isinstance(result, dict):
+                # 如果返回的是单个对象，包装成列表
+                return [result]
+        except json.JSONDecodeError:
+            pass
+
+        # 尝试提取 JSON 代码块
+        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
+        if json_match:
+            try:
+                result = json.loads(json_match.group(1))
+                if isinstance(result, list):
+                    return result
+                elif isinstance(result, dict):
+                    return [result]
+            except json.JSONDecodeError:
+                pass
+
+        # 尝试提取 [ ] 之间的内容
+        bracket_match = re.search(r'\[[\s\S]*\]', content)
+        if bracket_match:
+            try:
+                result = json.loads(bracket_match.group(0))
+                if isinstance(result, list):
+                    return result
+            except json.JSONDecodeError:
+                pass
+
+        # 尝试提取 { } 之间的内容 (可能是单个对象)
+        brace_match = re.search(r'\{[\s\S]*\}', content)
+        if brace_match:
+            try:
+                result = json.loads(brace_match.group(0))
+                if isinstance(result, dict):
+                    return [result]
+            except json.JSONDecodeError:
+                pass
+
+        # 解析失败，返回空列表
+        logger.warning(f"无法解析 LLM 返回的 JSON 数组: {content[:200]}...")
+        return []
+
     def extract_batch(
         self,
-        texts: list,
+        texts: list[str],
         source_type: str = "unknown"
-    ) -> list:
+    ) -> list[ExtractedEquipment]:
         """
-        批量提取装备信息
+        批量提取装备信息（多个文本分别提取）
 
         Args:
             texts: 文本列表
