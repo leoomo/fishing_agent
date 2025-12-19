@@ -232,55 +232,106 @@ async def chat(request: ChatRequest):
 
 ```
 fishing-agent/
-├── packages/                      # Agent 包目录
-│   └── agent_fishing/             # 钓鱼 Agent（完全自包含）
-│       ├── __init__.py           # 包入口和 LangGraph 兼容
-│       ├── core/                  # Agent 核心
+├── packages/                      # 模块化包目录
+│   ├── agent_fishing/             # 钓鱼 Agent（完全自包含）
+│   │   ├── __init__.py           # 包入口和 LangGraph 兼容
+│   │   ├── core/                  # Agent 核心
+│   │   │   ├── __init__.py
+│   │   │   ├── agent.py           # FishingAgent 实现
+│   │   │   ├── model_factory.py   # LLM 工厂
+│   │   │   ├── prompts.py         # 提示词
+│   │   │   └── callbacks.py       # 回调系统
+│   │   ├── middleware/            # 动态Prompt中间件
+│   │   │   ├── __init__.py
+│   │   │   └── dynamic_prompt.py  # 智能Prompt选择系统
+│   │   ├── tools/                 # Agent 工具集
+│   │   │   ├── __init__.py
+│   │   │   ├── basic.py           # 基础工具（时间功能）
+│   │   │   ├── weather.py         # 天气工具
+│   │   │   ├── fishing_tool.py    # 钓鱼工具
+│   │   │   ├── lure_tools.py      # 路亚装备工具
+│   │   │   ├── lure/              # 路亚子模块
+│   │   │   │   ├── embeddings.py  # DashScope嵌入服务
+│   │   │   │   ├── vector_store.py # ChromaDB向量存储
+│   │   │   │   └── knowledge_search.py # 语义搜索
+│   │   │   ├── fishing/           # 钓鱼评分子模块
+│   │   │   │   ├── weather_api.py # 天气API集成
+│   │   │   │   ├── weather_parser.py # 天气数据解析
+│   │   │   │   ├── time_optimizer.py # 时间优化器
+│   │   │   │   ├── report_generator.py # 报告生成器
+│   │   │   │   ├── enhanced_scorer.py # 增强7因子评分
+│   │   │   │   └── scorer.py      # 基础评分器
+│   │   │   └── scoring/           # 评分系统
+│   │   │       └── enhanced_scorer.py
+│   │   └── utils/                 # Agent 工具类
+│   │       ├── __init__.py
+│   │       ├── api_client.py      # API客户端
+│   │       ├── coordinate_utils.py # 坐标工具
+│   │       └── date_utils.py      # 日期工具
+│   ├── data_processing/           # 数据处理包 ⭐ v5.0.2新增（从agent_fishing独立）
+│   │   ├── __init__.py           # 包入口
+│   │   ├── pyproject.toml        # 包配置
+│   │   ├── image/                # 图片处理模块
+│   │   │   ├── __init__.py
+│   │   │   ├── batch_processor.py # 批量合并处理器
+│   │   │   ├── merger.py         # 图片合并器
+│   │   │   └── splitter.py       # 图片分割器
+│   │   ├── ocr/                  # OCR文字检测模块
+│   │   │   ├── __init__.py
+│   │   │   ├── ocr_processor.py  # OCR处理器
+│   │   │   └── text_detector.py  # 文字区域检测器
+│   │   └── dedup/                # 去重模块
+│   │       ├── __init__.py
+│   │       └── deduplicator.py   # 去重器
+│   └── scraper/                  # 爬虫框架包 ⭐ v5.0.2新增（从agent_fishing独立）
+│       ├── __init__.py           # 包入口，导出BaseSpider等核心类
+│       ├── pyproject.toml        # 包配置
+│       ├── spider/               # 爬虫核心模块
 │       │   ├── __init__.py
-│       │   ├── agent.py           # FishingAgent 实现
-│       │   ├── model_factory.py   # LLM 工厂
-│       │   ├── prompts.py         # 提示词
-│       │   └── callbacks.py       # 回调系统
-│       ├── middleware/            # 动态Prompt中间件
+│       │   ├── base.py           # BaseSpider基础类
+│       │   ├── anti_crawler.py   # 反爬虫工具
+│       │   └── downloader.py     # 下载器
+│       ├── spiders/              # 具体爬虫实现
 │       │   ├── __init__.py
-│       │   └── dynamic_prompt.py  # 智能Prompt选择系统
-│       ├── tools/                 # Agent 工具集
+│       │   ├── taobao_spider.py  # 淘宝爬虫
+│       │   ├── jd_spider.py      # 京东爬虫
+│       │   └── forum_spider.py   # 论坛爬虫
+│       ├── rpa/                  # RPA自动化框架
 │       │   ├── __init__.py
-│       │   ├── basic.py           # 基础工具（时间功能）
-│       │   ├── weather.py         # 天气工具
-│       │   ├── fishing_tool.py    # 钓鱼工具
-│       │   ├── lure_tools.py      # 路亚装备工具
-│       │   ├── lure/              # 路亚子模块
-│       │   │   ├── embeddings.py  # DashScope嵌入服务
-│       │   │   ├── vector_store.py # ChromaDB向量存储
-│       │   │   └── knowledge_search.py # 语义搜索
-│       │   ├── fishing/           # 钓鱼评分子模块
-│       │   │   ├── weather_api.py # 天气API集成
-│       │   │   ├── weather_parser.py # 天气数据解析
-│       │   │   ├── time_optimizer.py # 时间优化器
-│       │   │   ├── report_generator.py # 报告生成器
-│       │   │   ├── enhanced_scorer.py # 增强7因子评分
-│       │   │   └── scorer.py      # 基础评分器
-│       │   ├── crawler/           # 爬虫工具模块 ⭐ v4.0新增
-│       │   │   ├── downloader.py  # 下载器
-│       │   │   ├── deduplicator.py # 去重器
-│       │   │   ├── rpa/           # RPA爬虫核心
-│       │   │   │   ├── captcha_solver.py # 验证码解决
-│       │   │   │   ├── session_storage.py # 会话存储
-│       │   │   │   ├── core/      # 核心模块
-│       │   │   │   ├── taobao_rpa.py # 淘宝RPA
-│       │   │   │   └── extractors/ # 数据提取器
-│       │   │   └── workflow/      # 工作流管理 ⭐ v5.0新增
-│       │   │       ├── manager.py  # 工作流管理器
-│       │   │       ├── executor.py # 执行引擎
-│       │   │       └── scheduler.py # 任务调度器
-│       │   └── scoring/           # 评分系统
-│       │       └── enhanced_scorer.py
-│       └── utils/                 # Agent 工具类
+│       │   ├── captcha_solver.py # 验证码解决
+│       │   ├── session_storage.py # 会话存储
+│       │   ├── taobao_rpa.py     # 淘宝RPA
+│       │   ├── core/             # RPA核心模块
+│       │   ├── extractors/       # 数据提取器
+│       │   └── pages/            # 页面对象
+│       ├── platform/             # 平台抽象层
+│       │   ├── __init__.py
+│       │   ├── base_platform.py  # 基础平台类
+│       │   ├── registry.py       # 平台注册表
+│       │   ├── taobao_platform.py # 淘宝平台
+│       │   └── jd_platform.py    # 京东平台
+│       ├── workflow/             # 工作流引擎
+│       │   ├── __init__.py
+│       │   ├── engine.py         # 工作流引擎
+│       │   └── manager.py        # 工作流管理器
+│       ├── executor/             # 任务执行器
+│       │   ├── __init__.py
+│       │   ├── crawler_executor.py # 爬虫执行器
+│       │   └── task_queue.py     # 任务队列
+│       ├── monitoring/           # 监控告警
+│       │   ├── __init__.py
+│       │   ├── alerts.py         # 告警系统
+│       │   ├── metrics.py        # 指标收集
+│       │   └── monitor.py        # 监控主程序
+│       ├── scheduler/            # 定时调度
+│       │   ├── __init__.py
+│       │   └── workflow_scheduler.py # 工作流调度器
+│       ├── persister/            # 数据持久化
+│       │   ├── __init__.py
+│       │   └── equipment_persister.py # 装备数据持久化
+│       └── models/               # 独立的爬虫模型
 │           ├── __init__.py
-│           ├── api_client.py      # API客户端
-│           ├── coordinate_utils.py # 坐标工具
-│           └── date_utils.py      # 日期工具
+│           └── [各模型文件]      # CrawlerTask, CrawlerLog等
 ├── apps/                          # 应用层
 │   ├── cli/                       # CLI 应用
 │   │   └── main.py                # CLI主程序
@@ -371,6 +422,19 @@ fishing-agent/
 - **`utils/`**: 包内部工具类和辅助模块
 - **完全独立**: 可单独发布和测试，不依赖其他模块
 
+#### **`packages/data_processing/` - 数据处理包** ⭐ v5.0.2新增
+- **`image/`**: 图片处理功能，包括智能合并、批量处理、分割等
+- **`ocr/`**: OCR文字检测和提取功能
+- **`dedup/`**: 数据去重功能
+- **独立可用**: 不依赖 agent_fishing，可独立使用
+
+#### **`packages/scraper/` - 爬虫框架包** ⭐ v5.0.2新增
+- **`spider/`**: 爬虫核心，BaseSpider 基础类
+- **`spiders/`**: 各平台具体爬虫实现
+- **`rpa/`**: RPA 自动化框架
+- **`workflow/`**: 工作流管理和调度
+- **独立可用**: 不依赖 agent_fishing，通过 configure_database() 接收数据库连接
+
 #### **`apps/` - 应用层**
 - **`cli/`**: 命令行应用，用户交互界面
 - **`api/`**: FastAPI REST API 后端服务
@@ -409,6 +473,16 @@ agent = get_agent()  # LangGraph Studio 兼容
 from packages.data_processing.image import BatchMergeProcessor, ImageMerger
 processor = BatchMergeProcessor(source_dir="./images")
 result = processor.process()
+
+# 7. OCR 功能（位于 data_processing 包）
+from packages.data_processing.ocr import OCRMergeProcessor, TextRegionDetector
+ocr_processor = OCRMergeProcessor()
+text_detector = TextRegionDetector()
+
+# 8. 爬虫功能（位于 scraper 包）
+from packages.scraper import BaseSpider, CrawlItem
+from packages.scraper.spiders import TaobaoSpider
+from packages.scraper.workflow import WorkflowManager
 ```
 
 #### **工具访问模式**
@@ -674,6 +748,22 @@ from packages.data_processing.image import BatchMergeProcessor, ImageMerger
 
 # OCR功能
 from packages.data_processing.ocr import OCRMergeProcessor
+```
+
+### 🕷️ 爬虫框架系统 ⭐ v5.0.2架构更新
+
+爬虫功能已迁移到独立的 `packages/scraper` 包，提供完整的数据获取能力。
+
+```python
+# 基础爬虫使用
+from packages.scraper import BaseSpider, CrawlItem
+from packages.scraper.spiders import TaobaoSpider
+
+# RPA自动化
+from packages.scraper.rpa import TaobaoRPA
+
+# 工作流管理
+from packages.scraper.workflow import WorkflowManager
 ```
 
 #### **两种图片合并方案对比**
@@ -1460,6 +1550,7 @@ def get_weather_cached(location: str) -> dict:
 
 ### v5.0.2 架构优势
 - **模块化包架构**: 完全自包含的 Agent 包，支持独立发布
+- **基础设施分离**: data_processing 和 scraper 包独立，提高复用性 ⭐ v5.0.2新增
 - **全栈应用架构**: CLI、FastAPI 后端、React 前端三端分离
 - **LangGraph 兼容**: 原生支持 LangGraph Studio
 - **统一接口**: 一致的包导入和创建模式
@@ -1473,7 +1564,7 @@ def get_weather_cached(location: str) -> dict:
 1. v3.1.1: 模块化包架构 + 动态Prompt中间件
 2. v4.0.0: 爬虫监控模块 + RPA自动化
 3. v5.0.0: React管理前端 + JWT认证 + 数据分析配置
-4. v5.0.2: 智能图片合并 + OCR多提供商 + 工作流管理
+4. v5.0.2: 基础设施模块分离 + 智能图片合并 + OCR多提供商 + 工作流管理
 ```
 
 ### 关键特性对比

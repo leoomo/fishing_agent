@@ -21,12 +21,28 @@ Always open `@/openspec/AGENTS.md` when the request:
 
 ## 架构
 ```
-packages/agent_fishing/     # 自包含Agent包
-├── core/                   # agent.py, model_factory.py, prompts.py, callbacks.py
-│   └── middleware/         # dynamic_prompt.py
-├── tools/                  # basic, weather, fishing, lure_tools, lure/, scoring/
-│   └── lure/               # 路亚装备工具（装备推荐、对比、知识查询）
-└── utils/
+packages/                   # 模块化包目录
+├── agent_fishing/          # 自包含Agent包
+│   ├── core/               # agent.py, model_factory.py, prompts.py, callbacks.py
+│   │   └── middleware/     # dynamic_prompt.py
+│   ├── tools/              # basic, weather, fishing, lure_tools, lure/, scoring/
+│   │   └── lure/           # 路亚装备工具（装备推荐、对比、知识查询）
+│   └── utils/
+├── data_processing/        # 数据处理包 ⭐ v5.0.2新增
+│   ├── image/              # 图片处理 (ImageMerger, BatchMergeProcessor)
+│   ├── ocr/                # OCR文字检测 (TextRegionDetector)
+│   └── dedup/              # 去重工具
+└── scraper/                # 爬虫框架包 ⭐ v5.0.2新增
+    ├── spider/             # 爬虫核心 (BaseSpider, CrawlItem)
+    ├── spiders/            # 具体爬虫实现 (taobao, jd, forum)
+    ├── rpa/                # RPA自动化框架
+    ├── platform/           # 平台抽象层
+    ├── workflow/           # 工作流引擎
+    ├── executor/           # 任务执行器
+    ├── monitoring/         # 监控告警
+    ├── scheduler/          # 定时调度
+    ├── persister/          # 数据持久化
+    └── models/             # 独立的爬虫模型 (CrawlerTask, CrawlerLog等)
 apps/                       # 应用层
 ├── cli/                    # CLI应用 (main.py)
 ├── api/                    # FastAPI后端
@@ -62,13 +78,32 @@ cd apps/web-admin && npm run dev          # 运行React前端 (v5.0.0新增)
 
 ## 关键导入
 ```python
+# Agent 核心功能
 from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
 from packages.agent_fishing.core import ModelFactory
 from packages.agent_fishing.tools import get_weather, query_fishing_recommendation
 from packages.agent_fishing.utils import get_coordinates, parse_date_input
 
-# 图片合并功能（位于 data_processing 包）
+# 图片处理功能（位于 data_processing 包）
 from packages.data_processing.image import BatchMergeProcessor, ImageMerger
+from packages.data_processing.image.batch_processor import BatchMergeProcessor
+from packages.data_processing.image.merger import ImageMerger
+
+# OCR 功能（位于 data_processing 包）
+from packages.data_processing.ocr import OCRMergeProcessor
+from packages.data_processing.ocr.ocr_processor import OCRMergeProcessor
+from packages.data_processing.ocr.text_detector import TextRegionDetector
+
+# 去重功能（位于 data_processing 包）
+from packages.data_processing.dedup import Deduplicator
+from packages.data_processing.dedup.deduplicator import Deduplicator
+
+# 爬虫功能（位于 scraper 包）
+from packages.scraper import BaseSpider, CrawlItem, EquipmentData
+from packages.scraper.spider import BaseSpider, CrawlItem
+from packages.scraper.spiders import TaobaoSpider, JDSpider, ForumSpider
+from packages.scraper.rpa import TaobaoRPA
+from packages.scraper.workflow import WorkflowManager
 ```
 
 ## API端点
@@ -123,4 +158,9 @@ mkdir -p packages/agent_xxx/{core,tools,utils}
 ```
 
 ## 架构原则
-1. Agent自包含 (独立发布) | 2. 同步优先 (requests) | 3. 诚实数据 (无假数据) | 4. LangChain 1.0+ (@tool装饰器)
+1. Agent自包含 (独立发布) | 2. 基础设施模块化 (scraper/data_processing独立) | 3. 同步优先 (requests) | 4. 诚实数据 (无假数据) | 5. LangChain 1.0+ (@tool装饰器)
+
+## 包依赖说明
+- **agent_fishing**: 核心Agent包，独立自包含
+- **data_processing**: 数据处理包，独立可用，不依赖agent_fishing
+- **scraper**: 爬虫框架包，独立可用，通过configure_database()接收数据库连接

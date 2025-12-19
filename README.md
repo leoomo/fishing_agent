@@ -49,23 +49,39 @@ cd apps/web-admin && npm install && npm run dev
 ## 📚 文档导航
 
 - [📖 快速入门](docs/GETTING_STARTED.md) - 详细的安装配置指南
-- [🔧 API 参考](docs/API_REFERENCE.md) - 完整的 REST API 文档
+- [🔧 API 参考](docs/API.md) - 完整的 REST API 文档
 - [🖼️ 图片处理](docs/IMAGE_PROCESSING.md) - 智能图片合并和处理功能
 - [👥 用户指南](docs/USER_GUIDE.md) - 详细的使用说明和示例
 - [🏗️ 架构文档](docs/ARCHITECTURE.md) - 系统架构说明
 - [🔄 更新日志](CHANGELOG.md) - 版本更新记录
 - [🛠️ 开发指南](docs/DEVELOPMENT.md) - 开发环境搭建和贡献指南
 - [🐛 故障排除](docs/TROUBLESHOOTING.md) - 常见问题解决方案
+- [⚙️ 开发指令](docs/DEVELOPMENT_INSTRUCTIONS.md) - 开发环境详细说明
+- [🎯 React前端](docs/REACT_FRONTEND_GUIDE.md) - React管理前端指南
+- [🕷️ 爬虫指南](docs/CRAWLER_GUIDE.md) - 爬虫系统使用指南
+- [🧪 测试指南](docs/TESTING.md) - 测试框架和测试说明
 
 ## 🎯 快速体验
 
 ```python
-# 简单示例
+# Agent 核心功能
 from packages.agent_fishing import create_agent
 
 agent = create_agent(model_provider="zhipu")
 response = agent.run("明天杭州钓鱼怎么样？")
 print(response)
+
+# 图片处理功能
+from packages.data_processing.image import BatchMergeProcessor
+
+processor = BatchMergeProcessor(source_dir="./images")
+result = processor.process()
+
+# 爬虫功能
+from packages.scraper.spiders import TaobaoSpider
+
+spider = TaobaoSpider()
+results = spider.crawl("target_url")
 ```
 
 ## 🌐 访问地址
