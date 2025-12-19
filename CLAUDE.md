@@ -10,7 +10,7 @@ Always open `@/openspec/AGENTS.md` when the request:
 
 模块化 Agent 架构 + JWT认证系统 + React管理前端，基于 LangChain 1.0+ 和 7 因子科学评分系统。
 
-**当前版本**: v5.0.2 | **当前分支**: feature/equipment-ui (功能已完成)
+**当前版本**: v5.0.2 | **当前分支**: feature/miniprogram-dev (文档重构完成)
 
 ## 核心特性
 - JWT认证系统 (RBAC权限管理 + Token安全) + 模块化Agent包 + 7因子评分 (温度/天气/风力/气压/湿度/季节/月相)
@@ -164,3 +164,46 @@ mkdir -p packages/agent_xxx/{core,tools,utils}
 - **agent_fishing**: 核心Agent包，独立自包含
 - **data_processing**: 数据处理包，独立可用，不依赖agent_fishing
 - **scraper**: 爬虫框架包，独立可用，通过configure_database()接收数据库连接
+
+## 📚 文档导航
+
+### 📖 文档中心 (docs/)
+重新组织为面向角色的清晰结构：
+
+#### 🎯 [用户指南](docs/01-user-guide/)
+面向最终用户和初学者
+- [快速开始](docs/01-user-guide/getting-started.md) - 5分钟上手
+- [基础功能](docs/01-user-guide/basic-features.md) - 核心功能使用
+- [故障排除](docs/01-user-guide/troubleshooting.md) - 常见问题解决
+- [常见问题](docs/01-user-guide/faq.md) - 用户FAQ
+
+#### 💻 [开发者指南](docs/02-developer-guide/)
+面向项目开发者
+- [环境配置](docs/02-developer-guide/environment-setup.md) - 开发环境搭建
+- [代码结构](docs/02-developer-guide/codebase-structure.md) - 项目架构说明
+- [开发流程](docs/02-developer-guide/development-workflows.md) - 开发规范和流程
+- [测试指南](docs/02-developer-guide/testing.md) - 测试策略和指南
+
+#### 🏗️ [架构设计](docs/03-architecture/)
+面向系统架构师
+- [系统设计](docs/03-architecture/system-design.md) - 整体架构和设计原则
+- [架构概览](docs/03-architecture/README.md) - 架构文档导航中心
+
+#### 🔧 [运维部署](docs/04-operations/)
+面向DevOps工程师
+- [运维概览](docs/04-operations/README.md) - 运维文档导航中心
+
+#### 📡 [API参考](docs/05-api-reference/)
+面向API集成开发者
+- [API概览](docs/05-api-reference/README.md) - 完整API文档入口和接口说明
+
+#### 📖 [专题指南](docs/06-guides/)
+特定功能和使用场景
+- [图片处理](docs/06-guides/image-processing.md) - OCR和图片处理功能
+- [小程序集成](docs/06-guides/miniprogram-integration.md) - 微信小程序开发指南
+- [装备导入](docs/06-guides/equipment-import.md) - 装备数据导入功能
+- [性能优化](docs/06-guides/performance-optimization.md) - 系统性能优化指南
+
+#### 📦 [归档文档](docs/archive/)
+历史文档和已弃用资料
+- [归档中心](docs/archive/README.md) - 历史文档导航和说明
