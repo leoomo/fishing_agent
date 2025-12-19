@@ -202,7 +202,7 @@ export default {
       this.messages = Array.isArray(chatState.messages) ? chatState.messages : []
       const sessions = chatStore.getSessions()
       this.sessions = Array.isArray(sessions) ? sessions : []
-      this.filteredSessions = this.sessions.filter(s => (s.title || '').trim() !== '新对话')
+      this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
       this.sending = chatState.sending || false
       this.streaming = chatState.streaming || false
       this.streamingMessage = chatState.streamingMessage || ''
@@ -218,7 +218,7 @@ export default {
           await chatStore.fetchSessions()
           const updatedSessions = chatStore.getSessions()
           this.sessions = Array.isArray(updatedSessions) ? updatedSessions : []
-          this.filteredSessions = this.sessions.filter(s => (s.title || '').trim() !== '新对话')
+          this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
         } catch (e) {
           // 未登录或 token 失效时，提示并跳转登录
           console.error('获取会话失败:', e)
@@ -238,7 +238,7 @@ export default {
       this.messages = Array.isArray(chatState.messages) ? chatState.messages : []
       const sessions = chatStore.getSessions()
       this.sessions = Array.isArray(sessions) ? sessions : []
-      this.filteredSessions = this.sessions.filter(s => (s.title || '').trim() !== '新对话')
+      this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
       this.sending = chatState.sending || false
       this.streaming = chatState.streaming || false
       this.streamingMessage = chatState.streamingMessage || ''
@@ -288,7 +288,7 @@ export default {
         })
         await chatStore.fetchSessions()
         this.sessions = chatStore.getSessions() || []
-        this.filteredSessions = this.sessions.filter(s => (s.title || '').trim() !== '新对话')
+        this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
       } catch (error) {
         console.error('创建新对话失败:', error)
         uni.showToast({
@@ -314,13 +314,7 @@ export default {
       try {
         await chatStore.switchSession(sessionId)
         this.sessions = chatStore.getSessions() || []
-        this.filteredSessions = this.sessions.filter(s => s.id !== undefined && !s.is_deleted)
-        // 按最后更新时间排序（最新的在前）
-        this.filteredSessions.sort((a, b) => {
-          const timeA = new Date(a.updated_at || a.created_at).getTime()
-          const timeB = new Date(b.updated_at || b.created_at).getTime()
-          return timeB - timeA
-        })
+        this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
         this.showSessions = false
         uni.showToast({ title: "已切换", icon: "success" })
       } catch (error) {
@@ -347,13 +341,7 @@ export default {
             try {
               await chatStore.deleteSession(sessionId)
               this.sessions = chatStore.getSessions() || []
-              this.filteredSessions = this.sessions.filter(s => s.id !== undefined && !s.is_deleted)
-              // 按最后更新时间排序（最新的在前）
-              this.filteredSessions.sort((a, b) => {
-                const timeA = new Date(a.updated_at || a.created_at).getTime()
-                const timeB = new Date(b.updated_at || b.created_at).getTime()
-                return timeB - timeA
-              })
+              this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
               uni.showToast({ title: "已删除", icon: "success" })
             } catch (error) {
               console.error("删除会话失败:", error)
