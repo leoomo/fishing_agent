@@ -280,11 +280,30 @@ export default {
     
     // 创建新对话（只清空状态，实际会话在发送消息时创建）
     async createNewChat() {
-      await chatStore.createNewSession()
-      // 刷新会话列表
-      await chatStore.fetchSessions()
-      this.sessions = chatStore.getSessions() || []
-      this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
+      try {
+        await chatStore.createNewSession()
+
+        // 立即清空本地消息列表，确保UI更新
+        this.messages = []
+        this.streamingMessage = ''
+        this.streaming = false
+        this.sending = false
+        // 关闭会话抽屉
+        this.showSessions = false
+
+        // 刷新会话列表，但禁止自动选择旧会话
+        await chatStore.fetchSessions(false)
+        this.sessions = chatStore.getSessions() || []
+        this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
+
+        // 强制滚动到顶部
+        this.scrollTop = 1
+        this.$nextTick(() => {
+          this.scrollTop = 0
+        })
+      } catch (error) {
+        console.error('[createNewChat] 错误:', error)
+      }
     },
 
     // 切换会话

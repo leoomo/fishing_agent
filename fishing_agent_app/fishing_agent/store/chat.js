@@ -93,7 +93,8 @@ async function _createSessionOnServer(title = '新对话') {
 }
 
 // 获取会话列表
-async function fetchSessions() {
+// autoSelect: 是否在没有当前会话时自动选择第一个会话（默认true）
+async function fetchSessions(autoSelect = true) {
   try {
     state.loading = true
 
@@ -103,7 +104,7 @@ async function fetchSessions() {
     state.sessions = Array.isArray(sessions) ? sessions : []
 
     // 如果没有当前会话且有会话列表，设置第一个为当前会话
-    if (!state.currentSessionId && state.sessions.length > 0) {
+    if (autoSelect && !state.currentSessionId && state.sessions.length > 0) {
       state.currentSessionId = state.sessions[0].id
       // 获取该会话的消息
       fetchMessages(state.currentSessionId)
