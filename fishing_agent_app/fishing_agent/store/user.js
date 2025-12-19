@@ -31,8 +31,7 @@ async function fetchUserInfo() {
     // 触发页面更新
     notifyListeners()
   } catch (error) {
-    console.error('获取用户信息失败:', error)
-    // 获取失败，可能token已过期，清除登录状态
+    // 获取失败，可能token已过期，清除登录状态（401是预期行为，不打印错误）
     logout()
   } finally {
     state.loading = false

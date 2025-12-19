@@ -85,13 +85,8 @@ async function logout() {
 
 // 获取当前用户信息
 async function getCurrentUser() {
-  try {
-    const response = await request.get('/auth/me')
-    return response
-  } catch (error) {
-    console.error('获取用户信息失败:', error)
-    throw error
-  }
+  const response = await request.get('/auth/me')
+  return response
 }
 
 // 验证token是否有效
