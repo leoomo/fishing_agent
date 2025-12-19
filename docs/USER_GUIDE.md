@@ -1,6 +1,6 @@
-# 用户指南
+# 用户指南 v5.0.2
 
-本指南将帮助您深入了解和使用智能钓鱼助手的各种功能。
+本指南将帮助您深入了解和使用智能钓鱼助手 v5.0.2 的各种功能。
 
 ## 目录
 
@@ -8,8 +8,12 @@
 - [基础使用](#基础使用)
 - [钓鱼推荐功能](#钓鱼推荐功能)
 - [路亚装备管理](#路亚装备管理)
+- [装备信息提取与导入](#装备信息提取与导入)
+- [图片处理与OCR识别](#图片处理与ocr识别)
+- [微信小程序使用](#微信小程序使用)
 - [API 使用示例](#api-使用示例)
 - [高级功能](#高级功能)
+- [爬虫与工作流管理](#爬虫与工作流管理)
 - [常见问题](#常见问题)
 - [最佳实践](#最佳实践)
 
@@ -210,12 +214,261 @@ curl -X GET "http://localhost:8000/api/v1/user-equipment/users/1/statistics" \
   -H "Authorization: Bearer <token>"
 ```
 
+## 装备信息提取与导入
+
+### 使用装备导入Agent
+
+v5.0.2 新增了专门的装备导入Agent，可以从文本中智能提取装备信息：
+
+```python
+from packages.agent_equipment_import import EquipmentImportAgent
+
+# 创建Agent（支持文本压缩）
+agent = EquipmentImportAgent(
+    model_provider="zhipu",
+    enable_compression=True,  # 启用文本压缩中间件
+    compression_min_length=2000
+)
+
+# 对话式交互
+response = agent.run("帮我从这段文字提取装备信息：光威赤刃 GT602L-M 路亚竿...")
+
+# 批量提取并保存
+results = agent.batch_extract_and_save(
+    text="长文本包含多个装备型号...",
+    source_type="ecommerce",
+    source_url="https://example.com"
+)
+
+# 查看结果
+for result in results:
+    if result.success:
+        print(f"成功: {result.message}, 待审核ID: {result.pending_id}")
+    else:
+        print(f"失败: {result.message}")
+```
+
+### 文本压缩功能
+
+对于长文本，系统会自动压缩以提取核心信息：
+
+```python
+# 文本压缩示例
+compressed_result = agent.compress_text(text="""
+长文本内容...
+包括英文营销语、售后说明、技术原理图等冗余内容...
+以及规格表、型号描述、技术特色等核心信息...
+""")
+
+print(f"压缩率: {compressed_result.compression_ratio}")
+print(f"原始长度: {compressed_result.original_length}")
+print(f"压缩后长度: {compressed_result.compressed_length}")
+print(f"核心信息: {compressed_result.core_info}")
+```
+
+### API方式提取装备信息
+
+```bash
+# 提取单个装备信息
+curl -X POST "http://localhost:8000/api/v1/equipment/import/extract" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "光威赤刃 GT602L-M 路亚竿，碳纤维材质，适合淡水路亚，价格¥299",
+    "source_type": "forum",
+    "source_url": "https://example.com/forum/post/123",
+    "enable_compression": true
+  }'
+
+# 批量提取装备信息
+curl -X POST "http://localhost:8000/api/v1/equipment/import/batch-extract" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "长文本包含多个装备型号...",
+    "source_type": "ecommerce",
+    "source_url": "https://example.com",
+    "enable_compression": true
+  }'
+```
+
+### 审核待审核装备
+
+```bash
+# 获取待审核列表
+curl -X GET "http://localhost:8000/api/v1/equipment/pending?page=1&page_size=20" \
+  -H "Authorization: Bearer <token>"
+
+# 审核通过
+curl -X POST "http://localhost:8000/api/v1/equipment/pending/12345/review" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "approve",
+    "review_notes": "信息准确，批准入库",
+    "equipment_data": {
+      "brand_id": 1,
+      "category": "路亚竿",
+      "model_name": "赤刃 GT602L-M",
+      "price": 299
+    }
+  }'
+```
+
+## 图片处理与OCR识别
+
+### 智能图片合并
+
+系统可以自动检测图片下方是否有文字，并智能合并相关图片：
+
+```python
+from packages.data_processing.image import BatchMergeProcessor
+
+# 创建批处理器
+processor = BatchMergeProcessor(
+    source_dir="./images",
+    output_dir="./merged",
+    quality=95,
+    bottom_detection_ratio=0.2,
+    ocr_confidence_threshold=0.5,
+    parallel_detection=True,
+    max_workers=4
+)
+
+# 执行批处理
+result = processor.process()
+if result["success"]:
+    print(f"处理完成: {result['statistics']}")
+```
+
+### OCR表格识别
+
+```bash
+# 识别图片中的表格（支持多张图片自动合并）
+curl -X POST "http://localhost:8000/api/v1/ocr/recognize-table" \
+  -H "Authorization: Bearer <token>" \
+  -F "files=@image1.jpg" \
+  -F "files=@image2.jpg"
+
+# 使用图片URL
+curl -X POST "http://localhost:8000/api/v1/ocr/recognize-table" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image_url": "https://example.com/spec-table.jpg"
+  }'
+```
+
+### OCR服务配置
+
+支持两种OCR提供商：
+
+#### 1. Ollama本地OCR（推荐）
+
+```bash
+# 环境变量配置
+OCR_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=deepseek-ocr
+OLLAMA_TIMEOUT=120
+```
+
+#### 2. SiliconFlow云端OCR
+
+```bash
+# 环境变量配置
+OCR_PROVIDER=siliconflow
+SILICONFLOW_API_KEY=your-api-key
+SILICONFLOW_OCR_TIMEOUT=30
+```
+
+### 检查OCR状态
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/ocr/status" \
+  -H "Authorization: Bearer <token>"
+```
+
+## 微信小程序使用
+
+### 微信登录
+
+```javascript
+// 微信小程序端代码
+wx.login({
+  success: async (res) => {
+    // 调用后端登录接口
+    const response = await wx.request({
+      url: 'http://your-domain.com/api/v1/auth/wechat/login',
+      method: 'POST',
+      data: { code: res.code }
+    });
+    
+    // 保存token
+    wx.setStorageSync('access_token', response.data.access_token);
+    
+    // 获取用户信息
+    if (response.data.is_new_user) {
+      wx.showModal({
+        title: '欢迎',
+        content: '欢迎来到智能钓鱼助手！',
+        showCancel: false
+      });
+    }
+  }
+});
+```
+
+### 绑定已有账号
+
+```javascript
+// 绑定微信到现有账号
+wx.request({
+  url: 'http://your-domain.com/api/v1/auth/wechat/bind',
+  method: 'POST',
+  header: {
+    'Authorization': `Bearer ${token}`
+  },
+  data: { code: wxCode }
+});
+```
+
+### 小程序API调用示例
+
+```javascript
+// 获取钓鱼推荐
+function getFishingRecommendation(query) {
+  const token = wx.getStorageSync('access_token');
+  
+  wx.request({
+    url: 'http://your-domain.com/api/v1/fishing/chat',
+    method: 'POST',
+    header: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    data: {
+      query: query,
+      model_provider: 'zhipu',
+      user_id: wx.getStorageSync('user_id')
+    },
+    success: (res) => {
+      console.log('推荐结果:', res.data.response);
+    }
+  });
+}
+
+// 使用示例
+getFishingRecommendation('明天北京钓鱼怎么样？');
+```
+
 ## API 使用示例
 
 ### Python SDK 示例
 
 ```python
 import requests
+import os
 
 class FishingClient:
     def __init__(self, base_url="http://localhost:8000"):
@@ -243,17 +496,24 @@ class FishingClient:
         })
         return response.json()
 
-    def get_equipment_list(self, user_id, category=None, page=1):
-        """获取用户装备列表"""
+    def extract_equipment(self, text, source_type="forum"):
+        """提取装备信息"""
         headers = {"Authorization": f"Bearer {self.token}"}
-        params = {"page": page, "page_size": 20}
-        if category:
-            params["category"] = category
+        response = requests.post(f"{self.base_url}/api/v1/equipment/import/extract",
+                               headers=headers, json={
+            "text": text,
+            "source_type": source_type,
+            "enable_compression": True
+        })
+        return response.json()
 
-        response = requests.get(
-            f"{self.base_url}/api/v1/user-equipment/users/{user_id}/equipment",
-            headers=headers, params=params
-        )
+    def recognize_table(self, image_path):
+        """OCR识别表格"""
+        headers = {"Authorization": f"Bearer {self.token}"}
+        with open(image_path, 'rb') as f:
+            files = {'files': f}
+            response = requests.post(f"{self.base_url}/api/v1/ocr/recognize-table",
+                                   headers=headers, files=files)
         return response.json()
 
 # 使用示例
@@ -261,8 +521,19 @@ client = FishingClient()
 user = client.login("admin", "admin123")
 print(f"登录成功: {user['username']}")
 
+# 钓鱼推荐
 response = client.chat("明天北京钓鱼怎么样？")
 print(f"推荐: {response['response']}")
+
+# 提取装备信息
+equipment = client.extract_equipment(
+    "光威赤刃 GT602L-M 路亚竿，碳纤维材质，价格299元"
+)
+print(f"提取结果: {equipment}")
+
+# OCR识别
+ocr_result = client.recognize_table("./spec_table.jpg")
+print(f"识别结果: {ocr_result['markdown']}")
 ```
 
 ### JavaScript SDK 示例
@@ -301,8 +572,33 @@ class FishingAPI {
         return response.json();
     }
 
-    async getTools() {
-        const response = await fetch(`${this.baseURL}/api/v1/fishing/tools`);
+    async extractEquipment(text, sourceType = 'forum') {
+        const response = await fetch(`${this.baseURL}/api/v1/equipment/import/extract`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text,
+                source_type: sourceType,
+                enable_compression: true
+            })
+        });
+        return response.json();
+    }
+
+    async recognizeTable(imageFile) {
+        const formData = new FormData();
+        formData.append('files', imageFile);
+        
+        const response = await fetch(`${this.baseURL}/api/v1/ocr/recognize-table`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: formData
+        });
         return response.json();
     }
 }
@@ -311,8 +607,15 @@ class FishingAPI {
 const api = new FishingAPI();
 await api.login('admin', 'admin123');
 
+// 钓鱼推荐
 const response = await api.chat('明天杭州适合钓鱼吗？');
 console.log(response.response);
+
+// 提取装备
+const equipment = await api.extractEquipment(
+    '达亿瓦 1000 纺车轮，浅线杯，适合路亚'
+);
+console.log(equipment.results);
 ```
 
 ## 高级功能
@@ -391,6 +694,83 @@ curl -X POST "http://localhost:8000/api/v1/admin/analytics/reports/generate" \
   }'
 ```
 
+## 爬虫与工作流管理
+
+### 创建爬虫任务
+
+```bash
+# 触发爬虫任务
+curl -X POST "http://localhost:8000/api/v1/admin/crawler/tasks/trigger" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task_type": "taobao",
+    "keywords": ["路亚竿", "渔轮"],
+    "max_pages": 5,
+    "category": "鱼竿"
+  }'
+```
+
+### 创建工作流
+
+```bash
+# 创建工作流模板
+curl -X POST "http://localhost:8000/api/v1/admin/crawler/workflows/templates" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "装备数据同步工作流",
+    "description": "定期同步电商平台装备数据",
+    "steps": [
+      {
+        "name": "爬取淘宝数据",
+        "task_type": "taobao",
+        "config": {
+          "keywords": ["路亚竿"],
+          "max_pages": 3
+        },
+        "depends_on": []
+      },
+      {
+        "name": "数据清洗",
+        "task_type": "data_clean",
+        "config": {},
+        "depends_on": ["爬取淘宝数据"]
+      }
+    ]
+  }'
+```
+
+### 创建定时调度
+
+```bash
+# 创建定时任务
+curl -X POST "http://localhost:8000/api/v1/admin/crawler/schedules" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "每日数据同步",
+    "template_id": 1,
+    "cron_expression": "0 2 * * *",
+    "timezone": "Asia/Shanghai",
+    "is_active": true
+  }'
+```
+
+### 导入导出数据
+
+```bash
+# CSV导入装备
+curl -X POST "http://localhost:8000/api/v1/equipment/import/csv" \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@equipment.csv"
+
+# 导出装备数据
+curl -X GET "http://localhost:8000/api/v1/equipment/export/csv?category=路亚竿&limit=1000" \
+  -H "Authorization: Bearer <token>" \
+  -o equipment_export.csv
+```
+
 ## 常见问题
 
 ### Q: 如何提高推荐准确度？
@@ -421,29 +801,41 @@ curl -X POST "http://localhost:8000/api/v1/admin/analytics/reports/generate" \
 3. **预算**: 杆+轮+线≈1:1:0.2
 4. **品牌**: 禧玛诺、达亿瓦、阿布等
 
+### Q: OCR识别如何提高准确率？
+
+**A**:
+1. 使用Ollama本地OCR，保护隐私且免费
+2. 图片清晰度越高越好
+3. 表格边界清晰，无遮挡
+4. 可使用智能合并功能处理多图
+
+### Q: 如何使用装备导入功能？
+
+**A**:
+1. 文本提取：直接粘贴商品描述
+2. 图片识别：使用OCR功能识别规格表
+3. 批量处理：支持长文本批量提取
+4. 审核机制：所有提取信息需审核后入库
+
 ### Q: API调用频率限制？
 
 **A**:
 - 未认证用户：100 请求/小时
-- 普通用户：1000 请求/小时
+- 只读用户：500 请求/小时
+- 编辑用户：1000 请求/小时
 - 管理员：无限制
 
-### Q: 如何获取最新的装备数据？
+### Q: 如何配置微信小程序？
 
 **A**:
-系统会自动从电商平台同步数据，也可以手动触发：
-
-```bash
-# 触发爬虫任务
-curl -X POST "http://localhost:8000/api/v1/admin/crawler/tasks/trigger" \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "task_type": "taobao",
-    "keywords": ["路亚竿"],
-    "max_pages": 3
-  }'
-```
+1. 在微信公众平台获取AppID和AppSecret
+2. 配置服务器域名白名单
+3. 设置环境变量：
+   ```bash
+   WECHAT_APPID=your-appid
+   WECHAT_SECRET=your-secret
+   WECHAT_AUTO_CREATE_USER=true
+   ```
 
 ## 最佳实践
 
@@ -509,12 +901,32 @@ import os
 API_KEY = os.getenv('DASHSCOPE_API_KEY')
 ```
 
+### 6. 图片处理优化
+
+```python
+# 并行处理提高效率
+processor = BatchMergeProcessor(
+    source_dir="./images",
+    parallel_detection=True,
+    max_workers=8  # 根据CPU核心数调整
+)
+
+# 自定义检测参数
+processor = BatchMergeProcessor(
+    source_dir="./images",
+    bottom_detection_ratio=0.3,  # 检测底部30%区域
+    ocr_confidence_threshold=0.7  # 提高置信度阈值
+)
+```
+
 ## 更多资源
 
 - [API 参考](./API_REFERENCE.md) - 完整的API文档
 - [快速入门](./GETTING_STARTED.md) - 安装配置指南
 - [架构文档](./ARCHITECTURE.md) - 系统架构说明
 - [更新日志](../CHANGELOG.md) - 版本更新记录
+- [微信小程序开发指南](./MINIPROGRAM_GUIDE.md) - 小程序集成指南
+- [图片处理指南](./IMAGE_PROCESSING.md) - OCR和图片处理详细说明
 
 ---
 

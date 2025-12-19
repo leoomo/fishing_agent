@@ -1,6 +1,6 @@
-# 快速入门指南
+# 快速入门指南 v5.0.2
 
-本指南将帮助您快速搭建和运行智能钓鱼助手项目。
+本指南将帮助您快速搭建和运行智能钓鱼助手 v5.0.2 项目。
 
 ## 目录
 
@@ -8,6 +8,7 @@
 - [安装步骤](#安装步骤)
 - [配置说明](#配置说明)
 - [运行项目](#运行项目)
+- [微信小程序开发](#微信小程序开发)
 - [验证安装](#验证安装)
 - [常见问题](#常见问题)
 
@@ -23,7 +24,7 @@
    python3 --version
    ```
 
-2. **uv 包管理器**
+2. **uv 包管理器**（推荐）
    ```bash
    # 安装 uv
    curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -32,11 +33,14 @@
    pip install uv
    ```
 
-3. **Node.js 18+**（仅前端需要）
+3. **Node.js 18+**（前端需要）
    ```bash
    # 检查 Node.js 版本
    node --version
    ```
+
+4. **微信开发者工具**（小程序开发）
+   - 下载地址：[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)
 
 ### API 密钥
 
@@ -48,6 +52,7 @@
 | 高德地图 | [高德开放平台](https://lbs.amap.com/) | 地理坐标服务 |
 | 通义千问 | [阿里云百炼平台](https://bailian.console.aliyun.com/) | LLM 和 Embedding |
 | 智谱AI | [智谱AI开放平台](https://open.bigmodel.cn/) | LLM 服务（推荐） |
+| 微信小程序 | [微信公众平台](https://mp.weixin.qq.com/) | 小程序登录（v5.0.2新增） |
 
 ## 安装步骤
 
@@ -57,6 +62,9 @@
 # 使用 git 克隆
 git clone https://github.com/yourusername/fishing-agent.git
 cd fishing-agent
+
+# 切换到 v5.0.2 分支
+git checkout v5.0.2
 ```
 
 ### 2. 安装 Python 依赖
@@ -64,6 +72,9 @@ cd fishing-agent
 ```bash
 # 使用 uv 安装依赖
 uv sync
+
+# 包含开发依赖
+uv sync --dev
 
 # 查看已安装的包
 uv pip list
@@ -82,26 +93,37 @@ nano .env  # 或使用其他编辑器
 在 `.env` 文件中添加您的 API 密钥：
 
 ```bash
-# 天气服务（必需）
+# === 天气服务（必需） ===
 CAIYUN_API_KEY=your_caiyun_api_key
-
-# 地图服务（必需）
 AMAP_API_KEY=your_amap_api_key
 
-# LLM 服务（至少配置一个）
-DASHSCOPE_API_KEY=your_dashscope_api_key
-ANTHROPIC_AUTH_TOKEN=your_anthropic_token
+# === LLM 服务（至少配置一个） ===
+DASHSCOPE_API_KEY=your_dashscope_api_key      # 通义千问
+ANTHROPIC_AUTH_TOKEN=your_anthropic_token    # 智谱AI（推荐）
 
-# JWT 认证（生产环境必需）
-JWT_SECRET_KEY=your-super-secret-jwt-key-here
+# === JWT 认证（必需） ===
+JWT_SECRET_KEY=your-super-secret-jwt-key-here-min-32-chars
 JWT_ALGORITHM=HS256
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-# 配置加密（生产环境建议设置）
-CONFIG_ENCRYPTION_KEY=your-32-character-encryption-key
+# === 微信小程序配置（v5.0.2新增） ===
+WECHAT_APPID=your-wechat-appid
+WECHAT_SECRET=your-wechat-secret
+WECHAT_AUTO_CREATE_USER=true
+
+# === OCR 配置（可选） ===
+OCR_PROVIDER=ollama                              # ollama 或 siliconflow
+OLLAMA_BASE_URL=http://localhost:11434          # 本地Ollama地址
+OLLAMA_MODEL=deepseek-ocr                        # OCR模型
+SILICONFLOW_API_KEY=your-siliconflow-api-key    # 云端OCR密钥
+
+# === 其他配置 ===
+LOG_LEVEL=INFO
+VECTOR_EMBEDDING_MODEL=text-embedding-v3
+VECTOR_AUTO_INDEX=true
 ```
 
-### 4. 安装前端依赖（可选）
+### 4. 安装前端依赖
 
 ```bash
 # 进入前端目录
@@ -112,6 +134,13 @@ npm install
 
 # 返回项目根目录
 cd ../..
+```
+
+### 5. 设置微信小程序（v5.0.2新增）
+
+```bash
+# 小程序目录已创建，使用微信开发者工具打开
+miniprogram/
 ```
 
 ## 配置说明
@@ -133,28 +162,41 @@ cd ../..
   - 用于 GLM-4.6 模型
   - 响应速度快，中文理解能力强
 
-#### 认证配置（可选）
+#### JWT 认证配置（必需）
 
-- `JWT_SECRET_KEY`: JWT 签名密钥，生产环境必须设置
+- `JWT_SECRET_KEY`: JWT 签名密钥（至少32字符），生产环境必须设置
 - `JWT_ALGORITHM`: JWT 算法，默认 HS256
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`: Token 过期时间（分钟）
 
-#### 安全配置（可选）
+#### 微信小程序配置（v5.0.2新增）
 
-- `CONFIG_ENCRYPTION_KEY`: 配置加密密钥（32字符），用于加密敏感配置
+- `WECHAT_APPID`: 微信小程序 AppID
+- `WECHAT_SECRET`: 微信小程序 AppSecret
+- `WECHAT_AUTO_CREATE_USER`: 是否自动创建新用户（默认 true）
 
-#### OCR配置（可选）
+#### OCR 配置（可选）
 
-- `OCR_PROVIDER`: OCR提供商，可选 `ollama`（本地）或 `siliconflow`（云端）
-- `OLLAMA_BASE_URL`: Ollama服务地址，默认 `http://localhost:11434`
-- `OLLAMA_MODEL`: Ollama OCR模型，默认 `deepseek-ocr`
-- `SILICONFLOW_API_KEY`: SiliconFlow API密钥（云端OCR使用）
+支持两种 OCR 提供商：
+
+1. **Ollama 本地 OCR（推荐）**
+   ```bash
+   OCR_PROVIDER=ollama
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_MODEL=deepseek-ocr
+   ```
+
+2. **SiliconFlow 云端 OCR**
+   ```bash
+   OCR_PROVIDER=siliconflow
+   SILICONFLOW_API_KEY=your-api-key
+   ```
 
 ### 数据库配置
 
-项目使用 SQLite 数据库，默认位置：
+项目使用 SQLite 数据库，自动创建：
 - 装备数据：`packages/agent_fishing/tools/lure/data/equipment.db`
-- 无需额外配置，自动创建
+- 待审核装备：`shared/data/pending_equipment.db`
+- 系统配置：`shared/data/system.db`
 
 ## 运行项目
 
@@ -178,7 +220,7 @@ uv run uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
 uv run fishing-api
 ```
 
-### 方式三：React 前端
+### 方式三：React 管理前端
 
 ```bash
 # 进入前端目录
@@ -190,7 +232,15 @@ npm run dev
 # 访问 http://localhost:5173
 ```
 
-### 方式四：Docker 部署
+### 方式四：微信小程序（v5.0.2新增）
+
+```bash
+# 1. 使用微信开发者工具打开 miniprogram/ 目录
+# 2. 在本地设置中勾选"不校验合法域名"
+# 3. 修改 miniprogram/utils/api.js 中的 baseURL 为本地地址
+```
+
+### 方式五：Docker 部署
 
 ```bash
 # 构建镜像
@@ -198,35 +248,188 @@ docker build -t fishing-agent .
 
 # 运行容器
 docker run -p 8000:8000 -v $(pwd)/.env:/app/.env fishing-agent
+
+# 或使用 docker-compose
+docker-compose up -d
 ```
+
+## 微信小程序开发（v5.0.2新增）
+
+### 1. 申请小程序账号
+
+1. 访问[微信公众平台](https://mp.weixin.qq.com/)
+2. 注册小程序账号
+3. 获取 AppID 和 AppSecret
+
+### 2. 配置小程序
+
+```bash
+# 更新 miniprogram/app.json
+{
+  "appid": "your-appid-here",
+  "setting": {
+    "urlCheck": false  // 开发环境关闭域名检查
+  }
+}
+```
+
+### 3. 本地开发配置
+
+```javascript
+// miniprogram/utils/api.js
+const API_BASE_URL = 'http://localhost:8000';  // 开发环境
+// const API_BASE_URL = 'https://api.yourdomain.com';  // 生产环境
+```
+
+### 4. 运行小程序
+
+1. 打开微信开发者工具
+2. 导入项目（选择 miniprogram/ 目录）
+3. 输入 AppID
+4. 点击编译
 
 ## 验证安装
 
-### 1. 测试 CLI 应用
+### 1. 测试核心包导入
+
+```bash
+# 测试所有核心包
+uv run python -c "
+from packages.agent_fishing import create_agent
+from packages.agent_equipment_import import EquipmentImportAgent
+from packages.data_processing.image import BatchMergeProcessor
+from packages.scraper import BaseSpider
+print('✅ 所有核心包导入成功')
+"
+```
+
+### 2. 测试 CLI 应用
 
 ```bash
 # 运行测试命令
-uv run python -c "from packages.agent_fishing import create_agent; print('✅ Agent 创建成功')"
+uv run fishing --help
 
-# 测试工具加载
-uv run python -c "from packages.agent_fishing import get_all_tools; print(f'✅ 工具数量: {len(get_all_tools())}')"
+# 测试对话功能
+echo "明天北京钓鱼怎么样？" | uv run fishing
 ```
 
-### 2. 测试 API 服务
+### 3. 测试 API 服务
 
 ```bash
 # 健康检查
 curl http://localhost:8000/health
 
+# 测试微信登录
+curl -X POST http://localhost:8000/api/v1/auth/wechat/login \
+  -H "Content-Type: application/json" \
+  -d '{"code": "test_code"}'
+
 # 预期响应
-# {"status":"ok"}
+# {"access_token": "...", "user": {...}}
 ```
 
-### 3. 测试前端访问
+### 4. 测试 OCR 功能
+
+```bash
+# 检查 OCR 状态
+curl http://localhost:8000/api/v1/ocr/status
+
+# 测试图片识别
+curl -X POST http://localhost:8000/api/v1/ocr/recognize-table \
+  -H "Authorization: Bearer your-token" \
+  -F "files=@test-image.jpg"
+```
+
+### 5. 测试前端访问
 
 打开浏览器访问：
 - API 文档：http://localhost:8000/docs
-- React 前端：http://localhost:5173（需要先启动前端服务）
+- React 前端：http://localhost:5173
+- 管理后台：http://localhost:5173（登录后访问）
+
+## OCR 功能配置
+
+### 使用 Ollama 本地 OCR（推荐）
+
+1. **安装 Ollama**
+   ```bash
+   # macOS
+   brew install ollama
+   
+   # Linux
+   curl -fsSL https://ollama.com/install.sh | sh
+   ```
+
+2. **下载 OCR 模型**
+   ```bash
+   ollama pull deepseek-ocr
+   ```
+
+3. **启动 Ollama 服务**
+   ```bash
+   ollama serve
+   ```
+
+4. **配置环境变量**
+   ```bash
+   OCR_PROVIDER=ollama
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_MODEL=deepseek-ocr
+   ```
+
+### 使用 SiliconFlow 云端 OCR
+
+1. **注册账号**
+   - 访问 [SiliconFlow](https://siliconflow.cn/)
+   - 获取 API Key
+
+2. **配置环境变量**
+   ```bash
+   OCR_PROVIDER=siliconflow
+   SILICONFLOW_API_KEY=your-api-key
+   ```
+
+## 装备导入功能（v5.0.2新增）
+
+### 1. 使用 Python API
+
+```python
+from packages.agent_equipment_import import EquipmentImportAgent
+
+# 创建导入 Agent
+agent = EquipmentImportAgent(
+    model_provider="zhipu",
+    enable_compression=True  # 启用文本压缩
+)
+
+# 提取装备信息
+text = """
+光威赤刃 GT602L-M 路亚竿，碳纤维材质，超轻硬设计，
+适合淡水作钓，长度2.4米，自重120g，售价299元。
+"""
+
+result = agent.extract_and_save(
+    text=text,
+    source_type="ecommerce",
+    source_url="https://example.com"
+)
+
+print(f"提取结果: {result}")
+```
+
+### 2. 使用 API 接口
+
+```bash
+# 提取装备信息
+curl -X POST http://localhost:8000/api/v1/equipment/import/extract \
+  -H "Authorization: Bearer your-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "光威赤刃 GT602L-M 路亚竿，价格299元",
+    "source_type": "forum",
+    "enable_compression": true
+  }'
+```
 
 ## 常见问题
 
@@ -238,7 +441,7 @@ curl http://localhost:8000/health
 ls -la .env
 
 # 检查密钥格式（无空格，无引号）
-cat .env | grep API_KEY
+cat .env | grep -E "API_KEY|SECRET"
 ```
 
 ### Q: 模块导入错误
@@ -252,30 +455,44 @@ uv run python main.py
 python main.py
 ```
 
-### Q: 前端无法连接后端
+### Q: 微信小程序无法连接本地 API
 
-**A**: 检查 CORS 配置和端口：
-- 确保 API 服务在 8000 端口运行
-- 检查 `apps/api/main.py` 中的 CORS 设置
+**A**: 
+1. 确保本地 API 服务已启动
+2. 在微信开发者工具中关闭"不校验合法域名"
+3. 检查 CORS 配置是否允许小程序域名
+
+### Q: OCR 识别失败
+
+**A**: 
+1. 检查 OCR 提供商配置
+2. 确保 Ollama 已下载 `deepseek-ocr` 模型
+3. 验证 SiliconFlow API Key 是否有效
+
+### Q: JWT Token 错误
+
+**A**: 
+1. 确保 JWT_SECRET_KEY 至少 32 字符
+2. 检查 Token 是否过期
+3. 验证 Token 格式：`Bearer <token>`
 
 ### Q: 数据库连接失败
 
 **A**: 检查数据库文件权限：
 ```bash
-# 检查数据库文件
-ls -la packages/agent_fishing/tools/lure/data/
+# 创建数据目录
+mkdir -p shared/data
 
-# 创建目录（如不存在）
-mkdir -p packages/agent_fishing/tools/lure/data/
+# 检查权限
+ls -la shared/data/
 ```
 
-### Q: LLM 响应慢
+### Q: 前端无法连接后端
 
-**A**: 建议使用智谱 AI：
-```bash
-# .env 中配置
-ANTHROPIC_AUTH_TOKEN=your_zhipu_api_key
-```
+**A**: 
+- 确保 API 服务在 8000 端口运行
+- 检查 `apps/api/main.py` 中的 CORS 设置
+- 验证 proxy 配置（如果使用）
 
 ### Q: 如何重置配置
 
@@ -286,200 +503,40 @@ cp .env.example .env
 # 重新编辑配置
 ```
 
-### 5. 初始化数据库（可选）
+## 创建管理员用户
 
-系统会自动创建和初始化数据库，但如果需要重新初始化：
-
-```bash
-# 初始化装备数据库
-uv run python -c "
-from packages.agent_fishing.tools.lure.database import init_database
-init_database()
-print('数据库初始化完成')
-"
-```
-
-### 6. 创建管理员用户（生产环境）
-
-在生产环境中，需要创建管理员用户：
+### 使用 Python 脚本
 
 ```bash
-# 使用Python脚本创建
 uv run python -c "
 import bcrypt
-from packages.agent_fishing.tools.lure.database import get_db
-from packages.agent_fishing.tools.lure.models.system import AdminUser
+import os
+from sqlalchemy import create_engine
+from apps.api.auth.models import User
+from shared.config import get_settings
 
-# 获取数据库连接
-db = get_db()
+settings = get_settings()
+engine = create_engine(settings.DATABASE_URL)
 
 # 创建管理员用户
 password = 'admin123'  # 请使用强密码
 hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
-admin = AdminUser(
-    username='admin',
-    email='admin@example.com',
-    password_hash=hashed_password.decode('utf-8'),
-    role='admin',
-    is_active=True
-)
-
-db.add(admin)
-db.commit()
-print('管理员用户创建成功')
+with engine.connect() as conn:
+    admin = User(
+        username='admin',
+        email='admin@example.com',
+        password_hash=hashed_password.decode('utf-8'),
+        role='admin',
+        is_active=True
+    )
+    conn.add(admin)
+    conn.commit()
+    print('管理员用户创建成功')
 "
 ```
 
-## JWT认证配置
-
-### 生成安全的JWT密钥
-
-```bash
-# 生成32字符的随机密钥
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-将生成的密钥添加到 `.env` 文件：
-
-```bash
-JWT_SECRET_KEY=your-generated-secret-key-here
-JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
-```
-
-### 测试JWT认证
-
-```bash
-# 1. 登录获取Token
-curl -X POST http://localhost:8000/api/v1/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{
-       "username": "admin",
-       "password": "admin123"
-     }'
-
-# 2. 使用Token访问受保护的API
-TOKEN="your-jwt-token-here"
-curl -X GET http://localhost:8000/api/v1/auth/me \
-     -H "Authorization: Bearer $TOKEN"
-```
-
-## 工作流管理系统
-
-### 创建第一个工作流
-
-```bash
-# 使用API创建工作流模板
-curl -X POST http://localhost:8000/api/v1/admin/crawler/workflows/templates \
-     -H "Authorization: Bearer $TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "name": "测试爬虫工作流",
-       "description": "简单的测试工作流",
-       "steps": [
-         {
-           "name": "爬取测试数据",
-           "task_type": "taobao",
-           "config": {
-             "keywords": ["路亚竿"],
-             "max_pages": 1
-           },
-           "depends_on": []
-         }
-       ]
-     }'
-```
-
-### 创建定时调度
-
-```bash
-# 创建每日执行的任务
-curl -X POST http://localhost:8000/api/v1/admin/crawler/schedules \
-     -H "Authorization: Bearer $TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "name": "每日数据同步",
-       "template_id": 1,
-       "cron_expression": "0 2 * * *",
-       "timezone": "Asia/Shanghai",
-       "is_active": true
-     }'
-```
-
-## React管理前端
-
-### 启动前端开发服务器
-
-```bash
-cd apps/web-admin
-
-# 安装依赖（首次运行）
-npm install
-
-# 启动开发服务器
-npm run dev
-
-# 访问 http://localhost:5173
-```
-
-### 前端功能概览
-
-1. **登录页面**
-   - 默认用户: `admin`
-   - 默认密码: `admin123`
-
-2. **仪表板**
-   - 系统概览
-   - 实时监控数据
-   - 快速操作入口
-
-3. **装备管理**
-   - 装备列表
-   - 添加/编辑装备
-   - 装备分类管理
-
-4. **爬虫管理**
-   - 任务列表
-   - 执行日志
-   - 工作流管理
-
-5. **数据分析**
-   - 装备统计
-   - 趋势分析
-   - 报表生成
-
-6. **系统配置**
-   - API密钥管理
-   - 系统参数设置
-   - 用户管理
-
-## 部署配置
-
-### Docker部署
-
-```dockerfile
-# Dockerfile示例
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# 安装uv
-COPY pyproject.toml ./
-RUN pip install uv && uv sync --frozen
-
-# 复制源代码
-COPY . .
-
-# 运行应用
-CMD ["uv", "run", "uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-```bash
-# 构建和运行
-docker build -t fishing-agent .
-docker run -p 8000:8000 -v $(pwd)/.env:/app/.env fishing-agent
-```
+## 生产环境部署
 
 ### 环境变量清单
 
@@ -491,25 +548,66 @@ CAIYUN_API_KEY=xxx
 AMAP_API_KEY=xxx
 DASHSCOPE_API_KEY=xxx
 
-# === LLM提供商（至少配置一个） ===
-ANTHROPIC_AUTH_TOKEN=xxx  # 智谱AI
-OPENAI_API_KEY=xxx        # OpenAI
-
 # === JWT认证（必需） ===
-JWT_SECRET_KEY=xxx
+JWT_SECRET_KEY=xxx-at-least-32-characters
 JWT_ALGORITHM=HS256
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-# === 可选配置 ===
+# === 微信小程序（如需要） ===
+WECHAT_APPID=xxx
+WECHAT_SECRET=xxx
+
+# === OCR配置 ===
+OCR_PROVIDER=ollama
+OLLAMA_BASE_URL=http://ollama:11434
+
+# === 数据库 ===
+DATABASE_URL=sqlite:///./data/app.db
+
+# === 日志 ===
 LOG_LEVEL=INFO
-CACHE_TTL=3600
+LOG_TO_FILE=true
+```
 
-# === 向量存储 ===
-VECTOR_EMBEDDING_MODEL=text-embedding-v3
-VECTOR_AUTO_INDEX=true
+### Docker Compose 部署
 
-# === 数据库配置（使用SQLite默认值） ===
-DATABASE_URL=sqlite:///packages/agent_fishing/tools/lure/data/equipment.db
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  api:
+    image: fishing-agent:v5.0.2
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/app.db
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+
+volumes:
+  ollama_data:
 ```
 
 ## 下一步
@@ -517,6 +615,8 @@ DATABASE_URL=sqlite:///packages/agent_fishing/tools/lure/data/equipment.db
 - 查看 [API 参考](./API_REFERENCE.md) 了解所有可用接口
 - 阅读 [用户指南](./USER_GUIDE.md) 学习高级功能
 - 浏览 [架构文档](./ARCHITECTURE.md) 理解系统设计
+- 查看 [图片处理指南](./IMAGE_PROCESSING.md) 了解 OCR 功能
+- 阅读 [微信小程序指南](./MINIPROGRAM_GUIDE.md) 开发小程序应用
 - 查看 [故障排除指南](./TROUBLESHOOTING.md) 解决常见问题
 
 ## 获取帮助
@@ -533,3 +633,40 @@ DATABASE_URL=sqlite:///packages/agent_fishing/tools/lure/data/equipment.db
 ---
 
 祝您使用愉快！🎣
+
+## 版本更新说明
+
+### v5.0.2 新增功能
+
+- ✨ 微信小程序支持
+- ✨ 装备导入 Agent（文本压缩 + 批量提取）
+- ✨ OCR 多提供商（Ollama 本地 + SiliconFlow 云端）
+- ✨ 智能图片合并系统
+- ✨ 完善的 JWT 认证和权限管理
+
+### 升级指南
+
+从 v5.0.1 升级：
+
+1. 拉取最新代码
+   ```bash
+   git pull origin v5.0.2
+   ```
+
+2. 更新依赖
+   ```bash
+   uv sync
+   ```
+
+3. 更新环境变量（添加微信小程序配置）
+   ```bash
+   # 添加到 .env
+   WECHAT_APPID=xxx
+   WECHAT_SECRET=xxx
+   OCR_PROVIDER=ollama
+   ```
+
+4. 运行数据库迁移（如需要）
+   ```bash
+   uv run alembic upgrade head
+   ```
