@@ -17,7 +17,7 @@ Always open `@/openspec/AGENTS.md` when the request:
 - 时间段意图识别 (98%+准确率) + 动态Prompt中间件 + 装备管理UI优化
 - 智能图片合并 (自动检测文字 + 批量处理 + 本地化处理) + OCR多提供商支持 (Ollama本地 + SiliconFlow云端)
 - 路亚装备管理系统 + 数据分析报表 (装备统计/趋势分析/品牌排行) + 系统配置管理 (API密钥/参数配置)
-- React管理前端 (React 19.2.0 + TypeScript + Ant Design 5.22.0) + 爬虫监控模块 + 工作流管理系统
+- React管理前端 (React 19.2.0 + TypeScript + Ant Design 5.22.0) + 微信小程序 (uni-app) + 爬虫监控模块 + 工作流管理系统
 
 ## 架构
 ```
@@ -62,6 +62,14 @@ apps/                       # 应用层
     │   ├── pages/          # 页面组件
     │   └── services/       # API服务
     └── package.json        # 前端依赖配置
+miniprogram/                # 微信小程序 ⭐ v5.0.2新增
+    ├── fishing_agent/      # 小程序主体 (基于uni-app)
+    │   ├── pages/          # 页面 (登录、聊天、首页)
+    │   ├── api/            # API封装
+    │   ├── store/          # 状态管理
+    │   ├── static/         # 静态资源
+    │   └── manifest.json   # 小程序配置
+    └── unpackage/          # 编译输出目录
 shared/                     # 共享资源
 ├── config/                 # 全局配置
 └── data/                   # 共享数据
@@ -74,6 +82,11 @@ cp .env.example .env                       # 配置环境
 uv run python main.py                      # 运行CLI
 uv run uvicorn apps.api.main:app --reload # 运行API
 cd apps/web-admin && npm run dev          # 运行React前端 (v5.0.0新增)
+
+# 微信小程序 (v5.0.2新增)
+# 1. 使用微信开发者工具打开 miniprogram/fishing_agent/
+# 2. 配置小程序AppID和服务器域名
+# 3. 在本地设置中关闭"不校验合法域名"选项
 ```
 
 ## 关键导入
@@ -104,6 +117,10 @@ from packages.scraper.spider import BaseSpider, CrawlItem
 from packages.scraper.spiders import TaobaoSpider, JDSpider, ForumSpider
 from packages.scraper.rpa import TaobaoRPA
 from packages.scraper.workflow import WorkflowManager
+
+# 装备导入功能（v5.0.2新增）
+from packages.agent_equipment_import import EquipmentImportAgent
+from packages.agent_equipment_import.core import TextCompressor
 ```
 
 ## API端点
@@ -116,6 +133,14 @@ GET  /health                  # 健康检查
 # 认证 API (v3.1.1新增)
 POST /api/v1/auth/login       # 用户登录
 GET  /api/v1/auth/me          # 获取用户信息
+
+# 微信小程序 API (v5.0.2新增)
+POST /api/v1/auth/wechat/login  # 微信登录
+POST /api/v1/auth/wechat/bind   # 绑定微信账号
+
+# OCR和图片处理 API (v5.0.2新增)
+POST /api/v1/ocr/recognize-table  # OCR表格识别
+GET  /api/v1/ocr/status           # OCR服务状态
 
 # 数据分析 API (v5.0.0新增)
 GET  /api/v1/admin/analytics/equipment/stats      # 装备统计
@@ -148,6 +173,11 @@ ANTHROPIC_AUTH_TOKEN=xxx     # 智谱AI (推荐)
 JWT_SECRET_KEY=xxx           # JWT密钥 (必须设置)
 JWT_ALGORITHM=HS256          # JWT算法
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60  # Token过期时间(分钟)
+
+# 微信小程序 (v5.0.2新增)
+WECHAT_APPID=xxx            # 微信小程序AppID
+WECHAT_SECRET=xxx           # 微信小程序AppSecret
+WECHAT_AUTO_CREATE_USER=true # 是否自动创建新用户
 ```
 
 ## 新增Agent模板
