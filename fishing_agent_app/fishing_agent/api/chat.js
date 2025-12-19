@@ -259,7 +259,6 @@ async function sendMessageStream(messageData, onMessage, onError, onComplete) {
                 // 统一 { content } - 优先使用 delta（增量），否则使用 content（全文）
                 const textDelta = (json && (json.delta || json.content || json.message)) || ''
                 if (textDelta && onMessage) {
-                  console.log('[SSE] delta:', textDelta.substring(0, 30))
                   onMessage({ content: textDelta })
                 }
               } catch (_) {
