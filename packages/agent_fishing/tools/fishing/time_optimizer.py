@@ -240,56 +240,66 @@ def find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) ->
 
 def generate_score_trend(hourly_scores: List[Dict[str, Any]]) -> str:
     """
-    生成24小时评分趋势（紧凑2行显示，适配手机屏幕）
+    生成24小时评分趋势（4时段+进度条，适配手机屏幕）
 
     Args:
         hourly_scores: 24小时评分列表
 
     Returns:
-        紧凑趋势图字符串
+        4时段进度条格式的趋势图字符串
     """
     try:
         if not hourly_scores:
             return "无评分数据"
 
-        # 迷你柱状图字符（9级：0-8）
-        bars = " ▁▂▃▄▅▆▇█"
+        # 时段定义
+        periods = [
+            ("🌅 凌晨", 0, 6),
+            ("🌞 上午", 6, 12),
+            ("☀️ 下午", 12, 18),
+            ("🌙 晚上", 18, 24),
+        ]
 
-        def score_to_bar(score: float) -> str:
-            """将评分映射到柱状图字符"""
-            level = int((score / 100) * 8)
-            return bars[min(max(level, 0), 8)]
+        def make_progress_bar(score: float, width: int = 10) -> str:
+            """生成进度条"""
+            filled = int((score / 100) * width)
+            return "█" * filled + "░" * (width - filled)
 
-        # 提取评分
-        scores = [h['score'] for h in hourly_scores]
+        # 计算每个时段平均分
+        period_scores = []
+        for name, start, end in periods:
+            # 确保不超出列表范围
+            actual_end = min(end, len(hourly_scores))
+            if start < actual_end:
+                segment = hourly_scores[start:actual_end]
+                avg = sum(s['score'] for s in segment) / len(segment)
+                period_scores.append((name, start, end, avg))
 
-        # 计算统计信息
-        max_score = max(scores)
-        min_score = min(scores)
-        avg_score = sum(scores) / len(scores)
+        if not period_scores:
+            return "无评分数据"
 
-        # 找峰值和谷值的时间
-        max_idx = scores.index(max_score)
-        min_idx = scores.index(min_score)
+        # 找最佳时段
+        best_idx = max(range(len(period_scores)), key=lambda i: period_scores[i][3])
+
+        # 生成输出
+        lines = ["📊 24小时评分概览", ""]
+        for i, (name, start, end, avg) in enumerate(period_scores):
+            bar = make_progress_bar(avg)
+            best_mark = " ⬅️最佳" if i == best_idx else ""
+            lines.append(f"{name} {start:02d}-{end:02d}  {bar} {avg:.0f}分{best_mark}")
+
+        # 添加统计
+        all_scores = [s['score'] for s in hourly_scores]
+        max_score = max(all_scores)
+        max_idx = all_scores.index(max_score)
+        avg_score = sum(all_scores) / len(all_scores)
         max_time = hourly_scores[max_idx]['time_str']
-        min_time = hourly_scores[min_idx]['time_str']
 
-        # 生成两行趋势图（每行12小时）
-        line1 = "".join(score_to_bar(s['score']) for s in hourly_scores[:12])
-        line2 = "".join(score_to_bar(s['score']) for s in hourly_scores[12:24]) if len(hourly_scores) > 12 else ""
+        lines.append("")
+        lines.append(f"📈 全天均分: {avg_score:.0f}分 | 峰值: {max_score:.0f}分({max_time})")
+        lines.append("")
 
-        # 构建输出
-        chart = []
-        chart.append("📊 24小时评分趋势")
-        chart.append("")
-        chart.append(f"00-11时: {line1}")
-        if line2:
-            chart.append(f"12-23时: {line2}")
-        chart.append("")
-        chart.append(f"📈 均分: {avg_score:.0f}分 | 峰值: {max_score:.0f}分({max_time}) | 谷值: {min_score:.0f}分({min_time})")
-        chart.append("")
-
-        return "\n".join(chart)
+        return "\n".join(lines)
 
     except Exception as e:
         logger.error(f"生成评分趋势图失败: {e}")
