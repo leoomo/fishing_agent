@@ -60,19 +60,19 @@ class ExtractedEquipment:
     def from_dict(cls, data: Dict[str, Any]) -> "ExtractedEquipment":
         """从字典创建实例"""
         return cls(
-            equipment_type=data.get("equipment_type", ""),
+            equipment_type=data.get("equipment_type") or "",
             brand_name=data.get("brand_name"),
             model=data.get("model"),
             name=data.get("name"),
             price_min=data.get("price_min"),
             price_max=data.get("price_max"),
             description=data.get("description"),
-            features=data.get("features", []),
-            target_fish=data.get("target_fish", []),
+            features=data.get("features") or [],
+            target_fish=data.get("target_fish") or [],
             user_level=data.get("user_level"),
-            specs=data.get("specs", {}),
-            confidence=data.get("confidence", 0.0),
-            extraction_notes=data.get("extraction_notes", "")
+            specs=data.get("specs") or {},
+            confidence=data.get("confidence") or 0.0,
+            extraction_notes=data.get("extraction_notes") or ""
         )
 
     def get_summary(self) -> str:
