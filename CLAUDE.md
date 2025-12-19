@@ -97,23 +97,13 @@ from packages.agent_fishing.core import ModelFactory
 from packages.agent_fishing.tools import get_weather, query_fishing_recommendation
 from packages.agent_fishing.utils import get_coordinates, parse_date_input
 
-# 图片处理功能（位于 data_processing 包）
+# 数据处理功能（位于 data_processing 包）
 from packages.data_processing.image import BatchMergeProcessor, ImageMerger
-from packages.data_processing.image.batch_processor import BatchMergeProcessor
-from packages.data_processing.image.merger import ImageMerger
-
-# OCR 功能（位于 data_processing 包）
 from packages.data_processing.ocr import OCRMergeProcessor
-from packages.data_processing.ocr.ocr_processor import OCRMergeProcessor
-from packages.data_processing.ocr.text_detector import TextRegionDetector
-
-# 去重功能（位于 data_processing 包）
 from packages.data_processing.dedup import Deduplicator
-from packages.data_processing.dedup.deduplicator import Deduplicator
 
 # 爬虫功能（位于 scraper 包）
-from packages.scraper import BaseSpider, CrawlItem, EquipmentData
-from packages.scraper.spider import BaseSpider, CrawlItem
+from packages.scraper import BaseSpider, CrawlItem
 from packages.scraper.spiders import TaobaoSpider, JDSpider, ForumSpider
 from packages.scraper.rpa import TaobaoRPA
 from packages.scraper.workflow import WorkflowManager
@@ -125,40 +115,32 @@ from packages.agent_equipment_import.core import TextCompressor
 
 ## API端点
 ```
-# 钓鱼助手 API
-POST /api/v1/fishing/chat     # 对话接口
-GET  /api/v1/fishing/tools    # 工具列表
-GET  /health                  # 健康检查
+# 核心API
+POST /api/v1/fishing/chat           # 对话接口
+GET  /api/v1/fishing/tools          # 工具列表
+GET  /health                        # 健康检查
 
-# 认证 API (v3.1.1新增)
-POST /api/v1/auth/login       # 用户登录
-GET  /api/v1/auth/me          # 获取用户信息
+# 认证API
+POST /api/v1/auth/login             # 用户登录 (v3.1.1)
+GET  /api/v1/auth/me                # 获取用户信息
+POST /api/v1/auth/wechat/login      # 微信登录 (v5.0.2)
+POST /api/v1/auth/wechat/bind       # 绑定微信账号
 
-# 微信小程序 API (v5.0.2新增)
-POST /api/v1/auth/wechat/login  # 微信登录
-POST /api/v1/auth/wechat/bind   # 绑定微信账号
+# 功能API
+POST /api/v1/ocr/recognize-table    # OCR表格识别 (v5.0.2)
+GET  /api/v1/ocr/status             # OCR服务状态
 
-# OCR和图片处理 API (v5.0.2新增)
-POST /api/v1/ocr/recognize-table  # OCR表格识别
-GET  /api/v1/ocr/status           # OCR服务状态
-
-# 数据分析 API (v5.0.0新增)
-GET  /api/v1/admin/analytics/equipment/stats      # 装备统计
-GET  /api/v1/admin/analytics/equipment/trends     # 趋势分析
-POST /api/v1/admin/analytics/reports/generate     # 生成报表
-
-# 配置管理 API (v5.0.0新增)
-GET  /api/v1/admin/config/configs                 # 查询配置
-POST /api/v1/admin/config/configs                 # 创建配置
-POST /api/v1/admin/config/configs/test-api-key    # 测试API密钥
-
-# 爬虫管理 API (v4.0.0新增)
-GET  /api/v1/admin/crawler/tasks                  # 爬虫任务列表
-POST /api/v1/admin/crawler/tasks/trigger          # 触发爬虫
-
-# 监控管理 API (v4.0.0新增)
-GET  /api/v1/admin/monitor/api-stats              # API统计
-GET  /api/v1/admin/monitor/llm-stats               # LLM统计
+# 管理API
+GET  /api/v1/admin/analytics/equipment/stats    # 装备统计 (v5.0.0)
+GET  /api/v1/admin/analytics/equipment/trends   # 趋势分析
+POST /api/v1/admin/analytics/reports/generate   # 生成报表
+GET  /api/v1/admin/config/configs               # 查询配置 (v5.0.0)
+POST /api/v1/admin/config/configs               # 创建配置
+POST /api/v1/admin/config/configs/test-api-key  # 测试API密钥
+GET  /api/v1/admin/crawler/tasks                # 爬虫任务列表 (v4.0.0)
+POST /api/v1/admin/crawler/tasks/trigger        # 触发爬虫
+GET  /api/v1/admin/monitor/api-stats            # API统计 (v4.0.0)
+GET  /api/v1/admin/monitor/llm-stats             # LLM统计
 ```
 
 ## 环境变量
@@ -201,39 +183,32 @@ mkdir -p packages/agent_xxx/{core,tools,utils}
 重新组织为面向角色的清晰结构：
 
 #### 🎯 [用户指南](docs/01-user-guide/)
-面向最终用户和初学者
 - [快速开始](docs/01-user-guide/getting-started.md) - 5分钟上手
-- [基础功能](docs/01-user-guide/basic-features.md) - 核心功能使用
-- [故障排除](docs/01-user-guide/troubleshooting.md) - 常见问题解决
+- [基础功能](docs/01-user-guide/basic-features.md) - 核心功能
+- [故障排除](docs/01-user-guide/troubleshooting.md) - 问题解决
 - [常见问题](docs/01-user-guide/faq.md) - 用户FAQ
 
 #### 💻 [开发者指南](docs/02-developer-guide/)
-面向项目开发者
-- [环境配置](docs/02-developer-guide/environment-setup.md) - 开发环境搭建
-- [代码结构](docs/02-developer-guide/codebase-structure.md) - 项目架构说明
-- [开发流程](docs/02-developer-guide/development-workflows.md) - 开发规范和流程
-- [测试指南](docs/02-developer-guide/testing.md) - 测试策略和指南
+- [环境配置](docs/02-developer-guide/environment-setup.md) - 环境搭建
+- [代码结构](docs/02-developer-guide/codebase-structure.md) - 项目架构
+- [开发流程](docs/02-developer-guide/development-workflows.md) - 开发规范
+- [测试指南](docs/02-developer-guide/testing.md) - 测试策略
 
 #### 🏗️ [架构设计](docs/03-architecture/)
-面向系统架构师
 - [系统设计](docs/03-architecture/system-design.md) - 整体架构和设计原则
-- [架构概览](docs/03-architecture/README.md) - 架构文档导航中心
+- [架构概览](docs/03-architecture/README.md) - 架构文档导航
 
 #### 🔧 [运维部署](docs/04-operations/)
-面向DevOps工程师
-- [运维概览](docs/04-operations/README.md) - 运维文档导航中心
+- [运维概览](docs/04-operations/README.md) - 运维文档导航
 
 #### 📡 [API参考](docs/05-api-reference/)
-面向API集成开发者
-- [API概览](docs/05-api-reference/README.md) - 完整API文档入口和接口说明
+- [API概览](docs/05-api-reference/README.md) - 完整API文档和接口说明
 
 #### 📖 [专题指南](docs/06-guides/)
-特定功能和使用场景
-- [图片处理](docs/06-guides/image-processing.md) - OCR和图片处理功能
-- [小程序集成](docs/06-guides/miniprogram-integration.md) - 微信小程序开发指南
-- [装备导入](docs/06-guides/equipment-import.md) - 装备数据导入功能
-- [性能优化](docs/06-guides/performance-optimization.md) - 系统性能优化指南
+- [图片处理](docs/06-guides/image-processing.md) - OCR和图片处理
+- [小程序集成](docs/06-guides/miniprogram-integration.md) - 微信小程序开发
+- [装备导入](docs/06-guides/equipment-import.md) - 装备数据导入
+- [性能优化](docs/06-guides/performance-optimization.md) - 系统性能优化
 
 #### 📦 [归档文档](docs/archive/)
-历史文档和已弃用资料
-- [归档中心](docs/archive/README.md) - 历史文档导航和说明
+- [归档中心](docs/archive/README.md) - 历史文档导航
