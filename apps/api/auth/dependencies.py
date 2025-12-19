@@ -55,13 +55,19 @@ async def get_current_user(
         # Verify token
         payload = verify_token(token)
 
-        # Extract user information
-        user_id = payload.get("user_id")
+        # Extract user information (支持 user_id 或 sub 字段)
+        user_id = payload.get("user_id") or payload.get("sub")
         username = payload.get("username")
         role_str = payload.get("role")
 
         if not all([user_id, username, role_str]):
             raise ValueError("Token payload 缺少必需字段")
+
+        # 确保 user_id 是整数
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            raise ValueError(f"无效的用户ID: {user_id}")
 
         # Validate role
         try:
