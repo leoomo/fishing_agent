@@ -582,6 +582,8 @@ export default {
   background-color: white;
   border-radius: 20rpx;
   margin-bottom: 30rpx;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .welcome-avatar {
@@ -601,6 +603,9 @@ export default {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .welcome-title {
@@ -615,10 +620,16 @@ export default {
   color: #666;
   line-height: 1.6;
   margin-bottom: 40rpx;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .suggested-questions {
   width: 100%;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .suggested-title {
@@ -639,37 +650,55 @@ export default {
   border-radius: 15rpx;
   font-size: 28rpx;
   color: #333;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  line-height: 1.5;
+  box-sizing: border-box;
 }
 
 .message-item {
   display: flex;
   margin-bottom: 30rpx;
+  align-items: flex-start;
 }
 
 .user-message {
   flex-direction: row-reverse;
+  justify-content: flex-start;
 }
 
 .ai-message {
   flex-direction: row;
+  justify-content: flex-start;
 }
 
 .message-avatar {
   width: 80rpx;
   height: 80rpx;
   margin: 0 20rpx;
+  flex-shrink: 0; /* 防止头像被压缩 */
 }
 
 .message-content {
   display: flex;
   flex-direction: column;
   max-width: 70%;
+  min-width: 0; /* 允许内容收缩 */
+  word-wrap: break-word;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .message-bubble {
   padding: 20rpx 30rpx;
   border-radius: 20rpx;
   margin-bottom: 10rpx;
+  min-width: 0; /* 允许内容收缩 */
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  box-sizing: border-box;
 }
 
 .user-message .message-bubble {
@@ -686,6 +715,12 @@ export default {
   font-size: 30rpx;
   line-height: 1.5;
   word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .typing-cursor {
