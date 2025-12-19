@@ -36,6 +36,9 @@ class AdminUser(Base, TimestampMixin):
     is_active = Column(Boolean, default=True, nullable=False, index=True, comment="Whether user is active")
     last_login = Column(String(50), comment="Last login timestamp (ISO format)")
 
+    # WeChat integration fields
+    wechat_unionid = Column(String(100), unique=True, index=True, comment="WeChat UnionID for binding")
+
     # Relationships (lazy loading to avoid dependency issues)
     configs_modified = relationship("SystemConfig", back_populates="modifier", lazy='noload')
     reports_generated = relationship("AnalyticsReport", back_populates="generator", lazy='noload')

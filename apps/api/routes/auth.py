@@ -14,6 +14,7 @@ from ..auth.dependencies import get_current_user, CurrentUser
 from ..auth.permissions import get_role_permissions
 from packages.agent_fishing.tools.lure.orm.session import get_db_session
 from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+from ..services.wechat_service import wechat_service
 
 import logging
 
@@ -210,6 +211,23 @@ async def get_profile(current_user: CurrentUser = Depends(get_current_user)):
         )
 
 
+@router.get("/me", response_model=ProfileResponse)
+async def get_me(current_user: CurrentUser = Depends(get_current_user)):
+    """
+    Get current user profile (alias for /profile)
+
+    This endpoint is for mobile app compatibility.
+    Mobile apps typically call /auth/me to get current user info.
+
+    Args:
+        current_user: Current authenticated user (from JWT token)
+
+    Returns:
+        ProfileResponse: User profile and permissions
+    """
+    return await get_profile(current_user)
+
+
 @router.post("/logout")
 async def logout(current_user: CurrentUser = Depends(get_current_user)):
     """
@@ -227,3 +245,221 @@ async def logout(current_user: CurrentUser = Depends(get_current_user)):
     """
     logger.info(f"User logged out: {current_user.username}")
     return {"message": "登出成功"}
+
+
+# WeChat Login Schemas
+class WeChatLoginRequest(BaseModel):
+    """WeChat login request payload"""
+    code: str = Field(..., description="微信登录code")
+    nickname: Optional[str] = Field(None, description="微信昵称")
+    avatar_url: Optional[str] = Field(None, description="微信头像URL")
+    gender: Optional[int] = Field(0, description="性别：0未知，1男，2女")
+    city: Optional[str] = Field(None, description="城市")
+    province: Optional[str] = Field(None, description="省份")
+    country: Optional[str] = Field(None, description="国家")
+    language: Optional[str] = Field("zh_CN", description="语言")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "code": "031Kc1002CqHL31hR0002VvLTK3Kc10g",
+                    "nickname": "微信用户",
+                    "avatar_url": "https://thirdwx.qlogo.cn/...",
+                    "gender": 1,
+                    "city": "深圳",
+                    "province": "广东",
+                    "country": "中国"
+                }
+            ]
+        }
+    }
+
+
+class WeChatBindRequest(BaseModel):
+    """WeChat bind request payload"""
+    admin_user_id: int = Field(..., description="管理员用户ID")
+    code: str = Field(..., description="微信登录code")
+    nickname: Optional[str] = Field(None, description="微信昵称")
+    avatar_url: Optional[str] = Field(None, description="微信头像URL")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "admin_user_id": 1,
+                    "code": "031Kc1002CqHL31hR0002VvLTK3Kc10g",
+                    "nickname": "微信用户"
+                }
+            ]
+        }
+    }
+
+
+@router.post("/wechat/login", response_model=LoginResponse)
+async def wechat_login(request: WeChatLoginRequest):
+    """
+    WeChat login endpoint
+
+    Authenticate user using WeChat miniprogram code and returns JWT access token.
+
+    Args:
+        request: WeChat login data (code and user info)
+
+    Returns:
+        LoginResponse: JWT token and user information
+
+    Raises:
+        HTTPException: 400 if login fails
+        HTTPException: 500 if server error
+    """
+    import os
+
+    # 开发模式：模拟登录
+    if os.getenv("WECHAT_DEV_MODE", "").lower() == "true":
+        logger.info(f"[DEV MODE] Mock WeChat login for code: {request.code}")
+        from ..auth.jwt import create_access_token
+        from datetime import datetime
+
+        # 生成模拟用户数据
+        mock_openid = f"mock_openid_{request.code[:8] if request.code else 'dev'}"
+        nickname = request.nickname or "测试用户"
+
+        # 生成 token
+        access_token = create_access_token(data={
+            "sub": "1",
+            "username": nickname,
+            "role": "readonly",
+            "openid": mock_openid,
+        })
+
+        # 模拟权限列表
+        mock_permissions = [
+            "equipment:read",
+            "fishing:query",
+            "weather:query",
+        ]
+
+        return LoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=UserInfo(
+                user_id=1,
+                username=nickname,
+                email=f"{mock_openid}@wechat.mock",
+                role="readonly",
+                full_name=nickname,
+                is_active=True,
+                created_at=datetime.now().isoformat(),
+            ),
+            permissions=mock_permissions,
+        )
+
+    try:
+        # Initialize WeChat service
+        wechat_service.initialize()
+
+        # Perform WeChat login or create user
+        result = await wechat_service.login_or_create_user(
+            code=request.code,
+            nickname=request.nickname,
+            avatar_url=request.avatar_url,
+            gender=request.gender or 0,
+            city=request.city,
+            province=request.province,
+            country=request.country,
+            language=request.language or "zh_CN"
+        )
+
+        return LoginResponse(**result)
+
+    except ValueError as e:
+        logger.error(f"WeChat login configuration error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="微信登录服务配置错误"
+        )
+    except Exception as e:
+        logger.error(f"WeChat login failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/wechat/bind")
+async def wechat_bind(
+    request: WeChatBindRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Bind WeChat account to current admin user
+
+    Args:
+        request: WeChat bind data
+        current_user: Current authenticated user
+
+    Returns:
+        dict: Binding result
+
+    Raises:
+        HTTPException: 400 if binding fails
+        HTTPException: 403 if permission denied
+    """
+    try:
+        # Initialize WeChat service
+        wechat_service.initialize()
+
+        # Only allow binding to own account or admin can bind to others
+        if current_user.role != "admin" and request.admin_user_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只能绑定自己的账号"
+            )
+
+        # Perform WeChat binding
+        result = await wechat_service.bind_wechat_to_admin(
+            admin_user_id=request.admin_user_id,
+            code=request.code,
+            nickname=request.nickname,
+            avatar_url=request.avatar_url
+        )
+
+        return result
+
+    except ValueError as e:
+        logger.error(f"WeChat bind configuration error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="微信登录服务配置错误"
+        )
+    except Exception as e:
+        logger.error(f"WeChat bind failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get("/wechat/config")
+async def get_wechat_config():
+    """
+    Get WeChat configuration for frontend
+
+    Returns:
+        dict: WeChat app configuration
+    """
+    import os
+
+    app_id = os.getenv("WECHAT_APP_ID") or os.getenv("WECHAT_APPID")
+    if not app_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="微信配置缺失"
+        )
+
+    return {
+        "app_id": app_id,
+        "api_url": os.getenv("WECHAT_API_URL", "https://api.weixin.qq.com"),
+        "auto_create_user": os.getenv("WECHAT_AUTO_CREATE_USER", "true").lower() == "true"
+    }

@@ -170,6 +170,7 @@ app = FastAPI(
 from .routes import fishing_router
 from .routes.user_equipment import router as user_equipment_router
 from .routes.auth import router as auth_router
+from .routes.chat import router as chat_router
 from .routes.equipment_admin import router as equipment_admin_router
 from .routes.user_admin import router as user_admin_router
 from .routes.import_export import router as import_export_router
@@ -208,6 +209,7 @@ install_api_logging_middleware(
 app.include_router(fishing_router, prefix="/api/v1/fishing", tags=["fishing"])
 app.include_router(user_equipment_router, prefix="/api/v1/user-equipment", tags=["user-equipment"])
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])  # Mobile app chat adapter
 
 # Phase 3 管理模块路由
 app.include_router(equipment_admin_router, prefix="/api/v1/admin", tags=["equipment-admin"])

@@ -4,7 +4,7 @@ Core Agent - Simplified fishing assistant implementation
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Iterator, Generator
 from datetime import datetime
 
 from langchain.agents import create_agent
@@ -152,6 +152,61 @@ class FishingAgent:
                 return self._fallback_response(user_input)
             else:
                 return f"抱歉，我遇到了一些技术问题：{str(e)}。请稍后重试。"
+
+    def stream(self, user_input: str) -> Generator[str, None, None]:
+        """
+        Execute agent query with streaming output
+
+        Uses LangChain 1.0+ native .stream() method to yield
+        incremental content chunks for SSE responses.
+
+        Args:
+            user_input: User query string
+
+        Yields:
+            Content chunks as they are generated
+        """
+        try:
+            if self.enable_logging:
+                logger.info(f"📝 [流式] 用户输入: {user_input}")
+
+            # Build callbacks list
+            callbacks = [self.callback]
+            if self.callback._usage_handler:
+                callbacks.append(self.callback._usage_handler)
+
+            # 使用 stream_mode="messages" 获取逐 token 流式输出
+            total_content = ""
+
+            for chunk in self.agent.stream(
+                {"messages": [HumanMessage(content=user_input)]},
+                config={"callbacks": callbacks},
+                stream_mode="messages"
+            ):
+                # stream_mode="messages" 返回 (message, metadata) 元组
+                if isinstance(chunk, tuple) and len(chunk) >= 2:
+                    msg, metadata = chunk[0], chunk[1]
+
+                    # 只处理 AI 消息的内容块
+                    if hasattr(msg, 'content') and msg.content:
+                        content = msg.content
+                        # AIMessageChunk 的 content 就是增量
+                        if content and isinstance(content, str):
+                            total_content += content
+                            yield content
+
+            if self.enable_logging:
+                logger.info(f"🤖 [流式] 回复完成: {len(total_content)} 字符")
+
+        except Exception as e:
+            logger.error(f"💥 [流式] 智能体执行出错: {e}")
+
+            # Graceful degradation
+            if self._is_weather_fishing_query(user_input):
+                fallback = self._fallback_response(user_input)
+                yield fallback
+            else:
+                yield f"抱歉，我遇到了一些技术问题：{str(e)}。请稍后重试。"
 
     def _extract_response(self, result: Any) -> str:
         """

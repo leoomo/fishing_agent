@@ -82,6 +82,7 @@ class ModelFactory:
         model_kwargs = {
             "api_key": api_key,
             "timeout": timeout,
+            "streaming": True,  # 启用流式输出
         }
 
         # Add model name if specified
