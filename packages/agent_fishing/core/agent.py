@@ -177,6 +177,7 @@ class FishingAgent:
 
             # 使用 stream_mode="messages" 获取逐 token 流式输出
             total_content = ""
+            seen_chunks = set()  # 用于去重
 
             for chunk in self.agent.stream(
                 {"messages": [HumanMessage(content=user_input)]},
@@ -186,12 +187,22 @@ class FishingAgent:
                 # stream_mode="messages" 返回 (message, metadata) 元组
                 if isinstance(chunk, tuple) and len(chunk) >= 2:
                     msg, metadata = chunk[0], chunk[1]
+                    msg_type = type(msg).__name__
 
-                    # 只处理 AI 消息的内容块
+                    # 只处理 AIMessageChunk（AI 的流式输出），跳过 ToolMessage（工具返回结果）
+                    if msg_type != "AIMessageChunk":
+                        continue
+
+                    # 只处理有 content 的消息
                     if hasattr(msg, 'content') and msg.content:
                         content = msg.content
-                        # AIMessageChunk 的 content 就是增量
                         if content and isinstance(content, str):
+                            # 使用内容哈希去重，避免重复发送相同的 chunk
+                            chunk_hash = hash(content)
+                            if chunk_hash in seen_chunks:
+                                continue
+                            seen_chunks.add(chunk_hash)
+
                             total_content += content
                             yield content
 
