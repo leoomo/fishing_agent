@@ -50,6 +50,7 @@ class SessionResponse(BaseModel):
     user_id: Optional[int] = Field(None, description="User ID")
     title: str = Field(..., description="Session title")
     is_active: bool = Field(default=True, description="Whether session is active")
+    message_count: int = Field(default=0, description="Number of messages in session")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
 

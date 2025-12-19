@@ -92,9 +92,9 @@ async function fetchSessions() {
     state.loading = true
 
     const response = await chatApi.getUserSessions()
-    // 确保 sessions 始终是数组
-    const items = response?.items || response
-    state.sessions = Array.isArray(items) ? items : []
+    // API 返回格式: {sessions: [...], total: N}
+    const sessions = response?.sessions || response?.items || response
+    state.sessions = Array.isArray(sessions) ? sessions : []
 
     // 如果没有当前会话且有会话列表，设置第一个为当前会话
     if (!state.currentSessionId && state.sessions.length > 0) {
@@ -121,9 +121,9 @@ async function fetchMessages(sessionId) {
     state.loading = true
 
     const response = await chatApi.getSessionHistory(sessionId)
-    // 确保 messages 始终是数组
-    const items = response?.items || response
-    state.messages = Array.isArray(items) ? items : []
+    // API 返回格式: {messages: [...], total: N}
+    const messages = response?.messages || response?.items || response
+    state.messages = Array.isArray(messages) ? messages : []
 
     // 触发页面更新
     notifyListeners()
@@ -363,9 +363,9 @@ async function clearCurrentSession() {
 async function fetchSuggestedQuestions(category = '') {
   try {
     const response = await chatApi.getSuggestedQuestions(category)
-    // 确保 suggestedQuestions 始终是数组
-    const items = response?.items || response
-    state.suggestedQuestions = Array.isArray(items) ? items : []
+    // API 返回格式: {suggestions: [...]}
+    const suggestions = response?.suggestions || response?.items || response
+    state.suggestedQuestions = Array.isArray(suggestions) ? suggestions : []
 
     // 触发页面更新
     notifyListeners()
