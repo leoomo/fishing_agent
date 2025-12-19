@@ -39,7 +39,7 @@ function removeListener(listener) {
 
 // 通知所有监听器
 function notifyListeners() {
-  listeners.forEach(listener => {
+    console.log("[Store] notifyListeners called at:", Date.now(), "streaming:", state.streaming, "messageLength:", state.streamingMessage?.length || 0);  listeners.forEach(listener => {
     if (typeof listener === 'function') {
       listener(getChatState())
     }
@@ -213,7 +213,7 @@ async function sendMessageStream(content, onChunk) {
   try {
     state.sending = true
     state.streaming = true
-    state.streamingMessage = ''
+    console.log("[Store] Streaming started at:", Date.now());    state.streamingMessage = ''
     
     // 添加用户消息到列表
     const userMessage = {
