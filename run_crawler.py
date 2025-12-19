@@ -14,8 +14,8 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
 
-from packages.agent_fishing.tools.crawler.rpa import TaobaoRPA, TaobaoShopCategoryRPA, TaobaoShopRPA
-from packages.agent_fishing.tools.crawler import DataPersister
+from packages.scraper.rpa import TaobaoRPA, TaobaoShopCategoryRPA, TaobaoShopRPA
+from packages.scraper.persister.equipment_persister import DataPersister
 from packages.agent_fishing.tools.lure.database import get_db
 from packages.agent_fishing.tools.lure.image_manager import ImageManager, LocalImageStorage
 

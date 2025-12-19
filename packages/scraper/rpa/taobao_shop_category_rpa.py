@@ -59,6 +59,37 @@ class TaobaoShopCategoryRPA(PlaywrightSpider):
 
         logger.info("TaobaoShopCategoryRPA v2.0 初始化完成")
 
+    def crawl(self, **kwargs) -> List[EquipmentData]:
+        """
+        实现抽象方法 - 默认调用 crawl_shop_category
+
+        Returns:
+            商品数据列表
+        """
+        return self.crawl_shop_category()
+
+    def search_equipment(
+        self, keyword: str, category: Optional[str] = None, max_results: int = 50
+    ) -> List[EquipmentData]:
+        """
+        实现抽象方法 - 店铺分类爬虫不支持关键词搜索
+
+        Returns:
+            空列表
+        """
+        logger.warning("TaobaoShopCategoryRPA 不支持关键词搜索功能")
+        return []
+
+    def get_product_detail(self, product_url: str) -> Optional[EquipmentData]:
+        """
+        实现抽象方法 - 店铺分类爬虫不支持单独商品详情获取
+
+        Returns:
+            None
+        """
+        logger.warning("TaobaoShopCategoryRPA 不支持单独商品详情获取")
+        return None
+
     def crawl_shop_category(self) -> List[EquipmentData]:
         """
         爬取店铺分类商品的主要入口方法
