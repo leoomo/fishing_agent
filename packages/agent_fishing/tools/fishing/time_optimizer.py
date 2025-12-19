@@ -240,68 +240,53 @@ def find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) ->
 
 def generate_score_trend(hourly_scores: List[Dict[str, Any]]) -> str:
     """
-    生成24小时评分趋势ASCII可视化图
+    生成24小时评分趋势（紧凑2行显示，适配手机屏幕）
 
     Args:
         hourly_scores: 24小时评分列表
 
     Returns:
-        ASCII趋势图字符串
+        紧凑趋势图字符串
     """
     try:
         if not hourly_scores:
             return "无评分数据"
 
+        # 迷你柱状图字符（9级：0-8）
+        bars = " ▁▂▃▄▅▆▇█"
+
+        def score_to_bar(score: float) -> str:
+            """将评分映射到柱状图字符"""
+            level = int((score / 100) * 8)
+            return bars[min(max(level, 0), 8)]
+
         # 提取评分
         scores = [h['score'] for h in hourly_scores]
-        hours = [h['time_str'] for h in hourly_scores]
 
         # 计算统计信息
         max_score = max(scores)
         min_score = min(scores)
         avg_score = sum(scores) / len(scores)
 
-        # 构建趋势图
+        # 找峰值和谷值的时间
+        max_idx = scores.index(max_score)
+        min_idx = scores.index(min_score)
+        max_time = hourly_scores[max_idx]['time_str']
+        min_time = hourly_scores[min_idx]['time_str']
+
+        # 生成两行趋势图（每行12小时）
+        line1 = "".join(score_to_bar(s['score']) for s in hourly_scores[:12])
+        line2 = "".join(score_to_bar(s['score']) for s in hourly_scores[12:24]) if len(hourly_scores) > 12 else ""
+
+        # 构建输出
         chart = []
-        chart.append("📊 24小时钓鱼评分趋势")
-        chart.append("=" * 50)
+        chart.append("📊 24小时评分趋势")
         chart.append("")
-
-        # 评分刻度（10个等级，从0到100）
-        height = 10  # 图表高度
-        width = len(scores)  # 图表宽度
-
-        # 绘制图表主体
-        for level in range(height, 0, -1):
-            score_threshold = (level / height) * 100
-            line = f"{int(score_threshold):3d} ┃ "
-
-            for score in scores:
-                if score >= score_threshold:
-                    line += "█"
-                else:
-                    line += " "
-
-            chart.append(line)
-
-        # 绘制底部分隔线
-        chart.append("    ┗" + "━" * width)
-
-        # 绘制时间轴（简化版：只显示关键时刻）
-        time_axis = "      "
-        for i, hour_str in enumerate(hours):
-            if i % 4 == 0:  # 每4小时显示一次
-                hour = hour_str.split(':')[0]
-                time_axis += f"{hour:2s}  "
-
-        chart.append(time_axis + " (时)")
+        chart.append(f"00-11时: {line1}")
+        if line2:
+            chart.append(f"12-23时: {line2}")
         chart.append("")
-
-        # 添加统计信息
-        chart.append(f"📈 统计数据:")
-        chart.append(f"   最高评分: {max_score:.1f}分")
-        chart.append(f"   最低评分: {min_score:.1f}分")
-        chart.append(f"   平均评分: {avg_score:.1f}分")
+        chart.append(f"📈 均分: {avg_score:.0f}分 | 峰值: {max_score:.0f}分({max_time}) | 谷值: {min_score:.0f}分({min_time})")
         chart.append("")
 
         return "\n".join(chart)
