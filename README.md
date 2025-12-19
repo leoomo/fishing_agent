@@ -8,6 +8,7 @@
 
 - **🎣 智能钓鱼推荐** - 基于7因子科学评分体系，准确推荐最佳钓鱼时间和地点
 - **🎒 路亚装备管理** - 智能装备推荐、用户装备库、电商数据同步、装备UI优化
+- **📦 装备导入Agent** - 新增agent_equipment_import包，支持文本压缩中间件和批量装备信息提取
 - **🖼️ 智能图片合并** - 自动检测图片下方文字，智能批量合并相关图片，本地处理无需外部API
 - **🔍 多提供商OCR** - 支持Ollama本地OCR和SiliconFlow云端OCR，灵活配置
 - **📊 数据分析报表** - 装备统计、趋势分析、用户行为洞察
@@ -71,6 +72,15 @@ agent = create_agent(model_provider="zhipu")
 response = agent.run("明天杭州钓鱼怎么样？")
 print(response)
 
+# 装备导入Agent (新增)
+from packages.agent_equipment_import import EquipmentImportAgent
+
+agent = EquipmentImportAgent(model_provider="zhipu")
+# 对话式提取
+response = agent.run("帮我识别这段文字里的装备信息")
+# 或直接API调用
+result = agent.extract_and_save(text="光威赤刃 GT602L-M 路亚竿", source_type="forum")
+
 # 图片处理功能
 from packages.data_processing.image import BatchMergeProcessor
 
@@ -121,7 +131,7 @@ MIT License
 
 > 🎣 智能分析，精准钓鱼！
 >
-> 当前版本：v5.0.2 (Phase 6 智能图片合并 + Phase 5 数据分析和配置管理 + Phase 4 爬虫监控模块 + Phase 3 React管理前端 + Phase 2 JWT认证系统 + Phase 1 模块化Agent架构)
+> 当前版本：v5.0.2 (Phase 6 智能图片合并 + 装备导入Agent + 文本压缩中间件 + Phase 5 数据分析和配置管理 + Phase 4 爬虫监控模块 + Phase 3 React管理前端 + Phase 2 JWT认证系统 + Phase 1 模块化Agent架构)
 
 ## 🔧 工作流管理系统
 
@@ -182,6 +192,58 @@ OCR_PROVIDER=siliconflow
 SILICONFLOW_API_KEY=your-api-key
 SILICONFLOW_OCR_TIMEOUT=30
 ```
+
+## 📦 装备导入Agent系统
+
+### 核心功能
+
+装备导入Agent (agent_equipment_import) 专注于从文本中提取装备信息并存储到待审核表。
+
+### 主要特性
+
+- **文本压缩中间件** - 自动压缩长文本，删除冗余内容保留核心信息，压缩率可达50%+
+- **批量装备提取** - 从单个长文本中提取多个装备型号，支持批量处理
+- **对话式交互** - 支持自然语言对话，理解用户意图并自动调用工具
+- **直接API调用** - 提供extract_and_save和batch_extract_and_save等直接API
+- **智能识别** - 基于LLM的装备信息提取，支持各种装备类型识别
+- **来源追踪** - 记录装备信息来源(电商/官网/论坛)，支持URL关联
+
+### 使用示例
+
+```python
+from packages.agent_equipment_import import EquipmentImportAgent
+
+# 创建Agent(支持文本压缩)
+agent = EquipmentImportAgent(
+    model_provider="zhipu",
+    enable_compression=True,  # 启用文本压缩中间件
+    compression_min_length=2000
+)
+
+# 对话式交互
+response = agent.run("帮我从这段文字提取装备信息：光威赤刃 GT602L-M 路亚竿...")
+
+# 批量提取并保存
+results = agent.batch_extract_and_save(
+    text="长文本包含多个装备型号...",
+    source_type="ecommerce",
+    source_url="https://example.com"
+)
+
+# 查看结果
+for result in results:
+    if result.success:
+        print(f"成功: {result.message}, 待审核ID: {result.pending_id}")
+    else:
+        print(f"失败: {result.message}")
+```
+
+### 文本压缩特性
+
+- **智能过滤** - 删除英文营销语、售后说明、技术原理图等冗余内容
+- **核心保留** - 保留规格表、型号描述、技术特色、代言人等关键信息
+- **元信息提取** - 自动提取品牌、系列、型号列表等元数据
+- **压缩统计** - 提供详细的压缩率和内容统计信息
 
 ## 🖼️ 智能图片合并系统
 

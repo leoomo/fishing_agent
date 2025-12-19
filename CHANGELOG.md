@@ -8,6 +8,10 @@
 ## [5.0.2] - 2024-12-18
 
 ### 新增
+- 📦 **装备导入Agent (agent_equipment_import)** - 全新独立的装备导入Agent包，支持从文本中提取装备信息
+- 🗜️ **文本压缩中间件** - 新增TextCompressorMiddleware，自动压缩长文本删除冗余内容，压缩率可达50%+
+- 📋 **批量装备提取** - 支持从单个长文本中批量提取多个装备型号，提高处理效率
+- 🤖 **对话式交互支持** - EquipmentImportAgent支持自然语言对话和直接API调用两种模式
 - 🔍 **OCR多提供商支持** - 重构OCR服务架构，支持Ollama本地和SiliconFlow云端双提供商
 - 🏗️ **OCR模块化设计** - 新增BaseOCRProvider抽象基类和Factory模式，便于扩展新提供商
 - 🦙 **Ollama本地OCR集成** - 支持deepseek-ocr模型，完全本地处理，保护数据隐私
@@ -16,10 +20,18 @@
 - 🛠️ **OCR调试工具增强** - 更新debug_ocr.py，支持多提供商状态查看和智能合并批处理
 
 ### 改进
+- 🏗️ **基础设施模块分离** - 将scraper和data_processing从agent_fishing中独立出来，形成清晰的三层架构
+- 🧹 **代码组织优化** - 各模块职责更加明确，便于独立开发和测试
+- 📦 **包依赖优化** - 调整各包的依赖关系，减少不必要的耦合
 - ⚙️ **环境变量扩展** - 新增OCR_PROVIDER、OLLAMA_BASE_URL、OLLAMA_MODEL等配置项
 - 🔧 **依赖管理优化** - 将ollama依赖设为必需，添加ocr-ollama可选依赖组
 - 📚 **文档结构优化** - 更新README添加OCR多提供商说明，完善配置示例
 - 🚀 **批处理性能提升** - 优化智能图片合并流程，支持更灵活的检测策略
+
+### 修复
+- 🔧 **ExtractedEquipment空值处理** - 修复from_dict方法对空值的处理逻辑
+- 🔗 **导入路径修复** - 修复TaobaoShopCategoryRPA的抽象方法实现和导入路径
+- 📂 **模块导入优化** - 修复data_processing包内部的导入路径问题
 
 ## [5.0.1] - 2024-12-14
 
