@@ -181,7 +181,9 @@ async function sendMessage(content) {
     }
     
     state.messages.push(aiMessage)
-    
+        
+        // 自动生成会话标题（如果当前会话是默认标题）
+        generateSessionTitleIfNeeded()    
     // 触发页面更新
     notifyListeners()
     
@@ -266,6 +268,8 @@ async function sendMessageStream(content, onChunk) {
         
         state.messages.push(aiMessage)
         
+        // 自动生成会话标题（如果当前会话是默认标题）
+        generateSessionTitleIfNeeded()        
         // 重置流式状态
         state.streaming = false
         // 立即结束发送态，避免出现额外“思考中”占位
@@ -428,6 +432,42 @@ function getStreamingMessage() {
   return state.streamingMessage
 }
 
+
+// 自动生成会话标题（如果需要）
+async function generateSessionTitleIfNeeded() {
+  if (!state.currentSessionId) return
+  
+  // 查找当前会话
+  const currentSession = state.sessions.find(s => s.id === state.currentSessionId)
+  if (!currentSession) return
+  
+  // 如果不是默认标题，则跳过
+  if (currentSession.title && currentSession.title.trim() !== "新对话") return
+  
+  try {
+    // 获取第一轮对话内容来生成标题
+    const userMessage = state.messages.find(m => m.role === "user")
+    const aiMessage = state.messages.find(m => m.role === "assistant")
+    
+    if (userMessage && aiMessage) {
+      // 使用用户的问题作为标题，截取前20个字符
+      let title = userMessage.content.substring(0, 20)
+      if (userMessage.content.length > 20) {
+        title += "..."
+      }
+      
+      // 更新会话标题
+      await chatApi.updateSessionTitle(state.currentSessionId, title)
+      
+      // 更新本地状态
+      currentSession.title = title
+      notifyListeners()
+    }
+  } catch (error) {
+    console.error("生成会话标题失败:", error)
+  }
+}
+
 export default {
   // 方法
   createNewSession,
@@ -440,7 +480,7 @@ export default {
   clearCurrentSession,
   fetchSuggestedQuestions,
   resetState,
-  
+  generateSessionTitleIfNeeded,  
   // 状态获取
   getChatState,
   getCurrentSessionId,

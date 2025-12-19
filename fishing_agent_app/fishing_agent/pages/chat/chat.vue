@@ -117,7 +117,7 @@
       <view v-for="item in filteredSessions" :key="item.id" class="session-item">
         <view class="session-info" @click="selectSession(item.id)">
           <text class="session-title-text">{{ item.title || '新对话' }}</text>
-          <text class="session-sub">{{ formatTime(item.updated_at || item.created_at) }}</text>
+          <text class="session-sub">{{ formatSessionTime(item.updated_at || item.created_at) }}</text>
         </view>
         <text class="session-delete-btn" @click.stop="removeSession(item.id)">🗑</text>
       </view>
@@ -298,25 +298,72 @@ export default {
     },
 
     // 切换会话
+    // 切换会话
     async selectSession(sessionId) {
       if (!sessionId) return
+      
+      // 检查是否已经在当前会话中
+      if (sessionId === chatStore.getCurrentSessionId()) {
+        this.showSessions = false
+        return
+      }
+      
+      uni.showLoading({ title: "切换中..." })
       try {
         await chatStore.switchSession(sessionId)
+        this.sessions = chatStore.getSessions() || []
+        this.filteredSessions = this.sessions.filter(s => s.id !== undefined && !s.is_deleted)
+        // 按最后更新时间排序（最新的在前）
+        this.filteredSessions.sort((a, b) => {
+          const timeA = new Date(a.updated_at || a.created_at).getTime()
+          const timeB = new Date(b.updated_at || b.created_at).getTime()
+          return timeB - timeA
+        })
         this.showSessions = false
+        uni.showToast({ title: "已切换", icon: "success" })
       } catch (error) {
-        console.error('切换会话失败:', error)
+        console.error("切换会话失败:", error)
+        uni.showToast({ title: "切换失败", icon: "none" })
+      } finally {
+        uni.hideLoading()
+      }
+    }        console.error('切换会话失败:', error)
         uni.showToast({ title: '切换失败', icon: 'none' })
       }
     },
 
     // 删除会话
+    // 删除会话
     async removeSession(sessionId) {
-      try {
-        await chatStore.deleteSession(sessionId)
-        this.sessions = chatStore.getSessions() || []
-        this.filteredSessions = this.sessions.filter(s => (s.title || '').trim() !== '新对话')
-        uni.showToast({ title: '已删除', icon: 'success' })
-      } catch (error) {
+      const session = this.sessions.find(s => s.id === sessionId)
+      const sessionTitle = session?.title || "新对话"
+      
+      uni.showModal({
+        title: "确认删除",
+        content: `确定要删除会话「${sessionTitle}」吗？删除后无法恢复。`,
+        confirmText: "删除",
+        confirmColor: "#ff4d4f",
+        success: async (res) => {
+          if (res.confirm) {
+            try {
+              await chatStore.deleteSession(sessionId)
+              this.sessions = chatStore.getSessions() || []
+              this.filteredSessions = this.sessions.filter(s => s.id !== undefined && !s.is_deleted)
+              // 按最后更新时间排序（最新的在前）
+              this.filteredSessions.sort((a, b) => {
+                const timeA = new Date(a.updated_at || a.created_at).getTime()
+                const timeB = new Date(b.updated_at || b.created_at).getTime()
+                return timeB - timeA
+              })
+              uni.showToast({ title: "已删除", icon: "success" })
+            } catch (error) {
+              console.error("删除会话失败:", error)
+              uni.showToast({ title: "删除失败", icon: "none" })
+            }
+          }
+        }
+      })
+    }      } catch (error) {
         console.error('删除会话失败:', error)
         uni.showToast({ title: '删除失败', icon: 'none' })
       }
@@ -370,8 +417,9 @@ export default {
     },
     
     // 格式化时间
-    formatTime(timeStr) {
-      if (!timeStr) return ''
+    // 格式化时间（用于会话列表）
+    formatSessionTime(timeStr) {
+      if (!timeStr) return ""
       
       const date = new Date(timeStr)
       const now = new Date()
@@ -379,12 +427,18 @@ export default {
       const diffSec = Math.floor(diffMs / 1000)
       const diffMin = Math.floor(diffSec / 60)
       const diffHour = Math.floor(diffMin / 60)
+      const diffDay = Math.floor(diffHour / 24)
       
-      // 24小时内容相对时间（分钟/小时+分钟）
-      if (diffHour < 24 && date.toDateString() === now.toDateString()) {
-        if (diffMin < 1) return '刚刚'
-        if (diffMin < 60) return `${diffMin}分钟前`
-        const h = diffHour
+n      if (diffSec < 60) return "刚刚"
+      if (diffMin < 60) return `${diffMin}分钟前`
+      if (diffHour < 24) return `${diffHour}小时前`
+      if (diffDay === 1) return "昨天"
+      if (diffDay < 7) return `${diffDay}天前`
+      
+n      // 超过一周显示具体日期
+      const md = date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" })
+      return md
+    },        const h = diffHour
         const m = diffMin % 60
         return m > 0 ? `${h}小时${m}分钟前` : `${h}小时前`
       }
