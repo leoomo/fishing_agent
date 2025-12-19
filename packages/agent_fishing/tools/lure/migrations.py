@@ -35,6 +35,7 @@ class DatabaseMigrations:
             self._migration_003_add_admin_users_table,
             self._migration_004_add_crawler_task_tables,
             self._migration_005_add_workflow_support,
+            self._migration_006_add_pending_equipment_table,
         ]
 
         for i, migration in enumerate(migrations, 1):
@@ -468,6 +469,68 @@ class DatabaseMigrations:
             "CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON crawler_schedules(next_run_time, is_enabled)"
         )
         logger.info("  创建索引: idx_schedules_*")
+
+    def _migration_006_add_pending_equipment_table(self):
+        """
+        迁移006: 创建待审核装备表
+
+        用于存储 Agent 从 OCR 文本中提取的装备信息，等待人工审核。
+        """
+        logger.info("执行迁移006: 创建待审核装备表")
+
+        # ========== pending_equipment表 ==========
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pending_equipment (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                status TEXT NOT NULL DEFAULT 'pending',
+
+                -- 原始输入
+                ocr_text TEXT NOT NULL,
+                source_type TEXT NOT NULL DEFAULT 'unknown',
+                source_url TEXT,
+
+                -- LLM 提取结果
+                extracted_data TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 0.0,
+
+                -- 提取的关键字段（便于列表展示和搜索）
+                equipment_type TEXT,
+                brand_name TEXT,
+                model_name TEXT,
+                product_name TEXT,
+
+                -- 审核信息
+                reviewed_by INTEGER,
+                reviewed_at TIMESTAMP,
+                review_notes TEXT,
+
+                -- 最终装备 ID
+                equipment_id INTEGER,
+
+                -- 时间戳
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                FOREIGN KEY (reviewed_by) REFERENCES admin_users(id),
+                FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id)
+            )
+        """)
+        logger.info("  创建表: pending_equipment")
+
+        # 创建索引
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pending_equipment_status ON pending_equipment(status)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pending_equipment_type ON pending_equipment(equipment_type)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pending_equipment_brand ON pending_equipment(brand_name)"
+        )
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pending_equipment_created ON pending_equipment(created_at)"
+        )
+        logger.info("  创建索引: idx_pending_equipment_*")
 
     def _get_table_columns(self, table_name: str) -> list:
         """
