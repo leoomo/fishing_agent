@@ -86,7 +86,8 @@ class ChatService:
         self,
         user_id: Optional[int] = None,
         limit: int = 20,
-        offset: int = 0
+        offset: int = 0,
+        include_empty: bool = False
     ) -> Dict:
         """
         List chat sessions for a user
@@ -95,15 +96,23 @@ class ChatService:
             user_id: User ID filter
             limit: Max results
             offset: Pagination offset
+            include_empty: Include sessions with no messages (default: False)
 
         Returns:
             dict: Sessions list with total count
         """
+        from sqlalchemy import func, exists
+
         with get_db_session() as session:
             query = session.query(ChatSession).filter(ChatSession.is_active == True)
 
             if user_id is not None:
                 query = query.filter(ChatSession.user_id == user_id)
+
+            # 过滤空会话：只返回有消息的会话
+            if not include_empty:
+                has_messages = exists().where(ChatMessage.session_id == ChatSession.id)
+                query = query.filter(has_messages)
 
             total = query.count()
             sessions = query.order_by(ChatSession.updated_at.desc()) \
@@ -113,6 +122,37 @@ class ChatService:
                 "sessions": [s.to_dict() for s in sessions],
                 "total": total
             }
+
+    def cleanup_empty_sessions(self, user_id: int) -> int:
+        """
+        清理用户的空会话（无消息的会话）
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            int: 清理的会话数量
+        """
+        from sqlalchemy import exists
+
+        with get_db_session() as session:
+            # 找出用户的空会话
+            has_messages = exists().where(ChatMessage.session_id == ChatSession.id)
+            empty_sessions = session.query(ChatSession).filter(
+                ChatSession.user_id == user_id,
+                ChatSession.is_active == True,
+                ~has_messages
+            ).all()
+
+            count = 0
+            for s in empty_sessions:
+                s.is_active = False
+                count += 1
+
+            if count > 0:
+                logger.info(f"Cleaned up {count} empty sessions for user {user_id}")
+
+            return count
 
     def update_session(self, session_id: int, title: str) -> Optional[Dict]:
         """

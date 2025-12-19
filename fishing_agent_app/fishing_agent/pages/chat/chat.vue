@@ -128,17 +128,17 @@
     <!-- 输入区域 -->
     <view class="input-area">
       <view class="input-container">
-        <input 
+        <input
           class="message-input"
           v-model="inputMessage"
           placeholder="问我路亚相关问题..."
-          :disabled="sending"
+          :disabled="sending || switching"
           @confirm="sendMessage"
           confirm-type="send"
         />
-        <button 
+        <button
           class="send-button"
-          :disabled="sending || inputMessage.trim().length === 0"
+          :disabled="sending || switching || inputMessage.trim().length === 0"
           @click="sendMessage"
         >
           <text class="send-text">发送</text>
@@ -165,7 +165,8 @@ export default {
       streamingMessage: '',
       suggestedQuestions: [],
       userInfo: null,
-      showSessions: false
+      showSessions: false,
+      switching: false  // 会话切换中状态
     }
   },
   
@@ -307,6 +308,8 @@ export default {
         return
       }
 
+      // 设置切换状态，禁用输入
+      this.switching = true
       uni.showLoading({ title: "切换中..." })
       try {
         await chatStore.switchSession(sessionId)
@@ -325,6 +328,7 @@ export default {
         uni.showToast({ title: "切换失败", icon: "none" })
       } finally {
         uni.hideLoading()
+        this.switching = false  // 恢复输入
       }
     },
 

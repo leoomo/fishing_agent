@@ -17,9 +17,10 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import StreamingResponse
 
+from ..auth.dependencies import get_current_user, CurrentUser
 from ..schemas.chat_session import (
     MessageRequest,
     MessageResponse,
@@ -43,7 +44,10 @@ chat_service = ChatService()
 # ============ Message Endpoints ============
 
 @router.post("/message", response_model=MessageResponse)
-async def send_message(request: MessageRequest):
+async def send_message(
+    request: MessageRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """
     Send a message and get AI response (non-streaming)
 
@@ -53,7 +57,7 @@ async def send_message(request: MessageRequest):
         result = chat_service.chat(
             message=request.message,
             session_id=request.session_id,
-            user_id=request.user_id
+            user_id=current_user.user_id  # 使用认证用户ID
         )
 
         return MessageResponse(
@@ -69,7 +73,10 @@ async def send_message(request: MessageRequest):
 
 
 @router.post("/message/stream")
-async def send_message_stream(request: MessageRequest):
+async def send_message_stream(
+    request: MessageRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """
     Send a message and get AI response (streaming via SSE)
 
@@ -78,12 +85,15 @@ async def send_message_stream(request: MessageRequest):
         data: {"content": "accumulated", "delta": "new chunk"}
         data: [DONE]
     """
+    # 捕获用户ID以在生成器中使用
+    user_id = current_user.user_id
+
     async def generate():
         try:
             for chunk in chat_service.chat_stream(
                 message=request.message,
                 session_id=request.session_id,
-                user_id=request.user_id
+                user_id=user_id  # 使用认证用户ID
             ):
                 if chunk.get("done"):
                     yield "data: [DONE]\n\n"
@@ -110,14 +120,14 @@ async def send_message_stream(request: MessageRequest):
 
 @router.get("/sessions", response_model=SessionListResponse)
 async def list_sessions(
-    user_id: Optional[int] = Query(None, description="Filter by user ID"),
+    current_user: CurrentUser = Depends(get_current_user),
     limit: int = Query(20, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Pagination offset")
 ):
     """
-    List chat sessions for a user
+    List chat sessions for current user
     """
-    result = chat_service.list_sessions(user_id=user_id, limit=limit, offset=offset)
+    result = chat_service.list_sessions(user_id=current_user.user_id, limit=limit, offset=offset)
     return SessionListResponse(
         sessions=[SessionResponse(**s) for s in result["sessions"]],
         total=result["total"]
@@ -125,47 +135,73 @@ async def list_sessions(
 
 
 @router.post("/sessions", response_model=SessionResponse)
-async def create_session(request: SessionCreate):
+async def create_session(
+    request: SessionCreate,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """
-    Create a new chat session
+    Create a new chat session for current user
     """
     result = chat_service.create_session(
-        user_id=request.user_id,
+        user_id=current_user.user_id,  # 使用认证用户ID
         title=request.title or "新对话"
     )
     return SessionResponse(**result)
 
 
 @router.get("/sessions/{session_id}", response_model=SessionResponse)
-async def get_session(session_id: int):
+async def get_session(
+    session_id: int,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """
-    Get session by ID
+    Get session by ID (with ownership verification)
     """
     result = chat_service.get_session(session_id)
     if not result:
         raise HTTPException(status_code=404, detail="Session not found")
+    # 验证会话归属
+    if result.get("user_id") != current_user.user_id:
+        raise HTTPException(status_code=403, detail="无权访问此会话")
     return SessionResponse(**result)
 
 
 @router.put("/sessions/{session_id}", response_model=SessionResponse)
-async def update_session(session_id: int, request: SessionUpdate):
+async def update_session(
+    session_id: int,
+    request: SessionUpdate,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """
-    Update session title
+    Update session title (with ownership verification)
     """
-    result = chat_service.update_session(session_id, request.title)
-    if not result:
+    # 先验证会话归属
+    session = chat_service.get_session(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if session.get("user_id") != current_user.user_id:
+        raise HTTPException(status_code=403, detail="无权修改此会话")
+
+    result = chat_service.update_session(session_id, request.title)
     return SessionResponse(**result)
 
 
 @router.delete("/sessions/{session_id}")
-async def delete_session(session_id: int):
+async def delete_session(
+    session_id: int,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """
-    Delete a session (soft delete)
+    Delete a session (soft delete, with ownership verification)
     """
-    success = chat_service.delete_session(session_id)
-    if not success:
+    # 先验证会话归属
+    session = chat_service.get_session(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if session.get("user_id") != current_user.user_id:
+        raise HTTPException(status_code=403, detail="无权删除此会话")
+
+    success = chat_service.delete_session(session_id)
     return {"success": True, "message": "Session deleted"}
 
 
@@ -174,16 +210,19 @@ async def delete_session(session_id: int):
 @router.get("/sessions/{session_id}/messages", response_model=MessageListResponse)
 async def get_session_messages(
     session_id: int,
+    current_user: CurrentUser = Depends(get_current_user),
     limit: int = Query(100, ge=1, le=500, description="Max results"),
     offset: int = Query(0, ge=0, description="Pagination offset")
 ):
     """
-    Get messages for a session
+    Get messages for a session (with ownership verification)
     """
-    # Verify session exists
+    # Verify session exists and ownership
     session = chat_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if session.get("user_id") != current_user.user_id:
+        raise HTTPException(status_code=403, detail="无权访问此会话")
 
     result = chat_service.get_messages(session_id, limit=limit, offset=offset)
     return MessageListResponse(
@@ -193,10 +232,20 @@ async def get_session_messages(
 
 
 @router.delete("/sessions/{session_id}/messages")
-async def clear_session_messages(session_id: int):
+async def clear_session_messages(
+    session_id: int,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """
-    Clear all messages in a session
+    Clear all messages in a session (with ownership verification)
     """
+    # Verify session exists and ownership
+    session = chat_service.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.get("user_id") != current_user.user_id:
+        raise HTTPException(status_code=403, detail="无权操作此会话")
+
     success = chat_service.clear_messages(session_id)
     return {"success": success, "message": "Messages cleared" if success else "No messages to clear"}
 
