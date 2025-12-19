@@ -278,24 +278,13 @@ export default {
       }
     },
     
-    // 创建新对话
+    // 创建新对话（只清空状态，实际会话在发送消息时创建）
     async createNewChat() {
-      try {
-        await chatStore.createNewSession()
-        uni.showToast({
-          title: '新对话已创建',
-          icon: 'success'
-        })
-        await chatStore.fetchSessions()
-        this.sessions = chatStore.getSessions() || []
-        this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
-      } catch (error) {
-        console.error('创建新对话失败:', error)
-        uni.showToast({
-          title: error.message || '创建失败',
-          icon: 'none'
-        })
-      }
+      await chatStore.createNewSession()
+      // 刷新会话列表
+      await chatStore.fetchSessions()
+      this.sessions = chatStore.getSessions() || []
+      this.filteredSessions = this.sessions.filter(s => s.message_count > 0)
     },
 
     // 切换会话

@@ -53,36 +53,42 @@ function getChatState() {
   }
 }
 
-// 创建新会话
+// 准备新会话（不立即创建，延迟到发送第一条消息时）
 async function createNewSession(title = '新对话') {
+  // 清空当前会话状态，但不立即调用API创建
+  // 会话会在发送第一条消息时自动创建
+  state.currentSessionId = null
+  state.messages = []
+  state.streamingMessage = ''
+  state.streaming = false
+  state.sending = false
+
+  // 触发页面更新
+  notifyListeners()
+
+  return null  // 返回null表示会话尚未创建
+}
+
+// 实际创建会话（内部方法，由发送消息时调用）
+async function _createSessionOnServer(title = '新对话') {
   try {
-    state.loading = true
-    
     const sessionData = {
       title: title,
       user_id: userStore.getUserInfo()?.id || 1
     }
-    
+
     const response = await chatApi.createSession(sessionData)
-    
+
     // 更新当前会话ID
     state.currentSessionId = response.id
-    
-    // 清空消息列表
-    state.messages = []
-    
+
     // 添加到会话列表
     state.sessions.unshift(response)
-    
-    // 触发页面更新
-    notifyListeners()
-    
+
     return response
   } catch (error) {
     console.error('创建会话失败:', error)
     throw error
-  } finally {
-    state.loading = false
   }
 }
 
@@ -140,10 +146,10 @@ async function fetchMessages(sessionId) {
 // 发送消息
 async function sendMessage(content) {
   if (!content.trim()) return
-  
+
   // 如果没有当前会话，创建新会话
   if (!state.currentSessionId) {
-    await createNewSession()
+    await _createSessionOnServer()
   }
   
   try {
@@ -206,10 +212,10 @@ async function sendMessage(content) {
 // 流式发送消息
 async function sendMessageStream(content, onChunk) {
   if (!content.trim()) return
-  
+
   // 如果没有当前会话，创建新会话
   if (!state.currentSessionId) {
-    await createNewSession()
+    await _createSessionOnServer()
   }
   
   try {
