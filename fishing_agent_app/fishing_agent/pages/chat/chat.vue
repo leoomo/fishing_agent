@@ -414,8 +414,14 @@ export default {
     // 格式化时间
     formatTime(timeStr) {
       if (!timeStr) return ''
-      
-      const date = new Date(timeStr)
+
+      // 后端返回 UTC 时间，需要确保正确解析
+      // 如果时间字符串没有时区标识，添加 'Z' 表示 UTC
+      let normalizedTimeStr = timeStr
+      if (!timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
+        normalizedTimeStr = timeStr + 'Z'
+      }
+      const date = new Date(normalizedTimeStr)
       const now = new Date()
       const diffMs = now.getTime() - date.getTime()
       const diffSec = Math.floor(diffMs / 1000)
