@@ -15,6 +15,7 @@ from ..tools import get_all_tools
 from .model_factory import ModelFactory
 from .prompts import BASE_SYSTEM_PROMPT, FISHING_OUTPUT_RULES, WEATHER_QUERY_RULES
 from .callbacks import FishingAgentCallback, OutputFormatValidator
+from .monitoring_callback import MonitoringCallback
 from ..middleware import select_prompt_by_query_type
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,10 @@ class FishingAgent:
         model_provider: str = "zhipu",
         timeout: int = 60,
         enable_logging: bool = True,
-        verbose_callbacks: bool = False
+        verbose_callbacks: bool = False,
+        enable_monitoring: bool = True,
+        user_id: Optional[int] = None,
+        session_id: Optional[int] = None
     ):
         """
         Initialize fishing agent
@@ -46,13 +50,29 @@ class FishingAgent:
             timeout: Request timeout in seconds
             enable_logging: Enable logging output
             verbose_callbacks: Enable verbose callback logging
+            enable_monitoring: Enable database monitoring (default True)
+            user_id: User ID for monitoring context
+            session_id: Chat session ID for monitoring context
         """
         self.model_provider = model_provider
         self.timeout = timeout
         self.enable_logging = enable_logging
+        self.enable_monitoring = enable_monitoring
+        self.user_id = user_id
+        self.session_id = session_id
 
-        # Initialize callback handler
+        # Initialize callback handler (legacy, for compatibility)
         self.callback = FishingAgentCallback(verbose=verbose_callbacks)
+
+        # Initialize monitoring callback (new, for database persistence)
+        self.monitoring_callback = MonitoringCallback(
+            agent_type="fishing",
+            model_provider=model_provider,
+            user_id=user_id,
+            session_id=session_id,
+            persist=enable_monitoring,
+            verbose=verbose_callbacks
+        )
 
         # Initialize output format validator
         self._format_validator = OutputFormatValidator()
@@ -111,12 +131,19 @@ class FishingAgent:
 
         return agent
 
-    def run(self, user_input: str) -> str:
+    def run(
+        self,
+        user_input: str,
+        user_id: Optional[int] = None,
+        session_id: Optional[int] = None
+    ) -> str:
         """
         Execute agent query
 
         Args:
             user_input: User query string
+            user_id: Override user ID for this execution
+            session_id: Override session ID for this execution
 
         Returns:
             Agent response string
@@ -125,9 +152,17 @@ class FishingAgent:
             if self.enable_logging:
                 logger.info(f"📝 用户输入: {user_input}")
 
-            # Invoke agent with callback tracking
-            # 构建回调列表，包含主回调和 usage 跟踪回调
-            callbacks = [self.callback]
+            # Update monitoring context if provided
+            if user_id is not None:
+                self.monitoring_callback.user_id = user_id
+            if session_id is not None:
+                self.monitoring_callback.session_id = session_id
+
+            # Set input text for monitoring
+            self.monitoring_callback.set_input(user_input)
+
+            # Build callbacks list with both legacy and monitoring callbacks
+            callbacks = [self.callback, self.monitoring_callback]
             if self.callback._usage_handler:
                 callbacks.append(self.callback._usage_handler)
 
@@ -153,7 +188,12 @@ class FishingAgent:
             else:
                 return f"抱歉，我遇到了一些技术问题：{str(e)}。请稍后重试。"
 
-    def stream(self, user_input: str) -> Generator[str, None, None]:
+    def stream(
+        self,
+        user_input: str,
+        user_id: Optional[int] = None,
+        session_id: Optional[int] = None
+    ) -> Generator[str, None, None]:
         """
         Execute agent query with streaming output
 
@@ -162,6 +202,8 @@ class FishingAgent:
 
         Args:
             user_input: User query string
+            user_id: Override user ID for this execution
+            session_id: Override session ID for this execution
 
         Yields:
             Content chunks as they are generated
@@ -170,8 +212,17 @@ class FishingAgent:
             if self.enable_logging:
                 logger.info(f"📝 [流式] 用户输入: {user_input}")
 
-            # Build callbacks list
-            callbacks = [self.callback]
+            # Update monitoring context if provided
+            if user_id is not None:
+                self.monitoring_callback.user_id = user_id
+            if session_id is not None:
+                self.monitoring_callback.session_id = session_id
+
+            # Set input text for monitoring
+            self.monitoring_callback.set_input(user_input)
+
+            # Build callbacks list with both legacy and monitoring callbacks
+            callbacks = [self.callback, self.monitoring_callback]
             if self.callback._usage_handler:
                 callbacks.append(self.callback._usage_handler)
 
@@ -353,6 +404,7 @@ class FishingAgent:
     def reset_stats(self) -> None:
         """Reset execution statistics"""
         self.callback.reset()
+        self.monitoring_callback.reset()
         if self.enable_logging:
             logger.info("📊 统计信息已重置")
 

@@ -17,6 +17,7 @@ from ..tools import get_import_tools
 from ..schemas.extracted import ExtractedEquipment, ImportResult
 from ..models.pending import save_pending_equipment
 from ..middleware import TextCompressorMiddleware, TextCompressor
+from packages.agent_fishing.core.monitoring_callback import MonitoringCallback
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,10 @@ class EquipmentImportAgent:
         timeout: int = 60,
         enable_logging: bool = True,
         enable_compression: bool = True,
-        compression_min_length: int = 2000
+        compression_min_length: int = 2000,
+        enable_monitoring: bool = True,
+        user_id: Optional[int] = None,
+        session_id: Optional[int] = None
     ):
         """
         初始化装备导入 Agent
@@ -47,11 +51,27 @@ class EquipmentImportAgent:
             enable_logging: 是否启用日志
             enable_compression: 是否启用文本压缩中间件
             compression_min_length: 触发压缩的最小文本长度
+            enable_monitoring: 是否启用数据库监控 (默认 True)
+            user_id: 用户 ID（用于监控上下文）
+            session_id: 会话 ID（用于监控上下文）
         """
         self.model_provider = model_provider
         self.timeout = timeout
         self.enable_logging = enable_logging
         self.enable_compression = enable_compression
+        self.enable_monitoring = enable_monitoring
+        self.user_id = user_id
+        self.session_id = session_id
+
+        # 初始化监控回调
+        self.monitoring_callback = MonitoringCallback(
+            agent_type="equipment_import",
+            model_provider=model_provider,
+            user_id=user_id,
+            session_id=session_id,
+            persist=enable_monitoring,
+            verbose=False
+        )
 
         # 初始化组件
         self.model = self._initialize_model()
@@ -116,7 +136,12 @@ class EquipmentImportAgent:
 
     # ========== 对话式调用 ==========
 
-    def run(self, user_input: str) -> str:
+    def run(
+        self,
+        user_input: str,
+        user_id: Optional[int] = None,
+        session_id: Optional[int] = None
+    ) -> str:
         """
         对话式交互
 
@@ -124,6 +149,8 @@ class EquipmentImportAgent:
 
         Args:
             user_input: 用户输入的自然语言
+            user_id: 覆盖用户 ID（用于监控）
+            session_id: 覆盖会话 ID（用于监控）
 
         Returns:
             str: Agent 的回复
@@ -132,8 +159,18 @@ class EquipmentImportAgent:
             if self.enable_logging:
                 logger.info(f"用户输入: {user_input}")
 
+            # 更新监控上下文
+            if user_id is not None:
+                self.monitoring_callback.user_id = user_id
+            if session_id is not None:
+                self.monitoring_callback.session_id = session_id
+
+            # 设置输入文本用于监控
+            self.monitoring_callback.set_input(user_input)
+
             result = self.agent.invoke(
-                {"messages": [HumanMessage(content=user_input)]}
+                {"messages": [HumanMessage(content=user_input)]},
+                config={"callbacks": [self.monitoring_callback]}
             )
 
             response = self._extract_response(result)
