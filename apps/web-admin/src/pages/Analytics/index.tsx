@@ -83,8 +83,16 @@ const Analytics = () => {
   const handleGenerateReport = async (reportType: string) => {
     setReportLoading(true)
     try {
+      // 计算日期范围
+      const endDate = dayjs()
+      const startDate = reportType === 'weekly'
+        ? endDate.subtract(7, 'day')
+        : endDate.subtract(30, 'day')
+
       const report = await analyticsApi.generateReport({
         report_type: reportType,
+        start_date: startDate.format('YYYY-MM-DD'),
+        end_date: endDate.format('YYYY-MM-DD'),
       })
       setCurrentReport(report)
       setReportVisible(true)
@@ -329,17 +337,17 @@ const Analytics = () => {
               </Card>
             </Col>
             <Col span={12}>
-              <Card title="用户水平分布">
+              <Card title="装备类别详情">
                 {stats && (
                   <Table
-                    dataSource={Object.entries(stats.by_user_level).map(
-                      ([level, count]) => ({ level, count })
+                    dataSource={Object.entries(stats.by_category).map(
+                      ([category, count]) => ({ category, count })
                     )}
                     columns={[
-                      { title: '用户水平', dataIndex: 'level' },
+                      { title: '装备类别', dataIndex: 'category' },
                       { title: '装备数量', dataIndex: 'count' },
                     ]}
-                    rowKey="level"
+                    rowKey="category"
                     pagination={false}
                     size="small"
                   />
@@ -351,7 +359,7 @@ const Analytics = () => {
       </Tabs>
 
       <Modal
-        title={currentReport?.title || '业务报表'}
+        title={`${currentReport?.report_type === 'weekly' ? '周报' : '月报'} - ${currentReport?.start_date} 至 ${currentReport?.end_date}`}
         open={reportVisible}
         onCancel={() => setReportVisible(false)}
         width={800}
@@ -365,10 +373,12 @@ const Analytics = () => {
           <div>
             <p style={{ color: '#999' }}>
               生成时间: {new Date(currentReport.generated_at).toLocaleString('zh-CN')}
+              &nbsp;&nbsp;|&nbsp;&nbsp;
+              生成人: {currentReport.generated_by}
             </p>
             <Paragraph>
               <pre style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: 16 }}>
-                {currentReport.content}
+                {JSON.stringify(currentReport.report_data, null, 2)}
               </pre>
             </Paragraph>
           </div>

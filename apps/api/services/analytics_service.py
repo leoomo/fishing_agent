@@ -8,7 +8,7 @@ from packages.agent_fishing.tools.lure.orm.session import get_db_session
 from packages.agent_fishing.tools.lure.models.equipment import Equipment
 from packages.agent_fishing.tools.lure.models.brand import Brand
 from packages.agent_fishing.tools.lure.models.user import User, UserEquipment
-from packages.agent_fishing.tools.lure.models.system import AnalyticsReport, APILog
+from packages.agent_fishing.tools.lure.models.system import AnalyticsReport, APILog, AdminUser
 
 logger = logging.getLogger(__name__)
 
@@ -294,6 +294,13 @@ class AnalyticsService:
             dict: 报表数据
         """
         with get_db_session() as session:
+            # 查找管理员用户ID
+            admin_user = session.query(AdminUser).filter(
+                AdminUser.username == generated_by
+            ).first()
+
+            admin_user_id = admin_user.id if admin_user else None
+
             # 收集报表数据
             report_data = {
                 "equipment": {
@@ -324,7 +331,7 @@ class AnalyticsService:
                 start_date=datetime.fromisoformat(start_date).date(),
                 end_date=datetime.fromisoformat(end_date).date(),
                 report_data=json.dumps(report_data, ensure_ascii=False),  # JSON 字符串
-                generated_by=None,  # TODO: 关联 admin_user_id
+                generated_by=admin_user_id,  # 关联 admin_user_id
                 is_published=True
             )
 
