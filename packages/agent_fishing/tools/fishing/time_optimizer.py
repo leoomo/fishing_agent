@@ -130,6 +130,123 @@ def is_slot_in_time_range(
         return in_evening or in_morning
 
 
+def merge_adjacent_slots(
+    slots: List[Dict[str, Any]],
+    hourly_scores: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    合并相邻且评分相同的时段
+
+    Args:
+        slots: 已选时段列表
+        hourly_scores: 原始24小时评分列表（用于重新计算合并后的数据）
+
+    Returns:
+        合并后的时段列表
+
+    Examples:
+        输入: [{6:00-10:00, 85分}, {10:00-12:00, 85分}]
+        输出: [{6:00-12:00, 85分}]  # 评分相同，合并
+
+        输入: [{6:00-10:00, 85分}, {10:00-12:00, 83分}]
+        输出: [{6:00-10:00, 85分}, {10:00-12:00, 83分}]  # 评分不同，不合并
+    """
+    if len(slots) <= 1:
+        return slots
+
+    # 按起始时间排序
+    sorted_slots = sorted(slots, key=lambda x: x['start_hour'])
+
+    merged = []
+    current = sorted_slots[0].copy()
+
+    for slot in sorted_slots[1:]:
+        # 判断是否可以合并：相邻且评分完全相同
+        if (slot['start_hour'] == current['end_hour'] and
+                slot['avg_score'] == current['avg_score']):
+            # 合并时段：重新从 hourly_scores 计算
+            new_start = current['start_hour']
+            new_end = slot['end_hour']
+            window_scores = hourly_scores[new_start:new_end]
+
+            # 重新计算所有指标
+            current = _build_slot_from_window(window_scores, new_start, new_end)
+        else:
+            merged.append(current)
+            current = slot.copy()
+
+    merged.append(current)
+    return merged
+
+
+def _build_slot_from_window(
+    window_scores: List[Dict[str, Any]],
+    start_idx: int,
+    end_idx: int
+) -> Dict[str, Any]:
+    """
+    从小时评分窗口构建时段数据
+
+    Args:
+        window_scores: 窗口内的小时评分列表
+        start_idx: 起始索引
+        end_idx: 结束索引
+
+    Returns:
+        时段字典
+    """
+    window_size = len(window_scores)
+
+    # 计算平均评分
+    avg_score = sum(h['score'] for h in window_scores) / window_size
+
+    # 获取时间范围
+    start_time = window_scores[0]['time_str']
+    last_dt = window_scores[-1].get('datetime')
+    if last_dt:
+        end_dt = last_dt + timedelta(hours=1)
+        end_time = end_dt.strftime('%H:%M')
+    else:
+        last_hour = int(window_scores[-1]['time_str'].split(':')[0])
+        end_hour = (last_hour + 1) % 24
+        end_time = f"{end_hour:02d}:00"
+
+    # 计算平均天气数据
+    avg_temp = sum(h['temperature'] for h in window_scores) / window_size
+    avg_wind = sum(h['wind_speed'] for h in window_scores) / window_size
+    avg_humidity = sum(h['humidity'] for h in window_scores) / window_size
+    avg_pressure = sum(h['pressure'] for h in window_scores) / window_size
+
+    # 获取温度和风速范围
+    min_temp = min(h['temperature'] for h in window_scores)
+    max_temp = max(h['temperature'] for h in window_scores)
+    min_wind = min(h['wind_speed'] for h in window_scores)
+    max_wind = max(h['wind_speed'] for h in window_scores)
+
+    # 获取主要天气状况
+    conditions = [h['condition'] for h in window_scores]
+    main_condition = max(set(conditions), key=conditions.count)
+
+    return {
+        'start_hour': start_idx,
+        'end_hour': end_idx,
+        'start_time': start_time,
+        'end_time': end_time,
+        'time_range': f"{start_time}-{end_time}",
+        'duration_hours': window_size,
+        'avg_score': avg_score,
+        'temperature': avg_temp,
+        'temp_min': min_temp,
+        'temp_max': max_temp,
+        'condition': main_condition,
+        'wind_speed': avg_wind,
+        'wind_min': min_wind,
+        'wind_max': max_wind,
+        'humidity': avg_humidity,
+        'pressure': avg_pressure
+    }
+
+
 def find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) -> List[Dict[str, Any]]:
     """
     智能检测最佳钓鱼时段（灵活时段长度）
@@ -228,10 +345,14 @@ def find_best_time_slots(hourly_scores: List[Dict[str, Any]], top_n: int = 3) ->
                 if len(selected_slots) >= top_n:
                     break
 
-        # 保持按评分降序排序，确保🥇对应最高分
+        # 合并相邻且评分接近的时段
+        merged_slots = merge_adjacent_slots(selected_slots, hourly_scores)
 
-        logger.info(f"成功检测{len(selected_slots)}个最佳钓鱼时段")
-        return selected_slots
+        # 按评分降序排序，确保🥇对应最高分
+        merged_slots.sort(key=lambda x: x['avg_score'], reverse=True)
+
+        logger.info(f"成功检测{len(merged_slots)}个最佳钓鱼时段（合并前{len(selected_slots)}个）")
+        return merged_slots
 
     except Exception as e:
         logger.error(f"智能时段检测失败: {e}")
