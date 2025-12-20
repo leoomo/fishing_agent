@@ -273,6 +273,137 @@ class APILog(Base):
         }
 
 
+class AgentExecutionLog(Base):
+    """Agent execution tracking - one record per agent.run() call"""
+
+    __tablename__ = 'agent_execution_logs'
+
+    __table_args__ = (
+        Index('ix_agent_exec_timestamp_type', 'timestamp', 'agent_type'),
+        Index('ix_agent_exec_user_timestamp', 'user_id', 'timestamp'),
+        Index('ix_agent_exec_session', 'session_id'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True,
+                       comment="Execution timestamp")
+
+    # Agent identification
+    agent_type = Column(String(50), nullable=False, index=True,
+                        comment="Agent type (fishing/equipment_import/etc)")
+    agent_version = Column(String(20), comment="Agent version if applicable")
+
+    # Execution context
+    session_id = Column(Integer, index=True, comment="Chat session ID if applicable")
+    user_id = Column(Integer, index=True, comment="User ID")
+
+    # Input/Output
+    input_text = Column(Text, comment="User input (truncated to 1000 chars)")
+    output_text = Column(Text, comment="Agent output (truncated to 2000 chars)")
+
+    # LLM metrics
+    model_provider = Column(String(50), comment="LLM provider used")
+    model_name = Column(String(100), comment="Model name")
+    llm_calls = Column(Integer, default=0, comment="Number of LLM calls in this execution")
+    input_tokens = Column(Integer, default=0, comment="Total input tokens")
+    output_tokens = Column(Integer, default=0, comment="Total output tokens")
+    total_tokens = Column(Integer, default=0, comment="Total tokens")
+
+    # Performance
+    latency_ms = Column(Integer, comment="Total execution time in milliseconds")
+    success = Column(Boolean, default=True, nullable=False, index=True)
+    error_message = Column(Text, comment="Error message if failed")
+
+    # Cost
+    estimated_cost = Column(Float, default=0.0, comment="Estimated cost in CNY")
+
+    # Tool usage summary (JSON)
+    tool_calls_summary = Column(Text, comment="JSON summary of tool calls")
+
+    # Relationships
+    tool_calls = relationship("ToolCallLog", back_populates="execution", cascade="all, delete-orphan")
+    llm_logs = relationship("LLMLog", back_populates="execution")
+
+    def __repr__(self):
+        return f"<AgentExecutionLog(id={self.id}, agent='{self.agent_type}', tokens={self.total_tokens})>"
+
+    def to_dict(self):
+        """Convert to dictionary representation"""
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'agent_type': self.agent_type,
+            'agent_version': self.agent_version,
+            'session_id': self.session_id,
+            'user_id': self.user_id,
+            'input_text': self.input_text,
+            'output_text': self.output_text,
+            'model_provider': self.model_provider,
+            'model_name': self.model_name,
+            'llm_calls': self.llm_calls,
+            'input_tokens': self.input_tokens,
+            'output_tokens': self.output_tokens,
+            'total_tokens': self.total_tokens,
+            'latency_ms': self.latency_ms,
+            'success': self.success,
+            'error_message': self.error_message,
+            'estimated_cost': self.estimated_cost,
+            'tool_calls_summary': self.tool_calls_summary,
+        }
+
+
+class ToolCallLog(Base):
+    """Detailed tool call tracking"""
+
+    __tablename__ = 'tool_call_logs'
+
+    __table_args__ = (
+        Index('ix_tool_call_timestamp_name', 'timestamp', 'tool_name'),
+        Index('ix_tool_call_execution', 'execution_id'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # Link to execution
+    execution_id = Column(Integer, ForeignKey('agent_execution_logs.id', ondelete='CASCADE'),
+                          nullable=False, index=True)
+
+    # Tool info
+    tool_name = Column(String(100), nullable=False, index=True, comment="Tool function name")
+    tool_category = Column(String(50), comment="Tool category (weather/fishing/lure/etc)")
+
+    # Execution details
+    input_args = Column(Text, comment="Tool input arguments (JSON, truncated)")
+    output_result = Column(Text, comment="Tool output (truncated to 1000 chars)")
+
+    # Performance
+    latency_ms = Column(Integer, comment="Tool execution time in milliseconds")
+    success = Column(Boolean, default=True, nullable=False, index=True)
+    error_message = Column(Text, comment="Error message if failed")
+
+    # Relationships
+    execution = relationship("AgentExecutionLog", back_populates="tool_calls")
+
+    def __repr__(self):
+        return f"<ToolCallLog(id={self.id}, tool='{self.tool_name}', latency={self.latency_ms}ms)>"
+
+    def to_dict(self):
+        """Convert to dictionary representation"""
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'execution_id': self.execution_id,
+            'tool_name': self.tool_name,
+            'tool_category': self.tool_category,
+            'input_args': self.input_args,
+            'output_result': self.output_result,
+            'latency_ms': self.latency_ms,
+            'success': self.success,
+            'error_message': self.error_message,
+        }
+
+
 class LLMLog(Base):
     """LLM API call logging"""
 
@@ -284,6 +415,8 @@ class LLMLog(Base):
         Index('ix_llm_logs_timestamp_provider', 'timestamp', 'model_provider'),
         # 按成功状态和时间统计
         Index('ix_llm_logs_success_timestamp', 'success', 'timestamp'),
+        # 按 Agent 类型统计
+        Index('ix_llm_logs_agent_type', 'agent_type'),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -297,6 +430,16 @@ class LLMLog(Base):
     success = Column(Boolean, nullable=False, index=True, comment="Whether call succeeded")
     error_message = Column(Text, comment="Error message if failed")
     cost = Column(Float, comment="Estimated cost in CNY")
+
+    # New fields for agent monitoring
+    agent_type = Column(String(50), index=True, comment="Agent type that made the call")
+    session_id = Column(Integer, index=True, comment="Session ID if applicable")
+    user_id = Column(Integer, index=True, comment="User ID if applicable")
+    execution_id = Column(Integer, ForeignKey('agent_execution_logs.id', ondelete='SET NULL'),
+                          comment="Parent execution ID")
+
+    # Relationships
+    execution = relationship("AgentExecutionLog", back_populates="llm_logs")
 
     def __repr__(self):
         return f"<LLMLog(id={self.id}, provider='{self.model_provider}', tokens={self.total_tokens})>"

@@ -20,11 +20,17 @@ import {
   CloseCircleOutlined,
   WarningOutlined,
   ClockCircleOutlined,
+  ThunderboltOutlined,
+  ToolOutlined,
+  DollarOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { monitorApi } from '@/api/services/monitor'
 import type { APIStats, LLMStats, DBPerformance, SystemHealth, RealtimeStats } from '@/types/monitor'
 import type { ColumnsType } from 'antd/es/table'
+import AgentAnalytics from './AgentAnalytics'
+import ToolAnalytics from './ToolAnalytics'
+import CostReport from './CostReport'
 
 const Monitor = () => {
   const [loading, setLoading] = useState(true)
@@ -500,6 +506,45 @@ const Monitor = () => {
               pagination={false}
             />
           </Card>
+        </Tabs.TabPane>
+
+        {/* Agent 分析 */}
+        <Tabs.TabPane
+          tab={
+            <span>
+              <ThunderboltOutlined />
+              Agent 分析
+            </span>
+          }
+          key="agent"
+        >
+          <AgentAnalytics />
+        </Tabs.TabPane>
+
+        {/* 工具分析 */}
+        <Tabs.TabPane
+          tab={
+            <span>
+              <ToolOutlined />
+              工具分析
+            </span>
+          }
+          key="tool"
+        >
+          <ToolAnalytics />
+        </Tabs.TabPane>
+
+        {/* 成本报表 */}
+        <Tabs.TabPane
+          tab={
+            <span>
+              <DollarOutlined />
+              成本报表
+            </span>
+          }
+          key="cost"
+        >
+          <CostReport />
         </Tabs.TabPane>
       </Tabs>
     </div>

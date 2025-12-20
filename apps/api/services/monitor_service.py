@@ -4,12 +4,12 @@
 
 import logging
 import time
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import func
+from sqlalchemy import func, case, text
 
 from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.system import APILog, LLMLog
+from packages.agent_fishing.tools.lure.models.system import APILog, LLMLog, AgentExecutionLog, ToolCallLog
 
 logger = logging.getLogger(__name__)
 
@@ -85,11 +85,45 @@ class MonitorService:
                 for ep in top_endpoints_raw
             ]
 
+            # 按端点统计
+            requests_by_endpoint = {}
+            for ep in top_endpoints:
+                requests_by_endpoint[ep["endpoint"]] = ep["count"]
+
+            # 按状态码统计
+            status_stats = session.query(
+                APILog.status_code,
+                func.count(APILog.id).label('count')
+            ).filter(
+                APILog.timestamp >= start_date
+            ).group_by(
+                APILog.status_code
+            ).all()
+
+            requests_by_status = {str(status): count for status, count in status_stats}
+
+            # 按日期统计
+            daily_stats = session.query(
+                func.date(APILog.timestamp).label('date'),
+                func.count(APILog.id).label('count')
+            ).filter(
+                APILog.timestamp >= start_date
+            ).group_by(
+                func.date(APILog.timestamp)
+            ).order_by('date').all()
+
+            requests_by_day = [
+                {"date": str(date), "count": count}
+                for date, count in daily_stats
+            ]
+
             return {
-                "total_calls": total_calls,
+                "total_requests": total_calls,
                 "avg_response_time": round(avg_response_time, 2),
-                "error_rate": round(error_rate, 2),
-                "top_endpoints": top_endpoints
+                "error_rate": round(error_rate, 2) / 100,  # 转换为小数
+                "requests_by_endpoint": requests_by_endpoint,
+                "requests_by_status": requests_by_status,
+                "requests_by_day": requests_by_day
             }
 
     def get_llm_stats(
@@ -149,38 +183,57 @@ class MonitorService:
             success_rate = (success_count / total_calls * 100) if total_calls > 0 else 0
 
             # 按提供商统计
-            by_provider = {}
-            providers_raw = session.query(LLMLog.model_provider).distinct().all()
+            by_provider_stats = session.query(
+                LLMLog.model_provider,
+                func.count(LLMLog.id).label('calls'),
+                func.sum(LLMLog.total_tokens).label('tokens'),
+                func.sum(LLMLog.cost).label('cost'),
+                func.avg(LLMLog.response_time).label('avg_latency')
+            ).filter(
+                LLMLog.timestamp >= start_date
+            ).group_by(
+                LLMLog.model_provider
+            ).all()
 
-            for (provider,) in providers_raw:
-                if not provider:
-                    continue
-
-                provider_logs = query.filter(LLMLog.model_provider == provider)
-
-                by_provider[provider] = {
-                    "calls": provider_logs.count(),
-                    "tokens": session.query(
-                        func.sum(LLMLog.total_tokens)
-                    ).filter(
-                        LLMLog.model_provider == provider,
-                        LLMLog.timestamp >= start_date
-                    ).scalar() or 0,
-                    "cost": session.query(
-                        func.sum(LLMLog.cost)
-                    ).filter(
-                        LLMLog.model_provider == provider,
-                        LLMLog.timestamp >= start_date
-                    ).scalar() or 0
+            by_provider = [
+                {
+                    "provider": provider,
+                    "calls": calls,
+                    "tokens": int(tokens or 0),
+                    "cost": round(float(cost or 0), 4),
+                    "avg_latency": round(float(avg_latency or 0), 2)
                 }
+                for provider, calls, tokens, cost, avg_latency in by_provider_stats
+                if provider
+            ]
+
+            # 按日期统计
+            daily_stats = session.query(
+                func.date(LLMLog.timestamp).label('date'),
+                func.count(LLMLog.id).label('calls'),
+                func.sum(LLMLog.total_tokens).label('tokens')
+            ).filter(
+                LLMLog.timestamp >= start_date
+            ).group_by(
+                func.date(LLMLog.timestamp)
+            ).order_by('date').all()
+
+            by_day = [
+                {
+                    "date": str(date),
+                    "calls": calls,
+                    "tokens": int(tokens or 0)
+                }
+                for date, calls, tokens in daily_stats
+            ]
 
             return {
                 "total_calls": total_calls,
                 "total_tokens": int(total_tokens),
-                "total_cost": round(float(total_cost), 2),
-                "avg_response_time": round(avg_response_time, 2),
-                "success_rate": round(success_rate, 2),
-                "by_provider": by_provider
+                "total_cost": round(float(total_cost), 4),
+                "success_rate": round(success_rate, 2) / 100,  # 转换为小数
+                "by_provider": by_provider,
+                "by_day": by_day
             }
 
     def get_db_performance(self) -> Dict:
@@ -202,16 +255,17 @@ class MonitorService:
 
         return {
             "avg_query_time": 25.5,  # 模拟：平均查询时间 25.5ms
-            "slow_queries_count": 3,  # 模拟：3个慢查询
+            "slow_queries": 3,  # 模拟：3个慢查询
             "connection_pool_size": 10,
             "active_connections": 2,
-            "table_sizes": {
-                "equipment": 150,  # MB
-                "users": 80,
-                "fishing_logs": 120,
-                "crawler_tasks": 45,
-                "api_logs": 200
-            }
+            "table_sizes": [
+                {"table": "equipment", "size_mb": 150, "row_count": 5000},
+                {"table": "brands", "size_mb": 2, "row_count": 50},
+                {"table": "users", "size_mb": 80, "row_count": 1200},
+                {"table": "fishing_logs", "size_mb": 120, "row_count": 8000},
+                {"table": "crawler_tasks", "size_mb": 45, "row_count": 300},
+                {"table": "api_logs", "size_mb": 200, "row_count": 15000}
+            ]
         }
 
     def check_system_health(self) -> Dict:
@@ -293,4 +347,339 @@ class MonitorService:
                 "api_errors_per_minute": api_errors,
                 "llm_calls_per_minute": llm_calls,
                 "llm_tokens_per_minute": int(llm_tokens)
+            }
+
+    # ========== Agent 监控方法 ==========
+
+    def get_agent_stats(
+        self,
+        agent_type: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> Dict:
+        """
+        获取 Agent 执行统计
+
+        Args:
+            agent_type: 过滤特定 Agent 类型
+            start_date: 开始日期（YYYY-MM-DD）
+            end_date: 结束日期（YYYY-MM-DD）
+
+        Returns:
+            dict: Agent 统计数据
+        """
+        with get_db_session() as session:
+            query = session.query(AgentExecutionLog)
+
+            # 默认统计最近7天
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+            query = query.filter(AgentExecutionLog.timestamp >= start_date)
+            if end_date:
+                query = query.filter(AgentExecutionLog.timestamp <= end_date)
+            if agent_type:
+                query = query.filter(AgentExecutionLog.agent_type == agent_type)
+
+            # 按 Agent 类型聚合
+            stats = session.query(
+                AgentExecutionLog.agent_type,
+                func.count(AgentExecutionLog.id).label('total_executions'),
+                func.avg(AgentExecutionLog.latency_ms).label('avg_latency'),
+                func.sum(AgentExecutionLog.total_tokens).label('total_tokens'),
+                func.sum(AgentExecutionLog.estimated_cost).label('total_cost'),
+                func.sum(case((AgentExecutionLog.success == True, 1), else_=0)).label('success_count'),
+            ).filter(
+                AgentExecutionLog.timestamp >= start_date
+            )
+
+            if end_date:
+                stats = stats.filter(AgentExecutionLog.timestamp <= end_date)
+            if agent_type:
+                stats = stats.filter(AgentExecutionLog.agent_type == agent_type)
+
+            stats = stats.group_by(AgentExecutionLog.agent_type).all()
+
+            agents = []
+            total_executions = 0
+            total_tokens = 0
+            total_cost = 0.0
+
+            for row in stats:
+                exec_count = row.total_executions or 0
+                success_rate = (row.success_count / exec_count * 100) if exec_count > 0 else 0
+                tokens = row.total_tokens or 0
+                cost = row.total_cost or 0
+
+                agents.append({
+                    "agent_type": row.agent_type,
+                    "total_executions": exec_count,
+                    "success_rate": round(success_rate, 2),
+                    "avg_latency_ms": round(row.avg_latency, 2) if row.avg_latency else 0,
+                    "total_tokens": int(tokens),
+                    "total_cost": round(float(cost), 4),
+                })
+
+                total_executions += exec_count
+                total_tokens += tokens
+                total_cost += cost
+
+            return {
+                "agents": agents,
+                "total_executions": total_executions,
+                "total_tokens": int(total_tokens),
+                "total_cost": round(total_cost, 4)
+            }
+
+    def get_tool_stats(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> Dict:
+        """
+        获取工具使用统计
+
+        Args:
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            dict: 工具统计数据
+        """
+        with get_db_session() as session:
+            # 默认统计最近7天
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+            # 按工具聚合
+            by_tool = session.query(
+                ToolCallLog.tool_name,
+                ToolCallLog.tool_category,
+                func.count(ToolCallLog.id).label('call_count'),
+                func.avg(ToolCallLog.latency_ms).label('avg_latency'),
+                func.sum(case((ToolCallLog.success == True, 1), else_=0)).label('success_count'),
+            ).filter(
+                ToolCallLog.timestamp >= start_date
+            )
+
+            if end_date:
+                by_tool = by_tool.filter(ToolCallLog.timestamp <= end_date)
+
+            by_tool = by_tool.group_by(
+                ToolCallLog.tool_name, ToolCallLog.tool_category
+            ).order_by(
+                func.count(ToolCallLog.id).desc()
+            ).all()
+
+            tools = []
+            for row in by_tool:
+                call_count = row.call_count or 0
+                success_rate = (row.success_count / call_count * 100) if call_count > 0 else 0
+
+                tools.append({
+                    "tool_name": row.tool_name,
+                    "category": row.tool_category or "other",
+                    "call_count": call_count,
+                    "success_rate": round(success_rate, 2),
+                    "avg_latency_ms": round(row.avg_latency, 2) if row.avg_latency else 0,
+                })
+
+            # 按类别统计
+            by_category_query = session.query(
+                ToolCallLog.tool_category,
+                func.count(ToolCallLog.id).label('count'),
+            ).filter(
+                ToolCallLog.timestamp >= start_date
+            )
+
+            if end_date:
+                by_category_query = by_category_query.filter(ToolCallLog.timestamp <= end_date)
+
+            by_category_result = by_category_query.group_by(ToolCallLog.tool_category).all()
+
+            by_category = {
+                (row.tool_category or "other"): row.count
+                for row in by_category_result
+            }
+
+            return {
+                "tools": tools,
+                "by_category": by_category,
+            }
+
+    def get_latency_percentiles(
+        self,
+        agent_type: Optional[str] = None,
+        start_date: Optional[str] = None
+    ) -> Dict:
+        """
+        获取延时百分位数据 (P50/P90/P99)
+
+        Args:
+            agent_type: 过滤特定 Agent 类型
+            start_date: 开始日期
+
+        Returns:
+            dict: 延时百分位数据
+        """
+        with get_db_session() as session:
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+            query = session.query(AgentExecutionLog.latency_ms).filter(
+                AgentExecutionLog.latency_ms.isnot(None),
+                AgentExecutionLog.timestamp >= start_date
+            )
+
+            if agent_type:
+                query = query.filter(AgentExecutionLog.agent_type == agent_type)
+
+            latencies = sorted([r[0] for r in query.all() if r[0] is not None])
+
+            if not latencies:
+                return {"p50": 0, "p90": 0, "p99": 0, "min": 0, "max": 0}
+
+            def percentile(data: List[int], p: int) -> int:
+                idx = int(len(data) * p / 100)
+                return data[min(idx, len(data) - 1)]
+
+            return {
+                "p50": percentile(latencies, 50),
+                "p90": percentile(latencies, 90),
+                "p99": percentile(latencies, 99),
+                "min": latencies[0],
+                "max": latencies[-1],
+            }
+
+    def get_cost_report(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        group_by: str = "day"
+    ) -> Dict:
+        """
+        获取成本报表
+
+        Args:
+            start_date: 开始日期
+            end_date: 结束日期
+            group_by: 分组方式 (day/week/month)
+
+        Returns:
+            dict: 成本报表数据
+        """
+        with get_db_session() as session:
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+            query = session.query(AgentExecutionLog).filter(
+                AgentExecutionLog.timestamp >= start_date
+            )
+
+            if end_date:
+                query = query.filter(AgentExecutionLog.timestamp <= end_date)
+
+            # 获取所有记录并在 Python 中处理（避免数据库特定 SQL）
+            records = query.all()
+
+            # 按日期和 Agent 类型分组
+            daily_stats = {}
+            by_agent = {}
+
+            for record in records:
+                date_str = record.timestamp.strftime('%Y-%m-%d')
+                agent = record.agent_type
+
+                key = (date_str, agent)
+                if key not in daily_stats:
+                    daily_stats[key] = {
+                        "date": date_str,
+                        "agent_type": agent,
+                        "total_cost": 0,
+                        "total_tokens": 0,
+                        "executions": 0
+                    }
+
+                daily_stats[key]["total_cost"] += record.estimated_cost or 0
+                daily_stats[key]["total_tokens"] += record.total_tokens or 0
+                daily_stats[key]["executions"] += 1
+
+                by_agent[agent] = by_agent.get(agent, 0) + (record.estimated_cost or 0)
+
+            items = list(daily_stats.values())
+            items.sort(key=lambda x: (x["date"], x["agent_type"]))
+
+            total_cost = sum(item["total_cost"] for item in items)
+
+            return {
+                "items": items,
+                "total_cost": round(total_cost, 4),
+                "by_agent": {k: round(v, 4) for k, v in by_agent.items()}
+            }
+
+    def get_agent_trends(
+        self,
+        agent_type: Optional[str] = None,
+        days: int = 7
+    ) -> Dict:
+        """
+        获取 Agent 趋势数据
+
+        Args:
+            agent_type: 过滤特定 Agent 类型
+            days: 统计天数
+
+        Returns:
+            dict: 趋势数据
+        """
+        with get_db_session() as session:
+            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+
+            query = session.query(AgentExecutionLog).filter(
+                AgentExecutionLog.timestamp >= start_date
+            )
+
+            if agent_type:
+                query = query.filter(AgentExecutionLog.agent_type == agent_type)
+
+            records = query.all()
+
+            # 按日期分组
+            daily_stats = {}
+
+            for record in records:
+                date_str = record.timestamp.strftime('%Y-%m-%d')
+
+                if date_str not in daily_stats:
+                    daily_stats[date_str] = {
+                        "date": date_str,
+                        "executions": 0,
+                        "tokens": 0,
+                        "cost": 0,
+                        "success_count": 0
+                    }
+
+                daily_stats[date_str]["executions"] += 1
+                daily_stats[date_str]["tokens"] += record.total_tokens or 0
+                daily_stats[date_str]["cost"] += record.estimated_cost or 0
+                if record.success:
+                    daily_stats[date_str]["success_count"] += 1
+
+            # 计算成功率并格式化
+            trends = []
+            for date_str in sorted(daily_stats.keys()):
+                stats = daily_stats[date_str]
+                success_rate = (stats["success_count"] / stats["executions"] * 100) if stats["executions"] > 0 else 0
+
+                trends.append({
+                    "date": date_str,
+                    "executions": stats["executions"],
+                    "tokens": stats["tokens"],
+                    "cost": round(stats["cost"], 4),
+                    "success_rate": round(success_rate, 2)
+                })
+
+            return {
+                "agent_type": agent_type,
+                "trends": trends
             }

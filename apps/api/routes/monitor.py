@@ -12,7 +12,12 @@ from apps.api.schemas.monitor import (
     APIStatsResponse,
     LLMStatsResponse,
     DBPerformanceResponse,
-    SystemHealthResponse
+    SystemHealthResponse,
+    AgentStatsResponse,
+    ToolStatsResponse,
+    LatencyPercentilesResponse,
+    CostReportResponse,
+    AgentTrendsResponse
 )
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
@@ -200,3 +205,191 @@ async def websocket_realtime_stats(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+# ========== Agent 监控端点 ==========
+
+@router.get(
+    "/agent-stats",
+    response_model=AgentStatsResponse,
+    summary="Agent 执行统计",
+    description="获取各 Agent 的执行统计（执行次数、Token、成本、成功率等）"
+)
+async def get_agent_stats(
+    agent_type: Optional[str] = Query(None, description="过滤特定 Agent 类型"),
+    start_date: Optional[str] = Query(None, description="开始日期（YYYY-MM-DD）"),
+    end_date: Optional[str] = Query(None, description="结束日期（YYYY-MM-DD）"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    获取 Agent 执行统计
+
+    Args:
+        agent_type: 过滤特定 Agent 类型 (fishing/equipment_import)
+        start_date: 开始日期（默认最近7天）
+        end_date: 结束日期（默认今天）
+
+    Returns:
+        AgentStatsResponse: Agent 统计数据
+    """
+    try:
+        monitor_service = MonitorService()
+
+        stats = monitor_service.get_agent_stats(
+            agent_type=agent_type,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        return AgentStatsResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"获取 Agent 统计失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/tool-stats",
+    response_model=ToolStatsResponse,
+    summary="工具使用统计",
+    description="获取工具调用统计（调用次数、成功率、延时等）"
+)
+async def get_tool_stats(
+    start_date: Optional[str] = Query(None, description="开始日期（YYYY-MM-DD）"),
+    end_date: Optional[str] = Query(None, description="结束日期（YYYY-MM-DD）"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    获取工具使用统计
+
+    Args:
+        start_date: 开始日期（默认最近7天）
+        end_date: 结束日期（默认今天）
+
+    Returns:
+        ToolStatsResponse: 工具统计数据
+    """
+    try:
+        monitor_service = MonitorService()
+
+        stats = monitor_service.get_tool_stats(
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        return ToolStatsResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"获取工具统计失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/latency-percentiles",
+    response_model=LatencyPercentilesResponse,
+    summary="延时百分位",
+    description="获取 Agent 执行延时百分位数据（P50/P90/P99）"
+)
+async def get_latency_percentiles(
+    agent_type: Optional[str] = Query(None, description="过滤特定 Agent 类型"),
+    start_date: Optional[str] = Query(None, description="开始日期（YYYY-MM-DD）"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    获取延时百分位数据
+
+    Args:
+        agent_type: 过滤特定 Agent 类型
+        start_date: 开始日期（默认最近7天）
+
+    Returns:
+        LatencyPercentilesResponse: 延时百分位数据
+    """
+    try:
+        monitor_service = MonitorService()
+
+        stats = monitor_service.get_latency_percentiles(
+            agent_type=agent_type,
+            start_date=start_date
+        )
+
+        return LatencyPercentilesResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"获取延时百分位失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/cost-report",
+    response_model=CostReportResponse,
+    summary="成本报表",
+    description="获取 Agent 成本报表（按日/Agent 类型分组）"
+)
+async def get_cost_report(
+    start_date: Optional[str] = Query(None, description="开始日期（YYYY-MM-DD）"),
+    end_date: Optional[str] = Query(None, description="结束日期（YYYY-MM-DD）"),
+    group_by: str = Query("day", description="分组方式 (day/week/month)"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    获取成本报表
+
+    Args:
+        start_date: 开始日期（默认最近30天）
+        end_date: 结束日期（默认今天）
+        group_by: 分组方式
+
+    Returns:
+        CostReportResponse: 成本报表数据
+    """
+    try:
+        monitor_service = MonitorService()
+
+        stats = monitor_service.get_cost_report(
+            start_date=start_date,
+            end_date=end_date,
+            group_by=group_by
+        )
+
+        return CostReportResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"获取成本报表失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/agent-trends",
+    response_model=AgentTrendsResponse,
+    summary="Agent 趋势",
+    description="获取 Agent 执行趋势数据（按日统计）"
+)
+async def get_agent_trends(
+    agent_type: Optional[str] = Query(None, description="过滤特定 Agent 类型"),
+    days: int = Query(7, description="统计天数", ge=1, le=90),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    获取 Agent 趋势数据
+
+    Args:
+        agent_type: 过滤特定 Agent 类型
+        days: 统计天数（默认7天）
+
+    Returns:
+        AgentTrendsResponse: 趋势数据
+    """
+    try:
+        monitor_service = MonitorService()
+
+        stats = monitor_service.get_agent_trends(
+            agent_type=agent_type,
+            days=days
+        )
+
+        return AgentTrendsResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"获取 Agent 趋势失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
