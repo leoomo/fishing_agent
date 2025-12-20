@@ -4,12 +4,13 @@
 
 import logging
 import time
+import os
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import func, case, text
 
 from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.system import APILog, LLMLog, AgentExecutionLog, ToolCallLog
+from packages.agent_fishing.tools.lure.models.system import APILog, LLMLog, AgentExecutionLog, ToolCallLog, SystemConfig
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,66 @@ class MonitorService:
 
     def __init__(self):
         """初始化监控服务"""
-        self.start_time = time.time()
+        self.start_time = self._get_persistent_start_time()
+
+    def _get_persistent_start_time(self) -> float:
+        """获取持久化的系统启动时间"""
+        try:
+            with get_db_session() as session:
+                # 尝试从数据库获取启动时间
+                config = session.query(SystemConfig).filter(
+                    SystemConfig.config_key == "system_start_time"
+                ).first()
+
+                if config and config.config_value:
+                    # 解析存储的时间戳
+                    start_time = float(config.config_value)
+                    # 验证时间戳是否合理（不能是未来时间，不能太旧）
+                    current_time = time.time()
+                    if start_time < current_time and current_time - start_time < 365 * 24 * 3600:  # 不超过一年
+                        return start_time
+                    else:
+                        # 时间戳无效，重新设置
+                        return self._set_start_time_in_db()
+                else:
+                    # 没有启动时间记录，设置新的
+                    return self._set_start_time_in_db()
+        except Exception as e:
+            logger.error(f"获取启动时间失败: {e}")
+            # 出错时使用当前时间
+            return time.time()
+
+    def _set_start_time_in_db(self) -> float:
+        """在数据库中设置启动时间"""
+        try:
+            current_time = time.time()
+            with get_db_session() as session:
+                # 检查是否已存在
+                config = session.query(SystemConfig).filter(
+                    SystemConfig.config_key == "system_start_time"
+                ).first()
+
+                if config:
+                    # 更新现有记录
+                    config.config_value = str(current_time)
+                    config.updated_at = datetime.utcnow()
+                else:
+                    # 创建新记录
+                    config = SystemConfig(
+                        config_key="system_start_time",
+                        config_value=str(current_time),
+                        config_type="system",
+                        description="系统启动时间戳",
+                        is_encrypted=False
+                    )
+                    session.add(config)
+
+                session.commit()
+                logger.info("系统启动时间已记录到数据库")
+                return current_time
+        except Exception as e:
+            logger.error(f"设置启动时间失败: {e}")
+            return time.time()
 
     def get_api_stats(
         self,

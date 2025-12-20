@@ -39,8 +39,10 @@ const Monitor = () => {
   const [dbPerformance, setDbPerformance] = useState<DBPerformance | null>(null)
   const [health, setHealth] = useState<SystemHealth | null>(null)
   const [realtimeStats, setRealtimeStats] = useState<RealtimeStats | null>(null)
+  const [currentUptime, setCurrentUptime] = useState<number>(0)
 
   const wsRef = useRef<WebSocket | null>(null)
+  const uptimeTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     fetchAllData()
@@ -50,8 +52,29 @@ const Monitor = () => {
       if (wsRef.current) {
         wsRef.current.close()
       }
+      if (uptimeTimerRef.current) {
+        clearInterval(uptimeTimerRef.current)
+      }
     }
   }, [])
+
+  // 更新运行时间
+  useEffect(() => {
+    if (health?.uptime_seconds) {
+      setCurrentUptime(health.uptime_seconds)
+
+      // 启动定时器，每秒更新一次
+      uptimeTimerRef.current = setInterval(() => {
+        setCurrentUptime(prev => prev + 1)
+      }, 1000)
+    }
+
+    return () => {
+      if (uptimeTimerRef.current) {
+        clearInterval(uptimeTimerRef.current)
+      }
+    }
+  }, [health?.uptime_seconds])
 
   const fetchAllData = async () => {
     setLoading(true)
@@ -114,6 +137,35 @@ const Monitor = () => {
       default:
         return 'default'
     }
+  }
+
+  // 格式化运行时间
+  const formatUptime = (seconds: number) => {
+    const days = Math.floor(seconds / 86400)  // 86400 = 24 * 60 * 60
+    const hours = Math.floor((seconds % 86400) / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = Math.floor(seconds % 60)
+
+    const parts = []
+
+    if (days > 0) {
+      parts.push(`${days}天`)
+    }
+
+    if (hours > 0) {
+      parts.push(`${hours}小时`)
+    }
+
+    if (minutes > 0) {
+      parts.push(`${minutes}分钟`)
+    }
+
+    // 只有当所有单位都是0或者至少有其他单位时才显示秒数
+    if ((secs > 0 && parts.length > 0) || parts.length === 0) {
+      parts.push(`${secs}秒`)
+    }
+
+    return parts.length > 0 ? parts.join('') : '0秒'
   }
 
   // API 请求趋势图
@@ -269,8 +321,8 @@ const Monitor = () => {
           <Col span={6}>
             <Statistic
               title="运行时间"
-              value={health ? Math.floor(health.uptime_seconds / 3600) : 0}
-              suffix="小时"
+              value={currentUptime > 0 ? formatUptime(currentUptime) : '0小时'}
+              valueStyle={{ fontSize: 16 }}
             />
           </Col>
         </Row>
