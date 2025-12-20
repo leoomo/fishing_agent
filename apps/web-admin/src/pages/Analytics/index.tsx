@@ -110,14 +110,14 @@ const Analytics = () => {
     tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
-      data: trends.map((t) => t.month),
+      data: trends.map((t) => t.date),
     },
     yAxis: { type: 'value' },
     series: [
       {
         name: '装备数量',
         type: 'line',
-        data: trends.map((t) => t.count),
+        data: trends.map((t) => t.total_count),
         smooth: true,
         areaStyle: { opacity: 0.3 },
       },
