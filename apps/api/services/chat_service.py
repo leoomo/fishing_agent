@@ -251,7 +251,9 @@ class ChatService:
                 if role == "user" and chat_session.title == "新对话":
                     chat_session.title = self._generate_title(content)
 
-            return message.to_dict()
+            # Convert to dict before the session closes
+            result = message.to_dict()
+            return result
 
     def get_messages(self, session_id: int, limit: int = 100, offset: int = 0) -> Dict:
         """

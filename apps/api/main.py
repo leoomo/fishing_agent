@@ -140,6 +140,13 @@ async def lifespan(app: FastAPI):
         from packages.scraper.scheduler.workflow_scheduler import WorkflowScheduler
         from packages.scraper.executor.task_queue import configure_database
         from packages.agent_fishing.tools.lure.database import get_db
+        from packages.agent_fishing.tools.lure.orm.session import init_db
+        from packages.agent_fishing.tools.lure.models.base import Base
+
+        # 初始化数据库并创建表
+        logger.info("初始化数据库...")
+        init_db(create_tables=True)
+        logger.info("数据库表创建完成")
 
         # 配置 scraper 包的数据库连接（依赖注入）
         configure_database(get_db)
