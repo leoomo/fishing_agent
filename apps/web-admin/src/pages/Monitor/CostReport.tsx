@@ -224,11 +224,12 @@ const CostReport = () => {
       }
     : {}
 
-  // 日均成本统计
-  const uniqueDays = costReport ? new Set(costReport.items.map((i) => i.date)).size : 1
-  const dailyAvgCost = costReport ? costReport.total_cost / uniqueDays : 0
+  // 日均成本统计 - 修复NaN问题
+  const uniqueDays = costReport && costReport.items.length > 0 ? new Set(costReport.items.map((i) => i.date)).size : 1
+  const totalCost = costReport?.total_cost || 0
+  const dailyAvgCost = uniqueDays > 0 ? totalCost / uniqueDays : 0
   const totalTokens = costReport?.items.reduce((sum, i) => sum + i.total_tokens, 0) || 0
-  const avgCostPerToken = totalTokens > 0 && costReport ? costReport.total_cost / totalTokens : 0
+  const avgCostPerToken = totalTokens > 0 && totalCost > 0 ? totalCost / totalTokens : 0
 
   if (loading && !costReport) {
     return (
@@ -285,10 +286,11 @@ const CostReport = () => {
           <Card>
             <Statistic
               title="日均成本"
-              value={dailyAvgCost}
+              value={isNaN(dailyAvgCost) ? 0 : dailyAvgCost}
               precision={4}
               prefix={<RiseOutlined />}
               suffix="CNY"
+              valueStyle={{ color: '#52c41a' }}
             />
           </Card>
         </Col>
@@ -305,7 +307,7 @@ const CostReport = () => {
           <Card>
             <Statistic
               title="每千 Token 成本"
-              value={avgCostPerToken * 1000}
+              value={isNaN(avgCostPerToken * 1000) ? 0 : avgCostPerToken * 1000}
               precision={4}
               prefix={<PieChartOutlined />}
               suffix="CNY"
