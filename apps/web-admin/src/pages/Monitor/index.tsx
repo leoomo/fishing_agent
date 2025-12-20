@@ -256,14 +256,14 @@ const Monitor = () => {
             <Statistic
               title="API 状态"
               value={health?.api_status || '-'}
-              valueStyle={{ color: health?.api_status === 'ok' ? '#52c41a' : '#ff4d4f' }}
+              valueStyle={{ color: health?.api_status === 'healthy' ? '#52c41a' : '#ff4d4f' }}
             />
           </Col>
           <Col span={6}>
             <Statistic
               title="数据库状态"
               value={health?.db_status || '-'}
-              valueStyle={{ color: health?.db_status === 'ok' ? '#52c41a' : '#ff4d4f' }}
+              valueStyle={{ color: health?.db_status === 'healthy' ? '#52c41a' : '#ff4d4f' }}
             />
           </Col>
           <Col span={6}>
