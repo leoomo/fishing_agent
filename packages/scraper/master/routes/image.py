@@ -43,12 +43,17 @@ def compute_url_hash(url: str) -> str:
 
 
 def is_duplicate_image(storage_path: Path, url_hash: str) -> Optional[Path]:
-    """检查图片是否已存在（基于URL哈希）"""
-    # 检查所有可能的扩展名
+    """
+    检查图片是否已存在（基于URL哈希）
+
+    递归搜索所有子目录，因为图片按日期/任务ID存储
+    """
+    # 递归搜索所有子目录中的匹配文件
     for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-        existing = storage_path / f"{url_hash}{ext}"
-        if existing.exists():
-            return existing
+        # 使用glob递归查找
+        matches = list(storage_path.glob(f"**/{url_hash}{ext}"))
+        if matches:
+            return matches[0]
     return None
 
 

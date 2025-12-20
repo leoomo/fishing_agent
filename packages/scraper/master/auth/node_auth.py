@@ -211,3 +211,32 @@ async def get_current_node_optional(
         return await get_current_node(credentials, db)
     except HTTPException:
         return None
+
+
+async def require_authenticated(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> NodeTokenPayload:
+    """
+    Require valid authentication for admin endpoints
+
+    验证Token有效性，用于管理端点的认证
+    不需要特定节点，只需要有效的Token即可
+
+    Returns:
+        NodeTokenPayload if authenticated
+
+    Raises:
+        HTTPException: If authentication fails
+    """
+    token = credentials.credentials
+
+    # Verify token
+    payload = verify_node_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return payload

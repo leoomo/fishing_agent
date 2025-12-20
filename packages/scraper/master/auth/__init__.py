@@ -10,6 +10,8 @@ from .node_auth import (
     hash_node_secret,
     verify_node_secret,
     get_current_node,
+    get_current_node_optional,
+    require_authenticated,
     NodeTokenPayload,
 )
 
@@ -19,5 +21,7 @@ __all__ = [
     "hash_node_secret",
     "verify_node_secret",
     "get_current_node",
+    "get_current_node_optional",
+    "require_authenticated",
     "NodeTokenPayload",
 ]

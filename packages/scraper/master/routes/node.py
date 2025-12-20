@@ -29,6 +29,8 @@ from ..auth.node_auth import (
     hash_node_secret,
     verify_node_secret,
     get_current_node,
+    require_authenticated,
+    NodeTokenPayload,
 )
 
 logger = logging.getLogger(__name__)
@@ -225,6 +227,7 @@ async def list_nodes(
     status: Optional[str] = None,
     capability: Optional[str] = None,
     db: Session = Depends(get_db_session),
+    _: NodeTokenPayload = Depends(require_authenticated),
 ):
     """
     获取节点列表
@@ -277,6 +280,7 @@ async def list_nodes(
 async def get_node(
     node_id: str,
     db: Session = Depends(get_db_session),
+    _: NodeTokenPayload = Depends(require_authenticated),
 ):
     """
     获取节点详情
@@ -320,6 +324,7 @@ async def update_node(
     node_id: str,
     request: NodeUpdateRequest,
     db: Session = Depends(get_db_session),
+    _: NodeTokenPayload = Depends(require_authenticated),
 ):
     """
     更新节点配置
@@ -381,6 +386,7 @@ async def update_node(
 async def delete_node(
     node_id: str,
     db: Session = Depends(get_db_session),
+    _: NodeTokenPayload = Depends(require_authenticated),
 ):
     """
     删除节点
@@ -419,6 +425,7 @@ async def delete_node(
 async def drain_node(
     node_id: str,
     db: Session = Depends(get_db_session),
+    _: NodeTokenPayload = Depends(require_authenticated),
 ):
     """
     排空节点

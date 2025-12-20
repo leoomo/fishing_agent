@@ -357,8 +357,11 @@ class CrawlerWorker:
                 if self.platform_registry:
                     result = self._execute_with_platform(task_id, task_data, config, tmp_path)
                 else:
-                    # 模拟执行（用于测试）
-                    result = self._execute_mock(task_id, task_data, config)
+                    # 平台注册器不可用时，拒绝执行并报告错误
+                    raise RuntimeError(
+                        "Platform registry not available - cannot execute task. "
+                        "Please ensure the platform module is properly installed."
+                    )
 
                 # 上报完成
                 self.client.complete_task(
@@ -485,35 +488,6 @@ class CrawlerWorker:
             'summary': {'platform': platform.name},
             'data': result.items,
             'image_stats': image_stats,
-        }
-
-    def _execute_mock(self, task_id: int, task_data: Dict, config: Dict) -> Dict:
-        """
-        模拟执行（用于测试）
-
-        Args:
-            task_id: 任务ID
-            task_data: 任务数据
-            config: 任务配置
-
-        Returns:
-            模拟结果
-        """
-        logger.info(f"Mock executing task {task_id}")
-
-        # 模拟执行过程
-        for i in range(5):
-            self.client.report_progress(task_id, (i + 1) * 20, f"Step {i + 1}/5")
-            time.sleep(1)
-
-        return {
-            'success_items': 10,
-            'failed_items': 0,
-            'total_items': 10,
-            'duplicate_items': 0,
-            'summary': {'mode': 'mock'},
-            'data': [{'id': j, 'name': f'Item {j}'} for j in range(10)],
-            'image_stats': {'downloaded': 0, 'uploaded': 0, 'duplicates': 0, 'errors': 0},
         }
 
     def _download_image(self, url: str, save_dir: Path) -> Optional[Path]:
