@@ -8,7 +8,8 @@ from packages.agent_fishing.tools.lure.orm.session import get_db_session
 from packages.agent_fishing.tools.lure.models.equipment import Equipment
 from packages.agent_fishing.tools.lure.models.brand import Brand
 from packages.agent_fishing.tools.lure.models.user import User, UserEquipment
-from packages.agent_fishing.tools.lure.models.system import AnalyticsReport, APILog, AdminUser
+from packages.agent_fishing.tools.lure.models.system import AnalyticsReport, APILog
+from packages.agent_fishing.tools.lure.models.admin_user import AdminUser
 
 logger = logging.getLogger(__name__)
 
