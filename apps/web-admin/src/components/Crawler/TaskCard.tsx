@@ -41,8 +41,10 @@ import {
   showTaskDetail,
   deleteTask,
   retryTask,
+  updateTask,
 } from '../../store/slices/crawlerSlice'
 import LoginInteraction from './LoginInteraction'
+import TaskEdit from './TaskEdit'
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
@@ -99,6 +101,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
 }) => {
   const dispatch = useDispatch<AppDispatch>()
   const [loginModalVisible, setLoginModalVisible] = useState(false)
+  const [editModalVisible, setEditModalVisible] = useState(false)
 
   const statusConfigItem = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.pending
 
@@ -141,10 +144,24 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   // 编辑任务
   const handleEdit = useCallback(() => {
-    // TODO: 实现编辑任务功能
     console.log('Edit task:', task.task_id, task.task_name)
-    message.info('编辑功能开发中...')
+    setEditModalVisible(true)
   }, [task.task_id, task.task_name])
+
+  // 保存编辑的任务
+  const handleSaveEdit = useCallback(async (taskData: Partial<CrawlerTask>) => {
+    try {
+      await dispatch(updateTask({ taskId: task.task_id, taskData })).unwrap()
+    } catch (error) {
+      console.error('更新任务失败:', error)
+      throw error // 重新抛出错误让TaskEdit组件处理
+    }
+  }, [dispatch, task.task_id])
+
+  // 关闭编辑弹窗
+  const handleCloseEdit = useCallback(() => {
+    setEditModalVisible(false)
+  }, [])
 
   // 处理菜单项点击
   const handleMenuClick = useCallback((key: string) => {
@@ -409,6 +426,15 @@ const TaskCard: React.FC<TaskCardProps> = ({
           }}
         />
       </Modal>
+
+      {/* 编辑任务弹窗 */}
+      <TaskEdit
+        visible={editModalVisible}
+        task={task}
+        onClose={handleCloseEdit}
+        onSave={handleSaveEdit}
+        loading={false}
+      />
     </>
   )
 }

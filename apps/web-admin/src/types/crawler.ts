@@ -22,6 +22,15 @@ export interface CrawlerTask {
   tags?: string[]
   retry_count?: number
   max_retries?: number
+
+  // 新增编辑相关属性
+  description?: string
+  max_pages?: number
+  delay_range?: [number, number]
+  timeout?: number
+  extract_images?: boolean
+  use_proxy?: boolean
+  random_ua?: boolean
 }
 
 export interface CrawlerTaskListResponse {

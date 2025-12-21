@@ -4,6 +4,7 @@
 
 from fastapi import APIRouter, HTTPException, Query, Depends, WebSocket, WebSocketDisconnect, status
 import asyncio
+import json
 import logging
 from typing import Optional, List
 from datetime import datetime, timedelta
@@ -147,6 +148,84 @@ async def get_task(
     except Exception as e:
         logger.error(f"获取任务详情失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.put(
+    "/tasks/{task_id}",
+    response_model=CrawlerTaskResponse,
+    summary="更新爬虫任务",
+    description="更新指定爬虫任务的信息"
+)
+async def update_task(
+    task_id: int,
+    task_update: dict,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """
+    更新爬虫任务
+
+    Args:
+        task_id: 任务ID
+        task_update: 更新数据
+
+    Returns:
+        CrawlerTaskResponse: 更新后的任务信息
+
+    Raises:
+        HTTPException: 任务不存在或更新失败
+    """
+    try:
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+
+            if not task:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"任务不存在: task_id={task_id}"
+                )
+
+            # 检查任务状态是否允许更新
+            if task.status == TaskStatus.RUNNING:
+                raise HTTPException(
+                    status_code=400,
+                    detail="运行中的任务不能更新"
+                )
+
+            # 更新允许的字段
+            allowed_fields = [
+                'task_name', 'priority', 'description', 'max_pages',
+                'delay_range', 'timeout', 'retry_count', 'extract_images',
+                'use_proxy', 'random_ua', 'config'
+            ]
+
+            updated = False
+            for field, value in task_update.items():
+                if field in allowed_fields and hasattr(task, field):
+                    if field == 'config' and value:
+                        # config字段需要JSON序列化
+                        task.config = json.dumps(value, ensure_ascii=False)
+                    else:
+                        setattr(task, field, value)
+                    updated = True
+
+            if not updated:
+                raise HTTPException(
+                    status_code=400,
+                    detail="没有有效的更新字段"
+                )
+
+            task.updated_at = datetime.now()
+            session.commit()
+
+            logger.info(f"任务更新成功: task_id={task_id}")
+            return _build_task_response(task)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")
 
 
 @router.post(
