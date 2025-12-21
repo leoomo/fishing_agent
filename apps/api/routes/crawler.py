@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from packages.scraper.database import get_crawler_db
 from packages.scraper.models import CrawlerTask, TaskStatus
+from packages.agent_fishing.tools.lure.orm.repositories.crawler_repo import CrawlerRepository
 
 from apps.api.schemas.crawler import (
     CrawlerTaskCreate,
@@ -296,7 +297,7 @@ async def retry_task(
         HTTPException: 任务不存在或状态不是 failed
     """
     try:
-        with get_db_session() as session:
+        with get_crawler_db().get_session() as session:
             repo = CrawlerRepository(session)
             task = repo.get(task_id)
 
@@ -351,17 +352,17 @@ async def start_task(
         HTTPException: 任务不存在或状态不允许启动
     """
     try:
-        with get_db_session() as session:
+        with get_crawler_db().get_session() as session:
             repo = CrawlerRepository(session)
             task = repo.get(task_id)
 
             if not task:
                 raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
 
-            if task.status not in [TaskStatus.PENDING, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+            if task.status not in [TaskStatus.PENDING, TaskStatus.FAILED]:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"只能启动等待、失败或已取消的任务，当前状态: {task.status}"
+                    detail=f"只能启动等待或失败的任务，当前状态: {task.status}"
                 )
 
             # 启动任务
@@ -527,7 +528,7 @@ async def websocket_crawler_progress(websocket: WebSocket, task_id: int):
 
         while True:
             # 查询任务状态
-            with get_db_session() as session:
+            with get_crawler_db().get_session() as session:
                 repo = CrawlerRepository(session)
                 task = repo.get(task_id)
 
@@ -595,7 +596,7 @@ async def create_workflow_template(
         WorkflowTemplateResponse: 创建的模板
     """
     try:
-        with get_db_session() as session:
+        with get_crawler_db().get_session() as session:
             workflow_manager = WorkflowManager(session)
 
             # 转换为字典格式保存
@@ -646,7 +647,7 @@ async def list_workflow_templates(
         PaginatedResponse: 模板列表
     """
     try:
-        with get_db_session() as session:
+        with get_crawler_db().get_session() as session:
             query = session.query(CrawlerWorkflowTemplate)
 
             # 筛选条件

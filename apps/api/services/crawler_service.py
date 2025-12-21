@@ -178,7 +178,7 @@ class CrawlerService:
                     raise ValueError(f"任务不存在: {task.id}")
 
                 # 检查任务状态
-                if current_task.status not in [TaskStatus.PENDING, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+                if current_task.status not in [TaskStatus.PENDING, TaskStatus.FAILED]:
                     raise ValueError(f"任务状态不允许启动: {current_task.status}")
 
                 # 更新任务状态
