@@ -41,6 +41,7 @@ import {
   showTaskDetail,
   deleteTask,
   retryTask,
+  startTask,
   updateTask,
 } from '../../store/slices/crawlerSlice'
 import LoginInteraction from './LoginInteraction'
@@ -120,6 +121,16 @@ const TaskCard: React.FC<TaskCardProps> = ({
     }
   }, [dispatch, task.task_id])
 
+  // 启动任务
+  const handleStart = useCallback(async () => {
+    try {
+      await dispatch(startTask(task.task_id)).unwrap()
+      message.success('任务启动成功')
+    } catch (error: unknown) {
+      console.error('启动任务失败:', error)
+    }
+  }, [dispatch, task.task_id])
+
   // 删除任务
   const handleDelete = useCallback(() => {
     console.log('handleDelete called for task:', task.task_name, task.task_id)
@@ -175,6 +186,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
         console.log('Handling edit click')
         handleEdit()
         break
+      case 'start':
+        console.log('Handling start click')
+        handleStart()
+        break
       case 'retry':
         console.log('Handling retry click')
         handleRetry()
@@ -190,7 +205,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       default:
         break
     }
-  }, [handleViewDetail, handleEdit, handleRetry, handleShowLogin, handleDelete])
+  }, [handleViewDetail, handleEdit, handleStart, handleRetry, handleShowLogin, handleDelete])
 
   // 更多操作菜单
   const moreMenuItems: MenuProps['items'] = [
@@ -204,6 +219,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
       label: '编辑任务',
       icon: <EditOutlined />,
       disabled: task.status === 'running',
+    },
+    {
+      key: 'start',
+      label: '启动任务',
+      icon: <PlayCircleOutlined />,
+      disabled: !['pending', 'failed', 'cancelled'].includes(task.status),
     },
     {
       key: 'retry',
@@ -264,6 +285,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
               type="text"
               icon={<EyeOutlined />}
               onClick={handleViewDetail}
+            />
+          </Tooltip>,
+          <Tooltip title="启动任务" key="start">
+            <Button
+              type="text"
+              icon={<PlayCircleOutlined />}
+              onClick={handleStart}
+              disabled={!['pending', 'failed', 'cancelled'].includes(task.status)}
             />
           </Tooltip>,
           <Tooltip title="重试任务" key="retry">

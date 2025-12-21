@@ -327,6 +327,59 @@ async def retry_task(
         raise HTTPException(status_code=500, detail=f"重试失败: {str(e)}")
 
 
+@router.post(
+    "/tasks/{task_id}/start",
+    response_model=CrawlerTaskResponse,
+    status_code=status.HTTP_200_OK,
+    summary="启动数据采集任务",
+    description="启动等待中的数据采集任务"
+)
+async def start_task(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    启动数据采集任务
+
+    Args:
+        task_id: 任务ID
+
+    Returns:
+        CrawlerTaskResponse: 更新后的任务信息
+
+    Raises:
+        HTTPException: 任务不存在或状态不允许启动
+    """
+    try:
+        with get_db_session() as session:
+            repo = CrawlerRepository(session)
+            task = repo.get(task_id)
+
+            if not task:
+                raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+
+            if task.status not in [TaskStatus.PENDING, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"只能启动等待、失败或已取消的任务，当前状态: {task.status}"
+                )
+
+            # 启动任务
+            crawler_service = CrawlerService()
+            updated_task = crawler_service.start_task(task)
+
+            logger.info(
+                f"任务启动: task_id={task_id}, "
+                f"user={current_user.user_id}"
+            )
+
+            return _build_task_response(updated_task)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"启动任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"启动失败: {str(e)}")
 
 
 @router.get(
