@@ -8,9 +8,8 @@ import logging
 from typing import List, Optional, Dict
 from datetime import datetime
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.crawler_repo import CrawlerRepository
-from packages.scraper.models import CrawlerTask, CrawlerLog
+from packages.scraper.database import get_crawler_db
+from packages.scraper.models import CrawlerTask, CrawlerLog, TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -22,27 +21,29 @@ class CrawlerService:
         self,
         task_type: str,
         keywords: Optional[List[str]] = None,
+        shop_url: Optional[str] = None,
         max_pages: int = 5,
         proxy: Optional[str] = None
-    ) -> CrawlerTask:
+    ) -> Dict:
         """
         触发爬虫任务
 
         Args:
-            task_type: 任务类型（taobao/jd/forum）
+            task_type: 任务类型（taobao/jd/pdd/forum）
             keywords: 搜索关键词
+            shop_url: 店铺URL
             max_pages: 最大爬取页数
             proxy: 代理服务器
 
         Returns:
             CrawlerTask: 创建的任务对象
         """
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
-
+        db = get_crawler_db()
+        with db.session_scope() as session:
             # 构造任务配置
             config = {
-                "keywords": keywords or ["路亚竿", "渔轮"],
+                "keywords": keywords or [],
+                "shop_url": shop_url,
                 "max_pages": max_pages,
                 "proxy": proxy
             }
@@ -51,8 +52,9 @@ class CrawlerService:
             task = CrawlerTask(
                 task_type=task_type,
                 task_name=f"{task_type}爬虫 - {datetime.now().strftime('%Y%m%d%H%M%S')}",
-                status='pending',
+                status=TaskStatus.PENDING,
                 config=json.dumps(config, ensure_ascii=False),
+                shop_url=shop_url,
                 total_items=0,
                 success_items=0,
                 failed_items=0
@@ -62,12 +64,16 @@ class CrawlerService:
             session.commit()
             session.refresh(task)
 
-            logger.info(f"爬虫任务已创建: task_id={task.id}, type={task_type}")
+            # 保存任务ID，用于后续操作
+            task_id = task.id
+
+            logger.info(f"爬虫任务已创建: task_id={task_id}, type={task_type}")
 
             # 异步启动爬虫（后台运行）
-            self._start_crawler_process(task.id, task_type, config)
+            self._start_crawler_process(task_id, task_type, config)
 
-            return task
+            # 在session内转换为dict返回，避免DetachedInstanceError
+            return task.to_dict()
 
     def _start_crawler_process(
         self,
@@ -124,12 +130,12 @@ class CrawlerService:
             logger.error(f"启动爬虫进程失败: {e}", exc_info=True)
 
             # 更新任务状态为失败
-            with get_db_session() as session:
-                repo = CrawlerRepository(session)
-                repo.update(task_id, {
-                    "status": "failed",
-                    "error_message": f"启动失败: {str(e)}"
-                })
+            db = get_crawler_db()
+            with db.session_scope() as session:
+                task = session.query(CrawlerTask).get(task_id)
+                if task:
+                    task.status = TaskStatus.FAILED
+                    task.error_message = f"启动失败: {str(e)}"
 
     def retry_task(self, task: CrawlerTask) -> CrawlerTask:
         """
@@ -159,15 +165,12 @@ class CrawlerService:
         Returns:
             dict: 同步状态统计
         """
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
-
+        db = get_crawler_db()
+        with db.session_scope() as session:
             # 统计最近成功任务
-            recent_success_tasks = repo.get_all(
-                filters={"status": "success"},
-                limit=10,
-                order_by="end_time DESC"
-            )
+            recent_success_tasks = session.query(CrawlerTask).filter(
+                CrawlerTask.status == TaskStatus.SUCCESS
+            ).order_by(CrawlerTask.end_time.desc()).limit(10).all()
 
             last_sync_time = None
             if recent_success_tasks:

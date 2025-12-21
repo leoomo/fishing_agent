@@ -99,8 +99,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
       type: 'taobao',
       config: {
         max_pages: 5,
-        delay_range: [2, 5],
-        extract_images: true,
+        keywords: ['路亚竿', '渔轮'],
       },
     },
     {
@@ -108,8 +107,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
       type: 'taobao',
       config: {
         max_pages: 1,
-        delay_range: [1, 2],
-        extract_images: false,
+        keywords: ['路亚装备'],
       },
     },
     {
@@ -117,20 +115,21 @@ const TaskForm: React.FC<TaskFormProps> = ({
       type: 'taobao',
       config: {
         max_pages: 50,
-        delay_range: [3, 8],
-        extract_images: true,
-        use_proxy: true,
+        keywords: ['路亚', '钓鱼装备', '渔具'],
       },
     },
   ]
 
   // 应用模板
   const handleApplyTemplate = (template: any) => {
+    const { type, config } = template
     form.setFieldsValue({
-      task_type: template.type,
-      ...template.config,
+      task_type: type,
+      max_pages: config.max_pages,
+      keywords: config.keywords?.join(', ') || '',
+      shop_url: config.shop_url || '',
     })
-    handleTaskTypeChange(template.type)
+    handleTaskTypeChange(type)
   }
 
   return (
@@ -142,12 +141,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
         task_type: 'taobao',
         platform: 'taobao',
         priority: 'medium',
-        max_pages: 10,
-        delay_range: [2, 5],
-        retry_count: 3,
-        timeout: 300,
-        extract_images: false,
-        use_proxy: false,
+        max_pages: 5,
+        shop_url: '',
+        keywords: '',
         ...initialValues,
       }}
     >
@@ -228,29 +224,32 @@ const TaskForm: React.FC<TaskFormProps> = ({
         </Row>
 
         <Form.Item
-          label="爬取目标"
-          name="target_url"
-          rules={[{ required: true, message: '请输入爬取目标URL或关键词' }]}
+          label="店铺URL"
+          name="shop_url"
+          tooltip="输入店铺首页URL，将爬取该店铺的所有商品"
         >
-          <Input placeholder="请输入目标URL、店铺名或搜索关键词" />
+          <Input placeholder="例如: https://shop123456.taobao.com 或 https://mall.jd.com/xxx" />
         </Form.Item>
 
         <Form.Item
-          label={
-            <Space>
-              详细配置
-              <Tooltip title="任务的具体执行参数">
-                <InfoCircleOutlined />
-              </Tooltip>
-            </Space>
-          }
-          name="config"
+          label="搜索关键词"
+          name="keywords"
+          tooltip="多个关键词用逗号分隔"
+          rules={[
+            {
+              validator: (_, value) => {
+                const shopUrl = form.getFieldValue('shop_url')
+                if (!shopUrl && !value) {
+                  return Promise.reject('请输入店铺URL或搜索关键词（至少填写一项）')
+                }
+                return Promise.resolve()
+              }
+            }
+          ]}
         >
-          <TextArea
-            rows={3}
-            placeholder='JSON格式的详细配置，例如: {"keywords": ["手机", "电脑"], "category": "电子产品"}'
-          />
+          <Input placeholder="多个关键词用逗号分隔，例如: 路亚竿, 渔轮, 钓鱼装备" />
         </Form.Item>
+
       </Card>
 
       {/* 快速模板 */}

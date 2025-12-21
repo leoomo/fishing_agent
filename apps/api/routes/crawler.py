@@ -8,8 +8,7 @@ import logging
 from typing import Optional, List
 from datetime import datetime, timedelta
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.crawler_repo import CrawlerRepository
+from packages.scraper.database import get_crawler_db
 from packages.scraper.models import CrawlerTask, TaskStatus
 
 from apps.api.schemas.crawler import (
@@ -82,23 +81,19 @@ async def list_tasks(
         CrawlerTaskListResponse: 任务列表
     """
     try:
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            query = session.query(CrawlerTask)
 
-            filters = {}
             if task_type:
-                filters['task_type'] = task_type
+                query = query.filter(CrawlerTask.task_type == task_type)
             if status:
-                filters['status'] = status
+                query = query.filter(CrawlerTask.status == status)
 
-            tasks = repo.get_all(
-                filters=filters,
-                limit=page_size,
-                offset=(page - 1) * page_size,
-                order_by='created_at DESC'
-            )
-
-            total = repo.count(filters=filters)
+            total = query.count()
+            tasks = query.order_by(CrawlerTask.created_at.desc()).offset(
+                (page - 1) * page_size
+            ).limit(page_size).all()
 
             return CrawlerTaskListResponse(
                 total=total,
@@ -135,9 +130,9 @@ async def get_task(
         HTTPException: 任务不存在
     """
     try:
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
-            task = repo.get(task_id)
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
 
             if not task:
                 raise HTTPException(
@@ -177,20 +172,21 @@ async def trigger_crawler(
     try:
         crawler_service = CrawlerService()
 
-        # 创建任务
-        task = crawler_service.trigger_crawler(
+        # 创建任务（返回dict）
+        task_dict = crawler_service.trigger_crawler(
             task_type=request.task_type,
             keywords=request.keywords,
+            shop_url=request.shop_url,
             max_pages=request.max_pages,
             proxy=request.proxy
         )
 
         logger.info(
-            f"爬虫任务已触发: task_id={task.id}, "
+            f"爬虫任务已触发: task_id={task_dict.get('id')}, "
             f"type={request.task_type}, user={current_user.user_id}"
         )
 
-        return _build_task_response(task)
+        return _build_task_response_from_dict(task_dict)
 
     except Exception as e:
         logger.error(f"触发爬虫任务失败: {e}", exc_info=True)
@@ -250,6 +246,43 @@ async def retry_task(
     except Exception as e:
         logger.error(f"重试任务失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"重试失败: {str(e)}")
+
+
+@router.delete(
+    "/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除爬虫任务",
+    description="删除指定的爬虫任务"
+)
+async def delete_task(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    删除爬虫任务
+
+    Args:
+        task_id: 任务ID
+
+    Raises:
+        HTTPException: 任务不存在
+    """
+    try:
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+
+            if not task:
+                raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+
+            session.delete(task)
+            logger.info(f"爬虫任务已删除: task_id={task_id}, user={current_user.user_id}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
 
 @router.get(
@@ -1392,7 +1425,7 @@ async def get_scheduler_status(
 def _build_task_response(task: CrawlerTask) -> CrawlerTaskResponse:
     """构造任务响应对象"""
     return CrawlerTaskResponse(
-        id=task.id,
+        task_id=task.id,  # 前端期望 task_id 而不是 id
         task_type=task.task_type,
         task_name=task.task_name,
         status=task.status,
@@ -1406,6 +1439,26 @@ def _build_task_response(task: CrawlerTask) -> CrawlerTaskResponse:
         result_summary=task.result_summary,
         created_at=task.created_at.isoformat(),
         updated_at=task.updated_at.isoformat()
+    )
+
+
+def _build_task_response_from_dict(task_dict: dict) -> CrawlerTaskResponse:
+    """从字典构造任务响应对象"""
+    return CrawlerTaskResponse(
+        task_id=task_dict.get('task_id'),  # 使用 task_id（来自 to_dict()）
+        task_type=task_dict.get('task_type'),
+        task_name=task_dict.get('task_name'),
+        status=task_dict.get('status'),
+        start_time=task_dict.get('start_time'),
+        end_time=task_dict.get('end_time'),
+        total_items=task_dict.get('total_items', 0),
+        success_items=task_dict.get('success_items', 0),
+        failed_items=task_dict.get('failed_items', 0),
+        error_message=task_dict.get('error_message'),
+        config=task_dict.get('config'),
+        result_summary=task_dict.get('result_summary'),
+        created_at=task_dict.get('created_at'),
+        updated_at=task_dict.get('updated_at')
     )
 
 
