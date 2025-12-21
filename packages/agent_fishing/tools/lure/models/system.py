@@ -26,6 +26,29 @@ class LogLevel(str, enum.Enum):
     ERROR = "error"
 
 
+class ErrorCategory(str, enum.Enum):
+    """Error categorization for pattern detection"""
+    LLM_API = "llm_api"           # OpenAI, Claude API failures
+    EXTERNAL_SERVICE = "external"  # Weather, map APIs
+    TOOL_EXECUTION = "tool"        # Fishing equipment analysis
+    DATABASE = "database"          # Storage and connectivity
+    TIMEOUT = "timeout"           # Request timeouts
+    VALIDATION = "validation"      # Input validation failures
+    AUTHENTICATION = "auth"       # Authentication/authorization
+    RATE_LIMIT = "rate_limit"     # Rate limiting
+    NETWORK = "network"           # Network connectivity issues
+    SYSTEM_RESOURCE = "system"    # System resource constraints
+    UNKNOWN = "unknown"           # Uncategorized errors
+
+
+class ErrorSeverity(str, enum.Enum):
+    """Error severity levels"""
+    CRITICAL = "critical"         # System-down errors
+    HIGH = "high"                 # Major functionality impacted
+    MEDIUM = "medium"             # Partial functionality impacted
+    LOW = "low"                   # Minor issues
+
+
 class ConfigType(str, enum.Enum):
     """System configuration type"""
     AGENT = "agent"
@@ -241,6 +264,10 @@ class APILog(Base):
         Index('ix_api_logs_timestamp_endpoint', 'timestamp', 'endpoint'),
         # 按状态码和时间统计错误
         Index('ix_api_logs_status_timestamp', 'status_code', 'timestamp'),
+        # 按错误类别和时间统计
+        Index('ix_api_logs_category_timestamp', 'error_category', 'timestamp'),
+        # 按相关ID统计
+        Index('ix_api_logs_correlation_id', 'correlation_id'),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -253,6 +280,13 @@ class APILog(Base):
     ip_address = Column(String(50), comment="Client IP address")
     user_agent = Column(String(500), comment="User agent string")
     error_message = Column(Text, comment="Error message if any")
+
+    # Enhanced error tracking fields
+    correlation_id = Column(String(100), index=True, comment="Correlation ID for cross-service tracing")
+    error_category = Column(SQLEnum(ErrorCategory, native_enum=False), index=True, comment="Error category for pattern detection")
+    error_severity = Column(SQLEnum(ErrorSeverity, native_enum=False), comment="Error severity level")
+    error_context = Column(Text, comment="Additional error context (JSON)")
+    stack_trace = Column(Text, comment="Stack trace for debugging")
 
     def __repr__(self):
         return f"<APILog(id={self.id}, endpoint='{self.endpoint}', status={self.status_code})>"
@@ -270,6 +304,11 @@ class APILog(Base):
             'ip_address': self.ip_address,
             'user_agent': self.user_agent,
             'error_message': self.error_message,
+            'correlation_id': self.correlation_id,
+            'error_category': self.error_category.value if isinstance(self.error_category, enum.Enum) else self.error_category,
+            'error_severity': self.error_severity.value if isinstance(self.error_severity, enum.Enum) else self.error_severity,
+            'error_context': self.error_context,
+            'stack_trace': self.stack_trace,
         }
 
 
@@ -282,6 +321,8 @@ class AgentExecutionLog(Base):
         Index('ix_agent_exec_timestamp_type', 'timestamp', 'agent_type'),
         Index('ix_agent_exec_user_timestamp', 'user_id', 'timestamp'),
         Index('ix_agent_exec_session', 'session_id'),
+        Index('ix_agent_exec_correlation_id', 'correlation_id'),
+        Index('ix_agent_exec_error_category', 'error_category', 'timestamp'),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -296,6 +337,15 @@ class AgentExecutionLog(Base):
     # Execution context
     session_id = Column(Integer, index=True, comment="Chat session ID if applicable")
     user_id = Column(Integer, index=True, comment="User ID")
+
+    # Enhanced error tracking
+    correlation_id = Column(String(100), index=True, comment="Correlation ID for cross-service tracing")
+    failure_stage = Column(String(50), comment="Stage where failure occurred (INIT/PROCESSING/TOOL_CALL/FINAL_RESPONSE)")
+    error_category = Column(SQLEnum(ErrorCategory, native_enum=False), index=True, comment="Error category for pattern detection")
+    error_pattern_id = Column(String(100), index=True, comment="Link to detected failure patterns")
+    recovery_attempted = Column(Boolean, default=False, comment="Whether recovery was attempted")
+    recovery_successful = Column(Boolean, comment="Whether recovery was successful")
+    failed_tool_name = Column(String(100), comment="Name of tool that caused failure")
 
     # Input/Output
     input_text = Column(Text, comment="User input (truncated to 1000 chars)")
@@ -336,6 +386,13 @@ class AgentExecutionLog(Base):
             'agent_version': self.agent_version,
             'session_id': self.session_id,
             'user_id': self.user_id,
+            'correlation_id': self.correlation_id,
+            'failure_stage': self.failure_stage,
+            'error_category': self.error_category.value if isinstance(self.error_category, enum.Enum) else self.error_category,
+            'error_pattern_id': self.error_pattern_id,
+            'recovery_attempted': self.recovery_attempted,
+            'recovery_successful': self.recovery_successful,
+            'failed_tool_name': self.failed_tool_name,
             'input_text': self.input_text,
             'output_text': self.output_text,
             'model_provider': self.model_provider,

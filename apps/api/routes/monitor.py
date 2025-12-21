@@ -393,3 +393,189 @@ async def get_agent_trends(
     except Exception as e:
         logger.error(f"获取 Agent 趋势失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+# ========== Failure Analytics Endpoints ==========
+# Import at the top of file when adding these imports:
+# from apps.api.services.failure_analytics_service import FailureAnalyticsService
+
+@router.get(
+    "/failure-patterns",
+    summary="Failure Pattern Detection",
+    description="Detect failure patterns in the system using advanced analytics"
+)
+async def get_failure_patterns(
+    time_range: str = Query("1h", description="Time range for analysis (e.g., '1h', '24h', '7d')"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    Get detected failure patterns
+
+    Args:
+        time_range: Time range for pattern analysis
+
+    Returns:
+        List of detected failure patterns
+    """
+    try:
+        from apps.api.services.failure_analytics_service import FailureAnalyticsService
+        from packages.agent_fishing.core.database import get_db
+
+        with next(get_db()) as db:
+            analytics_service = FailureAnalyticsService(db)
+            patterns = await analytics_service.detect_failure_patterns(time_range)
+
+            # Convert to response format
+            pattern_data = []
+            for pattern in patterns:
+                pattern_data.append({
+                    'pattern_id': pattern.pattern_id,
+                    'pattern_type': pattern.pattern_type,
+                    'description': pattern.description,
+                    'severity': pattern.severity,
+                    'frequency': pattern.frequency,
+                    'affected_services': pattern.affected_services,
+                    'confidence': pattern.confidence,
+                    'detected_at': pattern.detected_at.isoformat(),
+                    'metadata': pattern.metadata
+                })
+
+            return {
+                'status': 'success',
+                'patterns': pattern_data,
+                'time_range': time_range,
+                'total_patterns': len(pattern_data)
+            }
+
+    except Exception as e:
+        logger.error(f"获取失败模式失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/error-correlation/{correlation_id}",
+    summary="Error Correlation Analysis",
+    description="Get error correlation chain for a specific correlation ID"
+)
+async def get_error_correlation(
+    correlation_id: str,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    Get error correlation chain
+
+    Args:
+        correlation_id: Correlation ID to analyze
+
+    Returns:
+        Error correlation chain with related errors
+    """
+    try:
+        from apps.api.services.failure_analytics_service import FailureAnalyticsService
+        from packages.agent_fishing.core.database import get_db
+
+        with next(get_db()) as db:
+            analytics_service = FailureAnalyticsService(db)
+            error_chain = await analytics_service.get_error_correlation(correlation_id)
+
+            if not error_chain:
+                raise HTTPException(status_code=404, detail="未找到相关错误链")
+
+            return {
+                'status': 'success',
+                'correlation_id': error_chain.correlation_id,
+                'errors': error_chain.errors,
+                'root_cause': error_chain.root_cause,
+                'impact_score': error_chain.impact_score,
+                'total_errors': len(error_chain.errors)
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取错误关联失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/root-cause-analysis",
+    summary="Root Cause Analysis",
+    description="Perform automated root cause analysis on recent failures"
+)
+async def get_root_cause_analysis(
+    time_range: str = Query("24h", description="Time range for analysis (e.g., '1h', '24h', '7d')"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    Get root cause analysis
+
+    Args:
+        time_range: Time range for analysis
+
+    Returns:
+        List of potential root causes with confidence scores
+    """
+    try:
+        from apps.api.services.failure_analytics_service import FailureAnalyticsService
+        from packages.agent_fishing.core.database import get_db
+
+        with next(get_db()) as db:
+            analytics_service = FailureAnalyticsService(db)
+            root_causes = await analytics_service.get_root_cause_analysis(time_range)
+
+            # Convert to response format
+            cause_data = []
+            for cause in root_causes:
+                cause_data.append({
+                    'cause_id': cause.cause_id,
+                    'cause_type': cause.cause_type,
+                    'description': cause.description,
+                    'confidence': cause.confidence,
+                    'evidence': cause.evidence,
+                    'suggested_action': cause.suggested_action,
+                    'generated_at': cause.generated_at.isoformat()
+                })
+
+            return {
+                'status': 'success',
+                'root_causes': cause_data,
+                'time_range': time_range,
+                'total_causes': len(cause_data)
+            }
+
+    except Exception as e:
+        logger.error(f"获取根因分析失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/failure-metrics",
+    summary="Comprehensive Failure Metrics",
+    description="Get comprehensive failure metrics and statistics"
+)
+async def get_failure_metrics(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    Get comprehensive failure metrics
+
+    Returns:
+        Dictionary with failure statistics and metrics
+    """
+    try:
+        from apps.api.services.failure_analytics_service import FailureAnalyticsService
+        from packages.agent_fishing.core.database import get_db
+
+        with next(get_db()) as db:
+            analytics_service = FailureAnalyticsService(db)
+            metrics = await analytics_service.get_failure_metrics()
+
+            return {
+                'status': 'success',
+                'metrics': metrics,
+                'generated_at': datetime.utcnow().isoformat()
+            }
+
+    except Exception as e:
+        logger.error(f"获取失败指标失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
