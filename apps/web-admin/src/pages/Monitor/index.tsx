@@ -23,6 +23,8 @@ import {
   ThunderboltOutlined,
   ToolOutlined,
   DollarOutlined,
+  BugOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { monitorApi } from '@/api/services/monitor'
@@ -31,6 +33,8 @@ import type { ColumnsType } from 'antd/es/table'
 import AgentAnalytics from './AgentAnalytics'
 import ToolAnalytics from './ToolAnalytics'
 import CostReport from './CostReport'
+import FailurePatterns from '../Monitor/FailurePatterns'
+import RootCauseAnalysis from '../Monitor/RootCauseAnalysis'
 
 const Monitor = () => {
   const [loading, setLoading] = useState(true)
@@ -597,6 +601,32 @@ const Monitor = () => {
           key="cost"
         >
           <CostReport />
+        </Tabs.TabPane>
+
+        {/* 失败模式检测 */}
+        <Tabs.TabPane
+          tab={
+            <span>
+              <BugOutlined />
+              失败模式
+            </span>
+          }
+          key="failure-patterns"
+        >
+          <FailurePatterns />
+        </Tabs.TabPane>
+
+        {/* 根因分析 */}
+        <Tabs.TabPane
+          tab={
+            <span>
+              <SearchOutlined />
+              根因分析
+            </span>
+          }
+          key="root-cause"
+        >
+          <RootCauseAnalysis />
         </Tabs.TabPane>
       </Tabs>
     </div>
