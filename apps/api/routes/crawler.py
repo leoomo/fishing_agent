@@ -248,41 +248,6 @@ async def retry_task(
         raise HTTPException(status_code=500, detail=f"重试失败: {str(e)}")
 
 
-@router.delete(
-    "/tasks/{task_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="删除爬虫任务",
-    description="删除指定的爬虫任务"
-)
-async def delete_task(
-    task_id: int,
-    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
-):
-    """
-    删除爬虫任务
-
-    Args:
-        task_id: 任务ID
-
-    Raises:
-        HTTPException: 任务不存在
-    """
-    try:
-        db = get_crawler_db()
-        with db.session_scope() as session:
-            task = session.query(CrawlerTask).get(task_id)
-
-            if not task:
-                raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
-
-            session.delete(task)
-            logger.info(f"爬虫任务已删除: task_id={task_id}, user={current_user.user_id}")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"删除任务失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
 
 @router.get(
@@ -307,18 +272,22 @@ async def get_task_logs(
         List[CrawlerLogResponse]: 日志列表
     """
     try:
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
-
+        db = get_crawler_db()
+        with db.session_scope() as session:
             # 验证任务存在
-            task = repo.get(task_id)
+            task = session.query(CrawlerTask).get(task_id)
             if not task:
                 raise HTTPException(
                     status_code=404,
                     detail=f"任务不存在: task_id={task_id}"
                 )
 
-            logs = repo.get_task_logs(task_id, level=level)
+            # 查询日志
+            query = session.query(CrawlerLog).filter(CrawlerLog.task_id == task_id)
+            if level:
+                query = query.filter(CrawlerLog.level == level)
+
+            logs = query.order_by(CrawlerLog.created_at.desc()).limit(100).all()
 
             return [
                 CrawlerLogResponse(
@@ -359,9 +328,9 @@ async def delete_task(
         HTTPException: 任务不存在或正在运行
     """
     try:
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
-            task = repo.get(task_id)
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
 
             if not task:
                 raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
@@ -372,8 +341,7 @@ async def delete_task(
                     detail="无法删除正在运行的任务"
                 )
 
-            repo.delete(task_id)
-
+            session.delete(task)
             logger.info(f"任务记录已删除: task_id={task_id}, user={current_user.user_id}")
 
     except HTTPException:
