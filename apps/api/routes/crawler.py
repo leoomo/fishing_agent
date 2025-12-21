@@ -384,6 +384,92 @@ async def start_task(
 
 
 @router.post(
+    "/tasks/{task_id}/stop",
+    response_model=CrawlerTaskResponse,
+    status_code=status.HTTP_200_OK,
+    summary="停止数据采集任务",
+    description="停止正在运行或等待中的数据采集任务"
+)
+async def stop_task(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    停止数据采集任务
+
+    将任务状态设置为 CANCELLED，并通知 Worker 停止执行。
+
+    Args:
+        task_id: 任务ID
+
+    Returns:
+        CrawlerTaskResponse: 更新后的任务信息
+
+    Raises:
+        HTTPException: 任务不存在或状态不允许停止
+    """
+    try:
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+
+            if not task:
+                raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+
+            if task.status not in [TaskStatus.QUEUED, TaskStatus.RUNNING]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"只能停止等待中或运行中的任务，当前状态: {task.status}"
+                )
+
+            # 更新任务状态为已取消
+            task.status = TaskStatus.CANCELLED
+            task.end_time = datetime.now()
+            task.error_message = "用户手动停止"
+
+            # 在 config 中标记为已取消，Worker 心跳时会收到取消命令
+            config = json.loads(task.config) if task.config else {}
+            config["_cancelled"] = True
+            config["_cancelled_at"] = datetime.now().isoformat()
+            config["_cancelled_by"] = current_user.user_id
+            task.config = json.dumps(config, ensure_ascii=False)
+
+            session.commit()
+
+            logger.info(
+                f"任务已停止: task_id={task_id}, user={current_user.user_id}"
+            )
+
+            # 推送 WebSocket 更新
+            try:
+                from apps.api.services.websocket_manager import get_ws_manager
+                import asyncio
+
+                ws_manager = get_ws_manager()
+                asyncio.create_task(
+                    ws_manager.broadcast_progress(
+                        task_id=task_id,
+                        status="CANCELLED",
+                        progress=0,
+                        message="任务已被用户停止",
+                        items_processed=task.total_items or 0,
+                        items_success=task.success_items or 0,
+                        items_failed=task.failed_items or 0
+                    )
+                )
+            except Exception as ws_error:
+                logger.debug(f"WebSocket 推送失败: {ws_error}")
+
+            return _build_task_response(task)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"停止任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"停止失败: {str(e)}")
+
+
+@router.post(
     "/tasks/{task_id}/rerun",
     response_model=CrawlerTaskResponse,
     status_code=status.HTTP_200_OK,
@@ -448,7 +534,8 @@ async def rerun_task(
                 f"任务重新运行: task_id={task_id}, user={current_user.user_id}"
             )
 
-            return _build_task_response(updated_task)
+            # start_task 返回的是 dict，需要使用 _build_task_response_from_dict
+            return _build_task_response_from_dict(updated_task)
 
     except HTTPException:
         raise
@@ -1608,9 +1695,9 @@ def _build_task_response(task: CrawlerTask) -> CrawlerTaskResponse:
         status=task.status,
         start_time=task.start_time.isoformat() if task.start_time else None,
         end_time=task.end_time.isoformat() if task.end_time else None,
-        total_items=task.total_items,
-        success_items=task.success_items,
-        failed_items=task.failed_items,
+        total_items=task.total_items or 0,
+        success_items=task.success_items or 0,
+        failed_items=task.failed_items or 0,
         error_message=task.error_message,
         config=task.config,
         result_summary=task.result_summary,
