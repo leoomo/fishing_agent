@@ -217,6 +217,27 @@ async def claim_tasks(
                 f"{[t['task_id'] for t in claimed_tasks]}"
             )
 
+            # 推送 WebSocket 更新，通知前端任务状态已变更
+            try:
+                from apps.api.services.websocket_manager import get_ws_manager
+                import asyncio
+
+                ws_manager = get_ws_manager()
+                for claimed_task in claimed_tasks:
+                    asyncio.create_task(
+                        ws_manager.broadcast_progress(
+                            task_id=claimed_task['task_id'],
+                            status="RUNNING",
+                            progress=0,
+                            message=f"任务已被 Worker {worker_id} 领取，开始执行",
+                            items_processed=0,
+                            items_success=0,
+                            items_failed=0
+                        )
+                    )
+            except Exception as ws_error:
+                logger.debug(f"WebSocket 推送失败: {ws_error}")
+
             return TaskClaimResponse(
                 success=True,
                 tasks=claimed_tasks,
