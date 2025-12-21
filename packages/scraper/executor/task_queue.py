@@ -13,6 +13,9 @@ from typing import Optional, Callable, Dict, Any
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
+from ..database import get_crawler_db
+from ..models import CrawlerTask, TaskStatus
+
 logger = logging.getLogger(__name__)
 
 # 全局数据库获取函数（通过 configure_database 设置）
@@ -179,128 +182,171 @@ class CrawlerTaskQueue:
             return False
 
     def _execute_via_subprocess(self, task_id: int, config: Dict) -> bool:
-        """通过subprocess执行任务"""
-        try:
-            # 获取数据库连接
-            db = _get_db()
+        """
+        通过subprocess执行任务
 
-            # 更新任务状态
-            db.execute_write(
-                "UPDATE crawler_tasks SET status = ?, start_time = datetime('now') WHERE id = ?",
-                ("running", task_id)
-            )
-
-            # 构造执行命令
-            cmd = [
-                "python3",
-                "-c",
-                f"""
-import sys
-import json
-import time
-from datetime import datetime
-from packages.scraper.database import get_db
-
-# 更新任务进度
-db = _get_db()
-config = {json.dumps(config)}
-
-# 模拟执行
-time.sleep(2)
-
-# 更新任务完成状态
-db.execute_write(
-    "UPDATE crawler_tasks SET status = ?, end_time = datetime('now'), "
-    "success_items = 5, total_items = 5 WHERE id = ?",
-    ("success", task_id)
-)
-print(f"Task {task_id} completed via subprocess")
-                """
-            ]
-
-            # 启动子进程
-            logger.debug(f"启动subprocess执行任务 {task_id}")
-
-            # 使用Python执行器运行
-            import subprocess
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5分钟超时
-            )
-
-            if result.returncode == 0:
-                logger.info(f"任务 {task_id} subprocess执行成功")
-                return True
-            else:
-                logger.error(f"任务 {task_id} subprocess执行失败: {result.stderr}")
-
-                # 更新错误状态
-                db.execute_write(
-                    "UPDATE crawler_tasks SET status = ?, error_message = ?, end_time = datetime('now') WHERE id = ?",
-                    ("failed", result.stderr, task_id)
-                )
-                return False
-
-        except Exception as e:
-            logger.error(f"任务 {task_id} subprocess执行异常: {e}", exc_info=True)
-
-            # 更新数据库中的错误状态
-            try:
-                db = _get_db()
-                db.execute_write(
-                    "UPDATE crawler_tasks SET status = ?, error_message = ?, end_time = datetime('now') WHERE id = ?",
-                    ("failed", str(e), task_id)
-                )
-            except:
-                pass
-
-            return False
+        注意：subprocess 模式目前使用线程模式作为回退
+        """
+        # 暂时使用线程模式执行
+        # TODO: 实现真正的subprocess执行（需要独立的执行脚本）
+        logger.info(f"任务 {task_id} 使用线程模式执行（subprocess模式暂未实现）")
+        return self._execute_via_thread(task_id, config)
 
     def _execute_via_thread(self, task_id: int, config: Dict) -> bool:
-        """通过线程执行任务"""
+        """
+        通过线程执行任务
+
+        使用独立的数据库会话确保线程安全
+        """
+        db = get_crawler_db()
+        session = None
+
         try:
-            # 获取数据库连接
-            db = _get_db()
+            # 获取独立的数据库会话
+            session = db.get_session()
 
-            # 更新任务状态
-            db.execute_write(
-                "UPDATE crawler_tasks SET status = ?, start_time = datetime('now') WHERE id = ?",
-                ("running", task_id)
-            )
+            # 获取任务
+            task = session.query(CrawlerTask).filter(
+                CrawlerTask.id == task_id
+            ).first()
 
-            # 模拟任务执行
-            logger.debug(f"线程模式执行任务 {task_id}")
+            if not task:
+                logger.error(f"任务 {task_id} 不存在")
+                return False
 
-            # 这里可以添加实际的爬虫逻辑
-            # 现在只是模拟
+            # 更新任务状态为运行中
+            task.status = TaskStatus.RUNNING
+            task.start_time = datetime.utcnow()
+            session.commit()
+
+            logger.info(f"[Thread] 开始执行任务 {task_id}, 类型: {task.task_type}")
+
+            # 推送进度：开始执行
+            self._push_ws_progress(task_id, "RUNNING", 10, "任务开始执行")
+
+            # 模拟任务执行（实际环境中这里调用真实的爬虫逻辑）
+            # TODO: 集成真实的爬虫执行器
             time.sleep(1)
+            self._push_ws_progress(task_id, "RUNNING", 50, "正在处理数据...")
+            time.sleep(1)
+            self._push_ws_progress(task_id, "RUNNING", 90, "即将完成...")
 
             # 更新任务完成状态
-            db.execute_write(
-                "UPDATE crawler_tasks SET status = ?, end_time = datetime('now'), "
-                "success_items = 3, total_items = 3 WHERE id = ?",
-                ("success", task_id)
+            task.status = TaskStatus.SUCCESS
+            task.end_time = datetime.utcnow()
+            task.success_items = 3
+            task.total_items = 3
+            session.commit()
+
+            # 推送进度：完成
+            self._push_ws_progress(
+                task_id, "SUCCESS", 100, "任务执行完成",
+                items_success=3, items_processed=3
             )
 
-            logger.info(f"任务 {task_id} 线程执行成功")
+            # 触发工作流后续任务
+            self._trigger_workflow_next_tasks(task, session)
+
+            logger.info(f"任务 {task_id} 执行成功")
             return True
 
         except Exception as e:
-            logger.error(f"任务 {task_id} 线程执行异常: {e}", exc_info=True)
+            logger.error(f"任务 {task_id} 执行异常: {e}", exc_info=True)
 
-            # 更新数据库中的错误状态
+            # 更新任务状态为失败
             try:
-                db = _get_db()
-                db.execute_write(
-                    "UPDATE crawler_tasks SET status = ?, error_message = ?, end_time = datetime('now') WHERE id = ?",
-                    ("failed", str(e), task_id)
-                )
-            except:
-                pass
+                if session:
+                    task = session.query(CrawlerTask).filter(
+                        CrawlerTask.id == task_id
+                    ).first()
+                    if task:
+                        task.status = TaskStatus.FAILED
+                        task.error_message = str(e)
+                        task.end_time = datetime.utcnow()
+                        session.commit()
+
+                # 推送进度：失败
+                self._push_ws_progress(task_id, "FAILED", 0, f"执行失败: {str(e)}")
+
+            except Exception as db_error:
+                logger.error(f"更新任务失败状态时出错: {db_error}")
+                if session:
+                    session.rollback()
 
             return False
+
+        finally:
+            if session:
+                session.close()
+
+    def _push_ws_progress(
+        self,
+        task_id: int,
+        status: str,
+        progress: int,
+        message: str,
+        items_processed: int = 0,
+        items_success: int = 0,
+        items_failed: int = 0
+    ):
+        """
+        推送 WebSocket 进度更新（线程安全）
+
+        Args:
+            task_id: 任务ID
+            status: 任务状态
+            progress: 进度百分比
+            message: 进度消息
+        """
+        try:
+            import asyncio
+            from apps.api.services.websocket_manager import get_ws_manager
+
+            ws_manager = get_ws_manager()
+
+            # 创建协程
+            coro = ws_manager.broadcast_progress(
+                task_id=task_id,
+                status=status,
+                progress=progress,
+                message=message,
+                items_processed=items_processed,
+                items_success=items_success,
+                items_failed=items_failed
+            )
+
+            # 尝试获取运行中的事件循环
+            try:
+                loop = asyncio.get_running_loop()
+                # 在已有事件循环中调度
+                asyncio.run_coroutine_threadsafe(coro, loop)
+            except RuntimeError:
+                # 没有运行中的事件循环，创建新的
+                asyncio.run(coro)
+
+        except Exception as e:
+            # WebSocket 推送失败不应影响任务执行
+            logger.debug(f"WebSocket 进度推送失败: {e}")
+
+    def _trigger_workflow_next_tasks(self, task: CrawlerTask, session):
+        """
+        触发工作流的后续任务
+
+        Args:
+            task: 已完成的任务
+            session: 数据库会话
+        """
+        if not task.workflow_id:
+            return
+
+        try:
+            from ..workflow.task_chain import TaskChainManager
+
+            chain_manager = TaskChainManager(session)
+            chain_manager.on_task_complete(task)
+
+        except Exception as e:
+            logger.error(f"触发工作流后续任务失败: {e}", exc_info=True)
 
     def start_worker_loop(self):
         """启动工作循环"""
@@ -361,15 +407,15 @@ print(f"Task {task_id} completed via subprocess")
     def get_task_status(self, task_id: int) -> Optional[str]:
         """获取任务状态"""
         try:
-            db = _get_db()
-            result = db.execute(
-                "SELECT status FROM crawler_tasks WHERE id = ?",
-                (task_id,)
-            )
+            db = get_crawler_db()
+            with db.session_scope() as session:
+                task = session.query(CrawlerTask).filter(
+                    CrawlerTask.id == task_id
+                ).first()
 
-            if result:
-                return result[0]['status']
-            return None
+                if task:
+                    return task.status.value if hasattr(task.status, 'value') else str(task.status)
+                return None
         except Exception as e:
             logger.error(f"获取任务状态失败: {e}")
             return None
@@ -377,23 +423,24 @@ print(f"Task {task_id} completed via subprocess")
     def cancel_task(self, task_id: int) -> bool:
         """取消任务（仅适用于未开始的任务）"""
         try:
-            # 检查任务状态
-            status = self.get_task_status(task_id)
-            if status not in ['pending']:
-                logger.warning(f"任务 {task_id} 状态为 {status}，无法取消")
-                return False
+            db = get_crawler_db()
+            with db.session_scope() as session:
+                task = session.query(CrawlerTask).filter(
+                    CrawlerTask.id == task_id
+                ).first()
 
-            # 从队列中移除
-            # 注意：PriorityQueue没有直接移除元素的方法
-            # 这里标记为已取消，在执行时检查
-            logger.info(f"标记任务 {task_id} 为已取消")
+                if not task:
+                    logger.error(f"任务 {task_id} 不存在")
+                    return False
 
-            # 更新数据库状态
-            db = _get_db()
-            db.execute_write(
-                "UPDATE crawler_tasks SET status = ?, error_message = ? WHERE id = ?",
-                ("cancelled", "用户取消", task_id)
-            )
+                if task.status != TaskStatus.PENDING:
+                    logger.warning(f"任务 {task_id} 状态为 {task.status}，无法取消")
+                    return False
+
+                # 标记为已取消
+                task.status = TaskStatus.FAILED
+                task.error_message = "用户取消"
+                logger.info(f"任务 {task_id} 已取消")
 
             return True
 
@@ -404,38 +451,32 @@ print(f"Task {task_id} completed via subprocess")
     def retry_task(self, task_id: int) -> bool:
         """重试失败的任务"""
         try:
-            # 检查任务是否已失败
-            status = self.get_task_status(task_id)
-            if status != 'failed':
-                logger.warning(f"任务 {task_id} 状态为 {status}，无法重试")
-                return False
+            db = get_crawler_db()
+            with db.session_scope() as session:
+                task = session.query(CrawlerTask).filter(
+                    CrawlerTask.id == task_id
+                ).first()
 
-            # 获取任务信息
-            db = _get_db()
-            result = db.execute(
-                "SELECT config FROM crawler_tasks WHERE id = ?",
-                (task_id,)
-            )
+                if not task:
+                    logger.error(f"找不到任务 {task_id}")
+                    return False
 
-            if not result:
-                logger.error(f"找不到任务 {task_id} 的配置信息")
-                return False
+                if task.status != TaskStatus.FAILED:
+                    logger.warning(f"任务 {task_id} 状态为 {task.status}，无法重试")
+                    return False
 
-            config = json.loads(result[0]['config']) if result[0]['config'] else {}
+                # 获取配置
+                config = json.loads(task.config) if task.config else {}
+                config["is_retry"] = True
 
-            # 增加重试次数
-            current_retry = db.execute(
-                "SELECT retry_count FROM crawler_tasks WHERE id = ?",
-                (task_id,)
-            )[0]['retry_count']
-
-            db.execute_write(
-                "UPDATE crawler_tasks SET retry_count = retry_count + 1, status = 'pending' WHERE id = ?",
-                (task_id,)
-            )
+                # 增加重试次数
+                current_retry = task.retry_count or 0
+                task.retry_count = current_retry + 1
+                task.status = TaskStatus.PENDING
+                task.error_message = None
 
             # 重新提交到队列
-            priority = 1  # 重试任务优先级较高
+            priority = 5  # 重试任务优先级较高
             self.submit(task_id, priority, config)
 
             logger.info(f"任务 {task_id} 已重新提交，当前重试次数: {current_retry + 1}")

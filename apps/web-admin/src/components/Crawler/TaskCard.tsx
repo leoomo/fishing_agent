@@ -40,7 +40,7 @@ import type { AppDispatch } from '../../store/store'
 import {
   showTaskDetail,
   deleteTask,
-  retryTask,
+  rerunTask,
   startTask,
   updateTask,
 } from '../../store/slices/crawlerSlice'
@@ -106,13 +106,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
     dispatch(showTaskDetail(task.task_id))
   }, [dispatch, task.task_id])
 
-  // 重试任务
-  const handleRetry = useCallback(async () => {
+  // 重新运行任务
+  const handleRerun = useCallback(async () => {
     try {
-      await dispatch(retryTask(task.task_id)).unwrap()
-      message.success('任务重试成功')
+      await dispatch(rerunTask(task.task_id)).unwrap()
     } catch (error: unknown) {
-      console.error('重试任务失败:', error)
+      console.error('重新运行任务失败:', error)
     }
   }, [dispatch, task.task_id])
 
@@ -185,9 +184,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
         console.log('Handling start click')
         handleStart()
         break
-      case 'retry':
-        console.log('Handling retry click')
-        handleRetry()
+      case 'rerun':
+        console.log('Handling rerun click')
+        handleRerun()
         break
       case 'login':
         console.log('Handling login click')
@@ -200,7 +199,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       default:
         break
     }
-  }, [handleViewDetail, handleEdit, handleStart, handleRetry, handleShowLogin, handleDelete])
+  }, [handleViewDetail, handleEdit, handleStart, handleRerun, handleShowLogin, handleDelete])
 
   // 更多操作菜单
   const moreMenuItems: MenuProps['items'] = [
@@ -222,10 +221,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
       disabled: !['pending', 'failed'].includes(task.status.toLowerCase()),
     },
     {
-      key: 'retry',
-      label: '重试任务',
+      key: 'rerun',
+      label: '重新运行',
       icon: <ReloadOutlined />,
-      disabled: task.status.toLowerCase() !== 'failed',
+      disabled: task.status.toLowerCase() === 'running',
     },
     {
       type: 'divider',
@@ -290,12 +289,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
               disabled={!['pending', 'failed'].includes(task.status.toLowerCase())}
             />
           </Tooltip>,
-          <Tooltip title="重试任务" key="retry">
+          <Tooltip title="重新运行" key="rerun">
             <Button
               type="text"
               icon={<ReloadOutlined />}
-              onClick={handleRetry}
-              disabled={task.status !== 'failed'}
+              onClick={handleRerun}
+              disabled={task.status.toLowerCase() === 'running'}
             />
           </Tooltip>,
           <Dropdown

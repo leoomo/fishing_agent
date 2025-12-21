@@ -82,60 +82,89 @@ class CrawlerService:
         config: Dict
     ):
         """
-        启动数据采集进程（后台运行）
+        提交任务到全局任务队列执行
 
         Args:
             task_id: 任务ID
             task_type: 任务类型
             config: 任务配置
-
-        Note:
-            实际生产环境中，这里应该调用真实的数据采集脚本
-            目前仅做演示，不启动真实进程
         """
         try:
-            # 构造数据采集命令
-            # cmd = [
-            #     "uv", "run", "python",
-            #     "scripts/run_crawler.py",
-            #     "--type", task_type,
-            #     "--task-id", str(task_id),
-            #     "--keywords", ",".join(config.get("keywords", [])),
-            #     "--max-pages", str(config.get("max_pages", 5))
-            # ]
-            #
-            # if config.get("proxy"):
-            #     cmd.extend(["--proxy", config["proxy"]])
-            #
-            # # 后台启动数据采集进程
-            # subprocess.Popen(
-            #     cmd,
-            #     stdout=subprocess.DEVNULL,
-            #     stderr=subprocess.DEVNULL,
-            #     start_new_session=True  # 独立会话，不受父进程影响
-            # )
+            # 延迟导入避免循环引用
+            from packages.scraper.executor.task_queue import get_task_queue
 
-            logger.info(
-                f"数据采集进程待启动: task_id={task_id}, type={task_type}"
-            )
-            logger.info(
-                "注意: 当前为演示模式，未实际启动数据采集进程。"
-                "实际生产环境需要实现真实的数据采集逻辑。"
+            # 获取全局任务队列
+            task_queue = get_task_queue()
+
+            # 计算任务优先级
+            priority = self._calculate_priority(task_type, config)
+
+            # 提交任务到队列
+            task_queue.submit(
+                task_id=task_id,
+                priority=priority,
+                config=config
             )
 
-            # 演示模式：直接标记任务为待处理
-            # 真实环境中，任务状态由数据采集进程更新
+            logger.info(
+                f"任务已提交到队列: task_id={task_id}, "
+                f"type={task_type}, priority={priority}"
+            )
 
+        except RuntimeError as e:
+            # 任务队列未初始化
+            logger.error(f"任务队列不可用: {e}")
+            self._mark_task_failed(task_id, "任务队列未初始化")
+            raise
         except Exception as e:
-            logger.error(f"启动数据采集进程失败: {e}", exc_info=True)
+            logger.error(f"提交任务到队列失败: {e}", exc_info=True)
+            self._mark_task_failed(task_id, str(e))
+            raise
 
-            # 更新任务状态为失败
+    def _calculate_priority(self, task_type: str, config: Dict) -> int:
+        """
+        计算任务优先级
+
+        Args:
+            task_type: 任务类型
+            config: 任务配置
+
+        Returns:
+            int: 优先级（数字越大优先级越高）
+        """
+        priority = config.get("priority", 0)
+
+        # 重试任务优先级更高
+        if config.get("is_retry"):
+            priority += 5
+
+        # 根据任务类型调整优先级
+        type_priorities = {
+            "taobao": 1,
+            "jd": 1,
+            "forum": 0
+        }
+        priority += type_priorities.get(task_type, 0)
+
+        return priority
+
+    def _mark_task_failed(self, task_id: int, error_message: str):
+        """
+        标记任务为失败状态
+
+        Args:
+            task_id: 任务ID
+            error_message: 错误信息
+        """
+        try:
             db = get_crawler_db()
             with db.session_scope() as session:
                 task = session.query(CrawlerTask).get(task_id)
                 if task:
                     task.status = TaskStatus.FAILED
-                    task.error_message = f"启动失败: {str(e)}"
+                    task.error_message = f"启动失败: {error_message}"
+        except Exception as e:
+            logger.error(f"更新任务失败状态时出错: {e}")
 
     def retry_task(self, task: CrawlerTask) -> CrawlerTask:
         """
