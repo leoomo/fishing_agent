@@ -27,13 +27,14 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
-import { useDispatch, useSelector } from 'react-redux'
+import { useDispatch } from 'react-redux'
 import { message } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
 
 import type { CrawlerTask } from '../../types/crawler'
+import type { AppDispatch } from '../../store/store'
 import {
   showTaskDetail,
   deleteTask,
@@ -44,14 +45,14 @@ import LoginInteraction from './LoginInteraction'
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
 
-const { Text, Title } = Typography
+const { Text } = Typography
 const { Meta } = Card
 
 interface TaskCardProps {
   task: CrawlerTask
   isSelected?: boolean
-  onSelectionChange?: (taskId: number, selected: boolean) => void
-  showLoginInteraction?: boolean
+  // onSelectionChange?: (taskId: number, selected: boolean) => void // Removed: unused prop
+  // showLoginInteraction?: boolean // Removed: unused prop
 }
 
 // 状态配置
@@ -91,10 +92,10 @@ const statusConfig = {
 const TaskCard: React.FC<TaskCardProps> = ({
   task,
   isSelected = false,
-  onSelectionChange,
-  showLoginInteraction = false,
+  // onSelectionChange, // Removed: unused prop
+  // showLoginInteraction, // Removed: unused prop
 }) => {
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const [loginModalVisible, setLoginModalVisible] = useState(false)
 
   const statusConfigItem = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.pending
@@ -108,7 +109,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
   const handleRetry = useCallback(async () => {
     try {
       await dispatch(retryTask(task.task_id)).unwrap()
-    } catch (error: any) {
+      message.success('任务重试成功')
+    } catch (error: unknown) {
       console.error('重试任务失败:', error)
     }
   }, [dispatch, task.task_id])
@@ -124,7 +126,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
       onOk: async () => {
         try {
           await dispatch(deleteTask(task.task_id)).unwrap()
-        } catch (error: any) {
+          message.success('任务删除成功')
+        } catch (error: unknown) {
           console.error('删除任务失败:', error)
         }
       },
@@ -196,7 +199,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
         hoverable
         className={`task-card ${isSelected ? 'selected' : ''}`}
         size="small"
-        bordered
         style={{
           marginBottom: 16,
           border: isSelected ? '2px solid #1890ff' : undefined,
@@ -344,13 +346,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
         onCancel={() => setLoginModalVisible(false)}
         footer={null}
         width={900}
-        destroyOnClose
       >
         <LoginInteraction
           taskId={task.task_id}
           platform={task.platform}
           platformName={task.platform_name}
-          onComplete={(userInfo) => {
+          onComplete={() => {
             setLoginModalVisible(false)
             message.success('登录成功，任务将开始执行')
           }}
