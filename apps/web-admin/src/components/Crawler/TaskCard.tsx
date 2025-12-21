@@ -26,6 +26,7 @@ import {
   CloseCircleOutlined,
   LoadingOutlined,
   ExclamationCircleOutlined,
+  EditOutlined,
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 import { useDispatch } from 'react-redux'
@@ -138,6 +139,13 @@ const TaskCard: React.FC<TaskCardProps> = ({
     setLoginModalVisible(true)
   }, [])
 
+  // 编辑任务
+  const handleEdit = useCallback(() => {
+    // TODO: 实现编辑任务功能
+    console.log('Edit task:', task.task_id, task.task_name)
+    message.info('编辑功能开发中...')
+  }, [task.task_id, task.task_name])
+
   // 处理菜单项点击
   const handleMenuClick = useCallback((key: string) => {
     console.log('Menu item clicked:', key)
@@ -145,6 +153,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
       case 'detail':
         console.log('Handling detail click')
         handleViewDetail()
+        break
+      case 'edit':
+        console.log('Handling edit click')
+        handleEdit()
         break
       case 'retry':
         console.log('Handling retry click')
@@ -161,7 +173,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       default:
         break
     }
-  }, [handleViewDetail, handleRetry, handleShowLogin, handleDelete])
+  }, [handleViewDetail, handleEdit, handleRetry, handleShowLogin, handleDelete])
 
   // 更多操作菜单
   const moreMenuItems: MenuProps['items'] = [
@@ -169,6 +181,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
       key: 'detail',
       label: '查看详情',
       icon: <EyeOutlined />,
+    },
+    {
+      key: 'edit',
+      label: '编辑任务',
+      icon: <EditOutlined />,
+      disabled: task.status === 'running',
     },
     {
       key: 'retry',
