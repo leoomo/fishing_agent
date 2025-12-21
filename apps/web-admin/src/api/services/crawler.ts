@@ -66,6 +66,11 @@ export const crawlerApi = {
     return client.post(`/admin/crawler/tasks/${taskId}/start`)
   },
 
+  // 重新运行任务（成功或失败的任务都可以重跑）
+  rerunTask: (taskId: number): Promise<CrawlerTask> => {
+    return client.post(`/admin/crawler/tasks/${taskId}/rerun`)
+  },
+
   // 获取任务日志
   getTaskLogs: (taskId: number, level?: string): Promise<CrawlerLog[]> => {
     return client.get(`/admin/crawler/tasks/${taskId}/logs`, {

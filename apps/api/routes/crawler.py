@@ -383,6 +383,80 @@ async def start_task(
         raise HTTPException(status_code=500, detail=f"启动失败: {str(e)}")
 
 
+@router.post(
+    "/tasks/{task_id}/rerun",
+    response_model=CrawlerTaskResponse,
+    status_code=status.HTTP_200_OK,
+    summary="重新运行任务",
+    description="重新运行已完成或失败的任务（重置状态后启动）"
+)
+async def rerun_task(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    重新运行任务
+
+    将任务状态重置为 PENDING，清空执行结果，然后重新启动。
+    支持对成功、失败状态的任务重新运行。
+
+    Args:
+        task_id: 任务ID
+
+    Returns:
+        CrawlerTaskResponse: 更新后的任务信息
+
+    Raises:
+        HTTPException: 任务不存在或正在运行中
+    """
+    try:
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+
+            if not task:
+                raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+
+            if task.status == TaskStatus.RUNNING:
+                raise HTTPException(
+                    status_code=400,
+                    detail="任务正在运行中，无法重新运行"
+                )
+
+            # 重置任务状态
+            task.status = TaskStatus.PENDING
+            task.start_time = None
+            task.end_time = None
+            task.success_items = 0
+            task.failed_items = 0
+            task.total_items = 0
+            task.error_message = None
+            task.result_summary = None
+            task.retry_count = (task.retry_count or 0) + 1
+
+            session.commit()
+
+            logger.info(
+                f"任务已重置: task_id={task_id}, user={current_user.user_id}"
+            )
+
+            # 启动任务
+            crawler_service = CrawlerService()
+            updated_task = crawler_service.start_task(task)
+
+            logger.info(
+                f"任务重新运行: task_id={task_id}, user={current_user.user_id}"
+            )
+
+            return _build_task_response(updated_task)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"重新运行任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"重新运行失败: {str(e)}")
+
+
 @router.get(
     "/tasks/{task_id}/logs",
     response_model=List[CrawlerLogResponse],
@@ -517,61 +591,63 @@ async def websocket_crawler_progress(websocket: WebSocket, task_id: int):
     """
     WebSocket 实时推送爬虫任务进度
 
+    使用 WebSocketManager 管理连接，支持从执行器推送进度
+
     Args:
         websocket: WebSocket 连接
         task_id: 任务ID
     """
-    await websocket.accept()
+    from apps.api.services.websocket_manager import get_ws_manager
+
+    ws_manager = get_ws_manager()
 
     try:
+        await ws_manager.connect(websocket, task_id)
         logger.info(f"WebSocket 连接建立: task_id={task_id}")
 
-        while True:
-            # 查询任务状态
-            with get_crawler_db().get_session() as session:
-                repo = CrawlerRepository(session)
-                task = repo.get(task_id)
+        # 发送初始状态
+        with get_crawler_db().get_session() as session:
+            repo = CrawlerRepository(session)
+            task = repo.get(task_id)
 
-                if not task:
-                    await websocket.send_json({
-                        "error": f"任务不存在: {task_id}"
-                    })
-                    break
-
-                # 推送进度
+            if task:
                 await websocket.send_json({
+                    "type": "init",
                     "task_id": task_id,
-                    "status": task.status,
-                    "progress": f"{task.success_items}/{task.total_items}",
+                    "status": task.status.value if hasattr(task.status, 'value') else str(task.status),
+                    "progress": 0,
                     "success_items": task.success_items,
                     "failed_items": task.failed_items,
+                    "total_items": task.total_items,
                     "timestamp": datetime.utcnow().isoformat()
                 })
 
-                # 任务结束时断开连接
-                if task.status in [TaskStatus.SUCCESS, TaskStatus.FAILED]:
-                    logger.info(
-                        f"任务已完成，关闭 WebSocket: task_id={task_id}, "
-                        f"status={task.status}"
-                    )
-                    break
+        # 保持连接，等待客户端消息或断开
+        while True:
+            try:
+                # 等待客户端消息（ping/pong 保活）
+                data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=30.0
+                )
 
-            # 每秒推送一次
-            await asyncio.sleep(1)
+                # 处理 ping
+                if data == "ping":
+                    await websocket.send_text("pong")
+
+            except asyncio.TimeoutError:
+                # 发送 ping 保持连接
+                try:
+                    await websocket.send_text("ping")
+                except:
+                    break
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket 客户端断开连接: task_id={task_id}")
     except Exception as e:
         logger.error(f"WebSocket 错误: {e}", exc_info=True)
-        try:
-            await websocket.send_json({"error": str(e)})
-        except:
-            pass
     finally:
-        try:
-            await websocket.close()
-        except:
-            pass
+        await ws_manager.disconnect(websocket, task_id)
 
 
 # ========== 工作流模板管理 ==========

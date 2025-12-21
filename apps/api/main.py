@@ -138,10 +138,11 @@ async def lifespan(app: FastAPI):
     # 初始化工作流调度器
     try:
         from packages.scraper.scheduler.workflow_scheduler import WorkflowScheduler
-        from packages.scraper.executor.task_queue import configure_database
+        from packages.scraper.executor.task_queue import configure_database, initialize_task_queue
         from packages.agent_fishing.tools.lure.database import get_db
         from packages.agent_fishing.tools.lure.orm.session import init_db
         from packages.agent_fishing.tools.lure.models.base import Base
+        import threading
 
         # 初始化数据库并创建表
         logger.info("初始化数据库...")
@@ -155,6 +156,21 @@ async def lifespan(app: FastAPI):
         workflow_scheduler = WorkflowScheduler(scheduler, get_db)
         workflow_scheduler.load_schedules_from_db()
         logger.info("工作流调度器初始化完成")
+
+        # 初始化爬虫任务队列
+        logger.info("初始化爬虫任务队列...")
+        max_workers = int(os.getenv("CRAWLER_WORKERS", "3"))
+        task_queue = initialize_task_queue(mode="thread", max_workers=max_workers)
+
+        # 启动任务队列工作线程
+        worker_thread = threading.Thread(
+            target=task_queue.start_worker_loop,
+            daemon=True,
+            name="crawler-worker"
+        )
+        worker_thread.start()
+        logger.info(f"爬虫任务队列已启动 (模式=thread, 工作器={max_workers})")
+
     except Exception as e:
         logger.error(f"工作流调度器初始化失败: {e}")
 
@@ -162,6 +178,15 @@ async def lifespan(app: FastAPI):
 
     # 关闭时清理
     logger.info("正在关闭应用...")
+
+    # 关闭任务队列
+    try:
+        from packages.scraper.executor.task_queue import shutdown_task_queue
+        logger.info("正在关闭爬虫任务队列...")
+        shutdown_task_queue(wait=True, timeout=30)
+        logger.info("爬虫任务队列已关闭")
+    except Exception as e:
+        logger.error(f"关闭爬虫任务队列失败: {e}")
 
     if scheduler:
         scheduler.shutdown(wait=False)
@@ -186,13 +211,8 @@ from .routes.monitor import router as monitor_router
 from .routes.analytics import router as analytics_router
 from .routes.config import router as config_router
 from .routes.ocr import router as ocr_router
+from .routes.worker import router as worker_router
 from .middleware import install_api_logging_middleware
-
-app = FastAPI(
-    title="智能钓鱼助手 API",
-    version="5.0.0",
-    description="基于 LangChain 的智能钓鱼助手 REST API - 支持数据分析和配置管理"
-)
 
 # GZip 压缩中间件（响应大于 500 字节时压缩）
 app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -233,6 +253,9 @@ app.include_router(config_router, prefix="/api/v1/admin/config", tags=["config"]
 
 # OCR 图片表格识别路由
 app.include_router(ocr_router, prefix="/api/v1/ocr", tags=["ocr"])
+
+# 分布式 Worker API 路由
+app.include_router(worker_router, prefix="/api/v1/worker", tags=["worker"])
 
 
 @app.get("/")
