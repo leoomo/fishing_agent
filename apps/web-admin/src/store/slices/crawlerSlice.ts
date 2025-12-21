@@ -108,6 +108,7 @@ const initialState: CrawlerState = {
   errors: {
     tasks: null,
     createTask: null,
+    updateTask: null,
     deleteTask: null,
     stats: null,
   },
@@ -182,6 +183,21 @@ export const retryTask = createAsyncThunk(
       return response
     } catch (error: any) {
       const errorMessage = error.response?.data?.detail || '重试任务失败'
+      message.error(errorMessage)
+      return rejectWithValue(errorMessage)
+    }
+  }
+)
+
+export const updateTask = createAsyncThunk(
+  'crawler/updateTask',
+  async ({ taskId, taskData }: { taskId: number; taskData: Partial<CrawlerTask> }, { rejectWithValue }) => {
+    try {
+      const response = await crawlerApi.updateTask(taskId, taskData)
+      message.success('任务更新成功')
+      return response
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || '更新任务失败'
       message.error(errorMessage)
       return rejectWithValue(errorMessage)
     }
@@ -423,6 +439,25 @@ const crawlerSlice = createSlice({
         if (taskIndex > -1) {
           state.tasks[taskIndex] = updatedTask
         }
+      })
+
+    // updateTask
+    builder
+      .addCase(updateTask.pending, (state) => {
+        state.loading.updateTask = true
+        state.errors.updateTask = null
+      })
+      .addCase(updateTask.fulfilled, (state, action) => {
+        state.loading.updateTask = false
+        const updatedTask = action.payload
+        const taskIndex = state.tasks.findIndex(task => task.task_id === updatedTask.task_id)
+        if (taskIndex > -1) {
+          state.tasks[taskIndex] = updatedTask
+        }
+      })
+      .addCase(updateTask.rejected, (state, action) => {
+        state.loading.updateTask = false
+        state.errors.updateTask = action.payload as string
       })
 
     // fetchTaskStats

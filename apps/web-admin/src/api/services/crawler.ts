@@ -46,6 +46,11 @@ export const crawlerApi = {
     return client.get(`/admin/crawler/tasks/${taskId}`)
   },
 
+  // 更新任务
+  updateTask: (taskId: number, taskData: Partial<CrawlerTask>): Promise<CrawlerTask> => {
+    return client.put(`/admin/crawler/tasks/${taskId}`, taskData)
+  },
+
   // 触发爬虫任务
   triggerCrawler: (data: TriggerCrawlerRequest): Promise<CrawlerTask> => {
     return client.post('/admin/crawler/tasks/trigger', data)
