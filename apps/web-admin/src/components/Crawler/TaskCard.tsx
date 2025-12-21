@@ -13,6 +13,7 @@ import {
   Modal,
   Badge,
 } from 'antd'
+import { Modal as AntdModal } from 'antd'
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -117,21 +118,19 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   // 删除任务
   const handleDelete = useCallback(() => {
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除任务 "${task.task_name}" 吗？此操作不可恢复。`,
-      okText: '确定',
-      cancelText: '取消',
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          await dispatch(deleteTask(task.task_id)).unwrap()
-          message.success('任务删除成功')
-        } catch (error: unknown) {
-          console.error('删除任务失败:', error)
-        }
-      },
-    })
+    console.log('handleDelete called for task:', task.task_name, task.task_id)
+    const shouldDelete = window.confirm(`确定要删除任务 "${task.task_name}" 吗？此操作不可恢复。`)
+    if (shouldDelete) {
+      console.log('User confirmed delete')
+      try {
+        dispatch(deleteTask(task.task_id)).unwrap()
+        message.success('任务删除成功')
+      } catch (error: unknown) {
+        console.error('删除任务失败:', error)
+      }
+    } else {
+      console.log('User cancelled delete')
+    }
   }, [dispatch, task.task_id, task.task_name])
 
   // 显示登录交互
@@ -139,19 +138,42 @@ const TaskCard: React.FC<TaskCardProps> = ({
     setLoginModalVisible(true)
   }, [])
 
+  // 处理菜单项点击
+  const handleMenuClick = useCallback((key: string) => {
+    console.log('Menu item clicked:', key)
+    switch (key) {
+      case 'detail':
+        console.log('Handling detail click')
+        handleViewDetail()
+        break
+      case 'retry':
+        console.log('Handling retry click')
+        handleRetry()
+        break
+      case 'login':
+        console.log('Handling login click')
+        handleShowLogin()
+        break
+      case 'delete':
+        console.log('Handling delete click')
+        handleDelete()
+        break
+      default:
+        break
+    }
+  }, [handleViewDetail, handleRetry, handleShowLogin, handleDelete])
+
   // 更多操作菜单
   const moreMenuItems: MenuProps['items'] = [
     {
       key: 'detail',
       label: '查看详情',
       icon: <EyeOutlined />,
-      onClick: handleViewDetail,
     },
     {
       key: 'retry',
       label: '重试任务',
       icon: <ReloadOutlined />,
-      onClick: handleRetry,
       disabled: task.status !== 'failed',
     },
     {
@@ -161,7 +183,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
       key: 'login',
       label: '登录处理',
       icon: <PlayCircleOutlined />,
-      onClick: handleShowLogin,
       disabled: !['pending', 'failed'].includes(task.status),
     },
     {
@@ -172,7 +193,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
       label: '删除任务',
       icon: <DeleteOutlined />,
       danger: true,
-      onClick: handleDelete,
       disabled: task.status === 'running',
     },
   ]
@@ -219,7 +239,15 @@ const TaskCard: React.FC<TaskCardProps> = ({
               disabled={task.status !== 'failed'}
             />
           </Tooltip>,
-          <Dropdown menu={{ items: moreMenuItems }} key="more">
+          <Dropdown
+            menu={{
+              items: moreMenuItems,
+              onClick: ({ key }) => handleMenuClick(key)
+            }}
+            trigger={['click']}
+            placement="bottomRight"
+            key="more"
+          >
             <Button type="text" icon={<MoreOutlined />} />
           </Dropdown>,
         ]}

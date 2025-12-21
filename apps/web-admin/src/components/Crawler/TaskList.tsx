@@ -13,6 +13,7 @@ import {
   Card,
   Modal,
 } from 'antd'
+import { Modal as AntdModal } from 'antd'
 import {
   AppstoreOutlined,
   TableOutlined,
@@ -87,26 +88,26 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
 
   // 批量删除
   const handleBulkDelete = async () => {
+    console.log('handleBulkDelete called with tasks:', selectedTasks)
     if (selectedTasks.length === 0) {
       message.warning('请选择要删除的任务')
       return
     }
 
-    Modal.confirm({
-      title: '批量删除确认',
-      content: `确定要删除选中的 ${selectedTasks.length} 个任务吗？此操作不可恢复。`,
-      okText: '确定',
-      cancelText: '取消',
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          await dispatch(bulkDeleteTasks(selectedTasks)).unwrap()
-          message.success('批量删除成功')
-        } catch (error: any) {
-          console.error('批量删除失败:', error)
-        }
-      },
-    })
+    // 由于Modal.confirm在React 19 + Antd 5.x中的兼容性问题，暂时直接执行删除
+    // 在实际生产环境中，可以考虑使用其他弹窗库或自定义确认组件
+    const shouldDelete = window.confirm(`确定要删除选中的 ${selectedTasks.length} 个任务吗？此操作不可恢复。`)
+    if (shouldDelete) {
+      console.log('User confirmed bulk delete')
+      try {
+        await dispatch(bulkDeleteTasks(selectedTasks)).unwrap()
+        message.success('批量删除成功')
+      } catch (error: any) {
+        console.error('批量删除失败:', error)
+      }
+    } else {
+      console.log('User cancelled bulk delete')
+    }
   }
 
   // 切换视图模式
