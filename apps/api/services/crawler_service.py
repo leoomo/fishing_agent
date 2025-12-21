@@ -69,8 +69,9 @@ class CrawlerService:
 
             logger.info(f"数据采集任务已创建: task_id={task_id}, type={task_type}")
 
-            # 异步启动数据采集（后台运行）
-            self._start_crawler_process(task_id, task_type, config)
+            # 注意：任务创建后状态为 PENDING，需要用户手动点击"启动"按钮
+            # 启动后状态变为 QUEUED，等待 Worker 领取
+            # 不再自动提交到内部队列执行
 
             # 在session内转换为dict返回，避免DetachedInstanceError
             return task.to_dict()
@@ -187,18 +188,20 @@ class CrawlerService:
             proxy=config.get("proxy")
         )
 
-    def start_task(self, task: CrawlerTask) -> CrawlerTask:
+    def start_task(self, task: CrawlerTask) -> Dict:
         """
         启动等待中的任务
+
+        将任务状态改为 QUEUED（等待Worker领取），而不是直接运行。
+        Worker 领取任务后会将状态改为 RUNNING。
 
         Args:
             task: 等待中的任务
 
         Returns:
-            CrawlerTask: 更新后的任务
+            Dict: 更新后的任务字典
         """
         try:
-            # 更新任务状态为运行中
             db = get_crawler_db()
             with db.session_scope() as session:
                 # 重新获取任务以确保最新状态
@@ -210,31 +213,20 @@ class CrawlerService:
                 if current_task.status not in [TaskStatus.PENDING, TaskStatus.FAILED]:
                     raise ValueError(f"任务状态不允许启动: {current_task.status}")
 
-                # 更新任务状态
-                current_task.status = TaskStatus.RUNNING
-                current_task.start_time = datetime.utcnow()
+                # 更新任务状态为 QUEUED（等待Worker领取）
+                current_task.status = TaskStatus.QUEUED
                 current_task.error_message = None
 
-                # 提取配置并启动采集进程
-                config = json.loads(current_task.config) if current_task.config else {}
+                logger.info(
+                    f"任务已加入队列等待领取: task_id={current_task.id}, "
+                    f"type={current_task.task_type}"
+                )
 
-                # 异步启动数据采集（后台运行）
-                self._start_crawler_process(current_task.id, current_task.task_type, config)
-
-                logger.info(f"数据采集任务已启动: task_id={current_task.id}, type={current_task.task_type}")
-
-                return current_task
+                # 在session内转换为dict返回，避免DetachedInstanceError
+                return current_task.to_dict()
 
         except Exception as e:
-            # 更新任务状态为失败
-            db = get_crawler_db()
-            with db.session_scope() as session:
-                current_task = session.query(CrawlerTask).get(task.id)
-                if current_task:
-                    current_task.status = TaskStatus.FAILED
-                    current_task.error_message = f"启动失败: {str(e)}"
-
-            logger.error(f"启动数据采集任务失败: {e}", exc_info=True)
+            logger.error(f"启动任务失败: {e}", exc_info=True)
             raise
 
     def get_sync_status(self) -> Dict:
