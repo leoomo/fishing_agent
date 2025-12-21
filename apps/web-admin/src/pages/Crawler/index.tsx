@@ -109,7 +109,17 @@ const CrawlerPage: React.FC = () => {
   // 创建任务
   const handleCreateTask = useCallback(async (values: any) => {
     try {
-      await dispatch(createTask(values)).unwrap()
+      // 转换表单值为API期望的格式
+      const requestData = {
+        task_type: values.task_type,
+        keywords: values.keywords
+          ? values.keywords.split(/[,，]+/).map((k: string) => k.trim()).filter(Boolean)
+          : undefined,
+        max_pages: values.max_pages || 5,
+        proxy: values.proxy || undefined,
+        shop_url: values.shop_url || undefined,
+      }
+      await dispatch(createTask(requestData)).unwrap()
       dispatch(hideTaskForm())
       form.resetFields()
       handleRefresh()

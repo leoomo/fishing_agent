@@ -18,7 +18,7 @@ class CrawlerTaskCreate(BaseModel):
 
 class CrawlerTaskResponse(BaseModel):
     """爬虫任务响应"""
-    id: int
+    task_id: int  # 前端期望 task_id 而不是 id
     task_type: str
     task_name: str
     status: str  # pending, running, success, failed
@@ -58,8 +58,9 @@ class CrawlerLogResponse(BaseModel):
 
 class TriggerCrawlerRequest(BaseModel):
     """触发爬虫任务请求"""
-    task_type: str = Field(..., pattern="^(taobao|jd|forum)$", description="任务类型")
+    task_type: str = Field(..., pattern="^(taobao|jd|pdd|forum)$", description="任务类型")
     keywords: Optional[List[str]] = Field(None, description="搜索关键词列表")
+    shop_url: Optional[str] = Field(None, description="店铺URL")
     max_pages: Optional[int] = Field(5, ge=1, le=50, description="最大爬取页数")
     proxy: Optional[str] = Field(None, description="代理服务器")
 
