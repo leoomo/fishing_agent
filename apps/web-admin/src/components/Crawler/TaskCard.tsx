@@ -42,6 +42,7 @@ import {
   deleteTask,
   rerunTask,
   startTask,
+  stopTask,
   updateTask,
 } from '../../store/slices/crawlerSlice'
 import LoginInteraction from './LoginInteraction'
@@ -87,6 +88,11 @@ const statusConfig = {
     icon: <CloseCircleOutlined />,
     text: '失败',
   },
+  cancelled: {
+    color: 'default',
+    icon: <PauseCircleOutlined />,
+    text: '已停止',
+  },
   paused: {
     color: 'warning',
     icon: <PauseCircleOutlined />,
@@ -127,6 +133,15 @@ const TaskCard: React.FC<TaskCardProps> = ({
       message.success('任务启动成功')
     } catch (error: unknown) {
       console.error('启动任务失败:', error)
+    }
+  }, [dispatch, task.task_id])
+
+  // 停止任务
+  const handleStop = useCallback(async () => {
+    try {
+      await dispatch(stopTask(task.task_id)).unwrap()
+    } catch (error: unknown) {
+      console.error('停止任务失败:', error)
     }
   }, [dispatch, task.task_id])
 
@@ -189,6 +204,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
         console.log('Handling start click')
         handleStart()
         break
+      case 'stop':
+        console.log('Handling stop click')
+        handleStop()
+        break
       case 'rerun':
         console.log('Handling rerun click')
         handleRerun()
@@ -204,7 +223,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       default:
         break
     }
-  }, [handleViewDetail, handleEdit, handleStart, handleRerun, handleShowLogin, handleDelete])
+  }, [handleViewDetail, handleEdit, handleStart, handleStop, handleRerun, handleShowLogin, handleDelete])
 
   // 更多操作菜单
   const moreMenuItems: MenuProps['items'] = [
@@ -223,7 +242,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
       key: 'start',
       label: '启动任务',
       icon: <PlayCircleOutlined />,
-      disabled: !['pending', 'failed'].includes(task.status.toLowerCase()),
+      disabled: !['pending', 'failed', 'cancelled'].includes(task.status.toLowerCase()),
+    },
+    {
+      key: 'stop',
+      label: '停止任务',
+      icon: <PauseCircleOutlined />,
+      disabled: !['queued', 'running'].includes(task.status.toLowerCase()),
+      danger: true,
     },
     {
       key: 'rerun',
@@ -286,14 +312,25 @@ const TaskCard: React.FC<TaskCardProps> = ({
               onClick={handleViewDetail}
             />
           </Tooltip>,
-          <Tooltip title="启动任务" key="start">
-            <Button
-              type="text"
-              icon={<PlayCircleOutlined />}
-              onClick={handleStart}
-              disabled={!['pending', 'failed'].includes(task.status.toLowerCase())}
-            />
-          </Tooltip>,
+          ['queued', 'running'].includes(task.status.toLowerCase()) ? (
+            <Tooltip title="停止任务" key="stop">
+              <Button
+                type="text"
+                danger
+                icon={<PauseCircleOutlined />}
+                onClick={handleStop}
+              />
+            </Tooltip>
+          ) : (
+            <Tooltip title="启动任务" key="start">
+              <Button
+                type="text"
+                icon={<PlayCircleOutlined />}
+                onClick={handleStart}
+                disabled={!['pending', 'failed', 'cancelled'].includes(task.status.toLowerCase())}
+              />
+            </Tooltip>
+          ),
           <Tooltip title="重新运行" key="rerun">
             <Button
               type="text"

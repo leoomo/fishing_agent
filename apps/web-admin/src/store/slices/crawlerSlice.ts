@@ -219,6 +219,21 @@ export const startTask = createAsyncThunk(
   }
 )
 
+export const stopTask = createAsyncThunk(
+  'crawler/stopTask',
+  async (taskId: number, { rejectWithValue }) => {
+    try {
+      const response = await crawlerApi.stopTask(taskId)
+      message.success('任务已停止')
+      return response
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || '停止任务失败'
+      message.error(errorMessage)
+      return rejectWithValue(errorMessage)
+    }
+  }
+)
+
 export const updateTask = createAsyncThunk(
   'crawler/updateTask',
   async ({ taskId, taskData }: { taskId: number; taskData: Partial<CrawlerTask> }, { rejectWithValue }) => {
@@ -484,6 +499,16 @@ const crawlerSlice = createSlice({
     // startTask
     builder
       .addCase(startTask.fulfilled, (state, action) => {
+        const updatedTask = action.payload
+        const taskIndex = state.tasks.findIndex(task => task.task_id === updatedTask.task_id)
+        if (taskIndex > -1) {
+          state.tasks[taskIndex] = updatedTask
+        }
+      })
+
+    // stopTask
+    builder
+      .addCase(stopTask.fulfilled, (state, action) => {
         const updatedTask = action.payload
         const taskIndex = state.tasks.findIndex(task => task.task_id === updatedTask.task_id)
         if (taskIndex > -1) {
