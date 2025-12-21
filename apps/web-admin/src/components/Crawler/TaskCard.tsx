@@ -82,12 +82,7 @@ const statusConfig = {
     icon: <CloseCircleOutlined />,
     text: '失败',
   },
-  cancelled: {
-    color: 'warning',
-    icon: <ExclamationCircleOutlined />,
-    text: '已取消',
-  },
-  paused: {
+    paused: {
     color: 'warning',
     icon: <PauseCircleOutlined />,
     text: '已暂停',
@@ -104,7 +99,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
   const [loginModalVisible, setLoginModalVisible] = useState(false)
   const [editModalVisible, setEditModalVisible] = useState(false)
 
-  const statusConfigItem = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.pending
+  const statusConfigItem = statusConfig[task.status.toLowerCase() as keyof typeof statusConfig] || statusConfig.pending
 
   // 查看任务详情
   const handleViewDetail = useCallback(() => {
@@ -218,19 +213,19 @@ const TaskCard: React.FC<TaskCardProps> = ({
       key: 'edit',
       label: '编辑任务',
       icon: <EditOutlined />,
-      disabled: task.status === 'running',
+      disabled: task.status.toLowerCase() === 'running',
     },
     {
       key: 'start',
       label: '启动任务',
       icon: <PlayCircleOutlined />,
-      disabled: !['pending', 'failed', 'cancelled'].includes(task.status),
+      disabled: !['pending', 'failed'].includes(task.status.toLowerCase()),
     },
     {
       key: 'retry',
       label: '重试任务',
       icon: <ReloadOutlined />,
-      disabled: task.status !== 'failed',
+      disabled: task.status.toLowerCase() !== 'failed',
     },
     {
       type: 'divider',
@@ -249,7 +244,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       label: '删除任务',
       icon: <DeleteOutlined />,
       danger: true,
-      disabled: task.status === 'running',
+      disabled: task.status.toLowerCase() === 'running',
     },
   ]
 
@@ -292,7 +287,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
               type="text"
               icon={<PlayCircleOutlined />}
               onClick={handleStart}
-              disabled={!['pending', 'failed', 'cancelled'].includes(task.status)}
+              disabled={!['pending', 'failed'].includes(task.status.toLowerCase())}
             />
           </Tooltip>,
           <Tooltip title="重试任务" key="retry">
@@ -407,29 +402,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
           </Col>
         </Row>
 
-        {/* 操作按钮 */}
-        {task.status === 'pending' && (
-          <div style={{ marginTop: 12, textAlign: 'center' }}>
-            <Space>
-              <Button
-                type="primary"
-                size="small"
-                icon={<PlayCircleOutlined />}
-                onClick={handleShowLogin}
-              >
-                开始执行
-              </Button>
-              <Button
-                size="small"
-                icon={<DeleteOutlined />}
-                onClick={handleDelete}
-              >
-                删除
-              </Button>
-            </Space>
-          </div>
-        )}
-      </Card>
+        </Card>
 
       {/* 登录交互弹窗 */}
       <Modal
