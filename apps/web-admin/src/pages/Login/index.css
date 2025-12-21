@@ -16,3 +16,13 @@
   font-size: 20px;
   font-weight: 600;
 }
+
+/* 记住密码复选框样式 */
+.login-card .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+
+.login-card .ant-checkbox-wrapper {
+  color: #666;
+  font-size: 14px;
+}
