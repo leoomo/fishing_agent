@@ -35,6 +35,7 @@ import {
   createTask,
   showTaskForm,
   hideTaskForm,
+  hideTaskDetail,
   clearAllErrors,
   selectTasks,
   selectStats,
@@ -50,6 +51,7 @@ import {
 import TaskList from '../../components/Crawler/TaskList'
 import TaskForm from '../../components/Crawler/TaskForm'
 import TaskFilters from '../../components/Crawler/TaskFilters'
+import TaskDetail from '../../components/Crawler/TaskDetail'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -133,6 +135,12 @@ const CrawlerPage: React.FC = () => {
     dispatch(resetCrawlerState())
     handleRefresh()
   }, [dispatch, handleRefresh])
+
+  // 获取当前选中的任务
+  const getCurrentTask = () => {
+    if (!ui.selectedTaskId) return null
+    return tasks.find(task => task.task_id === ui.selectedTaskId) || null
+  }
 
   // 计算统计数据
   const getStatValue = useCallback((key: string, defaultValue: any = 0) => {
@@ -272,6 +280,13 @@ const CrawlerPage: React.FC = () => {
           loading={loading.createTask}
         />
       </Modal>
+
+      {/* 任务详情弹窗 */}
+      <TaskDetail
+        visible={ui.showTaskDetail}
+        task={getCurrentTask()}
+        onClose={() => dispatch(hideTaskDetail())}
+      />
 
       {/* 开发环境调试按钮 */}
       {import.meta.env.DEV && (
