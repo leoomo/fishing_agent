@@ -399,6 +399,7 @@ async def get_agent_trends(
 # Import at the top of file when adding these imports:
 # from apps.api.services.failure_analytics_service import FailureAnalyticsService
 
+
 @router.get(
     "/failure-patterns",
     summary="Failure Pattern Detection",
@@ -419,9 +420,9 @@ async def get_failure_patterns(
     """
     try:
         from apps.api.services.failure_analytics_service import FailureAnalyticsService
-        from packages.agent_fishing.core.database import get_db
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
 
-        with next(get_db()) as db:
+        with get_db_session() as db:
             analytics_service = FailureAnalyticsService(db)
             patterns = await analytics_service.detect_failure_patterns(time_range)
 
@@ -472,9 +473,9 @@ async def get_error_correlation(
     """
     try:
         from apps.api.services.failure_analytics_service import FailureAnalyticsService
-        from packages.agent_fishing.core.database import get_db
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
 
-        with next(get_db()) as db:
+        with get_db_session() as db:
             analytics_service = FailureAnalyticsService(db)
             error_chain = await analytics_service.get_error_correlation(correlation_id)
 
@@ -517,9 +518,9 @@ async def get_root_cause_analysis(
     """
     try:
         from apps.api.services.failure_analytics_service import FailureAnalyticsService
-        from packages.agent_fishing.core.database import get_db
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
 
-        with next(get_db()) as db:
+        with get_db_session() as db:
             analytics_service = FailureAnalyticsService(db)
             root_causes = await analytics_service.get_root_cause_analysis(time_range)
 
@@ -564,9 +565,9 @@ async def get_failure_metrics(
     """
     try:
         from apps.api.services.failure_analytics_service import FailureAnalyticsService
-        from packages.agent_fishing.core.database import get_db
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
 
-        with next(get_db()) as db:
+        with get_db_session() as db:
             analytics_service = FailureAnalyticsService(db)
             metrics = await analytics_service.get_failure_metrics()
 
