@@ -158,6 +158,56 @@ class CrawlerService:
             proxy=config.get("proxy")
         )
 
+    def start_task(self, task: CrawlerTask) -> CrawlerTask:
+        """
+        启动等待中的任务
+
+        Args:
+            task: 等待中的任务
+
+        Returns:
+            CrawlerTask: 更新后的任务
+        """
+        try:
+            # 更新任务状态为运行中
+            db = get_crawler_db()
+            with db.session_scope() as session:
+                # 重新获取任务以确保最新状态
+                current_task = session.query(CrawlerTask).get(task.id)
+                if not current_task:
+                    raise ValueError(f"任务不存在: {task.id}")
+
+                # 检查任务状态
+                if current_task.status not in [TaskStatus.PENDING, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+                    raise ValueError(f"任务状态不允许启动: {current_task.status}")
+
+                # 更新任务状态
+                current_task.status = TaskStatus.RUNNING
+                current_task.start_time = datetime.utcnow()
+                current_task.error_message = None
+
+                # 提取配置并启动采集进程
+                config = json.loads(current_task.config) if current_task.config else {}
+
+                # 异步启动数据采集（后台运行）
+                self._start_crawler_process(current_task.id, current_task.task_type, config)
+
+                logger.info(f"数据采集任务已启动: task_id={current_task.id}, type={current_task.task_type}")
+
+                return current_task
+
+        except Exception as e:
+            # 更新任务状态为失败
+            db = get_crawler_db()
+            with db.session_scope() as session:
+                current_task = session.query(CrawlerTask).get(task.id)
+                if current_task:
+                    current_task.status = TaskStatus.FAILED
+                    current_task.error_message = f"启动失败: {str(e)}"
+
+            logger.error(f"启动数据采集任务失败: {e}", exc_info=True)
+            raise
+
     def get_sync_status(self) -> Dict:
         """
         获取数据同步状态

@@ -61,6 +61,11 @@ export const crawlerApi = {
     return client.post(`/admin/crawler/tasks/${taskId}/retry`)
   },
 
+  // 启动任务
+  startTask: (taskId: number): Promise<CrawlerTask> => {
+    return client.post(`/admin/crawler/tasks/${taskId}/start`)
+  },
+
   // 获取任务日志
   getTaskLogs: (taskId: number, level?: string): Promise<CrawlerLog[]> => {
     return client.get(`/admin/crawler/tasks/${taskId}/logs`, {
