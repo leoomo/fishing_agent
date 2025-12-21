@@ -4,6 +4,7 @@ import {
   Form,
   Select,
   InputNumber,
+  Input,
   TimePicker,
   Button,
   Space,
@@ -175,9 +176,9 @@ const CronEditor: React.FC<CronEditorProps> = ({ value, onChange, timezone = 'As
                         <InputNumber min={1} max={365} />
                       </Form.Item>
                       <Form.Item label="执行时间" name="specific_times">
-                        <TimePicker.Format
+                        <TimePicker
                           format="HH:mm"
-                          value={dayjs('09:00', 'HH:mm')}
+                          defaultValue={dayjs('09:00', 'HH:mm')}
                         />
                       </Form.Item>
                     </>
@@ -198,9 +199,9 @@ const CronEditor: React.FC<CronEditorProps> = ({ value, onChange, timezone = 'As
                         </Select>
                       </Form.Item>
                       <Form.Item label="执行时间" name="specific_times">
-                        <TimePicker.Format
+                        <TimePicker
                           format="HH:mm"
-                          value={dayjs('09:00', 'HH:mm')}
+                          defaultValue={dayjs('09:00', 'HH:mm')}
                         />
                       </Form.Item>
                     </>
@@ -221,9 +222,9 @@ const CronEditor: React.FC<CronEditorProps> = ({ value, onChange, timezone = 'As
                         </Select>
                       </Form.Item>
                       <Form.Item label="执行时间" name="specific_times">
-                        <TimePicker.Format
+                        <TimePicker
                           format="HH:mm"
-                          value={dayjs('09:00', 'HH:mm')}
+                          defaultValue={dayjs('09:00', 'HH:mm')}
                         />
                       </Form.Item>
                     </>
@@ -250,7 +251,7 @@ const CronEditor: React.FC<CronEditorProps> = ({ value, onChange, timezone = 'As
           >
             <Input
               placeholder="0 9 * * *"
-              onChange={(e) => handleCronChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCronChange(e.target.value)}
             />
           </Form.Item>
 
