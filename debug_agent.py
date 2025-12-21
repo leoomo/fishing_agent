@@ -65,7 +65,6 @@ def check_environment():
 def test_agent_creation(model_provider: str = "qwen") -> bool:
     """测试Agent创建"""
     print(f"\n🤖 测试 {model_provider} Agent 创建...")
-
     try:
         from packages.agent_fishing import create_agent, ModelFactory
 
