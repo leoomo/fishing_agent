@@ -365,16 +365,16 @@ async def start_task(
                     detail=f"只能启动等待或失败的任务，当前状态: {task.status}"
                 )
 
-            # 启动任务
+            # 启动任务（返回 dict）
             crawler_service = CrawlerService()
-            updated_task = crawler_service.start_task(task)
+            task_dict = crawler_service.start_task(task)
 
             logger.info(
                 f"任务启动: task_id={task_id}, "
                 f"user={current_user.user_id}"
             )
 
-            return _build_task_response(updated_task)
+            return CrawlerTaskResponse(**task_dict)
 
     except HTTPException:
         raise
@@ -417,10 +417,10 @@ async def rerun_task(
             if not task:
                 raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
 
-            if task.status == TaskStatus.RUNNING:
+            if task.status in [TaskStatus.QUEUED, TaskStatus.RUNNING]:
                 raise HTTPException(
                     status_code=400,
-                    detail="任务正在运行中，无法重新运行"
+                    detail=f"任务状态为{task.status.value}，无法重新运行"
                 )
 
             # 重置任务状态

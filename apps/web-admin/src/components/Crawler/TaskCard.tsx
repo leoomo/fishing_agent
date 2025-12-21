@@ -25,8 +25,8 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   LoadingOutlined,
-  ExclamationCircleOutlined,
   EditOutlined,
+  HourglassOutlined,
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 import { useDispatch } from 'react-redux'
@@ -65,12 +65,17 @@ const statusConfig = {
   pending: {
     color: 'default',
     icon: <ClockCircleOutlined />,
-    text: '等待中',
+    text: '待启动',
+  },
+  queued: {
+    color: 'warning',
+    icon: <HourglassOutlined />,
+    text: '等待领取',
   },
   running: {
     color: 'processing',
     icon: <LoadingOutlined spin />,
-    text: '运行中',
+    text: '执行中',
   },
   success: {
     color: 'success',
@@ -82,7 +87,7 @@ const statusConfig = {
     icon: <CloseCircleOutlined />,
     text: '失败',
   },
-    paused: {
+  paused: {
     color: 'warning',
     icon: <PauseCircleOutlined />,
     text: '已暂停',
@@ -224,7 +229,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       key: 'rerun',
       label: '重新运行',
       icon: <ReloadOutlined />,
-      disabled: task.status.toLowerCase() === 'running',
+      disabled: ['queued', 'running'].includes(task.status.toLowerCase()),
     },
     {
       type: 'divider',
@@ -233,7 +238,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       key: 'login',
       label: '登录处理',
       icon: <PlayCircleOutlined />,
-      disabled: !['pending', 'failed'].includes(task.status),
+      disabled: !['pending', 'failed'].includes(task.status.toLowerCase()),
     },
     {
       type: 'divider',
@@ -243,7 +248,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       label: '删除任务',
       icon: <DeleteOutlined />,
       danger: true,
-      disabled: task.status.toLowerCase() === 'running',
+      disabled: ['queued', 'running'].includes(task.status.toLowerCase()),
     },
   ]
 
@@ -294,7 +299,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
               type="text"
               icon={<ReloadOutlined />}
               onClick={handleRerun}
-              disabled={task.status.toLowerCase() === 'running'}
+              disabled={['queued', 'running'].includes(task.status.toLowerCase())}
             />
           </Tooltip>,
           <Dropdown

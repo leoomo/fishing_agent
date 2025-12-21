@@ -169,9 +169,9 @@ async def claim_tasks(
 
     try:
         with db.session_scope() as session:
-            # 查找待执行的任务
+            # 查找已启动等待领取的任务（QUEUED 状态）
             query = session.query(CrawlerTask).filter(
-                CrawlerTask.status == TaskStatus.PENDING,
+                CrawlerTask.status == TaskStatus.QUEUED,
                 CrawlerTask.task_type.in_(request.supported_types)
             ).order_by(
                 CrawlerTask.created_at.asc()  # 先进先出
