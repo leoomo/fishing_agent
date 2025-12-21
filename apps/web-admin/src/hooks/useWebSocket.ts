@@ -315,7 +315,7 @@ export const useWebSocket = (
   }
 }
 
-// 专门用于爬虫任务的WebSocket Hook
+// 专门用于数据采集任务的WebSocket Hook
 export const useCrawlerWebSocket = (taskId: number) => {
   return useWebSocket(`/api/v1/admin/crawler/ws/crawler/${taskId}`, {
     reconnect: true,

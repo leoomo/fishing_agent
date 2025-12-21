@@ -355,7 +355,6 @@ const WorkflowTemplates: React.FC = () => {
             <Col span={8}>
               <Form.Item label="标签" name="tags">
                 <Select mode="tags" placeholder="添加标签">
-                  <Select.Option value="爬虫">爬虫</Select.Option>
                   <Select.Option value="数据采集">数据采集</Select.Option>
                   <Select.Option value="定时任务">定时任务</Select.Option>
                 </Select>

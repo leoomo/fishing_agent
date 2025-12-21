@@ -155,10 +155,10 @@ const CrawlerPage: React.FC = () => {
         <Row justify="space-between" align="middle">
           <Col>
             <Title level={2} style={{ margin: 0 }}>
-              爬虫管理
+              数据采集管理
             </Title>
             <Text type="secondary">
-              管理和监控爬虫任务的执行状态
+              管理和监控数据采集任务的执行状态
             </Text>
           </Col>
           <Col>
@@ -266,7 +266,7 @@ const CrawlerPage: React.FC = () => {
 
       {/* 创建任务表单弹窗 */}
       <Modal
-        title="创建爬虫任务"
+        title="创建数据采集任务"
         open={ui.showTaskForm}
         onCancel={() => dispatch(hideTaskForm())}
         footer={null}

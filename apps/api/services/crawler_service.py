@@ -1,5 +1,5 @@
 """
-爬虫服务 - 任务管理和执行逻辑
+数据采集服务 - 任务管理和执行逻辑
 """
 
 import subprocess
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class CrawlerService:
-    """爬虫服务"""
+    """数据采集服务"""
 
     def trigger_crawler(
         self,
@@ -26,7 +26,7 @@ class CrawlerService:
         proxy: Optional[str] = None
     ) -> Dict:
         """
-        触发爬虫任务
+        触发数据采集任务
 
         Args:
             task_type: 任务类型（taobao/jd/pdd/forum）
@@ -51,7 +51,7 @@ class CrawlerService:
             # 创建任务
             task = CrawlerTask(
                 task_type=task_type,
-                task_name=f"{task_type}爬虫 - {datetime.now().strftime('%Y%m%d%H%M%S')}",
+                task_name=f"{task_type}数据采集 - {datetime.now().strftime('%Y%m%d%H%M%S')}",
                 status=TaskStatus.PENDING,
                 config=json.dumps(config, ensure_ascii=False),
                 shop_url=shop_url,
@@ -67,9 +67,9 @@ class CrawlerService:
             # 保存任务ID，用于后续操作
             task_id = task.id
 
-            logger.info(f"爬虫任务已创建: task_id={task_id}, type={task_type}")
+            logger.info(f"数据采集任务已创建: task_id={task_id}, type={task_type}")
 
-            # 异步启动爬虫（后台运行）
+            # 异步启动数据采集（后台运行）
             self._start_crawler_process(task_id, task_type, config)
 
             # 在session内转换为dict返回，避免DetachedInstanceError
@@ -82,7 +82,7 @@ class CrawlerService:
         config: Dict
     ):
         """
-        启动爬虫进程（后台运行）
+        启动数据采集进程（后台运行）
 
         Args:
             task_id: 任务ID
@@ -90,11 +90,11 @@ class CrawlerService:
             config: 任务配置
 
         Note:
-            实际生产环境中，这里应该调用真实的爬虫脚本
+            实际生产环境中，这里应该调用真实的数据采集脚本
             目前仅做演示，不启动真实进程
         """
         try:
-            # 构造爬虫命令
+            # 构造数据采集命令
             # cmd = [
             #     "uv", "run", "python",
             #     "scripts/run_crawler.py",
@@ -107,7 +107,7 @@ class CrawlerService:
             # if config.get("proxy"):
             #     cmd.extend(["--proxy", config["proxy"]])
             #
-            # # 后台启动爬虫进程
+            # # 后台启动数据采集进程
             # subprocess.Popen(
             #     cmd,
             #     stdout=subprocess.DEVNULL,
@@ -116,18 +116,18 @@ class CrawlerService:
             # )
 
             logger.info(
-                f"爬虫进程待启动: task_id={task_id}, type={task_type}"
+                f"数据采集进程待启动: task_id={task_id}, type={task_type}"
             )
             logger.info(
-                "注意: 当前为演示模式，未实际启动爬虫进程。"
-                "实际生产环境需要实现真实的爬虫逻辑。"
+                "注意: 当前为演示模式，未实际启动数据采集进程。"
+                "实际生产环境需要实现真实的数据采集逻辑。"
             )
 
             # 演示模式：直接标记任务为待处理
-            # 真实环境中，任务状态由爬虫进程更新
+            # 真实环境中，任务状态由数据采集进程更新
 
         except Exception as e:
-            logger.error(f"启动爬虫进程失败: {e}", exc_info=True)
+            logger.error(f"启动数据采集进程失败: {e}", exc_info=True)
 
             # 更新任务状态为失败
             db = get_crawler_db()

@@ -95,7 +95,7 @@ if os.getenv("LOG_TO_FILE", "true").lower() == "true":
     agent_tools_handler.setFormatter(formatter)
     logging.getLogger('packages.agent_fishing.tools').addHandler(agent_tools_handler)
 
-    # 6. 爬虫RPA日志
+    # 6. 数据采集RPA日志
     crawler_handler = RotatingFileHandler(
         'logs/crawler/rpa.log',
         maxBytes=10*1024*1024,
@@ -223,7 +223,7 @@ app.include_router(equipment_admin_router, prefix="/api/v1/admin", tags=["equipm
 app.include_router(user_admin_router, prefix="/api/v1/admin", tags=["user-admin"])
 app.include_router(import_export_router, prefix="/api/v1/admin/import-export", tags=["import-export"])
 
-# Phase 4 爬虫和监控模块路由
+# Phase 4 数据采集和监控模块路由
 app.include_router(crawler_router, prefix="/api/v1/admin/crawler", tags=["crawler"])
 app.include_router(monitor_router, prefix="/api/v1/admin/monitor", tags=["monitor"])
 
