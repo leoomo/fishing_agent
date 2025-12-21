@@ -33,8 +33,8 @@ import type { ColumnsType } from 'antd/es/table'
 import AgentAnalytics from './AgentAnalytics'
 import ToolAnalytics from './ToolAnalytics'
 import CostReport from './CostReport'
-import FailurePatterns from '../Monitor/FailurePatterns'
-import RootCauseAnalysis from '../Monitor/RootCauseAnalysis'
+import FailurePatterns from '../components/Monitor/FailurePatterns'
+import RootCauseAnalysis from '../components/Monitor/RootCauseAnalysis'
 
 const Monitor = () => {
   const [loading, setLoading] = useState(true)
