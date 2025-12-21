@@ -137,7 +137,7 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
       <Card>
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="暂无爬虫任务"
+          description="暂无数据采集任务"
         >
           <Button type="primary" onClick={onRefresh}>
             刷新列表

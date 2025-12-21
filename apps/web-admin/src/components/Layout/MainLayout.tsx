@@ -49,7 +49,7 @@ const MainLayout = () => {
     {
       key: '/crawler',
       icon: <RobotOutlined />,
-      label: '爬虫管理',
+      label: '数据采集管理',
     },
     {
       key: '/workflow',

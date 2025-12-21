@@ -1,5 +1,5 @@
 """
-爬虫管理 Schema
+数据采集管理 Schema
 """
 
 from typing import Optional, List, Dict, Any
@@ -7,17 +7,17 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
 
 
-# ========== 爬虫任务 Schema ==========
+# ========== 数据采集任务 Schema ==========
 
 class CrawlerTaskCreate(BaseModel):
-    """创建爬虫任务请求"""
+    """创建数据采集任务请求"""
     task_type: str = Field(..., pattern="^(taobao|jd|forum)$", description="任务类型")
     task_name: str = Field(..., min_length=1, max_length=200, description="任务名称")
     config: Optional[Dict[str, Any]] = Field(None, description="任务配置（JSON）")
 
 
 class CrawlerTaskResponse(BaseModel):
-    """爬虫任务响应"""
+    """数据采集任务响应"""
     task_id: int  # 前端期望 task_id 而不是 id
     task_type: str
     task_name: str
@@ -37,7 +37,7 @@ class CrawlerTaskResponse(BaseModel):
 
 
 class CrawlerTaskListResponse(BaseModel):
-    """爬虫任务列表响应（分页）"""
+    """数据采集任务列表响应（分页）"""
     total: int = Field(..., description="总数量")
     page: int = Field(..., description="当前页码")
     page_size: int = Field(..., description="每页数量")
@@ -45,7 +45,7 @@ class CrawlerTaskListResponse(BaseModel):
 
 
 class CrawlerLogResponse(BaseModel):
-    """爬虫日志响应"""
+    """数据采集日志响应"""
     id: int
     task_id: int
     level: str  # info, warning, error
@@ -57,7 +57,7 @@ class CrawlerLogResponse(BaseModel):
 
 
 class TriggerCrawlerRequest(BaseModel):
-    """触发爬虫任务请求"""
+    """触发数据采集任务请求"""
     task_type: str = Field(..., pattern="^(taobao|jd|pdd|forum)$", description="任务类型")
     keywords: Optional[List[str]] = Field(None, description="搜索关键词列表")
     shop_url: Optional[str] = Field(None, description="店铺URL")

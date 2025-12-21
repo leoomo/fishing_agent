@@ -1,4 +1,4 @@
-// 爬虫管理类型定义
+// 数据采集管理类型定义
 
 export interface CrawlerTask {
   task_id: number

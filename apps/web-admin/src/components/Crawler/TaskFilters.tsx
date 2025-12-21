@@ -124,10 +124,10 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
         <Col span={4}>
           <Form.Item label="任务类型" name="task_type">
             <Select placeholder="选择类型" allowClear>
-              <Option value="taobao">淘宝爬虫</Option>
-              <Option value="jd">京东爬虫</Option>
-              <Option value="pdd">拼多多爬虫</Option>
-              <Option value="forum">论坛爬虫</Option>
+              <Option value="taobao">淘宝数据采集</Option>
+              <Option value="jd">京东数据采集</Option>
+              <Option value="pdd">拼多多数据采集</Option>
+              <Option value="forum">论坛数据采集</Option>
               <Option value="workflow">工作流</Option>
             </Select>
           </Form.Item>

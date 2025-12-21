@@ -29,7 +29,7 @@ export interface LoginStatusResponse {
 }
 
 export const crawlerApi = {
-  // 查询爬虫任务列表
+  // 查询数据采集任务列表
   listTasks: (params: {
     page: number
     page_size: number
@@ -51,7 +51,7 @@ export const crawlerApi = {
     return client.put(`/admin/crawler/tasks/${taskId}`, taskData)
   },
 
-  // 触发爬虫任务
+  // 触发数据采集任务
   triggerCrawler: (data: TriggerCrawlerRequest): Promise<CrawlerTask> => {
     return client.post('/admin/crawler/tasks/trigger', data)
   },

@@ -46,25 +46,25 @@ const TaskForm: React.FC<TaskFormProps> = ({
   // 任务类型配置
   const taskTypeConfigs = {
     taobao: {
-      name: '淘宝爬虫',
+      name: '淘宝数据采集',
       platforms: ['taobao', 'tmall'],
       defaultPriority: 'medium',
       description: '爬取淘宝商品信息',
     },
     jd: {
-      name: '京东爬虫',
+      name: '京东数据采集',
       platforms: ['jd'],
       defaultPriority: 'medium',
       description: '爬取京东商品信息',
     },
     pdd: {
-      name: '拼多多爬虫',
+      name: '拼多多数据采集',
       platforms: ['pdd'],
       defaultPriority: 'medium',
       description: '爬取拼多多商品信息',
     },
     forum: {
-      name: '论坛爬虫',
+      name: '论坛数据采集',
       platforms: ['zhihu', 'weibo', 'tieba'],
       defaultPriority: 'low',
       description: '爬取论坛帖子信息',

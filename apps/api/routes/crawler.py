@@ -1,5 +1,5 @@
 """
-爬虫管理路由 - 任务管理和实时监控
+数据采集管理路由 - 任务管理和实时监控
 """
 
 from fastapi import APIRouter, HTTPException, Query, Depends, WebSocket, WebSocketDisconnect, status
@@ -60,13 +60,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ========== 爬虫任务管理 ==========
+# ========== 数据采集任务管理 ==========
 
 @router.get(
     "/tasks",
     response_model=CrawlerTaskListResponse,
-    summary="查询爬虫任务列表",
-    description="查询爬虫任务列表（支持分页和筛选）"
+    summary="查询数据采集任务列表",
+    description="查询数据采集任务列表（支持分页和筛选）"
 )
 async def list_tasks(
     page: int = Query(1, ge=1, description="页码"),
@@ -76,7 +76,7 @@ async def list_tasks(
     current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
 ):
     """
-    查询爬虫任务列表（分页 + 筛选）
+    查询数据采集任务列表（分页 + 筛选）
 
     Returns:
         CrawlerTaskListResponse: 任务列表
@@ -104,22 +104,22 @@ async def list_tasks(
             )
 
     except Exception as e:
-        logger.error(f"查询爬虫任务失败: {e}", exc_info=True)
+        logger.error(f"查询数据采集任务失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
 
 
 @router.get(
     "/tasks/{task_id}",
     response_model=CrawlerTaskResponse,
-    summary="获取爬虫任务详情",
-    description="获取指定爬虫任务的详细信息"
+    summary="获取数据采集任务详情",
+    description="获取指定数据采集任务的详细信息"
 )
 async def get_task(
     task_id: int,
     current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
 ):
     """
-    获取爬虫任务详情
+    获取数据采集任务详情
 
     Args:
         task_id: 任务ID
@@ -153,8 +153,8 @@ async def get_task(
 @router.put(
     "/tasks/{task_id}",
     response_model=CrawlerTaskResponse,
-    summary="更新爬虫任务",
-    description="更新指定爬虫任务的信息"
+    summary="更新数据采集任务",
+    description="更新指定数据采集任务的信息"
 )
 async def update_task(
     task_id: int,
@@ -162,7 +162,7 @@ async def update_task(
     current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
 ):
     """
-    更新爬虫任务
+    更新数据采集任务
 
     Args:
         task_id: 任务ID
@@ -232,8 +232,8 @@ async def update_task(
     "/tasks/trigger",
     response_model=CrawlerTaskResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="手动触发爬虫任务",
-    description="手动触发爬虫任务（支持自定义关键词和配置）"
+    summary="手动触发数据采集任务",
+    description="手动触发数据采集任务（支持自定义关键词和配置）"
 )
 async def trigger_crawler(
     request: TriggerCrawlerRequest,
