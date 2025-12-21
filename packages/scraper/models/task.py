@@ -20,6 +20,7 @@ class TaskStatus(str, enum.Enum):
     RUNNING = "RUNNING"      # Worker已领取，执行中
     SUCCESS = "SUCCESS"      # 执行成功
     FAILED = "FAILED"        # 执行失败
+    CANCELLED = "CANCELLED"  # 用户手动停止
 
 
 class LogLevel(str, enum.Enum):
