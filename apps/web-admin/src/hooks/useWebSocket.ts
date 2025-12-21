@@ -46,8 +46,8 @@ export const useWebSocket = (
   })
 
   const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<number | null>(null)
+  const heartbeatIntervalRef = useRef<number | null>(null)
   const manualCloseRef = useRef<boolean>(false)
 
   // 构建完整的WebSocket URL
@@ -137,7 +137,7 @@ export const useWebSocket = (
       }
 
       ws.onclose = (event) => {
-        const wasClean = event.wasClose
+        const wasClean = event.wasClean
         const code = event.code
         const reason = event.reason
 

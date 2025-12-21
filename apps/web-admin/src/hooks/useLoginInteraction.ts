@@ -7,7 +7,7 @@ import {
   updateLoginStatus,
   clearLoginState,
   selectLoginStateByTaskId,
-  LoginStatus,
+  type LoginStatus,
 } from '../store/slices/crawlerSlice'
 import { crawlerApi } from '../api/services/crawler'
 
@@ -28,18 +28,7 @@ export const useLoginInteraction = (
   const loginState = useSelector(selectLoginStateByTaskId(taskId))
 
   // WebSocket连接
-  const { isConnected, lastMessage, error: wsError } = useLoginWebSocket(taskId, {
-    onConnect: () => {
-      console.log(`登录WebSocket已连接 - 任务 ${taskId}`)
-    },
-    onDisconnect: () => {
-      console.log(`登录WebSocket已断开 - 任务 ${taskId}`)
-    },
-    onError: (error) => {
-      console.error(`登录WebSocket连接错误 - 任务 ${taskId}:`, error)
-      message.error('登录连接失败，请刷新页面重试')
-    },
-  })
+  const { isConnected, lastMessage, error: wsError } = useLoginWebSocket(taskId)
 
   // 处理WebSocket消息
   useEffect(() => {

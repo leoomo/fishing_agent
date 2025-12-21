@@ -80,6 +80,11 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
     }
   }
 
+  // 处理任务选择变化
+  const handleTaskSelectionChange = (taskId: number, selected: boolean) => {
+    dispatch(toggleTaskSelection(taskId))
+  }
+
   // 批量删除
   const handleBulkDelete = async () => {
     if (selectedTasks.length === 0) {
@@ -96,6 +101,7 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
       onOk: async () => {
         try {
           await dispatch(bulkDeleteTasks(selectedTasks)).unwrap()
+          message.success('批量删除成功')
         } catch (error: any) {
           console.error('批量删除失败:', error)
         }
