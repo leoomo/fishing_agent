@@ -18,6 +18,7 @@ const Settings = lazy(() => import('@/pages/Settings'))
 const Crawler = lazy(() => import('@/pages/Crawler'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
 const Workflow = lazy(() => import('@/pages/Workflow'))
+const PendingEquipment = lazy(() => import('@/pages/PendingEquipment'))
 
 // 加载中组件
 const PageLoading = () => (
@@ -84,6 +85,9 @@ const App = () => {
 
                 {/* Crawler Management */}
                 <Route path="crawler" element={<Crawler />} />
+
+                {/* Pending Equipment Review */}
+                <Route path="pending-equipment" element={<PendingEquipment />} />
 
                 {/* Workflow Management */}
                 <Route path="workflow/*" element={<Workflow />} />

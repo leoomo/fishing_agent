@@ -15,6 +15,10 @@ from pydantic import BaseModel, Field
 
 from packages.scraper.database import get_crawler_db
 from packages.scraper.models import CrawlerTask, TaskStatus, CrawlerLog, LogLevel
+from apps.api.schemas.crawler import (
+    PendingEquipmentSubmit,
+    PendingEquipmentSubmitResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -416,3 +420,231 @@ async def get_workers_status():
         "registered_workers": list(WORKER_API_KEYS.keys()),
         "total_count": len(WORKER_API_KEYS)
     }
+
+
+@router.post(
+    "/submit-pending",
+    response_model=PendingEquipmentSubmitResponse,
+    summary="提交待审核装备数据",
+    description="Worker 提交 OCR 识别结果，服务端提取结构化数据并存入待审核表"
+)
+async def submit_pending_equipment(
+    request: PendingEquipmentSubmit,
+    worker_id: str = Depends(verify_worker_token)
+):
+    """
+    Worker 提交待审核装备数据
+
+    处理流程：
+    1. 验证 Worker 权限
+    2. 调用 EquipmentImportAgent 提取结构化数据
+    3. 存入 pending_equipment 表
+    4. 更新任务统计信息
+
+    Args:
+        request: 包含 OCR 文本和来源信息
+        worker_id: 从 Token 验证获取的 Worker ID
+
+    Returns:
+        PendingEquipmentSubmitResponse: 包含待审核记录 ID
+    """
+    try:
+        # 验证请求中的 worker_id 与 token 中的一致
+        if request.worker_id != worker_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Worker ID 不匹配 (请求: {request.worker_id}, Token: {worker_id})"
+            )
+
+        # 验证任务存在
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).filter(
+                CrawlerTask.id == request.task_id
+            ).first()
+
+            if not task:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"任务不存在: {request.task_id}"
+                )
+
+            # 验证任务是否分配给该 Worker
+            config = json.loads(task.config) if task.config else {}
+            assigned_worker = config.get("_assigned_worker")
+            if assigned_worker and assigned_worker != worker_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"任务不属于该 Worker (分配给: {assigned_worker})"
+                )
+
+        # 调用 EquipmentImportAgent 提取结构化数据
+        from packages.agent_equipment_import import EquipmentImportAgent
+
+        agent = EquipmentImportAgent(
+            model_provider="zhipu",
+            enable_logging=True,
+            enable_compression=True,
+            enable_monitoring=False  # Worker 提交不记录监控
+        )
+
+        # 使用 extract_and_save 提取并保存
+        result = agent.extract_and_save(
+            text=request.ocr_text,
+            source_type=request.source_type,
+            source_url=request.source_url
+        )
+
+        if result.success:
+            logger.info(
+                f"Worker {worker_id} 提交待审核数据成功: "
+                f"task_id={request.task_id}, pending_id={result.pending_id}"
+            )
+
+            # 记录日志
+            with db.session_scope() as session:
+                log = CrawlerLog(
+                    task_id=request.task_id,
+                    level=LogLevel.INFO,
+                    message=f"Worker 提交待审核装备数据，pending_id={result.pending_id}",
+                    details=json.dumps({
+                        "worker_id": worker_id,
+                        "pending_id": result.pending_id,
+                        "equipment_type": result.extracted.equipment_type if result.extracted else None,
+                        "brand_name": result.extracted.brand_name if result.extracted else None,
+                    }, ensure_ascii=False)
+                )
+                session.add(log)
+
+            return PendingEquipmentSubmitResponse(
+                success=True,
+                pending_id=result.pending_id,
+                message=result.message,
+                extracted_data=result.extracted.to_dict() if result.extracted else None
+            )
+        else:
+            logger.warning(
+                f"Worker {worker_id} 提交待审核数据失败: "
+                f"task_id={request.task_id}, error={result.message}"
+            )
+
+            return PendingEquipmentSubmitResponse(
+                success=False,
+                pending_id=None,
+                message=result.message,
+                extracted_data=result.extracted.to_dict() if result.extracted else None
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"提交待审核数据失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/submit-pending-batch",
+    response_model=dict,
+    summary="批量提交待审核装备数据",
+    description="Worker 批量提交 OCR 识别结果（从一张图片识别出多个装备）"
+)
+async def submit_pending_equipment_batch(
+    request: PendingEquipmentSubmit,
+    worker_id: str = Depends(verify_worker_token)
+):
+    """
+    Worker 批量提交待审核装备数据
+
+    用于一张截图中包含多个商品的情况。
+
+    Returns:
+        dict: 包含成功和失败的结果列表
+    """
+    try:
+        # 验证请求中的 worker_id 与 token 中的一致
+        if request.worker_id != worker_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Worker ID 不匹配"
+            )
+
+        # 验证任务存在
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).filter(
+                CrawlerTask.id == request.task_id
+            ).first()
+
+            if not task:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"任务不存在: {request.task_id}"
+                )
+
+        # 调用 EquipmentImportAgent 批量提取
+        from packages.agent_equipment_import import EquipmentImportAgent
+
+        agent = EquipmentImportAgent(
+            model_provider="zhipu",
+            enable_logging=True,
+            enable_compression=True,
+            enable_monitoring=False
+        )
+
+        # 使用 batch_extract_and_save 批量提取并保存
+        results = agent.batch_extract_and_save(
+            text=request.ocr_text,
+            source_type=request.source_type,
+            source_url=request.source_url
+        )
+
+        success_count = sum(1 for r in results if r.success)
+        failed_count = len(results) - success_count
+
+        logger.info(
+            f"Worker {worker_id} 批量提交待审核数据: "
+            f"task_id={request.task_id}, success={success_count}, failed={failed_count}"
+        )
+
+        # 记录日志
+        with db.session_scope() as session:
+            log = CrawlerLog(
+                task_id=request.task_id,
+                level=LogLevel.INFO,
+                message=f"Worker 批量提交待审核数据，成功 {success_count} 条，失败 {failed_count} 条",
+                details=json.dumps({
+                    "worker_id": worker_id,
+                    "success_count": success_count,
+                    "failed_count": failed_count,
+                }, ensure_ascii=False)
+            )
+            session.add(log)
+
+        return {
+            "success": True,
+            "total": len(results),
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "results": [
+                {
+                    "success": r.success,
+                    "pending_id": r.pending_id,
+                    "message": r.message,
+                    "equipment_type": r.extracted.equipment_type if r.extracted else None,
+                    "model": r.extracted.model if r.extracted else None,
+                }
+                for r in results
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"批量提交待审核数据失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
