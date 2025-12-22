@@ -7,6 +7,7 @@ import json
 import logging
 from typing import List, Optional, Dict
 from datetime import datetime
+from sqlalchemy import func
 
 from packages.scraper.database import get_crawler_db
 from packages.scraper.models import CrawlerTask, CrawlerLog, TaskStatus
@@ -238,6 +239,21 @@ class CrawlerService:
         """
         db = get_crawler_db()
         with db.session_scope() as session:
+            # 各状态任务数量统计
+            status_counts = dict(
+                session.query(CrawlerTask.status, func.count(CrawlerTask.id))
+                .group_by(CrawlerTask.status)
+                .all()
+            )
+
+            total_tasks = sum(status_counts.values())
+            pending_tasks = status_counts.get(TaskStatus.PENDING, 0)
+            queued_tasks = status_counts.get(TaskStatus.QUEUED, 0)
+            running_tasks = status_counts.get(TaskStatus.RUNNING, 0)
+            success_tasks_count = status_counts.get(TaskStatus.SUCCESS, 0)
+            failed_tasks_count = status_counts.get(TaskStatus.FAILED, 0)
+            cancelled_tasks = status_counts.get(TaskStatus.CANCELLED, 0)
+
             # 统计最近成功任务
             recent_success_tasks = session.query(CrawlerTask).filter(
                 CrawlerTask.status == TaskStatus.SUCCESS
@@ -262,5 +278,14 @@ class CrawlerService:
                 "total_synced": total_synced,
                 "pending_sync": pending_sync,
                 "duplicate_removed": duplicate_removed,
-                "sync_errors": sync_errors
+                "sync_errors": sync_errors,
+                # 任务状态统计，供前端展示
+                "total_tasks": total_tasks,
+                # 将待启动与等待领取合并为「待处理」
+                "pending_tasks": pending_tasks + queued_tasks,
+                "queued_tasks": queued_tasks,
+                "running_tasks": running_tasks,
+                "success_tasks": success_tasks_count,
+                "failed_tasks": failed_tasks_count,
+                "cancelled_tasks": cancelled_tasks,
             }
