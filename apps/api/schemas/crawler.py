@@ -349,3 +349,75 @@ class PaginatedResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+# ========== 待审核装备 Schema ==========
+
+class PendingEquipmentSubmit(BaseModel):
+    """Worker提交待审核装备数据"""
+    task_id: int = Field(..., description="关联的爬虫任务ID")
+    worker_id: str = Field(..., description="Worker ID")
+    ocr_text: str = Field(..., min_length=1, description="OCR识别的原始文本")
+    source_type: str = Field(
+        default="ecommerce",
+        pattern="^(ecommerce|official|forum|unknown)$",
+        description="来源类型"
+    )
+    source_url: Optional[str] = Field(None, description="来源URL")
+    image_data: Optional[str] = Field(None, description="Base64编码的原始图片(可选)")
+    equipment_type: Optional[str] = Field(None, description="装备类型(可选预填)")
+    brand_name: Optional[str] = Field(None, description="品牌名称(可选预填)")
+
+
+class PendingEquipmentSubmitResponse(BaseModel):
+    """Worker提交待审核装备响应"""
+    success: bool
+    pending_id: Optional[int] = Field(None, description="待审核记录ID")
+    message: str
+    extracted_data: Optional[Dict[str, Any]] = Field(None, description="LLM提取的结构化数据")
+
+
+class PendingEquipmentResponse(BaseModel):
+    """待审核装备响应"""
+    id: int
+    status: str  # pending/approved/rejected
+    ocr_text: str
+    source_type: str
+    source_url: Optional[str] = None
+    extracted_data: Optional[Dict[str, Any]] = None
+    confidence: float
+    equipment_type: Optional[str] = None
+    brand_name: Optional[str] = None
+    model_name: Optional[str] = None
+    product_name: Optional[str] = None
+    reviewed_by: Optional[int] = None
+    reviewed_at: Optional[str] = None
+    review_notes: Optional[str] = None
+    equipment_id: Optional[int] = None
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PendingEquipmentListResponse(BaseModel):
+    """待审核装备列表响应（分页）"""
+    total: int = Field(..., description="总数量")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    items: List[PendingEquipmentResponse] = Field(..., description="待审核列表")
+
+
+class PendingEquipmentReview(BaseModel):
+    """审核待审核装备请求"""
+    action: str = Field(..., pattern="^(approve|reject)$", description="审核动作")
+    review_notes: Optional[str] = Field(None, description="审核备注")
+    # 审核通过时，可以修正提取的数据
+    corrected_data: Optional[Dict[str, Any]] = Field(None, description="修正后的数据(可选)")
+
+
+class PendingEquipmentReviewResponse(BaseModel):
+    """审核响应"""
+    success: bool
+    message: str
+    equipment_id: Optional[int] = Field(None, description="审核通过后创建的装备ID")

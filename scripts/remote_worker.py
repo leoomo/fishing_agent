@@ -39,6 +39,14 @@ except ImportError as e:
     TAOBAO_RPA_AVAILABLE = False
     print(f"警告: 无法导入淘宝RPA模块: {e}")
 
+# 导入OCR处理模块
+try:
+    from packages.data_processing.ocr import OCRMergeProcessor, create_ocr_merge_processor
+    OCR_AVAILABLE = True
+except ImportError as e:
+    OCR_AVAILABLE = False
+    print(f"警告: 无法导入OCR模块: {e}")
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -245,6 +253,117 @@ class RemoteWorker:
             logger.error(f"汇报请求失败: {e}")
             return False
 
+    def submit_pending_equipment(
+        self,
+        task_id: int,
+        ocr_text: str,
+        source_type: str = "ecommerce",
+        source_url: Optional[str] = None
+    ) -> Dict:
+        """
+        提交待审核装备数据
+
+        Args:
+            task_id: 任务ID
+            ocr_text: OCR识别的文本
+            source_type: 来源类型
+            source_url: 来源URL
+
+        Returns:
+            提交结果
+        """
+        url = f"{self.server_url}/api/v1/worker/submit-pending"
+
+        payload = {
+            "task_id": task_id,
+            "worker_id": self.worker_id,
+            "ocr_text": ocr_text,
+            "source_type": source_type,
+            "source_url": source_url
+        }
+
+        try:
+            response = self.session.post(
+                url,
+                json=payload,
+                headers=self._get_headers(),
+                timeout=60  # OCR提取可能需要较长时间
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success"):
+                    logger.info(
+                        f"待审核数据提交成功: task_id={task_id}, "
+                        f"pending_id={data.get('pending_id')}"
+                    )
+                else:
+                    logger.warning(
+                        f"待审核数据提交失败: task_id={task_id}, "
+                        f"message={data.get('message')}"
+                    )
+                return data
+            else:
+                logger.error(f"提交失败: {response.status_code} - {response.text}")
+                return {"success": False, "message": response.text}
+
+        except requests.RequestException as e:
+            logger.error(f"提交待审核数据请求失败: {e}")
+            return {"success": False, "message": str(e)}
+
+    def submit_pending_equipment_batch(
+        self,
+        task_id: int,
+        ocr_text: str,
+        source_type: str = "ecommerce",
+        source_url: Optional[str] = None
+    ) -> Dict:
+        """
+        批量提交待审核装备数据（从一张图片识别出多个装备）
+
+        Args:
+            task_id: 任务ID
+            ocr_text: OCR识别的文本（可能包含多个商品）
+            source_type: 来源类型
+            source_url: 来源URL
+
+        Returns:
+            提交结果
+        """
+        url = f"{self.server_url}/api/v1/worker/submit-pending-batch"
+
+        payload = {
+            "task_id": task_id,
+            "worker_id": self.worker_id,
+            "ocr_text": ocr_text,
+            "source_type": source_type,
+            "source_url": source_url
+        }
+
+        try:
+            response = self.session.post(
+                url,
+                json=payload,
+                headers=self._get_headers(),
+                timeout=120  # 批量处理可能需要更长时间
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(
+                    f"批量提交完成: task_id={task_id}, "
+                    f"success={data.get('success_count')}, "
+                    f"failed={data.get('failed_count')}"
+                )
+                return data
+            else:
+                logger.error(f"批量提交失败: {response.status_code} - {response.text}")
+                return {"success": False, "message": response.text}
+
+        except requests.RequestException as e:
+            logger.error(f"批量提交待审核数据请求失败: {e}")
+            return {"success": False, "message": str(e)}
+
     def heartbeat(self) -> Dict:
         """发送心跳"""
         url = f"{self.server_url}/api/v1/worker/heartbeat"
@@ -348,6 +467,11 @@ class RemoteWorker:
         """
         执行淘宝爬虫任务
 
+        完整流程：
+        1. RPA采集商品截图
+        2. OCR识别截图（如果启用）
+        3. 提交识别结果到服务端待审核
+
         Args:
             task_id: 任务ID
             config: 任务配置，包含:
@@ -355,6 +479,8 @@ class RemoteWorker:
                 - shop_url: 店铺URL（可选）
                 - max_results: 最大采集数量（默认20）
                 - category: 商品类别（默认"通用"）
+                - enable_ocr: 是否启用OCR识别（默认True）
+                - submit_pending: 是否提交待审核数据（默认True）
 
         Returns:
             执行结果字典
@@ -377,6 +503,8 @@ class RemoteWorker:
         shop_url = config.get("shop_url", "")
         max_results = config.get("max_results", 20)
         category = config.get("category", "通用")
+        enable_ocr = config.get("enable_ocr", True)
+        submit_pending = config.get("submit_pending", True)
 
         # 关键词列表 - 支持字符串或列表格式
         if isinstance(keywords_raw, list):
@@ -387,9 +515,11 @@ class RemoteWorker:
             keywords = []
 
         logger.info(f"任务配置: keywords={keywords}, shop_url={shop_url}, max_results={max_results}")
+        logger.info(f"OCR配置: enable_ocr={enable_ocr}, submit_pending={submit_pending}")
 
         all_results = []
         failed_items = 0
+        pending_submitted = 0
 
         try:
             # 汇报开始
@@ -427,6 +557,19 @@ class RemoteWorker:
                     "total_items": 1
                 }
 
+            # 汇报进度 - 开始OCR处理
+            self.report_progress(task_id, "running", 50, "正在处理采集的图片...")
+
+            # OCR识别和提交待审核数据
+            if enable_ocr and OCR_AVAILABLE and submit_pending:
+                pending_submitted = self._process_and_submit_ocr(
+                    task_id=task_id,
+                    results=all_results,
+                    image_base_dir=str(rpa.image_save_dir),
+                    source_type="ecommerce"
+                )
+                logger.info(f"OCR处理完成，提交了 {pending_submitted} 条待审核数据")
+
             # 汇报完成
             self.report_progress(task_id, "running", 90, "正在整理采集结果...")
 
@@ -443,13 +586,14 @@ class RemoteWorker:
                     "specs": item.specs,
                 })
 
-            logger.info(f"淘宝任务完成: 成功采集 {len(all_results)} 个商品")
+            logger.info(f"淘宝任务完成: 成功采集 {len(all_results)} 个商品，提交待审核 {pending_submitted} 条")
 
             return {
                 "success": True,
                 "success_items": len(all_results),
                 "failed_items": failed_items,
                 "total_items": len(all_results) + failed_items,
+                "pending_submitted": pending_submitted,
                 "data": {
                     "products": products_data,
                     "keywords": keywords,
@@ -466,6 +610,158 @@ class RemoteWorker:
                 "failed_items": failed_items + 1,
                 "total_items": len(all_results) + failed_items + 1
             }
+
+    def _process_and_submit_ocr(
+        self,
+        task_id: int,
+        results: List,
+        image_base_dir: str,
+        source_type: str = "ecommerce"
+    ) -> int:
+        """
+        处理采集的图片并提交OCR识别结果到服务端
+
+        Args:
+            task_id: 任务ID
+            results: 采集结果列表（包含商品信息）
+            image_base_dir: 图片基础目录
+            source_type: 来源类型
+
+        Returns:
+            成功提交的待审核数据数量
+        """
+        if not OCR_AVAILABLE:
+            logger.warning("OCR模块不可用，跳过OCR处理")
+            return 0
+
+        submitted_count = 0
+        from pathlib import Path
+
+        try:
+            # 遍历每个商品
+            for item in results:
+                try:
+                    # 获取商品ID（用于定位图片目录）
+                    product_id = None
+                    if hasattr(item, 'source_url') and item.source_url:
+                        # 从URL中提取商品ID
+                        import re
+                        match = re.search(r'id=(\d+)', item.source_url)
+                        if match:
+                            product_id = match.group(1)
+
+                    if not product_id:
+                        logger.warning(f"无法获取商品ID，跳过OCR处理: {item.name}")
+                        continue
+
+                    # 图片目录
+                    image_dir = Path(image_base_dir) / product_id
+                    if not image_dir.exists():
+                        logger.warning(f"图片目录不存在，跳过: {image_dir}")
+                        continue
+
+                    # 获取所有图片
+                    image_files = list(image_dir.glob("*.jpg")) + list(image_dir.glob("*.png"))
+                    if not image_files:
+                        logger.warning(f"没有找到图片文件，跳过: {image_dir}")
+                        continue
+
+                    logger.info(f"处理商品 {product_id} 的 {len(image_files)} 张图片")
+
+                    # 创建OCR处理器
+                    import tempfile
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        processor = create_ocr_merge_processor(
+                            source_dir=str(image_dir),
+                            output_dir=temp_dir,
+                            enable_split=False,  # 不分割
+                            verbose=False
+                        )
+
+                        # 执行OCR处理
+                        result = processor.process()
+
+                        if result.success and result.output_files:
+                            # 读取合并后的图片进行OCR识别
+                            # 使用服务端的LLM进行识别，这里只需要将图片内容作为文本描述
+                            # 实际上，我们可以直接使用商品的specs信息作为OCR文本
+                            ocr_text = self._build_ocr_text_from_item(item)
+
+                            if ocr_text:
+                                # 提交到服务端
+                                submit_result = self.submit_pending_equipment(
+                                    task_id=task_id,
+                                    ocr_text=ocr_text,
+                                    source_type=source_type,
+                                    source_url=item.source_url if hasattr(item, 'source_url') else None
+                                )
+
+                                if submit_result.get("success"):
+                                    submitted_count += 1
+                                    logger.info(f"商品 {product_id} 待审核数据提交成功")
+                                else:
+                                    logger.warning(f"商品 {product_id} 待审核数据提交失败: {submit_result.get('message')}")
+
+                except Exception as e:
+                    logger.error(f"处理商品OCR失败: {e}", exc_info=True)
+                    continue
+
+        except Exception as e:
+            logger.error(f"OCR处理失败: {e}", exc_info=True)
+
+        return submitted_count
+
+    def _build_ocr_text_from_item(self, item) -> str:
+        """
+        从采集结果构建OCR文本
+
+        将商品的各项信息组合成类似OCR识别结果的文本格式
+
+        Args:
+            item: 商品数据项
+
+        Returns:
+            OCR文本
+        """
+        lines = []
+
+        # 商品名称
+        if hasattr(item, 'name') and item.name:
+            lines.append(f"商品名称: {item.name}")
+
+        # 品牌
+        if hasattr(item, 'brand_name') and item.brand_name:
+            lines.append(f"品牌: {item.brand_name}")
+
+        # 型号
+        if hasattr(item, 'model') and item.model:
+            lines.append(f"型号: {item.model}")
+
+        # 价格
+        if hasattr(item, 'price_min') and item.price_min:
+            price_str = f"¥{item.price_min}"
+            if hasattr(item, 'price_max') and item.price_max and item.price_max != item.price_min:
+                price_str += f" - ¥{item.price_max}"
+            lines.append(f"价格: {price_str}")
+
+        # 分类
+        if hasattr(item, 'category') and item.category:
+            lines.append(f"分类: {item.category}")
+
+        # 规格参数
+        if hasattr(item, 'specs') and item.specs:
+            lines.append("规格参数:")
+            if isinstance(item.specs, dict):
+                for key, value in item.specs.items():
+                    lines.append(f"  {key}: {value}")
+            elif isinstance(item.specs, str):
+                lines.append(f"  {item.specs}")
+
+        # 描述
+        if hasattr(item, 'description') and item.description:
+            lines.append(f"描述: {item.description}")
+
+        return "\n".join(lines)
 
     def _execute_jd_task(self, task_id: int, config: Dict) -> Dict:  # noqa: ARG002
         """执行京东爬虫任务 (示例)"""

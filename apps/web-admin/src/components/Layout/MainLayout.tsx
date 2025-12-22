@@ -11,6 +11,7 @@ import {
   BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
+  AuditOutlined,
 } from '@ant-design/icons'
 import { useDispatch } from 'react-redux'
 import { logout } from '@/store/slices/authSlice'
@@ -50,6 +51,11 @@ const MainLayout = () => {
       key: '/crawler',
       icon: <RobotOutlined />,
       label: '数据采集管理',
+    },
+    {
+      key: '/pending-equipment',
+      icon: <AuditOutlined />,
+      label: '待审核装备',
     },
     {
       key: '/workflow',

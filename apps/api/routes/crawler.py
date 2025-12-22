@@ -38,7 +38,12 @@ from apps.api.schemas.crawler import (
     CronExpressionRequest,
     CronExpressionResponse,
     ApiResponse,
-    PaginatedResponse
+    PaginatedResponse,
+    # Pending equipment schemas
+    PendingEquipmentResponse,
+    PendingEquipmentListResponse,
+    PendingEquipmentReview,
+    PendingEquipmentReviewResponse,
 )
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
@@ -1701,6 +1706,342 @@ async def get_scheduler_status(
     except Exception as e:
         logger.error(f"获取调度器状态失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+# ========== 待审核装备管理 ==========
+
+@router.get(
+    "/pending-equipment",
+    response_model=PendingEquipmentListResponse,
+    summary="获取待审核装备列表",
+    description="获取待审核装备列表（支持分页和筛选）"
+)
+async def list_pending_equipment(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    status_filter: Optional[str] = Query(None, alias="status", description="状态筛选: pending/approved/rejected"),
+    equipment_type: Optional[str] = Query(None, description="装备类型筛选"),
+    brand_name: Optional[str] = Query(None, description="品牌名称筛选"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取待审核装备列表
+
+    Returns:
+        PendingEquipmentListResponse: 待审核装备列表
+    """
+    try:
+        from packages.agent_equipment_import.models.pending import PendingEquipment
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+
+        with get_db_session() as session:
+            query = session.query(PendingEquipment)
+
+            # 筛选条件
+            if status_filter:
+                query = query.filter(PendingEquipment.status == status_filter)
+            if equipment_type:
+                query = query.filter(PendingEquipment.equipment_type == equipment_type)
+            if brand_name:
+                query = query.filter(PendingEquipment.brand_name.contains(brand_name))
+
+            # 计算总数
+            total = query.count()
+
+            # 分页
+            items = query.order_by(PendingEquipment.created_at.desc()).offset(
+                (page - 1) * page_size
+            ).limit(page_size).all()
+
+            return PendingEquipmentListResponse(
+                total=total,
+                page=page,
+                page_size=page_size,
+                items=[_build_pending_equipment_response(item) for item in items]
+            )
+
+    except Exception as e:
+        logger.error(f"获取待审核装备列表失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/pending-equipment/{pending_id}",
+    response_model=PendingEquipmentResponse,
+    summary="获取待审核装备详情",
+    description="获取指定待审核装备的详细信息"
+)
+async def get_pending_equipment(
+    pending_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取待审核装备详情
+
+    Args:
+        pending_id: 待审核记录ID
+
+    Returns:
+        PendingEquipmentResponse: 待审核装备详情
+    """
+    try:
+        from packages.agent_equipment_import.models.pending import PendingEquipment
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+
+        with get_db_session() as session:
+            item = session.query(PendingEquipment).filter(
+                PendingEquipment.id == pending_id
+            ).first()
+
+            if not item:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"待审核记录不存在: id={pending_id}"
+                )
+
+            return _build_pending_equipment_response(item)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取待审核装备详情失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.post(
+    "/pending-equipment/{pending_id}/review",
+    response_model=PendingEquipmentReviewResponse,
+    summary="审核待审核装备",
+    description="审核通过或拒绝待审核装备"
+)
+async def review_pending_equipment(
+    pending_id: int,
+    review: PendingEquipmentReview,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    审核待审核装备
+
+    Args:
+        pending_id: 待审核记录ID
+        review: 审核请求（包含action和notes）
+
+    Returns:
+        PendingEquipmentReviewResponse: 审核结果
+    """
+    try:
+        from packages.agent_equipment_import.models.pending import PendingEquipment
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+
+        with get_db_session() as session:
+            item = session.query(PendingEquipment).filter(
+                PendingEquipment.id == pending_id
+            ).first()
+
+            if not item:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"待审核记录不存在: id={pending_id}"
+                )
+
+            if item.status != "pending":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"该记录已被审核: status={item.status}"
+                )
+
+            equipment_id = None
+
+            if review.action == "approve":
+                # 审核通过，创建正式装备记录
+                equipment_id = _create_equipment_from_pending(
+                    session, item, review.corrected_data
+                )
+
+                item.status = "approved"
+                item.equipment_id = equipment_id
+                logger.info(f"待审核装备通过: pending_id={pending_id}, equipment_id={equipment_id}")
+            else:
+                # 审核拒绝
+                item.status = "rejected"
+                logger.info(f"待审核装备拒绝: pending_id={pending_id}")
+
+            # 更新审核信息
+            item.reviewed_by = current_user.user_id
+            item.reviewed_at = datetime.utcnow()
+            item.review_notes = review.review_notes
+
+            session.commit()
+
+            return PendingEquipmentReviewResponse(
+                success=True,
+                message=f"审核{'通过' if review.action == 'approve' else '拒绝'}成功",
+                equipment_id=equipment_id
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"审核待审核装备失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"审核失败: {str(e)}")
+
+
+@router.get(
+    "/pending-equipment/stats",
+    summary="获取待审核装备统计",
+    description="获取待审核装备的统计数据"
+)
+async def get_pending_equipment_stats(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取待审核装备统计数据
+
+    Returns:
+        统计数据字典
+    """
+    try:
+        from packages.agent_equipment_import.models.pending import PendingEquipment
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from sqlalchemy import func
+
+        with get_db_session() as session:
+            # 统计各状态数量
+            stats = session.query(
+                PendingEquipment.status,
+                func.count(PendingEquipment.id)
+            ).group_by(PendingEquipment.status).all()
+
+            stat_dict = {s[0]: s[1] for s in stats}
+            total = sum(stat_dict.values())
+
+            return {
+                "total": total,
+                "pending": stat_dict.get("pending", 0),
+                "approved": stat_dict.get("approved", 0),
+                "rejected": stat_dict.get("rejected", 0),
+            }
+
+    except Exception as e:
+        logger.error(f"获取待审核装备统计失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取统计失败: {str(e)}")
+
+
+@router.delete(
+    "/pending-equipment/{pending_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除待审核记录",
+    description="删除指定的待审核装备记录"
+)
+async def delete_pending_equipment(
+    pending_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_DELETE))
+):
+    """
+    删除待审核记录
+
+    Args:
+        pending_id: 待审核记录ID
+    """
+    try:
+        from packages.agent_equipment_import.models.pending import PendingEquipment
+        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+
+        with get_db_session() as session:
+            item = session.query(PendingEquipment).filter(
+                PendingEquipment.id == pending_id
+            ).first()
+
+            if not item:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"待审核记录不存在: id={pending_id}"
+                )
+
+            session.delete(item)
+            logger.info(f"待审核记录已删除: pending_id={pending_id}, user={current_user.user_id}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除待审核记录失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+
+
+def _build_pending_equipment_response(item) -> PendingEquipmentResponse:
+    """构造待审核装备响应对象"""
+    return PendingEquipmentResponse(
+        id=item.id,
+        status=item.status,
+        ocr_text=item.ocr_text,
+        source_type=item.source_type,
+        source_url=item.source_url,
+        extracted_data=json.loads(item.extracted_data) if item.extracted_data else None,
+        confidence=item.confidence or 0.0,
+        equipment_type=item.equipment_type,
+        brand_name=item.brand_name,
+        model_name=item.model_name,
+        product_name=item.product_name,
+        reviewed_by=item.reviewed_by,
+        reviewed_at=item.reviewed_at.isoformat() if item.reviewed_at else None,
+        review_notes=item.review_notes,
+        equipment_id=item.equipment_id,
+        created_at=item.created_at.isoformat(),
+        updated_at=item.updated_at.isoformat()
+    )
+
+
+def _create_equipment_from_pending(session, pending_item, corrected_data: Optional[dict] = None) -> int:
+    """
+    从待审核记录创建正式装备
+
+    Args:
+        session: 数据库会话
+        pending_item: 待审核记录
+        corrected_data: 修正后的数据（可选）
+
+    Returns:
+        int: 创建的装备ID
+    """
+    from packages.agent_fishing.tools.lure.models.equipment import Equipment
+    from packages.agent_fishing.tools.lure.models.brand import Brand
+
+    # 获取提取的数据
+    extracted = json.loads(pending_item.extracted_data) if pending_item.extracted_data else {}
+
+    # 如果有修正数据，则使用修正数据
+    if corrected_data:
+        extracted.update(corrected_data)
+
+    # 查找或创建品牌
+    brand_name = extracted.get("brand_name") or pending_item.brand_name
+    brand = None
+    if brand_name:
+        brand = session.query(Brand).filter(
+            Brand.name_cn == brand_name
+        ).first()
+
+        if not brand:
+            # 创建新品牌
+            brand = Brand(name_cn=brand_name, country="未知")
+            session.add(brand)
+            session.flush()
+
+    # 创建装备记录
+    equipment = Equipment(
+        name=extracted.get("name") or pending_item.product_name or "未命名装备",
+        category=extracted.get("equipment_type") or pending_item.equipment_type or "其他",
+        brand_id=brand.brand_id if brand else None,
+        price_min=extracted.get("price_min"),
+        price_max=extracted.get("price_max"),
+        description=extracted.get("description"),
+        source_url=pending_item.source_url,
+        is_active=True
+    )
+    session.add(equipment)
+    session.flush()
+
+    return equipment.equipment_id
 
 
 # ========== 辅助函数 ==========
