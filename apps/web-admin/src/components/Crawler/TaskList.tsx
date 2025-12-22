@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef, useCallback } from 'react'
 import {
   Row,
   Col,
@@ -24,6 +24,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { message } from 'antd'
 
 import type { CrawlerTask } from '../../types/crawler'
+import type { AppDispatch } from '../../store/store'
 import {
   selectTasks,
   selectPagination,
@@ -48,7 +49,7 @@ interface TaskListProps {
 }
 
 const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
 
   // 选择器
   const tasks = useSelector(selectTasks)
@@ -57,8 +58,8 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
   const selectedTasks = useSelector(selectSelectedTasks)
   const ui = useSelector(selectUI)
 
-  // 获取任务列表
-  useEffect(() => {
+  // 刷新任务列表的函数
+  const refreshTasks = useCallback(() => {
     const params = {
       page: pagination.current,
       pageSize: pagination.pageSize,
@@ -66,6 +67,31 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
     }
     dispatch(fetchTasks(params))
   }, [dispatch, pagination.current, pagination.pageSize, filters])
+
+  // 获取任务列表
+  useEffect(() => {
+    refreshTasks()
+  }, [refreshTasks])
+
+  // 自动刷新：检测是否有运行中或等待中的任务
+  const hasActiveTasksRef = useRef(false)
+  useEffect(() => {
+    const hasActiveTasks = tasks.some(
+      (task: CrawlerTask) => ['queued', 'running'].includes(task.status.toLowerCase())
+    )
+    hasActiveTasksRef.current = hasActiveTasks
+
+    // 如果有活跃任务，每5秒刷新一次
+    if (hasActiveTasks) {
+      const intervalId = setInterval(() => {
+        if (hasActiveTasksRef.current) {
+          refreshTasks()
+        }
+      }, 5000)
+
+      return () => clearInterval(intervalId)
+    }
+  }, [tasks, refreshTasks])
 
   // 处理页码变化
   const handlePageChange = (page: number, pageSize?: number) => {
