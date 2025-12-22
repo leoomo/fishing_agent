@@ -68,10 +68,18 @@ class TriggerCrawlerRequest(BaseModel):
 class SyncStatusResponse(BaseModel):
     """数据同步状态响应"""
     last_sync_time: Optional[str] = None
-    total_synced: int
-    pending_sync: int
-    duplicate_removed: int
-    sync_errors: int
+    total_synced: int = 0
+    pending_sync: int = 0
+    duplicate_removed: int = 0
+    sync_errors: int = 0
+    # 任务状态统计（前端概览使用）
+    total_tasks: int = 0
+    pending_tasks: int = 0
+    queued_tasks: int = 0
+    running_tasks: int = 0
+    success_tasks: int = 0
+    failed_tasks: int = 0
+    cancelled_tasks: int = 0
 
 
 # ========== 工作流 Schema ==========

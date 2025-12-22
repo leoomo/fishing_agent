@@ -226,15 +226,31 @@ const TaskForm: React.FC<TaskFormProps> = ({
         <Form.Item
           label="店铺URL"
           name="shop_url"
-          tooltip="输入店铺首页URL，将爬取该店铺的所有商品"
+          tooltip="输入店铺首页URL，将爬取该店铺的所有商品（可选）"
+          dependencies={['keywords']}
+          rules={[
+            {
+              validator: (_, value) => {
+                const keywords = form.getFieldValue('keywords')
+                if (!value && !keywords) {
+                  return Promise.reject('请输入店铺URL或搜索关键词（至少填写一项）')
+                }
+                return Promise.resolve()
+              }
+            }
+          ]}
         >
-          <Input placeholder="例如: https://shop123456.taobao.com 或 https://mall.jd.com/xxx" />
+          <Input
+            placeholder="例如: https://shop123456.taobao.com 或 https://mall.jd.com/xxx"
+            onChange={() => form.validateFields(['keywords'])}
+          />
         </Form.Item>
 
         <Form.Item
           label="搜索关键词"
           name="keywords"
-          tooltip="多个关键词用逗号分隔"
+          tooltip="多个关键词用逗号分隔（可选）"
+          dependencies={['shop_url']}
           rules={[
             {
               validator: (_, value) => {
@@ -247,7 +263,10 @@ const TaskForm: React.FC<TaskFormProps> = ({
             }
           ]}
         >
-          <Input placeholder="多个关键词用逗号分隔，例如: 路亚竿, 渔轮, 钓鱼装备" />
+          <Input
+            placeholder="多个关键词用逗号分隔，例如: 路亚竿, 渔轮, 钓鱼装备"
+            onChange={() => form.validateFields(['shop_url'])}
+          />
         </Form.Item>
 
       </Card>
