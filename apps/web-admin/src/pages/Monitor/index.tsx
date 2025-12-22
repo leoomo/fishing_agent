@@ -1,31 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import ReactECharts from 'echarts-for-react'
-
-// Safe ECharts wrapper to prevent undefined errors
-const SafeReactECharts = ({ option, style, ...props }: any) => {
-  if (!option || typeof option !== 'object') {
-    return (
-      <div style={{
-        ...style,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#999',
-        fontSize: 16
-      }}>
-        暂无数据
-      </div>
-    )
-  }
-
-  return (
-    <ReactECharts
-      option={option}
-      style={style}
-      {...props}
-    />
-  )
-}
 import {
   Card,
   Row,
@@ -61,6 +35,32 @@ import ToolAnalytics from './ToolAnalytics'
 import CostReport from './CostReport'
 import FailurePatterns from '../../components/Monitor/FailurePatterns'
 import RootCauseAnalysis from '../../components/Monitor/RootCauseAnalysis'
+
+// Safe ECharts wrapper to prevent undefined errors
+const SafeReactECharts = ({ option, style, ...props }: any) => {
+  if (!option || typeof option !== 'object') {
+    return (
+      <div style={{
+        ...style,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#999',
+        fontSize: 16
+      }}>
+        暂无数据
+      </div>
+    )
+  }
+
+  return (
+    <ReactECharts
+      option={option}
+      style={style}
+      {...props}
+    />
+  )
+}
 
 const Monitor = () => {
   const [loading, setLoading] = useState(true)
@@ -490,21 +490,21 @@ const Monitor = () => {
             <Col span={16}>
               <Card>
                 <SafeReactECharts
-                option={apiTrendOption}
-                style={{ height: 350, width: '100%' }}
-                lazyUpdate={true}
-                notMerge={true}
-              />
+                  option={apiTrendOption}
+                  style={{ height: 350, width: '100%' }}
+                  lazyUpdate={true}
+                  notMerge={true}
+                />
               </Card>
             </Col>
             <Col span={8}>
               <Card>
                 <SafeReactECharts
-                option={statusCodeOption}
-                style={{ height: 350, width: '100%' }}
-                lazyUpdate={true}
-                notMerge={true}
-              />
+                  option={statusCodeOption}
+                  style={{ height: 350, width: '100%' }}
+                  lazyUpdate={true}
+                  notMerge={true}
+                />
               </Card>
             </Col>
           </Row>
@@ -572,11 +572,11 @@ const Monitor = () => {
 
           <Card style={{ marginTop: 16 }}>
             <SafeReactECharts
-            option={llmTrendOption}
-            style={{ height: 350, width: '100%' }}
-            lazyUpdate={true}
-            notMerge={true}
-          />
+              option={llmTrendOption}
+              style={{ height: 350, width: '100%' }}
+              lazyUpdate={true}
+              notMerge={true}
+            />
           </Card>
 
           <Card title="提供商统计" style={{ marginTop: 16 }}>
