@@ -195,18 +195,37 @@ async def update_task(
 
             # 更新允许的字段
             allowed_fields = [
-                'task_name', 'priority', 'description', 'max_pages',
+                'task_name', 'task_type', 'priority', 'description', 'max_pages',
                 'delay_range', 'timeout', 'retry_count', 'extract_images',
-                'use_proxy', 'random_ua', 'config'
+                'use_proxy', 'random_ua', 'config', 'shop_url', 'keywords'
             ]
 
             updated = False
             for field, value in task_update.items():
-                if field in allowed_fields and hasattr(task, field):
+                if field in allowed_fields:
                     if field == 'config' and value:
                         # config字段需要JSON序列化
                         task.config = json.dumps(value, ensure_ascii=False)
-                    else:
+                    elif field == 'keywords':
+                        # keywords需要存入config
+                        config = json.loads(task.config) if task.config else {}
+                        # 支持字符串或列表格式
+                        if isinstance(value, str):
+                            config['keywords'] = [kw.strip() for kw in value.split(',') if kw.strip()]
+                        else:
+                            config['keywords'] = value
+                        task.config = json.dumps(config, ensure_ascii=False)
+                        updated = True
+                        continue
+                    elif field == 'shop_url':
+                        # shop_url同时存入task字段和config
+                        task.shop_url = value
+                        config = json.loads(task.config) if task.config else {}
+                        config['shop_url'] = value
+                        task.config = json.dumps(config, ensure_ascii=False)
+                        updated = True
+                        continue
+                    elif hasattr(task, field):
                         setattr(task, field, value)
                     updated = True
 

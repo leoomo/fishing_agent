@@ -31,6 +31,14 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+# 导入淘宝RPA爬虫
+try:
+    from packages.scraper.rpa.taobao_shop_category_rpa import TaobaoShopCategoryRPA
+    TAOBAO_RPA_AVAILABLE = True
+except ImportError as e:
+    TAOBAO_RPA_AVAILABLE = False
+    print(f"警告: 无法导入淘宝RPA模块: {e}")
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -337,29 +345,120 @@ class RemoteWorker:
             return False
 
     def _execute_taobao_task(self, task_id: int, config: Dict) -> Dict:
-        """执行淘宝爬虫任务 (示例)"""
-        logger.info(f"执行淘宝任务 {task_id}")
+        """
+        执行淘宝爬虫任务
 
-        # 模拟执行过程
-        self.report_progress(task_id, "running", 30, "正在登录淘宝...")
-        time.sleep(1)
+        Args:
+            task_id: 任务ID
+            config: 任务配置，包含:
+                - keywords: 搜索关键词列表（逗号分隔的字符串）
+                - shop_url: 店铺URL（可选）
+                - max_results: 最大采集数量（默认20）
+                - category: 商品类别（默认"通用"）
 
-        self.report_progress(task_id, "running", 60, "正在采集商品数据...")
-        time.sleep(1)
+        Returns:
+            执行结果字典
+        """
+        logger.info(f"执行淘宝任务 {task_id}, config={config}")
 
-        self.report_progress(task_id, "running", 90, "正在保存数据...")
-        time.sleep(0.5)
+        # 检查RPA模块是否可用
+        if not TAOBAO_RPA_AVAILABLE:
+            logger.error("淘宝RPA模块不可用")
+            return {
+                "success": False,
+                "error": "淘宝RPA模块未安装或导入失败",
+                "success_items": 0,
+                "failed_items": 0,
+                "total_items": 0
+            }
 
-        return {
-            "success": True,
-            "success_items": 10,
-            "total_items": 10,
-            "data": {"products": ["示例商品1", "示例商品2"]}
-        }
+        # 解析配置
+        keywords_raw = config.get("keywords", "")
+        shop_url = config.get("shop_url", "")
+        max_results = config.get("max_results", 20)
+        category = config.get("category", "通用")
 
-    def _execute_jd_task(self, task_id: int, config: Dict) -> Dict:
+        # 关键词列表 - 支持字符串或列表格式
+        if isinstance(keywords_raw, list):
+            keywords = [kw.strip() for kw in keywords_raw if kw and kw.strip()]
+        elif isinstance(keywords_raw, str) and keywords_raw:
+            keywords = [kw.strip() for kw in keywords_raw.split(",") if kw.strip()]
+        else:
+            keywords = []
+
+        logger.info(f"任务配置: keywords={keywords}, shop_url={shop_url}, max_results={max_results}")
+
+        all_results = []
+        failed_items = 0
+
+        try:
+            # 汇报开始
+            self.report_progress(task_id, "running", 10, "正在初始化淘宝RPA爬虫...")
+
+            # 创建RPA实例
+            rpa = TaobaoShopCategoryRPA()
+
+            # 配置店铺URL（如果提供）
+            if shop_url:
+                rpa.shop_url = shop_url
+                logger.info(f"使用自定义店铺URL: {shop_url}")
+
+            # 配置分类（如果提供关键词，使用第一个作为分类名）
+            if keywords:
+                rpa.category_name = keywords[0]
+                logger.info(f"使用分类名: {keywords[0]}")
+
+            # 执行爬取
+            self.report_progress(task_id, "running", 20, f"正在访问店铺并爬取分类商品...")
+            logger.info(f"开始爬取店铺: {rpa.shop_url}, 分类: {rpa.category_name}")
+
+            # 调用 crawl 方法执行实际爬取
+            all_results = rpa.crawl()
+            logger.info(f"爬取完成，获取到 {len(all_results)} 个商品")
+
+            # 汇报完成
+            self.report_progress(task_id, "running", 90, "正在整理采集结果...")
+
+            # 构建结果数据
+            products_data = []
+            for item in all_results:
+                products_data.append({
+                    "name": item.name,
+                    "brand": item.brand_name,
+                    "price": item.price_min,
+                    "url": item.source_url,
+                    "category": item.category,
+                    "model": item.model,
+                    "specs": item.specs,
+                })
+
+            logger.info(f"淘宝任务完成: 成功采集 {len(all_results)} 个商品")
+
+            return {
+                "success": True,
+                "success_items": len(all_results),
+                "failed_items": failed_items,
+                "total_items": len(all_results) + failed_items,
+                "data": {
+                    "products": products_data,
+                    "keywords": keywords,
+                    "shop_url": shop_url
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"淘宝任务执行失败: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "success_items": len(all_results),
+                "failed_items": failed_items + 1,
+                "total_items": len(all_results) + failed_items + 1
+            }
+
+    def _execute_jd_task(self, task_id: int, config: Dict) -> Dict:  # noqa: ARG002
         """执行京东爬虫任务 (示例)"""
-        logger.info(f"执行京东任务 {task_id}")
+        logger.info(f"执行京东任务 {task_id}, config={config}")
 
         self.report_progress(task_id, "running", 50, "正在采集京东数据...")
         time.sleep(2)
@@ -371,9 +470,9 @@ class RemoteWorker:
             "data": {"products": ["JD商品1"]}
         }
 
-    def _execute_forum_task(self, task_id: int, config: Dict) -> Dict:
+    def _execute_forum_task(self, task_id: int, config: Dict) -> Dict:  # noqa: ARG002
         """执行论坛爬虫任务 (示例)"""
-        logger.info(f"执行论坛任务 {task_id}")
+        logger.info(f"执行论坛任务 {task_id}, config={config}")
 
         self.report_progress(task_id, "running", 50, "正在爬取论坛帖子...")
         time.sleep(1)
@@ -385,9 +484,9 @@ class RemoteWorker:
             "data": {"posts": ["帖子1", "帖子2"]}
         }
 
-    def _execute_generic_task(self, task_id: int, config: Dict) -> Dict:
+    def _execute_generic_task(self, task_id: int, config: Dict) -> Dict:  # noqa: ARG002
         """执行通用任务 (示例)"""
-        logger.info(f"执行通用任务 {task_id}")
+        logger.info(f"执行通用任务 {task_id}, config={config}")
         time.sleep(1)
         return {"success": True, "success_items": 1, "total_items": 1}
 
@@ -481,7 +580,7 @@ class RemoteWorker:
             return
 
         # 信号处理
-        def signal_handler(signum, frame):
+        def signal_handler(signum, _frame):
             logger.info(f"收到信号 {signum}，准备退出...")
             self.stop()
             sys.exit(0)
