@@ -485,7 +485,7 @@ async def submit_pending_equipment(
             model_provider="zhipu",
             enable_logging=True,
             enable_compression=True,
-            enable_monitoring=False  # Worker 提交不记录监控
+            enable_monitoring=True  # 启用监控记录
         )
 
         # 使用 extract_and_save 提取并保存
@@ -591,7 +591,7 @@ async def submit_pending_equipment_batch(
             model_provider="zhipu",
             enable_logging=True,
             enable_compression=True,
-            enable_monitoring=False
+            enable_monitoring=True
         )
 
         # 使用 batch_extract_and_save 批量提取并保存
