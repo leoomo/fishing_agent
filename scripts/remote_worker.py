@@ -416,6 +416,17 @@ class RemoteWorker:
             all_results = rpa.crawl()
             logger.info(f"爬取完成，获取到 {len(all_results)} 个商品")
 
+            # 检查是否采集到数据
+            if not all_results or len(all_results) == 0:
+                logger.warning("未采集到任何商品数据，任务失败")
+                return {
+                    "success": False,
+                    "error": "未采集到任何商品数据（可能登录失败或页面加载异常）",
+                    "success_items": 0,
+                    "failed_items": 1,
+                    "total_items": 1
+                }
+
             # 汇报完成
             self.report_progress(task_id, "running", 90, "正在整理采集结果...")
 
