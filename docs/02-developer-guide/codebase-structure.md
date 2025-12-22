@@ -99,14 +99,20 @@ packages/                           # 模块化包目录
 │   ├── core/
 │   │   ├── agent.py                # 装备导入Agent
 │   │   ├── extractor.py            # 信息提取器
-│   │   └── compressor.py           # 文本压缩器
-│   ├── extractors/                 # 提取器实现
+│   │   └── prompts.py              # 提取提示词
+│   ├── middleware/
 │   │   ├── __init__.py
-│   │   ├── base_extractor.py       # 基础提取器
-│   │   └── custom_extractor.py     # 自定义提取器
-│   └── utils/
+│   │   ├── patterns.py             # 提取模式
+│   │   └── text_compressor.py      # 文本压缩中间件
+│   ├── models/                     # 数据模型
+│   │   ├── __init__.py
+│   │   └── pending.py              # 待审核装备模型
+│   ├── schemas/                    # 数据模式
+│   │   ├── __init__.py
+│   │   └── extracted.py            # 提取结果模式
+│   └── tools/
 │       ├── __init__.py
-│       └── text_utils.py           # 文本处理工具
+│       └── import_tool.py          # 导入工具
 ├── data_processing/                # 数据处理包 ⭐v5.0.2
 │   ├── __init__.py
 │   ├── image/                      # 图片处理
@@ -155,13 +161,18 @@ packages/                           # 模块化包目录
     ├── scheduler/                  # 定时调度
     │   ├── __init__.py
     │   └── cron_scheduler.py       # 定时任务
-    ├── persister/                  # 数据持久化
+    ├── persister/                  # 数据持久化 ⭐v5.0.2
     │   ├── __init__.py
-    │   └── database_persister.py   # 数据库持久化
+    │   └── equipment_persister.py  # 装备数据持久化
+    ├── worker/                     # 分布式Worker ⭐v5.0.2
+    │   ├── __init__.py
+    │   ├── worker.py               # Worker实现
+    │   └── client.py               # Worker客户端
     └── models/                     # 爬虫模型
         ├── __init__.py
-        ├── crawler_task.py         # 爬虫任务模型
-        └── crawler_log.py          # 爬虫日志模型
+        ├── base.py                 # 基础模型
+        ├── task.py                 # 任务模型
+        └── node.py                 # 节点模型
 ```
 
 ## 🏗️ 应用层结构
@@ -193,11 +204,19 @@ apps/                              # 应用层
 │   │   ├── __init__.py
 │   │   ├── fishing.py             # 钓鱼相关API
 │   │   ├── equipment.py           # 装备管理API
-│   │   ├── admin.py               # 管理员API
-│   │   ├── analytics.py           # 数据分析API ⭐v5.0.2
+│   │   ├── equipment_admin.py     # 装备管理API ⭐v5.0.2
+    │   │   ├── import_export.py       # 导入导出API ⭐v5.0.2
+    │   │   ├── auth.py                # 认证API ⭐v3.1.1
+    │   │   ├── user_admin.py          # 用户管理API ⭐v5.0.2
+    │   │   ├── user_equipment.py      # 用户装备API ⭐v5.0.2
+    │   │   ├── admin.py               # 管理员API
+    │   │   ├── analytics.py           # 数据分析API ⭐v5.0.2
 │   │   ├── config.py              # 配置管理API ⭐v5.0.2
 │   │   ├── crawler.py             # 爬虫管理API ⭐v4.0.0
-│   │   └── monitor.py             # 监控API ⭐v4.0.0
+│   │   ├── monitor.py             # 监控API ⭐v4.0.0
+    │   │   ├── ocr.py                 # OCR API ⭐v5.0.2
+    │   │   ├── chat.py                # 聊天API ⭐v5.0.2
+    │   │   └── worker.py              # Worker API ⭐v5.0.2
 │   ├── schemas/                   # 数据模型
 │   │   ├── __init__.py
 │   │   ├── fishing.py             # 钓鱼相关模型
