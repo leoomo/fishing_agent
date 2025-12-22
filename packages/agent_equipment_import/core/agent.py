@@ -215,8 +215,13 @@ class EquipmentImportAgent:
         Returns:
             ImportResult: 导入结果
         """
+        # 记录执行开始
+        self.monitoring_callback.set_input(f"extract_and_save: {text[:100]}...")
+        self.monitoring_callback.start_execution()
+
         try:
             if not text or not text.strip():
+                self.monitoring_callback.set_error("文本内容为空")
                 return ImportResult(
                     success=False,
                     message="文本内容为空"
@@ -227,6 +232,7 @@ class EquipmentImportAgent:
 
             # 检查提取结果
             if not extracted.equipment_type:
+                self.monitoring_callback.set_error("无法识别装备类型")
                 return ImportResult(
                     success=False,
                     message="无法识别装备类型",
@@ -241,6 +247,10 @@ class EquipmentImportAgent:
                 source_url=source_url
             )
 
+            # 记录成功执行
+            self.monitoring_callback.set_success(True)
+            self.monitoring_callback.end_execution()
+
             return ImportResult(
                 success=True,
                 pending_id=pending_id,
@@ -250,10 +260,14 @@ class EquipmentImportAgent:
 
         except Exception as e:
             logger.error(f"提取并保存失败: {e}")
+            self.monitoring_callback.set_error(f"处理失败: {str(e)}")
             return ImportResult(
                 success=False,
                 message=f"处理失败: {str(e)}"
             )
+        finally:
+            # 确保执行总是结束
+            self.monitoring_callback.end_execution()
 
     def extract_only(
         self,
@@ -294,8 +308,13 @@ class EquipmentImportAgent:
         Returns:
             List[ImportResult]: 每个型号的导入结果
         """
+        # 记录执行开始
+        self.monitoring_callback.set_input(f"batch_extract_and_save: {text[:100]}...")
+        self.monitoring_callback.start_execution()
+
         try:
             if not text or not text.strip():
+                self.monitoring_callback.set_error("文本内容为空")
                 return [ImportResult(
                     success=False,
                     message="文本内容为空"
@@ -360,14 +379,22 @@ class EquipmentImportAgent:
                 success_count = sum(1 for r in results if r.success)
                 logger.info(f"批量提取完成: {success_count}/{len(results)} 个型号成功")
 
+            # 记录成功执行
+            self.monitoring_callback.set_success(True)
+            self.monitoring_callback.end_execution()
+
             return results
 
         except Exception as e:
             logger.error(f"批量提取并保存失败: {e}")
+            self.monitoring_callback.set_error(f"批量处理失败: {str(e)}")
             return [ImportResult(
                 success=False,
                 message=f"批量处理失败: {str(e)}"
             )]
+        finally:
+            # 确保执行总是结束
+            self.monitoring_callback.end_execution()
 
     def batch_extract_only(
         self,

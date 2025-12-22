@@ -1,4 +1,31 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import ReactECharts from 'echarts-for-react'
+
+// Safe ECharts wrapper to prevent undefined errors
+const SafeReactECharts = ({ option, style, ...props }: any) => {
+  if (!option || typeof option !== 'object') {
+    return (
+      <div style={{
+        ...style,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#999',
+        fontSize: 16
+      }}>
+        暂无数据
+      </div>
+    )
+  }
+
+  return (
+    <ReactECharts
+      option={option}
+      style={style}
+      {...props}
+    />
+  )
+}
 import {
   Card,
   Row,
@@ -26,7 +53,6 @@ import {
   BugOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
-import ReactECharts from 'echarts-for-react'
 import { monitorApi } from '@/api/services/monitor'
 import type { APIStats, LLMStats, DBPerformance, SystemHealth, RealtimeStats } from '@/types/monitor'
 import type { ColumnsType } from 'antd/es/table'
@@ -173,8 +199,24 @@ const Monitor = () => {
   }
 
   // API 请求趋势图
-  const apiTrendOption = apiStats
-    ? {
+  const apiTrendOption = useMemo(() => {
+    if (!apiStats || !Array.isArray(apiStats.requests_by_day)) {
+      return {
+        title: { text: 'API 请求趋势', left: 'center' },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: [] },
+        yAxis: { type: 'value' },
+        series: [],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: { text: '暂无数据', fontSize: 16, fill: '#999' }
+        }
+      }
+    }
+
+    return {
         title: { text: 'API 请求趋势', left: 'center' },
         tooltip: { trigger: 'axis' },
         xAxis: {
@@ -192,11 +234,31 @@ const Monitor = () => {
           },
         ],
       }
-    : {}
+  }, [apiStats])
 
   // LLM Token 趋势图
-  const llmTrendOption = llmStats
-    ? {
+  const llmTrendOption = useMemo(() => {
+    if (!llmStats || !Array.isArray(llmStats.by_day)) {
+      return {
+        title: { text: 'LLM Token 消耗趋势', left: 'center' },
+        tooltip: { trigger: 'axis' },
+        legend: { top: 30 },
+        xAxis: { type: 'category', data: [] },
+        yAxis: [
+          { type: 'value', name: '调用次数' },
+          { type: 'value', name: 'Token 数' },
+        ],
+        series: [],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: { text: '暂无数据', fontSize: 16, fill: '#999' }
+        }
+      }
+    }
+
+    return {
         title: { text: 'LLM Token 消耗趋势', left: 'center' },
         tooltip: { trigger: 'axis' },
         legend: { top: 30 },
@@ -223,11 +285,29 @@ const Monitor = () => {
           },
         ],
       }
-    : {}
+  }, [llmStats])
 
   // 状态码分布图
-  const statusCodeOption = apiStats
-    ? {
+  const statusCodeOption = useMemo(() => {
+    if (!apiStats || !apiStats.requests_by_status) {
+      return {
+        title: { text: '状态码分布', left: 'center' },
+        tooltip: { trigger: 'item' },
+        series: [{
+          type: 'pie',
+          radius: '60%',
+          data: [],
+        }],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: { text: '暂无数据', fontSize: 16, fill: '#999' }
+        }
+      }
+    }
+
+    return {
         title: { text: '状态码分布', left: 'center' },
         tooltip: { trigger: 'item' },
         series: [
@@ -244,7 +324,7 @@ const Monitor = () => {
           },
         ],
       }
-    : {}
+  }, [apiStats])
 
   // LLM 提供商统计表格列
   const llmProviderColumns: ColumnsType<{
@@ -409,12 +489,22 @@ const Monitor = () => {
           <Row gutter={16} style={{ marginTop: 16 }}>
             <Col span={16}>
               <Card>
-                <ReactECharts option={apiTrendOption} style={{ height: 350 }} />
+                <SafeReactECharts
+                option={apiTrendOption}
+                style={{ height: 350, width: '100%' }}
+                lazyUpdate={true}
+                notMerge={true}
+              />
               </Card>
             </Col>
             <Col span={8}>
               <Card>
-                <ReactECharts option={statusCodeOption} style={{ height: 350 }} />
+                <SafeReactECharts
+                option={statusCodeOption}
+                style={{ height: 350, width: '100%' }}
+                lazyUpdate={true}
+                notMerge={true}
+              />
               </Card>
             </Col>
           </Row>
@@ -481,7 +571,12 @@ const Monitor = () => {
           </Row>
 
           <Card style={{ marginTop: 16 }}>
-            <ReactECharts option={llmTrendOption} style={{ height: 350 }} />
+            <SafeReactECharts
+            option={llmTrendOption}
+            style={{ height: 350, width: '100%' }}
+            lazyUpdate={true}
+            notMerge={true}
+          />
           </Card>
 
           <Card title="提供商统计" style={{ marginTop: 16 }}>
