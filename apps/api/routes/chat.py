@@ -37,9 +37,8 @@ from ..services.chat_service import ChatService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Service instance
+# Service instance for non-LLM operations
 chat_service = ChatService()
-
 
 # ============ Message Endpoints ============
 
@@ -54,7 +53,14 @@ async def send_message(
     This endpoint is for platforms that don't support SSE.
     """
     try:
-        result = chat_service.chat(
+        # Create chat service instance for this user
+        service = ChatService(
+            model_provider=request.model_provider,
+            user_id=current_user.user_id,
+            session_id=request.session_id
+        )
+
+        result = service.chat(
             message=request.message,
             session_id=request.session_id,
             user_id=current_user.user_id  # 使用认证用户ID
@@ -90,7 +96,14 @@ async def send_message_stream(
 
     async def generate():
         try:
-            for chunk in chat_service.chat_stream(
+            # Create chat service instance for this user
+            service = ChatService(
+                model_provider=request.model_provider,
+                user_id=current_user.user_id,
+                session_id=request.session_id
+            )
+
+            for chunk in service.chat_stream(
                 message=request.message,
                 session_id=request.session_id,
                 user_id=user_id  # 使用认证用户ID
