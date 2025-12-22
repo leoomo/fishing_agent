@@ -8,6 +8,7 @@ from datetime import datetime
 from packages.agent_fishing.tools.lure.orm.session import get_db_session
 from packages.agent_fishing.tools.lure.models.chat import ChatSession, ChatMessage
 from packages.agent_fishing import create_agent
+from packages.agent_fishing.core.monitoring_callback import MonitoringCallback
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +27,23 @@ DEFAULT_SUGGESTIONS = [
 class ChatService:
     """Chat service for managing sessions and messages"""
 
-    def __init__(self, model_provider: str = "qwen"):
+    def __init__(self, model_provider: str = "qwen", user_id: Optional[int] = None, session_id: Optional[int] = None):
         self.model_provider = model_provider
+        self.user_id = user_id
+        self.session_id = session_id
         self._agent = None
 
     @property
     def agent(self):
         """Lazy load agent"""
         if self._agent is None:
-            self._agent = create_agent(model_provider=self.model_provider)
+            self._agent = create_agent(
+                model_provider=self.model_provider,
+                enable_monitoring=True,
+                user_id=self.user_id,
+                session_id=self.session_id,
+                verbose_callbacks=False
+            )
         return self._agent
 
     # ============ Session Operations ============
