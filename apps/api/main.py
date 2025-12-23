@@ -144,6 +144,9 @@ async def lifespan(app: FastAPI):
         from packages.agent_fishing.tools.lure.models.base import Base
         import threading
 
+        # Import PendingEquipment model BEFORE init_db so its table gets created
+        from packages.agent_equipment_import.models.pending import PendingEquipment
+
         # 初始化数据库并创建表
         logger.info("初始化数据库...")
         init_db(create_tables=True)
