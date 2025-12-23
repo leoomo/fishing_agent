@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import client from '@/api/client'
 
-interface FailurePattern {
+export interface FailurePattern {
   pattern_id: string
   pattern_type: string
   description: string
@@ -13,7 +13,7 @@ interface FailurePattern {
   metadata: Record<string, any>
 }
 
-interface ErrorChain {
+export interface ErrorChain {
   correlation_id: string
   errors: Array<{
     timestamp: string
@@ -33,7 +33,7 @@ interface ErrorChain {
   total_errors: number
 }
 
-interface RootCause {
+export interface RootCause {
   cause_id: string
   cause_type: string
   description: string
@@ -92,10 +92,10 @@ export const useFailurePatterns = (): UseFailurePatternsReturn => {
     setError(null)
 
     try {
-      const data = await client.get(`/admin/monitor/failure-patterns`, {
+      const response = await client.get(`/admin/monitor/failure-patterns`, {
         params: { time_range: timeRange }
       })
-      setPatterns(data.patterns || [])
+      setPatterns(response.data?.patterns || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch failure patterns')
       console.error('Error fetching failure patterns:', err)
@@ -109,7 +109,8 @@ export const useFailurePatterns = (): UseFailurePatternsReturn => {
     setError(null)
 
     try {
-      const data = await client.get(`/admin/monitor/error-correlation/${correlationId}`)
+      const response = await client.get(`/admin/monitor/error-correlation/${correlationId}`)
+      const data = response.data
       const errorChain: ErrorChain = {
         correlation_id: data.correlation_id,
         errors: data.errors,
@@ -141,10 +142,10 @@ export const useFailurePatterns = (): UseFailurePatternsReturn => {
     setError(null)
 
     try {
-      const data = await client.get(`/admin/monitor/root-cause-analysis`, {
+      const response = await client.get(`/admin/monitor/root-cause-analysis`, {
         params: { time_range: timeRange }
       })
-      setRootCauses(data.root_causes || [])
+      setRootCauses(response.data?.root_causes || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch root causes')
       console.error('Error fetching root causes:', err)
@@ -158,8 +159,8 @@ export const useFailurePatterns = (): UseFailurePatternsReturn => {
     setError(null)
 
     try {
-      const data = await client.get('/admin/monitor/failure-metrics')
-      setMetrics(data.metrics)
+      const response = await client.get('/admin/monitor/failure-metrics')
+      setMetrics(response.data?.metrics)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch failure metrics')
       console.error('Error fetching failure metrics:', err)

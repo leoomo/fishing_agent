@@ -1,12 +1,10 @@
 import React, { useState, useCallback } from 'react'
 import {
   Card,
-  Timeline,
   Tag,
   Button,
   Space,
   Alert,
-  Tooltip,
   Typography,
   Row,
   Col,
@@ -18,7 +16,6 @@ import {
   Empty,
   Spin,
   List,
-  Divider,
 } from 'antd'
 import {
   SearchOutlined,
@@ -36,7 +33,7 @@ import 'dayjs/locale/zh-cn'
 
 dayjs.locale('zh-cn')
 
-const { Title, Text, Paragraph } = Typography
+const { Text } = Typography
 const { Option } = Select
 const { Panel } = Collapse
 
@@ -87,12 +84,6 @@ const RootCauseAnalysis: React.FC<RootCauseAnalysisProps> = ({ height = 600 }) =
     if (confidence >= 0.8) return '#52c41a'
     if (confidence >= 0.6) return '#faad14'
     return '#f5222d'
-  }
-
-  const getConfidenceStatus = (confidence: number) => {
-    if (confidence >= 0.8) return 'success'
-    if (confidence >= 0.6) return 'normal'
-    return 'exception'
   }
 
   const getCauseTypeColor = (causeType: string) => {
@@ -245,7 +236,7 @@ const RootCauseAnalysis: React.FC<RootCauseAnalysisProps> = ({ height = 600 }) =
                   }
                 >
                   <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                    {causes.map((cause, index) => (
+                    {causes.map((cause, _index) => (
                       <Card key={cause.cause_id} size="small">
                         <Row gutter={16}>
                           <Col span={16}>

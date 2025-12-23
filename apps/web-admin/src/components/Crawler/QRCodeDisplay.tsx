@@ -28,7 +28,6 @@ interface QRCodeDisplayProps {
 }
 
 const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
-  taskId,
   qrCode,
   expiresAt,
   onRefresh,

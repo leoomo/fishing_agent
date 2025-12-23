@@ -12,7 +12,6 @@ import {
 import {
   SearchOutlined,
   ClearOutlined,
-  FilterOutlined,
 } from '@ant-design/icons'
 import type { TaskFilters } from '../../types/crawler'
 import dayjs from 'dayjs'
@@ -27,7 +26,7 @@ interface TaskFiltersProps {
   onClearFilters: () => void
 }
 
-const TaskFilters: React.FC<TaskFiltersProps> = ({
+const TaskFiltersComponent: React.FC<TaskFiltersProps> = ({
   filters,
   onFilterChange,
   onClearFilters,
@@ -35,7 +34,7 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
   const [form] = Form.useForm()
 
   // 处理表单值变化
-  const handleValuesChange = useCallback((changedValues: any, allValues: any) => {
+  const handleValuesChange = useCallback((_changedValues: any, allValues: any) => {
     const newFilters: Partial<TaskFilters> = {}
 
     // 处理搜索关键词
@@ -198,4 +197,4 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
   )
 }
 
-export default TaskFilters
+export default TaskFiltersComponent

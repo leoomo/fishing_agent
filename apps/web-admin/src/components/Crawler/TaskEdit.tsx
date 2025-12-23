@@ -75,23 +75,20 @@ const TaskEdit: React.FC<TaskEditProps> = ({
   const [taskType, setTaskType] = useState<string>('taobao')
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false)
 
-  // 当前任务类型配置
-  const currentConfig = taskTypeConfigs[taskType as keyof typeof taskTypeConfigs] || taskTypeConfigs.taobao
-
   // 解析任务配置
   const parseTaskConfig = (task: CrawlerTask) => {
     try {
-      const config = task.config ? JSON.parse(task.config) : {}
+      const config = task.config ? JSON.parse(task.config as unknown as string) as Record<string, unknown> : {}
       return {
-        keywords: config.keywords?.join(', ') || '',
-        shop_url: config.shop_url || task.shop_url || '',
-        max_pages: config.max_pages || 5,
-        proxy: config.proxy || '',
+        keywords: (config.keywords as string[])?.join(', ') || '',
+        shop_url: (config.shop_url as string) || '',
+        max_pages: (config.max_pages as number) || 5,
+        proxy: (config.proxy as string) || '',
       }
     } catch {
       return {
         keywords: '',
-        shop_url: task.shop_url || '',
+        shop_url: '',
         max_pages: 5,
         proxy: '',
       }

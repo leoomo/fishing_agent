@@ -13,7 +13,6 @@ import {
   Modal,
   Badge,
 } from 'antd'
-import { Modal as AntdModal } from 'antd'
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,

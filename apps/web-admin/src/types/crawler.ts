@@ -94,6 +94,7 @@ export interface TaskStats {
   cancelled_tasks: number
   paused_tasks: number
   last_sync_time?: string
+  [key: string]: number | string | undefined
 }
 
 export interface SyncStatus {

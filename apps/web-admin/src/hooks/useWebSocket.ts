@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { message } from 'antd'
 
 export interface WebSocketOptions {
   onMessage?: (data: string) => void
@@ -78,7 +77,7 @@ export const useWebSocket = (
     if (!heartbeat || !wsRef.current) return
 
     clearHeartbeatInterval()
-    heartbeatIntervalRef.current = setInterval(() => {
+    heartbeatIntervalRef.current = window.setInterval(() => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         try {
           wsRef.current.send(JSON.stringify({ type: 'ping' }))
@@ -86,7 +85,7 @@ export const useWebSocket = (
           console.error('WebSocket心跳发送失败:', error)
         }
       }
-    }, heartbeatInterval)
+    }, heartbeatInterval) as unknown as number
   }, [heartbeat, heartbeatInterval, clearHeartbeatInterval])
 
   // 建立WebSocket连接
@@ -158,9 +157,9 @@ export const useWebSocket = (
             error: `连接断开，正在尝试重连 (${prev.reconnectAttempts + 1}/${maxReconnectAttempts})`,
           }))
 
-          reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectTimeoutRef.current = window.setTimeout(() => {
             connect()
-          }, reconnectInterval)
+          }, reconnectInterval) as unknown as number
         } else if (!manualCloseRef.current) {
           setState(prev => ({
             ...prev,

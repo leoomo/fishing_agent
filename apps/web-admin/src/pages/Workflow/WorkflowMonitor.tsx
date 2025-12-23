@@ -18,6 +18,7 @@ import {
   Tooltip,
   Popconfirm,
   Input,
+  Tabs,
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -33,6 +34,7 @@ import { formatDateTime } from '../../utils/date';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
+const { TabPane } = Tabs;
 
 const WorkflowMonitor: React.FC = () => {
   const [workflows, setWorkflows] = useState<WorkflowStatus[]>([]);

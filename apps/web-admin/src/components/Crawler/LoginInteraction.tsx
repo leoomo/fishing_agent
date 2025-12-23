@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Card,
   Steps,
@@ -10,7 +10,6 @@ import {
   Row,
   Col,
   Tag,
-  Spin,
   message,
 } from 'antd'
 import {
@@ -24,8 +23,7 @@ import {
 import QRCodeDisplay from './QRCodeDisplay'
 import { useWebSocket } from '../../hooks/useWebSocket'
 
-const { Title, Text, Paragraph } = Typography
-const { Step } = Steps
+const { Title, Paragraph } = Typography
 
 // 登录状态类型
 export type LoginStatus =
@@ -151,7 +149,7 @@ const LoginInteraction: React.FC<LoginInteractionProps> = ({
   const [loading, setLoading] = useState(false)
 
   // WebSocket连接管理
-  const { isConnected, lastMessage, error: wsError } = useWebSocket(
+  const { isConnected, error: wsError } = useWebSocket(
     `/api/v1/admin/crawler/login/${taskId}`,
     {
       onMessage: (data) => {

@@ -4,7 +4,6 @@ import type {
   PendingEquipmentListResponse,
   ReviewRequest,
   ReviewResponse,
-  PendingEquipmentFilters,
   PendingEquipmentStats,
 } from '@/types/pendingEquipment'
 
