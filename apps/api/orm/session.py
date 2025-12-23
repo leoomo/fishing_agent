@@ -19,7 +19,7 @@ DB_TYPE = os.getenv("DB_TYPE", "sqlite")  # sqlite, postgresql, mysql
 # SQLite configuration
 SQLITE_DB_PATH = os.getenv(
     "DB_PATH",
-    "packages/agent_fishing/tools/lure/data/equipment.db"
+    "shared/data/equipment.db"
 )
 
 # PostgreSQL configuration

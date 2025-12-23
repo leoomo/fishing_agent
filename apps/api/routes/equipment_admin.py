@@ -9,9 +9,9 @@ from functools import lru_cache
 import hashlib
 import json
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
-from packages.agent_fishing.tools.lure.orm.repositories.brand_repo import BrandRepository
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.equipment_repo import EquipmentRepository
+from apps.api.orm.repositories.brand_repo import BrandRepository
 
 from apps.api.schemas.equipment_admin import (
     EquipmentCreate,
@@ -174,7 +174,7 @@ async def list_equipment(
 
             # 应用相同的过滤条件
             from sqlalchemy import and_, or_
-            from packages.agent_fishing.tools.lure.models.equipment import Equipment
+            from apps.api.models.equipment import Equipment
 
             filters = []
             if category:

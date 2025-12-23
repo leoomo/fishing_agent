@@ -5,8 +5,8 @@ Tests for EquipmentRepository
 import pytest
 from sqlalchemy.orm import Session
 
-from packages.agent_fishing.tools.lure.orm.repositories import EquipmentRepository
-from packages.agent_fishing.tools.lure.models import Equipment, Brand, RodSpec
+from apps.api.orm.repositories import EquipmentRepository
+from apps.api.models import Equipment, Brand, RodSpec
 
 
 class TestEquipmentRepository:

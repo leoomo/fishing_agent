@@ -1,12 +1,11 @@
-#!/usr/bin/env python3
 """
-Unified Monitoring Callback - Collects and persists Agent metrics to database
+Unified Monitoring Callback - 统一监控回调
 
-This callback handler provides:
-- Token usage tracking across multiple LLM providers
-- Tool call metrics with timing
-- Automatic async persistence to database
-- Cost estimation based on model pricing
+适用于所有 Agent 的通用监控组件，提供:
+- Token 使用量追踪
+- 工具调用计时和分类
+- 异步数据库持久化
+- 成本估算
 """
 
 import logging
@@ -20,25 +19,25 @@ from langchain_core.callbacks import BaseCallbackHandler
 logger = logging.getLogger(__name__)
 
 
-# Model pricing per 1K tokens (in CNY)
+# 模型定价 (每 1K tokens，单位: CNY)
 MODEL_PRICING = {
     "qwen": {"input": 0.0008, "output": 0.002},
     "zhipu": {"input": 0.001, "output": 0.001},
     "doubao": {"input": 0.0008, "output": 0.002},
-    "openai": {"input": 0.015, "output": 0.06},  # GPT-4 pricing
+    "openai": {"input": 0.015, "output": 0.06},
     "deepseek": {"input": 0.001, "output": 0.002},
 }
 
 
 class MonitoringCallback(BaseCallbackHandler):
     """
-    Unified callback handler for all Agent monitoring.
+    统一监控回调 - 适用于所有 Agent
 
-    Features:
-    - Tracks LLM calls, tokens, and costs
-    - Records tool invocations with timing
-    - Automatically persists to database asynchronously (non-blocking)
-    - Supports all agent types with unified interface
+    特性:
+    - 单一回调替代双回调架构
+    - 异步非阻塞持久化
+    - 多 LLM 提供商 token 提取
+    - 工具调用分类和计时
 
     Usage:
         callback = MonitoringCallback(
@@ -47,7 +46,7 @@ class MonitoringCallback(BaseCallbackHandler):
             user_id=123,
             session_id=456
         )
-        agent.invoke({"messages": [...]}, config={"callbacks": [callback]})
+        agent.invoke({...}, config={"callbacks": [callback]})
     """
 
     def __init__(
@@ -61,16 +60,16 @@ class MonitoringCallback(BaseCallbackHandler):
         verbose: bool = False
     ):
         """
-        Initialize monitoring callback.
+        初始化监控回调
 
         Args:
-            agent_type: Agent identifier (e.g., "fishing", "equipment_import")
-            model_provider: LLM provider name (e.g., "zhipu", "qwen")
-            model_name: Model name (e.g., "glm-4-flash")
-            user_id: User ID for the request
-            session_id: Chat session ID if applicable
-            persist: Whether to persist to database (default True)
-            verbose: Enable verbose logging
+            agent_type: Agent 类型标识 (如 "fishing", "equipment_import")
+            model_provider: LLM 提供商 (如 "zhipu", "qwen")
+            model_name: 模型名称
+            user_id: 用户 ID
+            session_id: 会话 ID
+            persist: 是否持久化到数据库
+            verbose: 是否输出详细日志
         """
         super().__init__()
         self.agent_type = agent_type
@@ -81,16 +80,15 @@ class MonitoringCallback(BaseCallbackHandler):
         self.persist = persist
         self.verbose = verbose
 
-        # Execution tracking
+        # 执行追踪
         self.execution_id: Optional[int] = None
         self.input_text: str = ""
         self.output_text: str = ""
 
-        # Reset stats
         self._reset_stats()
 
     def _reset_stats(self):
-        """Reset all statistics for new execution"""
+        """重置统计数据"""
         self.stats = {
             "llm_calls": 0,
             "input_tokens": 0,
@@ -100,52 +98,44 @@ class MonitoringCallback(BaseCallbackHandler):
             "start_time": None,
             "end_time": None,
             "latency_ms": 0,
-            "tool_calls": [],  # List of tool call records
-            "llm_logs": [],    # List of LLM call records
+            "tool_calls": [],
+            "llm_logs": [],
         }
         self._current_tool_start: Optional[float] = None
         self._current_tool_name: str = "unknown"
         self._current_tool_input: str = ""
 
     def set_input(self, text: str):
-        """Set the user input text for this execution"""
+        """设置用户输入文本"""
         self.input_text = text[:1000] if text else ""
 
     def reset(self):
-        """Reset for new execution"""
+        """重置以进行新的执行"""
         self._reset_stats()
         self.execution_id = None
         self.input_text = ""
         self.output_text = ""
 
-    # ========== LLM Callbacks ==========
+    # ========== LLM 回调 ==========
 
-    def on_llm_start(
-        self,
-        serialized: Dict[str, Any],
-        prompts: List[str],
-        **kwargs: Any
-    ) -> None:
-        """Called when LLM starts generating"""
+    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs) -> None:
+        """LLM 开始生成"""
         self.stats["llm_calls"] += 1
-
         if self.stats["start_time"] is None:
             self.stats["start_time"] = time.time()
 
         if self.verbose:
             logger.debug(f"[{self.agent_type}] LLM started (call #{self.stats['llm_calls']})")
 
-    def on_llm_end(self, response: Any, **kwargs: Any) -> None:
-        """Called when LLM finishes generating"""
-        # Extract token usage
+    def on_llm_end(self, response: Any, **kwargs) -> None:
+        """LLM 完成生成"""
         input_tokens, output_tokens, total_tokens = self._extract_tokens(response)
 
         self.stats["input_tokens"] += input_tokens
         self.stats["output_tokens"] += output_tokens
         self.stats["total_tokens"] += total_tokens
 
-        # Record LLM call
-        llm_record = {
+        self.stats["llm_logs"].append({
             "timestamp": datetime.utcnow(),
             "model_provider": self.model_provider,
             "model_name": self.model_name,
@@ -154,17 +144,15 @@ class MonitoringCallback(BaseCallbackHandler):
             "total_tokens": total_tokens,
             "success": True,
             "error_message": None,
-        }
-        self.stats["llm_logs"].append(llm_record)
+        })
 
         if self.verbose:
-            logger.debug(f"[{self.agent_type}] LLM tokens: in={input_tokens}, out={output_tokens}, total={total_tokens}")
+            logger.debug(f"[{self.agent_type}] LLM tokens: in={input_tokens}, out={output_tokens}")
 
-    def on_llm_error(self, error: Exception, **kwargs: Any) -> None:
-        """Called on LLM error"""
+    def on_llm_error(self, error: Exception, **kwargs) -> None:
+        """LLM 错误"""
         self.stats["errors"] += 1
-
-        llm_record = {
+        self.stats["llm_logs"].append({
             "timestamp": datetime.utcnow(),
             "model_provider": self.model_provider,
             "model_name": self.model_name,
@@ -173,20 +161,13 @@ class MonitoringCallback(BaseCallbackHandler):
             "total_tokens": 0,
             "success": False,
             "error_message": str(error)[:500],
-        }
-        self.stats["llm_logs"].append(llm_record)
-
+        })
         logger.error(f"[{self.agent_type}] LLM error: {error}")
 
-    # ========== Tool Callbacks ==========
+    # ========== 工具回调 ==========
 
-    def on_tool_start(
-        self,
-        serialized: Dict[str, Any],
-        input_str: str,
-        **kwargs: Any
-    ) -> None:
-        """Called when tool starts execution"""
+    def on_tool_start(self, serialized: Dict[str, Any], input_str: str, **kwargs) -> None:
+        """工具开始执行"""
         self._current_tool_name = serialized.get("name", "unknown")
         self._current_tool_start = time.time()
         self._current_tool_input = str(input_str)[:500] if input_str else ""
@@ -194,11 +175,11 @@ class MonitoringCallback(BaseCallbackHandler):
         if self.verbose:
             logger.debug(f"[{self.agent_type}] Tool started: {self._current_tool_name}")
 
-    def on_tool_end(self, output: str, **kwargs: Any) -> None:
-        """Called when tool finishes execution"""
+    def on_tool_end(self, output: str, **kwargs) -> None:
+        """工具完成执行"""
         latency_ms = int((time.time() - self._current_tool_start) * 1000) if self._current_tool_start else 0
 
-        tool_record = {
+        self.stats["tool_calls"].append({
             "timestamp": datetime.utcnow(),
             "tool_name": self._current_tool_name,
             "tool_category": self._categorize_tool(self._current_tool_name),
@@ -207,18 +188,17 @@ class MonitoringCallback(BaseCallbackHandler):
             "latency_ms": latency_ms,
             "success": True,
             "error_message": None,
-        }
-        self.stats["tool_calls"].append(tool_record)
+        })
 
         if self.verbose:
             logger.debug(f"[{self.agent_type}] Tool completed: {self._current_tool_name} ({latency_ms}ms)")
 
-    def on_tool_error(self, error: Exception, **kwargs: Any) -> None:
-        """Called on tool error"""
+    def on_tool_error(self, error: Exception, **kwargs) -> None:
+        """工具错误"""
         self.stats["errors"] += 1
         latency_ms = int((time.time() - self._current_tool_start) * 1000) if self._current_tool_start else 0
 
-        tool_record = {
+        self.stats["tool_calls"].append({
             "timestamp": datetime.utcnow(),
             "tool_name": self._current_tool_name,
             "tool_category": self._categorize_tool(self._current_tool_name),
@@ -227,32 +207,23 @@ class MonitoringCallback(BaseCallbackHandler):
             "latency_ms": latency_ms,
             "success": False,
             "error_message": str(error)[:500],
-        }
-        self.stats["tool_calls"].append(tool_record)
-
+        })
         logger.error(f"[{self.agent_type}] Tool error in {self._current_tool_name}: {error}")
 
-    # ========== Chain Callbacks ==========
+    # ========== Chain 回调 ==========
 
-    def on_chain_start(
-        self,
-        serialized: Dict[str, Any],
-        inputs: Dict[str, Any],
-        **kwargs: Any
-    ) -> None:
-        """Called when chain starts execution"""
+    def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs) -> None:
+        """Chain 开始执行"""
         if self.stats["start_time"] is None:
             self.stats["start_time"] = time.time()
 
-    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
-        """Called when chain finishes - persist data asynchronously"""
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
+        """Chain 完成 - 异步持久化"""
         if self.stats["start_time"]:
             self.stats["end_time"] = time.time()
-            self.stats["latency_ms"] = int(
-                (self.stats["end_time"] - self.stats["start_time"]) * 1000
-            )
+            self.stats["latency_ms"] = int((self.stats["end_time"] - self.stats["start_time"]) * 1000)
 
-        # Extract output text
+        # 提取输出文本
         if isinstance(outputs, dict) and "messages" in outputs:
             messages = outputs["messages"]
             if messages:
@@ -260,7 +231,7 @@ class MonitoringCallback(BaseCallbackHandler):
                 if hasattr(last_msg, 'content'):
                     self.output_text = str(last_msg.content)[:2000]
 
-        # Persist to database asynchronously (non-blocking)
+        # 异步持久化
         if self.persist:
             threading.Thread(
                 target=self._persist_execution,
@@ -268,19 +239,16 @@ class MonitoringCallback(BaseCallbackHandler):
                 name=f"monitor-persist-{self.agent_type}"
             ).start()
 
-    def on_chain_error(self, error: Exception, **kwargs: Any) -> None:
-        """Called on chain error"""
+    def on_chain_error(self, error: Exception, **kwargs) -> None:
+        """Chain 错误"""
         self.stats["errors"] += 1
 
         if self.stats["start_time"]:
             self.stats["end_time"] = time.time()
-            self.stats["latency_ms"] = int(
-                (self.stats["end_time"] - self.stats["start_time"]) * 1000
-            )
+            self.stats["latency_ms"] = int((self.stats["end_time"] - self.stats["start_time"]) * 1000)
 
         logger.error(f"[{self.agent_type}] Chain error: {error}")
 
-        # Still persist on error
         if self.persist:
             threading.Thread(
                 target=self._persist_execution,
@@ -288,18 +256,18 @@ class MonitoringCallback(BaseCallbackHandler):
                 name=f"monitor-persist-{self.agent_type}"
             ).start()
 
-    # ========== Persistence ==========
+    # ========== 持久化 ==========
 
     def _persist_execution(self):
-        """Persist execution data to database (runs in background thread)"""
+        """持久化执行数据到数据库（后台线程）"""
         try:
-            from packages.agent_fishing.tools.lure.orm.session import get_db_session
-            from packages.agent_fishing.tools.lure.models.system import (
+            from apps.api.orm.session import get_db_session
+            from apps.api.models.system import (
                 AgentExecutionLog, ToolCallLog, LLMLog
             )
 
             with get_db_session() as session:
-                # Create execution log
+                # 创建执行日志
                 execution = AgentExecutionLog(
                     agent_type=self.agent_type,
                     session_id=self.session_id,
@@ -314,21 +282,18 @@ class MonitoringCallback(BaseCallbackHandler):
                     total_tokens=self.stats["total_tokens"],
                     latency_ms=self.stats["latency_ms"],
                     success=self.stats["errors"] == 0,
-                    error_message=None,  # Could collect error messages
+                    error_message=None,
                     estimated_cost=self._calculate_cost(),
-                    tool_calls_summary=json.dumps(
-                        self._build_tool_summary(),
-                        ensure_ascii=False
-                    ),
+                    tool_calls_summary=json.dumps(self._build_tool_summary(), ensure_ascii=False),
                 )
                 session.add(execution)
-                session.flush()  # Get the execution ID
+                session.flush()
 
                 self.execution_id = execution.id
 
-                # Create tool call logs
+                # 创建工具调用日志
                 for tool in self.stats["tool_calls"]:
-                    tool_log = ToolCallLog(
+                    session.add(ToolCallLog(
                         execution_id=execution.id,
                         timestamp=tool["timestamp"],
                         tool_name=tool["tool_name"],
@@ -338,12 +303,11 @@ class MonitoringCallback(BaseCallbackHandler):
                         latency_ms=tool.get("latency_ms"),
                         success=tool.get("success", True),
                         error_message=tool.get("error_message"),
-                    )
-                    session.add(tool_log)
+                    ))
 
-                # Create LLM logs
+                # 创建 LLM 日志
                 for llm in self.stats["llm_logs"]:
-                    llm_log = LLMLog(
+                    session.add(LLMLog(
                         timestamp=llm["timestamp"],
                         model_provider=llm["model_provider"],
                         model_name=llm.get("model_name"),
@@ -360,106 +324,79 @@ class MonitoringCallback(BaseCallbackHandler):
                         session_id=self.session_id,
                         user_id=self.user_id,
                         execution_id=execution.id,
-                    )
-                    session.add(llm_log)
+                    ))
 
                 session.commit()
 
             if self.verbose:
-                logger.info(f"[{self.agent_type}] Persisted execution #{self.execution_id} "
-                           f"(tokens={self.stats['total_tokens']}, cost={self._calculate_cost():.4f})")
+                logger.info(f"[{self.agent_type}] Persisted execution #{self.execution_id}")
 
         except Exception as e:
             logger.error(f"[{self.agent_type}] Failed to persist execution: {e}")
 
-    # ========== Token Extraction ==========
+    # ========== Token 提取 ==========
 
     def _extract_tokens(self, response: Any) -> tuple:
-        """
-        Extract token counts from LLM response.
-        Supports multiple model response formats.
-        """
-        input_tokens = 0
-        output_tokens = 0
-        total_tokens = 0
+        """从 LLM 响应中提取 token 数量（支持多种格式）"""
+        input_tokens = output_tokens = total_tokens = 0
 
-        # Method 1: From generations (LangChain 1.0+)
+        # 方法 1: generations.usage_metadata (LangChain 1.0+)
         if hasattr(response, 'generations') and response.generations:
             for gen_list in response.generations:
                 for gen in gen_list:
                     if hasattr(gen, 'message'):
                         msg = gen.message
-                        # From usage_metadata
                         if hasattr(msg, 'usage_metadata') and msg.usage_metadata:
                             usage = msg.usage_metadata
                             input_tokens += usage.get('input_tokens', 0)
                             output_tokens += usage.get('output_tokens', 0)
                             total_tokens += usage.get('total_tokens', 0)
-                        # From response_metadata (ChatTongyi, etc.)
                         elif hasattr(msg, 'response_metadata') and msg.response_metadata:
                             meta = msg.response_metadata
-                            if 'token_usage' in meta:
-                                usage = meta['token_usage']
-                                input_tokens += usage.get('input_tokens', usage.get('prompt_tokens', 0))
-                                output_tokens += usage.get('output_tokens', usage.get('completion_tokens', 0))
-                                total_tokens += usage.get('total_tokens', 0)
-                            elif 'usage' in meta:
-                                usage = meta['usage']
+                            usage = meta.get('token_usage', meta.get('usage', {}))
+                            if usage:
                                 input_tokens += usage.get('input_tokens', usage.get('prompt_tokens', 0))
                                 output_tokens += usage.get('output_tokens', usage.get('completion_tokens', 0))
                                 total_tokens += usage.get('total_tokens', 0)
 
-                    # From generation_info
                     if total_tokens == 0 and hasattr(gen, 'generation_info') and gen.generation_info:
-                        gen_info = gen.generation_info
-                        usage = gen_info.get('token_usage', gen_info.get('usage', {}))
+                        usage = gen.generation_info.get('token_usage', gen.generation_info.get('usage', {}))
                         if usage:
                             input_tokens += usage.get('input_tokens', usage.get('prompt_tokens', 0))
                             output_tokens += usage.get('output_tokens', usage.get('completion_tokens', 0))
                             total_tokens += usage.get('total_tokens', 0)
 
-        # Method 2: From llm_output (OpenAI compatible)
+        # 方法 2: llm_output.token_usage (OpenAI 兼容)
         if total_tokens == 0 and hasattr(response, 'llm_output') and response.llm_output:
-            token_usage = response.llm_output.get('token_usage', {})
-            if token_usage:
-                input_tokens = token_usage.get('prompt_tokens', token_usage.get('input_tokens', 0))
-                output_tokens = token_usage.get('completion_tokens', token_usage.get('output_tokens', 0))
-                total_tokens = token_usage.get('total_tokens', 0)
-
-        # Method 3: From llm_output usage field
-        if total_tokens == 0 and hasattr(response, 'llm_output') and response.llm_output:
-            usage = response.llm_output.get('usage', {})
+            usage = response.llm_output.get('token_usage', response.llm_output.get('usage', {}))
             if usage:
                 input_tokens = usage.get('prompt_tokens', usage.get('input_tokens', 0))
                 output_tokens = usage.get('completion_tokens', usage.get('output_tokens', 0))
                 total_tokens = usage.get('total_tokens', 0)
 
-        # Calculate total if not provided
+        # 计算总数
         if total_tokens == 0 and (input_tokens > 0 or output_tokens > 0):
             total_tokens = input_tokens + output_tokens
 
         return input_tokens, output_tokens, total_tokens
 
-    # ========== Cost Calculation ==========
+    # ========== 成本计算 ==========
 
     def _calculate_cost(self) -> float:
-        """Calculate estimated cost for this execution"""
-        return self._calculate_single_cost(
-            self.stats["input_tokens"],
-            self.stats["output_tokens"]
-        )
+        """计算本次执行的估算成本"""
+        return self._calculate_single_cost(self.stats["input_tokens"], self.stats["output_tokens"])
 
     def _calculate_single_cost(self, input_tokens: int, output_tokens: int) -> float:
-        """Calculate cost for given token counts"""
+        """计算单次调用成本"""
         pricing = MODEL_PRICING.get(self.model_provider, {"input": 0.001, "output": 0.001})
         input_cost = (input_tokens / 1000) * pricing["input"]
         output_cost = (output_tokens / 1000) * pricing["output"]
         return round(input_cost + output_cost, 6)
 
-    # ========== Helpers ==========
+    # ========== 辅助方法 ==========
 
     def _categorize_tool(self, tool_name: str) -> str:
-        """Categorize tool by name"""
+        """根据工具名称分类"""
         if not tool_name:
             return "other"
 
@@ -476,11 +413,10 @@ class MonitoringCallback(BaseCallbackHandler):
         for category, keywords in categories.items():
             if any(kw in tool_lower for kw in keywords):
                 return category
-
         return "other"
 
     def _build_tool_summary(self) -> Dict[str, int]:
-        """Build tool call count summary"""
+        """构建工具调用统计摘要"""
         summary = {}
         for tool in self.stats["tool_calls"]:
             name = tool.get("tool_name", "unknown")
@@ -488,7 +424,7 @@ class MonitoringCallback(BaseCallbackHandler):
         return summary
 
     def get_summary(self) -> Dict[str, Any]:
-        """Get execution summary (compatible with existing callback interface)"""
+        """获取执行统计摘要"""
         success_rate = 0.0
         total_calls = self.stats["llm_calls"] + len(self.stats["tool_calls"])
         if total_calls > 0:
@@ -511,7 +447,7 @@ class MonitoringCallback(BaseCallbackHandler):
         }
 
     def print_summary(self) -> None:
-        """Print formatted summary to console"""
+        """打印格式化的统计摘要"""
         summary = self.get_summary()
 
         print("\n" + "=" * 50)
@@ -531,3 +467,33 @@ class MonitoringCallback(BaseCallbackHandler):
                 print(f"  - {tool_name}: {count}x")
 
         print("=" * 50 + "\n")
+
+    # ========== 手动生命周期方法 (用于非 Agent 调用) ==========
+
+    def start_execution(self):
+        """手动开始执行追踪"""
+        if self.stats["start_time"] is None:
+            self.stats["start_time"] = time.time()
+
+    def end_execution(self):
+        """手动结束执行追踪"""
+        if self.stats["start_time"] and not self.stats["end_time"]:
+            self.stats["end_time"] = time.time()
+            self.stats["latency_ms"] = int((self.stats["end_time"] - self.stats["start_time"]) * 1000)
+
+            if self.persist:
+                threading.Thread(
+                    target=self._persist_execution,
+                    daemon=True,
+                    name=f"monitor-persist-{self.agent_type}"
+                ).start()
+
+    def set_error(self, message: str):
+        """设置错误信息"""
+        self.stats["errors"] += 1
+        logger.error(f"[{self.agent_type}] Error: {message}")
+
+    def set_success(self, success: bool):
+        """设置执行成功状态"""
+        if not success:
+            self.stats["errors"] += 1

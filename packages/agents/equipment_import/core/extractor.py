@@ -34,7 +34,7 @@ class EquipmentExtractor:
             self.model = model
         else:
             # 延迟导入，避免循环依赖
-            from packages.agent_fishing.core import ModelFactory
+            from packages.agents.fishing.core import ModelFactory
             self.model = ModelFactory.create(provider=model_provider)
 
     def extract(

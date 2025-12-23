@@ -30,7 +30,7 @@ def db_session(test_db_path):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.pool import StaticPool
-    from packages.agent_fishing.tools.lure.models.base import Base
+    from apps.api.models.base import Base
 
     # 创建内存数据库引擎（每个测试独立）
     engine = create_engine(
@@ -128,7 +128,7 @@ def sample_admin_user_data():
 def api_client(test_db_path):
     """FastAPI 测试客户端"""
     # 确保数据库初始化
-    from packages.agent_fishing.tools.lure.orm.session import init_db, close_db
+    from apps.api.orm.session import init_db, close_db
     close_db()
     init_db(create_tables=True)
 
@@ -148,8 +148,8 @@ def auth_headers(api_client):
 
     # 首先创建管理员用户
     try:
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
-        from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+        from apps.api.orm.session import get_db_session
+        from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 
         with get_db_session() as session:
             repo = AdminUserRepository(session)

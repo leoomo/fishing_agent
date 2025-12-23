@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from collections import defaultdict
 
-from packages.agent_fishing.tools.lure.models.system import (
+from apps.api.models.system import (
     APILog, AgentExecutionLog
 )
 

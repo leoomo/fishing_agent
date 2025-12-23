@@ -16,7 +16,7 @@ from datetime import datetime
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from packages.agent_fishing.tools.fishing import (
+from packages.agents.fishing.tools.fishing import (
     query_fishing_recommendation,
     _filter_time_slots_by_period,
     _is_slot_in_time_range,

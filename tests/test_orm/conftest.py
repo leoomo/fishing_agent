@@ -6,8 +6,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-from packages.agent_fishing.tools.lure.models.base import Base
-from packages.agent_fishing.tools.lure.models import (
+from apps.api.models.base import Base
+from apps.api.models import (
     Brand, Equipment, RodSpec, ReelSpec, LineSpec, LureSpec,
     User, UserEquipment, FishingLog,
     FishSpecies, FishKnowledge, FishSeasonActivity

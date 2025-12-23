@@ -14,8 +14,8 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.system import APILog, ErrorCategory, ErrorSeverity
+from apps.api.orm.session import get_db_session
+from apps.api.models.system import APILog, ErrorCategory, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 

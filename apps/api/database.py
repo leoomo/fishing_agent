@@ -17,7 +17,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 # 数据库路径
-DB_PATH = Path(__file__).parent / "data" / "equipment.db"
+DB_PATH = Path(__file__).parents[2] / "shared" / "data" / "equipment.db"
 
 
 class LureDatabase:
@@ -395,7 +395,7 @@ class LureDatabase:
     def _run_migrations(self):
         """运行数据库迁移"""
         try:
-            from .migrations import DatabaseMigrations
+            from packages.agents.fishing.tools.lure.migrations import DatabaseMigrations
             conn = self._get_connection()
             migrations = DatabaseMigrations(conn)
             migrations.run_all_migrations()

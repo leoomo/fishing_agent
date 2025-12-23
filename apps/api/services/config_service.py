@@ -2,8 +2,8 @@ import json
 import logging
 from typing import Dict, Optional, List
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.system import SystemConfig
+from apps.api.orm.session import get_db_session
+from apps.api.models.system import SystemConfig
 from apps.api.utils.encryption import encrypt_value, decrypt_value
 
 logger = logging.getLogger(__name__)

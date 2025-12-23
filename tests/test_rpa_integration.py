@@ -13,11 +13,11 @@ from pathlib import Path
 # 添加项目路径
 sys.path.append(str(Path(__file__).parent.parent))
 
-from packages.agent_fishing.tools.crawler.rpa.playwright_spider import PlaywrightSpider
-from packages.agent_fishing.tools.crawler.rpa.taobao_rpa import TaobaoRPA
-from packages.agent_fishing.tools.crawler.data_persister import DataPersister, EquipmentData
-from packages.agent_fishing.tools.lure.database import get_db
-from packages.agent_fishing.tools.lure.image_manager import ImageManager
+from packages.agents.fishing.tools.crawler.rpa.playwright_spider import PlaywrightSpider
+from packages.agents.fishing.tools.crawler.rpa.taobao_rpa import TaobaoRPA
+from packages.agents.fishing.tools.crawler.data_persister import DataPersister, EquipmentData
+from apps.api.database import get_db
+from packages.agents.fishing.tools.lure.image_manager import ImageManager
 
 # 配置日志
 logging.basicConfig(

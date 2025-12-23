@@ -7,8 +7,8 @@ Tests the complete authentication flow from end to end.
 import pytest
 from fastapi.testclient import TestClient
 from apps.api.main import app
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 from apps.api.auth.jwt import get_password_hash
 
 client = TestClient(app)
@@ -204,7 +204,7 @@ class TestAPILoggingMiddleware:
     @pytest.mark.skip(reason="API logging requires api_logs table which may not exist in test DB")
     def test_api_calls_are_logged(self):
         """Test that API calls are logged to database"""
-        from packages.agent_fishing.tools.lure.models.system import APILog
+        from apps.api.models.system import APILog
 
         # Make an API call
         response = client.get("/api/v1/auth/profile")
@@ -231,7 +231,7 @@ class TestAPILoggingMiddleware:
     @pytest.mark.skip(reason="API logging requires api_logs table which may not exist in test DB")
     def test_excluded_paths_not_logged(self):
         """Test that excluded paths are not logged"""
-        from packages.agent_fishing.tools.lure.models.system import APILog
+        from apps.api.models.system import APILog
 
         # Get count of health endpoint logs before
         with get_db_session() as session:

@@ -10,11 +10,11 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
-from packages.agent_fishing.tools.user_equipment import (
+from packages.agents.fishing.tools.user_equipment import (
     UserEquipmentManager,
     UserBasedRecommender,
 )
-from packages.agent_fishing.tools.lure.database import get_db
+from apps.api.database import get_db
 
 from ..schemas.user_equipment import (
     UserCreate,

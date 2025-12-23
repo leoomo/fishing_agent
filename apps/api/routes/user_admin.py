@@ -6,8 +6,8 @@ from fastapi import APIRouter, HTTPException, Query, Depends, status
 from typing import Optional, List
 import logging
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.user_repo import (
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.user_repo import (
     UserRepository,
     UserEquipmentRepository
 )
@@ -51,7 +51,7 @@ async def list_users(
             repo = UserRepository(session)
 
             # 构建过滤条件
-            from packages.agent_fishing.tools.lure.models.user import User
+            from apps.api.models.user import User
             from sqlalchemy import and_
 
             query = session.query(User)
@@ -271,7 +271,7 @@ async def get_user_fishing_logs(
                 )
 
             # 查询钓鱼记录
-            from packages.agent_fishing.tools.lure.models.user import FishingLog
+            from apps.api.models.user import FishingLog
 
             logs = (
                 session.query(FishingLog)

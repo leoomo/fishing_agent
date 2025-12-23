@@ -8,9 +8,9 @@ import requests
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
-from packages.agent_fishing.tools.lure.orm.repositories.wechat_user_repo import WeChatUserRepository
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
+from apps.api.orm.repositories.wechat_user_repo import WeChatUserRepository
 from ..auth.jwt import create_access_token
 
 logger = logging.getLogger(__name__)

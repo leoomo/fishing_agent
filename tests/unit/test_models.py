@@ -11,8 +11,8 @@ class TestEquipmentModel:
 
     def test_equipment_creation(self, db_session, sample_brand_data, sample_equipment_data):
         """测试装备创建"""
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment
 
         # 创建品牌
         brand = Brand(**sample_brand_data)
@@ -33,8 +33,8 @@ class TestEquipmentModel:
 
     def test_equipment_to_dict(self, db_session, sample_brand_data, sample_equipment_data):
         """测试装备 to_dict 方法"""
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment
 
         brand = Brand(**sample_brand_data)
         db_session.add(brand)
@@ -55,8 +55,8 @@ class TestEquipmentModel:
 
     def test_equipment_brand_relationship(self, db_session, sample_brand_data, sample_equipment_data):
         """测试装备和品牌的关系"""
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment
 
         brand = Brand(**sample_brand_data)
         db_session.add(brand)
@@ -78,7 +78,7 @@ class TestBrandModel:
 
     def test_brand_creation(self, db_session, sample_brand_data):
         """测试品牌创建"""
-        from packages.agent_fishing.tools.lure.models.brand import Brand
+        from apps.api.models.brand import Brand
 
         brand = Brand(**sample_brand_data)
         db_session.add(brand)
@@ -91,7 +91,7 @@ class TestBrandModel:
 
     def test_brand_to_dict(self, db_session, sample_brand_data):
         """测试品牌 to_dict 方法"""
-        from packages.agent_fishing.tools.lure.models.brand import Brand
+        from apps.api.models.brand import Brand
 
         brand = Brand(**sample_brand_data)
         db_session.add(brand)
@@ -108,8 +108,8 @@ class TestRodSpecModel:
 
     def test_rod_spec_creation(self, db_session, sample_brand_data, sample_equipment_data, sample_rod_spec_data):
         """测试鱼竿规格创建"""
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment, RodSpec
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment, RodSpec
 
         # 创建品牌
         brand = Brand(**sample_brand_data)
@@ -139,7 +139,7 @@ class TestUserModel:
 
     def test_user_creation(self, db_session, sample_user_data):
         """测试用户创建"""
-        from packages.agent_fishing.tools.lure.models.user import User
+        from apps.api.models.user import User
 
         user = User(**sample_user_data)
         db_session.add(user)
@@ -157,7 +157,7 @@ class TestAdminUserModel:
     def test_admin_user_creation(self, db_session):
         """测试管理员用户创建"""
         import bcrypt
-        from packages.agent_fishing.tools.lure.models.admin_user import AdminUser
+        from apps.api.models.admin_user import AdminUser
 
         # 使用 bcrypt 哈希密码
         password_hash = bcrypt.hashpw("test_password_123".encode(), bcrypt.gensalt()).decode()
@@ -180,7 +180,7 @@ class TestAdminUserModel:
     def test_admin_user_password_hash(self, db_session):
         """测试管理员密码哈希验证"""
         import bcrypt
-        from packages.agent_fishing.tools.lure.models.admin_user import AdminUser
+        from apps.api.models.admin_user import AdminUser
 
         # 使用 bcrypt 哈希密码
         raw_password = "test_password_123"
@@ -203,7 +203,7 @@ class TestAdminUserModel:
     def test_admin_user_password_not_plain(self, db_session):
         """测试密码不是明文存储"""
         import bcrypt
-        from packages.agent_fishing.tools.lure.models.admin_user import AdminUser
+        from apps.api.models.admin_user import AdminUser
 
         raw_password = "my_secret_password"
         password_hash = bcrypt.hashpw(raw_password.encode(), bcrypt.gensalt()).decode()

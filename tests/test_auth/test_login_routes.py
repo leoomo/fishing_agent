@@ -7,8 +7,8 @@ Note: These are integration tests that require a running database.
 import pytest
 from fastapi.testclient import TestClient
 from apps.api.main import app
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 from apps.api.auth.jwt import get_password_hash
 
 client = TestClient(app)
