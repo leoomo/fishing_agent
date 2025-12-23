@@ -48,6 +48,33 @@ export const useWebSocket = (
   const reconnectTimeoutRef = useRef<number | null>(null)
   const heartbeatIntervalRef = useRef<number | null>(null)
   const manualCloseRef = useRef<boolean>(false)
+  const reconnectAttemptsRef = useRef<number>(0)
+
+  // Use refs for options to avoid recreating connect when they change
+  const optionsRef = useRef({
+    onMessage,
+    onConnect,
+    onDisconnect,
+    onError,
+    reconnect,
+    reconnectInterval,
+    maxReconnectAttempts,
+    heartbeat,
+    heartbeatInterval,
+  })
+
+  // Update options ref when values change
+  optionsRef.current = {
+    onMessage,
+    onConnect,
+    onDisconnect,
+    onError,
+    reconnect,
+    reconnectInterval,
+    maxReconnectAttempts,
+    heartbeat,
+    heartbeatInterval,
+  }
 
   // 构建完整的WebSocket URL
   const getWebSocketUrl = useCallback(() => {
@@ -74,7 +101,7 @@ export const useWebSocket = (
 
   // 开始心跳
   const startHeartbeat = useCallback(() => {
-    if (!heartbeat || !wsRef.current) return
+    if (!optionsRef.current.heartbeat || !wsRef.current) return
 
     clearHeartbeatInterval()
     heartbeatIntervalRef.current = window.setInterval(() => {
@@ -85,8 +112,8 @@ export const useWebSocket = (
           console.error('WebSocket心跳发送失败:', error)
         }
       }
-    }, heartbeatInterval) as unknown as number
-  }, [heartbeat, heartbeatInterval, clearHeartbeatInterval])
+    }, optionsRef.current.heartbeatInterval) as unknown as number
+  }, [clearHeartbeatInterval])
 
   // 建立WebSocket连接
   const connect = useCallback(() => {
@@ -106,6 +133,7 @@ export const useWebSocket = (
       wsRef.current = ws
 
       ws.onopen = () => {
+        reconnectAttemptsRef.current = 0
         setState(prev => ({
           ...prev,
           isConnected: true,
@@ -116,7 +144,7 @@ export const useWebSocket = (
 
         manualCloseRef.current = false
         startHeartbeat()
-        onConnect?.()
+        optionsRef.current.onConnect?.()
       }
 
       ws.onmessage = (event) => {
@@ -132,7 +160,7 @@ export const useWebSocket = (
           lastMessage: data,
         }))
 
-        onMessage?.(data)
+        optionsRef.current.onMessage?.(data)
       }
 
       ws.onclose = (event) => {
@@ -147,19 +175,20 @@ export const useWebSocket = (
         }))
 
         clearHeartbeatInterval()
-        onDisconnect?.()
+        optionsRef.current.onDisconnect?.()
 
         // 如果不是手动关闭且启用了重连
-        if (!manualCloseRef.current && reconnect && state.reconnectAttempts < maxReconnectAttempts) {
+        if (!manualCloseRef.current && optionsRef.current.reconnect && reconnectAttemptsRef.current < optionsRef.current.maxReconnectAttempts) {
+          reconnectAttemptsRef.current += 1
           setState(prev => ({
             ...prev,
-            reconnectAttempts: prev.reconnectAttempts + 1,
-            error: `连接断开，正在尝试重连 (${prev.reconnectAttempts + 1}/${maxReconnectAttempts})`,
+            reconnectAttempts: reconnectAttemptsRef.current,
+            error: `连接断开，正在尝试重连 (${reconnectAttemptsRef.current}/${optionsRef.current.maxReconnectAttempts})`,
           }))
 
           reconnectTimeoutRef.current = window.setTimeout(() => {
             connect()
-          }, reconnectInterval) as unknown as number
+          }, optionsRef.current.reconnectInterval) as unknown as number
         } else if (!manualCloseRef.current) {
           setState(prev => ({
             ...prev,
@@ -177,7 +206,7 @@ export const useWebSocket = (
         }))
 
         console.error('WebSocket错误:', error)
-        onError?.(error)
+        optionsRef.current.onError?.(error)
       }
 
     } catch (error) {
@@ -192,14 +221,6 @@ export const useWebSocket = (
     }
   }, [
     getWebSocketUrl,
-    onConnect,
-    onDisconnect,
-    onError,
-    onMessage,
-    reconnect,
-    reconnectInterval,
-    maxReconnectAttempts,
-    state.reconnectAttempts,
     startHeartbeat,
     clearHeartbeatInterval,
   ])
@@ -240,6 +261,7 @@ export const useWebSocket = (
       wsRef.current = null
     }
 
+    reconnectAttemptsRef.current = 0
     setState(prev => ({
       ...prev,
       isConnected: false,
@@ -265,9 +287,10 @@ export const useWebSocket = (
         clearHeartbeatInterval()
       } else {
         // 页面显示时检查连接状态
-        if (!state.isConnected && !state.isConnecting && reconnect) {
+        // 只有当没有活跃连接且不在连接过程中时才尝试重连
+        if (!wsRef.current && optionsRef.current.reconnect) {
           connect()
-        } else if (state.isConnected) {
+        } else if (wsRef.current?.readyState === WebSocket.OPEN) {
           startHeartbeat()
         }
       }
@@ -277,12 +300,12 @@ export const useWebSocket = (
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [state.isConnected, state.isConnecting, reconnect, connect, startHeartbeat, clearHeartbeatInterval])
+  }, [connect, startHeartbeat, clearHeartbeatInterval])
 
   // 处理网络状态变化
   useEffect(() => {
     const handleOnline = () => {
-      if (!state.isConnected && !state.isConnecting && reconnect) {
+      if (!wsRef.current && optionsRef.current.reconnect) {
         setState(prev => ({
           ...prev,
           error: '网络已恢复，正在重连...',
@@ -305,7 +328,7 @@ export const useWebSocket = (
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [state.isConnected, state.isConnecting, reconnect, connect])
+  }, [connect])
 
   return {
     ...state,

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef } from 'react'
+import React, { useEffect, useCallback } from 'react'
 import {
   Card,
   Row,
@@ -46,6 +46,7 @@ import TaskList from '../../components/Crawler/TaskList'
 import TaskForm from '../../components/Crawler/TaskForm'
 import TaskFiltersComponent from '../../components/Crawler/TaskFilters'
 import TaskDetail from '../../components/Crawler/TaskDetail'
+import { useWebSocket } from '@/hooks/useWebSocket'
 
 const { Title, Text } = Typography
 
@@ -62,48 +63,41 @@ const CrawlerPage: React.FC = () => {
 
   const [form] = Form.useForm()
 
-  // 轮询刷新间隔 (毫秒)
-  const POLL_INTERVAL = 3000
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  // 检查是否有正在运行或等待中的任务
-  const hasActiveTask = tasks.some(task =>
-    ['queued', 'running'].includes(task.status?.toLowerCase())
-  )
-
-  // 初始化数据
-  useEffect(() => {
-    dispatch(fetchTasks({}))
-    dispatch(fetchTaskStats())
-  }, [dispatch])
-
-  // 当有活跃任务时，自动轮询刷新
-  useEffect(() => {
-    // 清除之前的定时器
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
-    }
-
-    // 如果有活跃任务，启动轮询
-    if (hasActiveTask) {
-      console.log('[Crawler] 检测到活跃任务，启动轮询刷新')
-      pollIntervalRef.current = setInterval(() => {
+  // WebSocket 实时状态更新
+  useWebSocket(
+    '/api/v1/admin/crawler/ws/crawler-status',
+    {
+      onMessage: (data) => {
+        try {
+          const message = JSON.parse(data)
+          if (message.type === 'status_update') {
+            // 直接分发 fulfilled action，避免触发 API 调用
+            dispatch({
+              type: 'crawler/fetchTasks/fulfilled',
+              payload: {
+                tasks: message.tasks,
+                total: message.total,
+              }
+            })
+            dispatch({
+              type: 'crawler/fetchTaskStats/fulfilled',
+              payload: message.stats
+            })
+          }
+        } catch (e) {
+          console.error('[Crawler] WebSocket 消息解析失败:', e)
+        }
+      },
+      onConnect: () => {
+        console.log('[Crawler] WebSocket 已连接')
+        // 连接后立即获取一次初始数据
         dispatch(fetchTasks({}))
         dispatch(fetchTaskStats())
-      }, POLL_INTERVAL)
-    } else {
-      console.log('[Crawler] 无活跃任务，停止轮询')
+      },
+      reconnect: true,
+      heartbeat: true,
     }
-
-    // 组件卸载时清除定时器
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
-      }
-    }
-  }, [hasActiveTask, dispatch])
+  )
 
   // 错误处理
   useEffect(() => {
