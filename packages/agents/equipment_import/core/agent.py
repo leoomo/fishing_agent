@@ -17,7 +17,7 @@ from ..tools import get_import_tools
 from ..schemas.extracted import ExtractedEquipment, ImportResult
 from ..models.pending import save_pending_equipment
 from ..middleware import TextCompressorMiddleware, TextCompressor
-from packages.agent_fishing.core.monitoring_callback import MonitoringCallback
+from packages.agents.agent_component.monitoring import MonitoringCallback
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ class EquipmentImportAgent:
     def _initialize_model(self) -> Any:
         """初始化 LLM 模型"""
         try:
-            from packages.agent_fishing.core import ModelFactory
+            from packages.agents.fishing.core import ModelFactory
             return ModelFactory.create(
                 provider=self.model_provider,
                 timeout=self.timeout

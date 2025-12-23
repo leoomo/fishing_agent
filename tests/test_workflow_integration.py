@@ -15,7 +15,7 @@ from pathlib import Path
 # 添加项目路径
 sys.path.append(str(Path(__file__).parent.parent))
 
-from packages.agent_fishing.tools.lure.database import get_db
+from apps.api.database import get_db
 
 # 配置日志
 logging.basicConfig(

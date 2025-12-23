@@ -24,7 +24,7 @@ load_dotenv()
 def main():
     """主程序入口"""
     try:
-        from packages.agent_fishing import create_agent
+        from packages.agents.fishing import create_agent
 
         print("🎣 智能钓鱼助手 v3.1.1")
         print("=" * 50)

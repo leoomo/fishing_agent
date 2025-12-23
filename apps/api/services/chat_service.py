@@ -5,10 +5,10 @@ import logging
 from typing import Dict, Optional, List, Generator
 from datetime import datetime
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.chat import ChatSession, ChatMessage
-from packages.agent_fishing import create_agent
-from packages.agent_fishing.core.monitoring_callback import MonitoringCallback
+from apps.api.orm.session import get_db_session
+from apps.api.models.chat import ChatSession, ChatMessage
+from packages.agents.fishing import create_agent
+from packages.agents.agent_component.monitoring import MonitoringCallback
 
 logger = logging.getLogger(__name__)
 

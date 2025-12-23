@@ -420,7 +420,7 @@ async def get_failure_patterns(
     """
     try:
         from apps.api.services.failure_analytics_service import FailureAnalyticsService
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
 
         with get_db_session() as db:
             analytics_service = FailureAnalyticsService(db)
@@ -473,7 +473,7 @@ async def get_error_correlation(
     """
     try:
         from apps.api.services.failure_analytics_service import FailureAnalyticsService
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
 
         with get_db_session() as db:
             analytics_service = FailureAnalyticsService(db)
@@ -518,7 +518,7 @@ async def get_root_cause_analysis(
     """
     try:
         from apps.api.services.failure_analytics_service import FailureAnalyticsService
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
 
         with get_db_session() as db:
             analytics_service = FailureAnalyticsService(db)
@@ -565,7 +565,7 @@ async def get_failure_metrics(
     """
     try:
         from apps.api.services.failure_analytics_service import FailureAnalyticsService
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
 
         with get_db_session() as db:
             analytics_service = FailureAnalyticsService(db)

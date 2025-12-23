@@ -11,8 +11,8 @@ from apps.api.auth.permissions import (
     has_permission,
     get_role_permissions
 )
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 from apps.api.auth.jwt import get_password_hash, create_access_token
 
 client = TestClient(app)

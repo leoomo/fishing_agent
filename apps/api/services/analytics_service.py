@@ -4,12 +4,12 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import func
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.equipment import Equipment
-from packages.agent_fishing.tools.lure.models.brand import Brand
-from packages.agent_fishing.tools.lure.models.user import User, UserEquipment
-from packages.agent_fishing.tools.lure.models.system import AnalyticsReport, APILog
-from packages.agent_fishing.tools.lure.models.admin_user import AdminUser
+from apps.api.orm.session import get_db_session
+from apps.api.models.equipment import Equipment
+from apps.api.models.brand import Brand
+from apps.api.models.user import User, UserEquipment
+from apps.api.models.system import AnalyticsReport, APILog
+from apps.api.models.admin_user import AdminUser
 
 logger = logging.getLogger(__name__)
 

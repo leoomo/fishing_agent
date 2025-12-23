@@ -16,11 +16,11 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from packages.agent_fishing.tools.user_equipment import (
+from packages.agents.fishing.tools.user_equipment import (
     UserEquipmentManager,
     UserBasedRecommender,
 )
-from packages.agent_fishing.tools.lure.database import get_db
+from apps.api.database import get_db
 
 
 def test_create_user():
@@ -217,7 +217,7 @@ def test_langchain_tools(user_id: int):
     print("测试6: LangChain工具调用")
     print("=" * 60)
 
-    from packages.agent_fishing.tools.user_equipment.tools import (
+    from packages.agents.fishing.tools.user_equipment.tools import (
         list_my_equipment,
         recommend_based_on_my_equipment,
     )

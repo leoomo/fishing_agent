@@ -18,7 +18,7 @@ from datetime import datetime
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from packages.agent_fishing.tools.scoring.enhanced_scorer import (
+from packages.agents.fishing.tools.scoring.enhanced_scorer import (
     calculate_seasonal_score,
     calculate_lunar_phase,
     calculate_lunar_score,

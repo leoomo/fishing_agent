@@ -14,10 +14,10 @@ from pathlib import Path
 # 添加项目路径
 sys.path.append(str(Path(__file__).parent.parent))
 
-from packages.agent_fishing.tools.lure.database import get_db
-from packages.agent_fishing.tools.crawler.monitoring import initialize_monitoring, get_monitoring_service
-from packages.agent_fishing.tools.crawler.executor.task_queue import CrawlerTaskQueue
-from packages.agent_fishing.tools.crawler.workflow.manager import WorkflowManager
+from apps.api.database import get_db
+from packages.agents.fishing.tools.crawler.monitoring import initialize_monitoring, get_monitoring_service
+from packages.agents.fishing.tools.crawler.executor.task_queue import CrawlerTaskQueue
+from packages.agents.fishing.tools.crawler.workflow.manager import WorkflowManager
 
 # 配置日志
 logging.basicConfig(
@@ -198,7 +198,7 @@ class WorkflowIntegrationTest:
             self.monitor.record_task_event("start", 10002, task_type="jd")
 
             # 模拟队列深度变化
-            from packages.agent_fishing.tools.crawler.monitoring.metrics import metrics_collector
+            from packages.agents.fishing.tools.crawler.monitoring.metrics import metrics_collector
             metrics_collector.record_queue_metrics(
                 depth=queue_stats["queue_depth"],
                 running=queue_stats["active_workers"]
@@ -207,19 +207,19 @@ class WorkflowIntegrationTest:
             logger.info("✅ 记录队列指标")
 
             # 获取实时监控数据
-            from packages.agent_fishing.tools.crawler.monitoring.metrics import metrics_collector
+            from packages.agents.fishing.tools.crawler.monitoring.metrics import metrics_collector
             current = metrics_collector.get_current_metrics()
             logger.info(f"当前活动任务数: {current['task_stats']['running']}")
 
             # 测试告警规则
             # 模拟队列深度过高
-            from packages.agent_fishing.tools.crawler.monitoring.metrics import metrics_collector
+            from packages.agents.fishing.tools.crawler.monitoring.metrics import metrics_collector
             metrics_collector.record_queue_metrics(depth=150, running=5)
             logger.info("模拟队列深度过高（150）")
 
             # 检查告警（这里不会自动触发，因为我们已经过了冷却时间）
             # 但我们可以手动验证告警规则
-            from packages.agent_fishing.tools.crawler.monitoring.alerts import QueueDepthAlertRule
+            from packages.agents.fishing.tools.crawler.monitoring.alerts import QueueDepthAlertRule
             rule = QueueDepthAlertRule(threshold=100)
             alert = rule.check()
 
@@ -354,7 +354,7 @@ class WorkflowIntegrationTest:
             logger.info("✅ 记录了4个性能测试任务")
 
             # 获取任务类型统计
-            from packages.agent_fishing.tools.crawler.monitoring.metrics import metrics_collector
+            from packages.agents.fishing.tools.crawler.monitoring.metrics import metrics_collector
             type_stats = metrics_collector.get_task_type_stats()
             for task_type, stats in type_stats.items():
                 logger.info(f"{task_type} 平台统计:")

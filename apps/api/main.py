@@ -82,8 +82,8 @@ if os.getenv("LOG_TO_FILE", "true").lower() == "true":
         encoding='utf-8'
     )
     agent_fishing_handler.setFormatter(formatter)
-    logging.getLogger('packages.agent_fishing.core').addHandler(agent_fishing_handler)
-    logging.getLogger('packages.agent_fishing.utils').addHandler(agent_fishing_handler)
+    logging.getLogger('packages.agents.fishing.core').addHandler(agent_fishing_handler)
+    logging.getLogger('packages.agents.fishing.utils').addHandler(agent_fishing_handler)
 
     # 5. Agent工具日志
     agent_tools_handler = RotatingFileHandler(
@@ -93,7 +93,7 @@ if os.getenv("LOG_TO_FILE", "true").lower() == "true":
         encoding='utf-8'
     )
     agent_tools_handler.setFormatter(formatter)
-    logging.getLogger('packages.agent_fishing.tools').addHandler(agent_tools_handler)
+    logging.getLogger('packages.agents.fishing.tools').addHandler(agent_tools_handler)
 
     # 6. 数据采集RPA日志
     crawler_handler = RotatingFileHandler(
@@ -103,7 +103,7 @@ if os.getenv("LOG_TO_FILE", "true").lower() == "true":
         encoding='utf-8'
     )
     crawler_handler.setFormatter(formatter)
-    logging.getLogger('packages.agent_fishing.tools.crawler').addHandler(crawler_handler)
+    logging.getLogger('packages.agents.fishing.tools.crawler').addHandler(crawler_handler)
 
     # 7. 默认日志（其他未分类的日志）
     default_handler = RotatingFileHandler(
@@ -139,13 +139,13 @@ async def lifespan(app: FastAPI):
     try:
         from packages.scraper.scheduler.workflow_scheduler import WorkflowScheduler
         from packages.scraper.executor.task_queue import configure_database, initialize_task_queue
-        from packages.agent_fishing.tools.lure.database import get_db
-        from packages.agent_fishing.tools.lure.orm.session import init_db
-        from packages.agent_fishing.tools.lure.models.base import Base
+        from apps.api.database import get_db
+        from apps.api.orm.session import init_db
+        from apps.api.models.base import Base
         import threading
 
         # Import PendingEquipment model BEFORE init_db so its table gets created
-        from packages.agent_equipment_import.models.pending import PendingEquipment
+        from packages.agents.equipment_import.models.pending import PendingEquipment
 
         # 初始化数据库并创建表
         logger.info("初始化数据库...")

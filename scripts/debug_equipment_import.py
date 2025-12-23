@@ -34,7 +34,7 @@ def load_ocr_text(file_path: str) -> str:
 
 def test_compression(text: str):
     """测试文本压缩效果"""
-    from packages.agent_equipment_import.middleware import TextCompressor
+    from packages.agents.equipment_import.middleware import TextCompressor
 
     print("\n" + "=" * 60)
     print("测试文本压缩效果")
@@ -156,7 +156,7 @@ def main():
     print("=" * 60)
 
     try:
-        from packages.agent_equipment_import import EquipmentImportAgent
+        from packages.agents.equipment_import import EquipmentImportAgent
 
         # 使用 qwen 模型，启用压缩
         agent = EquipmentImportAgent(

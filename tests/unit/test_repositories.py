@@ -10,9 +10,9 @@ class TestEquipmentRepository:
 
     def test_create_equipment(self, db_session, sample_brand_data, sample_equipment_data):
         """测试创建装备"""
-        from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment
+        from apps.api.orm.repositories.equipment_repo import EquipmentRepository
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment
 
         equipment_repo = EquipmentRepository(db_session)
 
@@ -32,9 +32,9 @@ class TestEquipmentRepository:
 
     def test_search_by_category(self, db_session, sample_brand_data, sample_equipment_data):
         """测试按类别搜索"""
-        from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment
+        from apps.api.orm.repositories.equipment_repo import EquipmentRepository
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment
 
         equipment_repo = EquipmentRepository(db_session)
 
@@ -60,9 +60,9 @@ class TestEquipmentRepository:
 
     def test_search_by_price_range(self, db_session, sample_brand_data, sample_equipment_data):
         """测试按价格范围搜索"""
-        from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment
+        from apps.api.orm.repositories.equipment_repo import EquipmentRepository
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment
 
         equipment_repo = EquipmentRepository(db_session)
 
@@ -90,9 +90,9 @@ class TestEquipmentRepository:
 
     def test_search_by_keyword(self, db_session, sample_brand_data, sample_equipment_data):
         """测试关键词搜索"""
-        from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment
+        from apps.api.orm.repositories.equipment_repo import EquipmentRepository
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment
 
         equipment_repo = EquipmentRepository(db_session)
 
@@ -123,8 +123,8 @@ class TestEquipmentRepository:
 
     def test_create_with_specs(self, db_session, sample_brand_data, sample_equipment_data, sample_rod_spec_data):
         """测试创建带规格的装备"""
-        from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
+        from apps.api.orm.repositories.equipment_repo import EquipmentRepository
+        from apps.api.models.brand import Brand
 
         equipment_repo = EquipmentRepository(db_session)
 
@@ -146,9 +146,9 @@ class TestEquipmentRepository:
 
     def test_get_with_details(self, db_session, sample_brand_data, sample_equipment_data):
         """测试获取装备详情（含关联）"""
-        from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
-        from packages.agent_fishing.tools.lure.models.equipment import Equipment
+        from apps.api.orm.repositories.equipment_repo import EquipmentRepository
+        from apps.api.models.brand import Brand
+        from apps.api.models.equipment import Equipment
 
         equipment_repo = EquipmentRepository(db_session)
 
@@ -174,8 +174,8 @@ class TestBrandRepository:
 
     def test_create_brand(self, db_session, sample_brand_data):
         """测试创建品牌"""
-        from packages.agent_fishing.tools.lure.orm.repositories.brand_repo import BrandRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
+        from apps.api.orm.repositories.brand_repo import BrandRepository
+        from apps.api.models.brand import Brand
 
         repo = BrandRepository(db_session)
         brand = Brand(**sample_brand_data)
@@ -187,8 +187,8 @@ class TestBrandRepository:
 
     def test_get_by_name(self, db_session, sample_brand_data):
         """测试按名称获取品牌"""
-        from packages.agent_fishing.tools.lure.orm.repositories.brand_repo import BrandRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
+        from apps.api.orm.repositories.brand_repo import BrandRepository
+        from apps.api.models.brand import Brand
 
         repo = BrandRepository(db_session)
         brand = Brand(**sample_brand_data)
@@ -202,8 +202,8 @@ class TestBrandRepository:
 
     def test_list_all_brands(self, db_session):
         """测试获取所有品牌"""
-        from packages.agent_fishing.tools.lure.orm.repositories.brand_repo import BrandRepository
-        from packages.agent_fishing.tools.lure.models.brand import Brand
+        from apps.api.orm.repositories.brand_repo import BrandRepository
+        from apps.api.models.brand import Brand
 
         repo = BrandRepository(db_session)
 
@@ -224,8 +224,8 @@ class TestUserRepository:
 
     def test_create_user(self, db_session, sample_user_data):
         """测试创建用户"""
-        from packages.agent_fishing.tools.lure.orm.repositories.user_repo import UserRepository
-        from packages.agent_fishing.tools.lure.models.user import User
+        from apps.api.orm.repositories.user_repo import UserRepository
+        from apps.api.models.user import User
 
         repo = UserRepository(db_session)
         user = User(**sample_user_data)
@@ -237,8 +237,8 @@ class TestUserRepository:
 
     def test_get_user_by_username(self, db_session, sample_user_data):
         """测试按用户名获取用户"""
-        from packages.agent_fishing.tools.lure.orm.repositories.user_repo import UserRepository
-        from packages.agent_fishing.tools.lure.models.user import User
+        from apps.api.orm.repositories.user_repo import UserRepository
+        from apps.api.models.user import User
 
         repo = UserRepository(db_session)
         user = User(**sample_user_data)
@@ -257,7 +257,7 @@ class TestAdminUserRepository:
     def test_create_admin_user(self, db_session):
         """测试创建管理员"""
         import bcrypt
-        from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+        from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 
         repo = AdminUserRepository(db_session)
         password_hash = bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode()
@@ -276,7 +276,7 @@ class TestAdminUserRepository:
     def test_get_admin_by_username(self, db_session):
         """测试按用户名获取管理员"""
         import bcrypt
-        from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+        from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 
         repo = AdminUserRepository(db_session)
         password_hash = bcrypt.hashpw("password123".encode(), bcrypt.gensalt()).decode()
@@ -297,7 +297,7 @@ class TestAdminUserRepository:
     def test_password_verification(self, db_session):
         """测试密码验证"""
         import bcrypt
-        from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+        from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 
         repo = AdminUserRepository(db_session)
         raw_password = "correct_password"
@@ -319,7 +319,7 @@ class TestAdminUserRepository:
     def test_deactivate_user(self, db_session):
         """测试禁用用户"""
         import bcrypt
-        from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+        from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 
         repo = AdminUserRepository(db_session)
         password_hash = bcrypt.hashpw("password".encode(), bcrypt.gensalt()).decode()

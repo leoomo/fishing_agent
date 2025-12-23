@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 from packages.scraper.database import get_crawler_db
 from packages.scraper.models import CrawlerTask, TaskStatus
-from packages.agent_fishing.tools.lure.orm.repositories.crawler_repo import CrawlerRepository
+from apps.api.orm.repositories.crawler_repo import CrawlerRepository
 
 from apps.api.schemas.crawler import (
     CrawlerTaskCreate,
@@ -50,7 +50,7 @@ from apps.api.auth.permissions import PermissionEnum
 from apps.api.services.crawler_service import CrawlerService
 
 # Workflow imports
-from packages.agent_fishing.tools.lure.database import get_db
+from apps.api.database import get_db
 from packages.scraper.models import CrawlerWorkflowTemplate, CrawlerSchedule, CrawlerLog
 from packages.scraper.workflow.manager import WorkflowManager
 from packages.scraper.executor.task_queue import CrawlerTaskQueue, configure_database
@@ -1731,8 +1731,8 @@ async def list_pending_equipment(
         PendingEquipmentListResponse: 待审核装备列表
     """
     try:
-        from packages.agent_equipment_import.models.pending import PendingEquipment
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
 
         with get_db_session() as session:
             query = session.query(PendingEquipment)
@@ -1785,8 +1785,8 @@ async def get_pending_equipment(
         PendingEquipmentResponse: 待审核装备详情
     """
     try:
-        from packages.agent_equipment_import.models.pending import PendingEquipment
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
 
         with get_db_session() as session:
             item = session.query(PendingEquipment).filter(
@@ -1830,8 +1830,8 @@ async def review_pending_equipment(
         PendingEquipmentReviewResponse: 审核结果
     """
     try:
-        from packages.agent_equipment_import.models.pending import PendingEquipment
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
 
         with get_db_session() as session:
             item = session.query(PendingEquipment).filter(
@@ -1901,8 +1901,8 @@ async def get_pending_equipment_stats(
         统计数据字典
     """
     try:
-        from packages.agent_equipment_import.models.pending import PendingEquipment
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
         from sqlalchemy import func
 
         with get_db_session() as session:
@@ -1944,8 +1944,8 @@ async def delete_pending_equipment(
         pending_id: 待审核记录ID
     """
     try:
-        from packages.agent_equipment_import.models.pending import PendingEquipment
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
 
         with get_db_session() as session:
             item = session.query(PendingEquipment).filter(
@@ -2003,8 +2003,8 @@ def _create_equipment_from_pending(session, pending_item, corrected_data: Option
     Returns:
         int: 创建的装备ID
     """
-    from packages.agent_fishing.tools.lure.models.equipment import Equipment
-    from packages.agent_fishing.tools.lure.models.brand import Brand
+    from apps.api.models.equipment import Equipment
+    from apps.api.models.brand import Brand
 
     # 获取提取的数据
     extracted = json.loads(pending_item.extracted_data) if pending_item.extracted_data else {}

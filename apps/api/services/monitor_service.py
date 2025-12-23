@@ -9,8 +9,8 @@ from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import func, case, text, Float
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.system import APILog, LLMLog, AgentExecutionLog, ToolCallLog, SystemConfig
+from apps.api.orm.session import get_db_session
+from apps.api.models.system import APILog, LLMLog, AgentExecutionLog, ToolCallLog, SystemConfig
 
 logger = logging.getLogger(__name__)
 

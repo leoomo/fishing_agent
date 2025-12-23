@@ -18,8 +18,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 from apps.api.auth.jwt import get_password_hash
 
 

@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from packages.scraper.rpa import TaobaoRPA, TaobaoShopCategoryRPA, TaobaoShopRPA
 from packages.scraper.persister.equipment_persister import DataPersister
-from packages.agent_fishing.tools.lure.database import get_db
-from packages.agent_fishing.tools.lure.image_manager import ImageManager, LocalImageStorage
+from apps.api.database import get_db
+from packages.agents.fishing.tools.lure.image_manager import ImageManager, LocalImageStorage
 
 
 # ==================== 配置区域 ====================

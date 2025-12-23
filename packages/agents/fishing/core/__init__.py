@@ -7,13 +7,13 @@ Agent 核心模块
 - ModelFactory: LLM 模型工厂
 - get_system_prompt: 系统提示词
 - create_fishing_prompt: 创建钓鱼提示词
-- FishingAgentCallback: 回调处理器
 - select_prompt_by_query_type: 动态 prompt 中间件
+
+Note: FishingAgentCallback 已移除，统一使用 packages.agents.agent_component.monitoring.MonitoringCallback
 """
 from .agent import FishingAgent
 from .model_factory import ModelFactory
 from .prompts import get_system_prompt, create_fishing_prompt
-from .callbacks import FishingAgentCallback
 from ..middleware import select_prompt_by_query_type
 
 
@@ -28,6 +28,5 @@ __all__ = [
     "ModelFactory",
     "get_system_prompt",
     "create_fishing_prompt",
-    "FishingAgentCallback",
     "select_prompt_by_query_type",
 ]

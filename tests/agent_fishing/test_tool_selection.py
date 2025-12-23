@@ -7,7 +7,7 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from packages.agent_fishing import create_agent as create_optimized_fishing_agent
+from packages.agents.fishing import create_agent as create_optimized_fishing_agent
 import logging
 
 logging.basicConfig(level=logging.WARNING)  # 减少日志噪音

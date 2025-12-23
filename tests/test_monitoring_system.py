@@ -13,11 +13,11 @@ from pathlib import Path
 # 添加项目路径
 sys.path.append(str(Path(__file__).parent.parent))
 
-from packages.agent_fishing.tools.crawler.monitoring import (
+from packages.agents.fishing.tools.crawler.monitoring import (
     metrics_collector, alert_manager, AlertLevel,
     MonitoringService
 )
-from packages.agent_fishing.tools.crawler.monitoring.alerts import (
+from packages.agents.fishing.tools.crawler.monitoring.alerts import (
     QueueDepthAlertRule, FailureRateAlertRule,
     SystemResourceAlertRule, TaskTimeoutAlertRule
 )

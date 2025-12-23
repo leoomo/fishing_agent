@@ -479,7 +479,7 @@ async def submit_pending_equipment(
                 )
 
         # 调用 EquipmentImportAgent 提取结构化数据
-        from packages.agent_equipment_import import EquipmentImportAgent
+        from packages.agents.equipment_import import EquipmentImportAgent
 
         agent = EquipmentImportAgent(
             model_provider="zhipu",
@@ -585,7 +585,7 @@ async def submit_pending_equipment_batch(
                 )
 
         # 调用 EquipmentImportAgent 批量提取
-        from packages.agent_equipment_import import EquipmentImportAgent
+        from packages.agents.equipment_import import EquipmentImportAgent
 
         agent = EquipmentImportAgent(
             model_provider="zhipu",

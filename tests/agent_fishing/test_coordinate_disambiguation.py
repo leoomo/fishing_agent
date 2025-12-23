@@ -2,7 +2,7 @@
 """地理编码歧义测试"""
 
 import pytest
-from packages.agent_fishing.utils.coordinate import (
+from packages.agents.fishing.utils.coordinate import (
     get_coordinates,
     select_best_geocode,
     is_within_bounds,
