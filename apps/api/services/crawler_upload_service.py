@@ -146,8 +146,12 @@ class CrawlerUploadService:
         # 更新任务的 downloaded_products 字段
         self._update_task_downloaded_products(task_id, list(downloaded))
 
+        # 成功判定：没有失败才算成功
+        total_processed = uploaded_count + skipped_count + failed_count
+        success = failed_count == 0 and uploaded_count > 0
+
         return CrawlerUploadResponse(
-            success=uploaded_count > 0 or skipped_count > 0,
+            success=success,
             task_id=task_id,
             uploaded_count=uploaded_count,
             skipped_count=skipped_count,

@@ -10,7 +10,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Header, Depends, status
+from fastapi import APIRouter, HTTPException, Header, Depends, status, Form, File, UploadFile
 from pydantic import BaseModel, Field
 
 from packages.scraper.database import get_crawler_db
@@ -647,4 +647,94 @@ async def submit_pending_equipment_batch(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
+        )
+
+
+# ========== Worker 图片上传 ==========
+
+@router.post(
+    "/upload-images",
+    response_model=dict,
+    summary="Worker 上传爬虫图片",
+    description="Worker 批量上传爬虫任务图片（使用 Worker Token 认证）"
+)
+async def worker_upload_images(
+    task_id: int = Form(..., description="任务ID"),
+    products: str = Form(..., description="产品列表JSON字符串"),
+    files: List[UploadFile] = File(..., description="图片文件列表"),
+    worker_id: str = Depends(verify_worker_token)
+):
+    """
+    Worker 批量上传爬虫图片
+
+    - 使用 X-Worker-Token 认证（不需要 JWT）
+    - 复用 CrawlerUploadService 处理上传逻辑
+
+    文件名格式: {product_index}_{image_index}.{ext}
+    """
+    try:
+        from apps.api.services.crawler_upload_service import CrawlerUploadService
+        from apps.api.schemas.crawler import CrawlerProductUpload, CrawlerUploadResponse
+
+        # 解析产品 JSON
+        try:
+            products_data = json.loads(products)
+            product_list = [CrawlerProductUpload(**p) for p in products_data]
+        except (json.JSONDecodeError, Exception) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"products JSON 解析失败: {str(e)}"
+            )
+
+        # 验证任务存在且属于该 Worker
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).filter(
+                CrawlerTask.id == task_id
+            ).first()
+
+            if not task:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"任务不存在: task_id={task_id}"
+                )
+
+            # 验证任务分配给该 Worker
+            config = json.loads(task.config) if task.config else {}
+            assigned_worker = config.get("_assigned_worker")
+            if assigned_worker and assigned_worker != worker_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"任务不属于该 Worker (分配给: {assigned_worker})"
+                )
+
+        # 调用上传服务
+        service = CrawlerUploadService()
+        result = service.upload_products(
+            task_id=task_id,
+            products=product_list,
+            files=files
+        )
+
+        logger.info(
+            f"Worker {worker_id} 上传图片完成: task_id={task_id}, "
+            f"uploaded={result.uploaded_count}, skipped={result.skipped_count}"
+        )
+
+        return {
+            "success": result.success,
+            "task_id": result.task_id,
+            "uploaded_count": result.uploaded_count,
+            "skipped_count": result.skipped_count,
+            "failed_count": result.failed_count,
+            "pending_ids": result.pending_ids,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Worker 上传图片失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"上传失败: {str(e)}"
         )
