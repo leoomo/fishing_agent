@@ -5,7 +5,7 @@ Playwright RPA 爬虫基类
 import time
 import random
 import logging
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from abc import ABC
 
 from playwright.sync_api import (
@@ -19,6 +19,13 @@ from playwright.sync_api import (
 
 from packages.scraper.spider.base import BaseSpider
 from .config import RPAConfig
+
+# 屏幕分辨率检测
+try:
+    from screeninfo import get_monitors
+    HAS_SCREENINFO = True
+except ImportError:
+    HAS_SCREENINFO = False
 
 logger = logging.getLogger(__name__)
 
@@ -149,9 +156,13 @@ class PlaywrightSpider(BaseSpider, ABC):
         Returns:
             BrowserContext 对象
         """
-        # 创建上下文
+        # 获取本机屏幕分辨率
+        screen_width, screen_height = self._get_screen_resolution()
+
+        # 创建上下文（使用桌面端配置，匹配本机分辨率）
         context = self.browser.new_context(
             user_agent=self.ua_rotator.get_random_ua(),
+            viewport={"width": screen_width, "height": screen_height},
             locale="zh-CN",
             timezone_id="Asia/Shanghai",
             permissions=["geolocation"],
@@ -199,6 +210,32 @@ class PlaywrightSpider(BaseSpider, ABC):
 
         logger.debug("浏览器上下文创建成功（已注入反检测脚本）")
         return context
+
+    def _get_screen_resolution(self) -> Tuple[int, int]:
+        """
+        获取本机屏幕分辨率
+
+        Returns:
+            (width, height) 元组，默认 1920x1080
+        """
+        default_resolution = (1920, 1080)
+
+        if not HAS_SCREENINFO:
+            logger.debug("screeninfo 未安装，使用默认分辨率")
+            return default_resolution
+
+        try:
+            monitors = get_monitors()
+            if monitors:
+                # 使用主显示器（第一个）
+                primary = monitors[0]
+                width, height = primary.width, primary.height
+                logger.info(f"检测到屏幕分辨率: {width}x{height}")
+                return (width, height)
+        except Exception as e:
+            logger.warning(f"获取屏幕分辨率失败: {e}")
+
+        return default_resolution
 
     def safe_goto(self, page: Page, url: str, max_retries: Optional[int] = None) -> bool:
         """
