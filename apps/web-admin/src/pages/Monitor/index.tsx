@@ -127,7 +127,11 @@ const Monitor = () => {
   }
 
   const connectWebSocket = () => {
-    const ws = new WebSocket(`ws://${window.location.host}/api/v1/admin/monitor/ws/realtime-stats`)
+    // 在开发环境中直接连接到后端，WebSocket不走Vite代理
+    const wsUrl = import.meta.env.DEV
+      ? 'ws://localhost:8000/api/v1/admin/monitor/ws/realtime-stats'
+      : `ws://${window.location.host}/api/v1/admin/monitor/ws/realtime-stats`
+    const ws = new WebSocket(wsUrl)
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
@@ -419,16 +423,16 @@ const Monitor = () => {
           description={
             <Row gutter={24}>
               <Col span={6}>
-                <span>API 请求/分钟: <strong>{realtimeStats.api_requests_per_minute}</strong></span>
+                <span>API 请求/分钟: <strong>{realtimeStats.api_requests_per_minute ?? 0}</strong></span>
               </Col>
               <Col span={6}>
-                <span>LLM Token/分钟: <strong>{realtimeStats.llm_tokens_per_minute}</strong></span>
+                <span>LLM Token/分钟: <strong>{realtimeStats.llm_tokens_per_minute ?? 0}</strong></span>
               </Col>
               <Col span={6}>
-                <span>错误率: <strong>{(realtimeStats.error_rate * 100).toFixed(2)}%</strong></span>
+                <span>错误率: <strong>{((realtimeStats.error_rate ?? 0) * 100).toFixed(2)}%</strong></span>
               </Col>
               <Col span={6}>
-                <span>在线用户: <strong>{realtimeStats.active_users}</strong></span>
+                <span>在线用户: <strong>{realtimeStats.active_users ?? 0}</strong></span>
               </Col>
             </Row>
           }

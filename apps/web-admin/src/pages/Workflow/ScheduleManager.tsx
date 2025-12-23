@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   Select,
+  InputNumber,
   message,
   Popconfirm,
   Card,
@@ -18,6 +19,8 @@ import {
   Descriptions,
   Divider,
   Timeline,
+  Tabs,
+  Statistic,
 } from 'antd';
 import {
   PlusOutlined,
@@ -35,6 +38,7 @@ import { formatDateTime } from '../../utils/date';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
+const { TabPane } = Tabs;
 
 const ScheduleManager: React.FC = () => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);

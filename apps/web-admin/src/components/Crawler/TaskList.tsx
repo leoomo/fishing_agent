@@ -11,9 +11,7 @@ import {
   Alert,
   Pagination,
   Card,
-  Modal,
 } from 'antd'
-import { Modal as AntdModal } from 'antd'
 import {
   AppstoreOutlined,
   TableOutlined,
@@ -32,7 +30,6 @@ import {
   selectSelectedTasks,
   fetchTasks,
   setPagination,
-  toggleTaskSelection,
   selectAllTasks,
   clearSelection,
   bulkDeleteTasks,
@@ -105,11 +102,6 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
     } else {
       dispatch(clearSelection())
     }
-  }
-
-  // 处理任务选择变化
-  const handleTaskSelectionChange = (taskId: number, selected: boolean) => {
-    dispatch(toggleTaskSelection(taskId))
   }
 
   // 批量删除
@@ -254,8 +246,6 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
               <TaskCard
                 task={task}
                 isSelected={selectedTasks.includes(task.task_id)}
-                onSelectionChange={handleTaskSelectionChange}
-                showLoginInteraction={task.status === 'pending'}
               />
             </Col>
           ))}
@@ -270,8 +260,6 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
               <TaskCard
                 task={task}
                 isSelected={selectedTasks.includes(task.task_id)}
-                onSelectionChange={handleTaskSelectionChange}
-                showLoginInteraction={task.status === 'pending'}
               />
             </div>
           ))}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Form,
   Input,
@@ -16,14 +16,10 @@ import {
 } from 'antd'
 import {
   InfoCircleOutlined,
-  PlusOutlined,
-  MinusCircleOutlined,
-  SettingOutlined,
 } from '@ant-design/icons'
 import type { FormInstance } from 'antd'
 
 const { Option } = Select
-const { TextArea } = Input
 
 interface TaskFormProps {
   form: FormInstance

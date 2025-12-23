@@ -17,10 +17,8 @@ import {
   Spin,
 } from 'antd'
 import {
-  ClockCircleOutlined,
   ExclamationCircleOutlined,
   BugOutlined,
-  LinkOutlined,
   InfoCircleOutlined,
   CloseCircleOutlined,
 } from '@ant-design/icons'
@@ -32,7 +30,7 @@ import 'dayjs/locale/zh-cn'
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
 
-const { Text, Title } = Typography
+const { Text } = Typography
 const { Panel } = Collapse
 
 interface ErrorInvestigationProps {
@@ -44,10 +42,9 @@ interface ErrorInvestigationProps {
 interface ErrorDetailProps {
   error: any
   index: number
-  totalErrors: number
 }
 
-const ErrorDetail: React.FC<ErrorDetailProps> = ({ error, index, totalErrors }) => {
+const ErrorDetail: React.FC<ErrorDetailProps> = ({ error, index }) => {
   const getSeverityColor = (severity?: string) => {
     switch (severity) {
       case 'critical': return 'red'
@@ -115,7 +112,6 @@ const ErrorDetail: React.FC<ErrorDetailProps> = ({ error, index, totalErrors }) 
                   </Text>
                 }
                 type="error"
-                size="small"
                 showIcon
               />
             )}
@@ -259,7 +255,7 @@ const ErrorInvestigation: React.FC<ErrorInvestigationProps> = ({
           {/* Error Timeline */}
           <Card size="small" title={`错误时间线 (${errorChain.total_errors} 个错误)`}>
             <Timeline mode="left">
-              {errorChain.errors.map((error, index) => (
+              {errorChain.errors.map((error: any, index: number) => (
                 <Timeline.Item
                   key={index}
                   dot={
@@ -280,7 +276,6 @@ const ErrorInvestigation: React.FC<ErrorInvestigationProps> = ({
                   <ErrorDetail
                     error={error}
                     index={index}
-                    totalErrors={errorChain.total_errors}
                   />
                 </Timeline.Item>
               ))}
@@ -291,7 +286,7 @@ const ErrorInvestigation: React.FC<ErrorInvestigationProps> = ({
           <Collapse>
             <Panel header="详细错误信息" key="details">
               <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                {errorChain.errors.map((error, index) => (
+                {errorChain.errors.map((error: any, index: number) => (
                   <Card key={index} size="small" title={`错误 ${index + 1} - ${error.service || 'Unknown'}`}>
                     <Descriptions column={2} size="small" bordered>
                       <Descriptions.Item label="时间戳" span={2}>

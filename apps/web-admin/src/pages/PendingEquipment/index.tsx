@@ -33,7 +33,7 @@ import {
   GlobalOutlined,
   MessageOutlined,
 } from '@ant-design/icons'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import type { ColumnsType } from 'antd/es/table'
 
 import {
@@ -105,18 +105,18 @@ const equipmentTypeTextMap: Record<string, string> = {
 }
 
 const PendingEquipmentPage: React.FC = () => {
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const [reviewForm] = Form.useForm()
 
   // 选择器
-  const items = useSelector(selectItems)
-  const stats = useSelector(selectStats)
-  const loading = useSelector(selectLoading)
-  const errors = useSelector(selectErrors)
-  const filters = useSelector(selectFilters)
-  const pagination = useSelector(selectPagination)
-  const ui = useSelector(selectUI)
-  const currentItem = useSelector(selectCurrentItem)
+  const items = useAppSelector(selectItems)
+  const stats = useAppSelector(selectStats)
+  const loading = useAppSelector(selectLoading)
+  const errors = useAppSelector(selectErrors)
+  const filters = useAppSelector(selectFilters)
+  const pagination = useAppSelector(selectPagination)
+  const ui = useAppSelector(selectUI)
+  const currentItem = useAppSelector(selectCurrentItem)
 
   // 初始化数据
   useEffect(() => {

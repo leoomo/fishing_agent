@@ -14,8 +14,6 @@ import {
   Progress,
   Select,
   Badge,
-  Timeline,
-  Modal,
   Empty,
   Spin,
 } from 'antd'
@@ -35,7 +33,7 @@ import 'dayjs/locale/zh-cn'
 
 dayjs.locale('zh-cn')
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 
 interface FailurePatternsProps {
@@ -66,16 +64,6 @@ const FailurePatterns: React.FC<FailurePatternsProps> = ({ height = 600 }) => {
     setSelectedTimeRange(value)
     fetchPatterns(value)
   }, [fetchPatterns])
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return '#f5222d'
-      case 'high': return '#fa8c16'
-      case 'medium': return '#fadb14'
-      case 'low': return '#52c41a'
-      default: return '#1890ff'
-    }
-  }
 
   const getSeverityTag = (severity: string) => {
     const colors = {
@@ -175,12 +163,12 @@ const FailurePatterns: React.FC<FailurePatternsProps> = ({ height = 600 }) => {
       render: (services: string[]) => (
         <Space wrap>
           {services.slice(0, 2).map(service => (
-            <Tag key={service} size="small">
+            <Tag key={service}>
               {service}
             </Tag>
           ))}
           {services.length > 2 && (
-            <Tag size="small">+{services.length - 2}</Tag>
+            <Tag>+{services.length - 2}</Tag>
           )}
         </Space>
       ),
@@ -200,7 +188,7 @@ const FailurePatterns: React.FC<FailurePatternsProps> = ({ height = 600 }) => {
       title: '操作',
       key: 'actions',
       width: 100,
-      render: (_, record: any) => (
+      render: (_: any, record: any) => (
         <Space>
           <Tooltip title="调查错误详情">
             <Button

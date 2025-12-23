@@ -8,12 +8,8 @@ import {
   Space,
   Typography,
   Alert,
-  Spin,
-  Modal,
   Form,
-  Input,
-  Select,
-  InputNumber,
+  Modal,
   message,
 } from 'antd'
 import {
@@ -23,11 +19,9 @@ import {
   PlayCircleOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ClockCircleOutlined,
-  ExclamationCircleOutlined,
   FilterOutlined,
 } from '@ant-design/icons'
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from '../../store/hooks'
 
 import {
   fetchTasks,
@@ -50,22 +44,21 @@ import {
 
 import TaskList from '../../components/Crawler/TaskList'
 import TaskForm from '../../components/Crawler/TaskForm'
-import TaskFilters from '../../components/Crawler/TaskFilters'
+import TaskFiltersComponent from '../../components/Crawler/TaskFilters'
 import TaskDetail from '../../components/Crawler/TaskDetail'
 
 const { Title, Text } = Typography
-const { Option } = Select
 
 const CrawlerPage: React.FC = () => {
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
 
   // 选择器
-  const tasks = useSelector(selectTasks)
-  const stats = useSelector(selectStats)
-  const loading = useSelector(selectLoading)
-  const errors = useSelector(selectErrors)
-  const filters = useSelector(selectFilters)
-  const ui = useSelector(selectUI)
+  const tasks = useAppSelector(selectTasks)
+  const stats = useAppSelector(selectStats)
+  const loading = useAppSelector(selectLoading)
+  const errors = useAppSelector(selectErrors)
+  const filters = useAppSelector(selectFilters)
+  const ui = useAppSelector(selectUI)
 
   const [form] = Form.useForm()
 
@@ -80,7 +73,7 @@ const CrawlerPage: React.FC = () => {
 
   // 初始化数据
   useEffect(() => {
-    dispatch(fetchTasks())
+    dispatch(fetchTasks({}))
     dispatch(fetchTaskStats())
   }, [dispatch])
 
@@ -96,7 +89,7 @@ const CrawlerPage: React.FC = () => {
     if (hasActiveTask) {
       console.log('[Crawler] 检测到活跃任务，启动轮询刷新')
       pollIntervalRef.current = setInterval(() => {
-        dispatch(fetchTasks())
+        dispatch(fetchTasks({}))
         dispatch(fetchTaskStats())
       }, POLL_INTERVAL)
     } else {
@@ -126,7 +119,7 @@ const CrawlerPage: React.FC = () => {
 
   // 刷新数据
   const handleRefresh = useCallback(() => {
-    dispatch(fetchTasks())
+    dispatch(fetchTasks({}))
     dispatch(fetchTaskStats())
   }, [dispatch])
 
@@ -285,7 +278,7 @@ const CrawlerPage: React.FC = () => {
       {/* 筛选器 */}
       {ui.showFilters && (
         <Card style={{ marginBottom: 16 }}>
-          <TaskFilters
+          <TaskFiltersComponent
             filters={filters}
             onFilterChange={handleFilterChange}
             onClearFilters={handleClearFilters}

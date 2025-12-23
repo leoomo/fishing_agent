@@ -13,16 +13,13 @@ import {
   Typography,
   Divider,
   Alert,
-  List,
   Tag,
-  Tooltip,
 } from 'antd';
 import {
   ClockCircleOutlined,
-  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { workflowApi } from '../api/workflow';
-import type { CronExpressionRequest, CronExpressionResponse } from '../api/workflow';
+import type { CronExpressionRequest } from '../api/workflow';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
