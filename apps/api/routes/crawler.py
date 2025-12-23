@@ -761,6 +761,66 @@ async def websocket_crawler_progress(websocket: WebSocket, task_id: int):
         await ws_manager.disconnect(websocket, task_id)
 
 
+@router.websocket("/ws/crawler-status")
+async def websocket_crawler_status(websocket: WebSocket):
+    """
+    WebSocket 实时推送爬虫全局状态
+
+    推送数据:
+    - 任务列表更新
+    - 统计数据更新 (total_tasks, running_tasks, success_tasks, failed_tasks)
+
+    Note:
+        连接后每3秒推送一次最新状态，参考 monitor.py 中的 /ws/realtime-stats
+    """
+    await websocket.accept()
+
+    try:
+        logger.info("爬虫状态 WebSocket 连接建立")
+
+        crawler_service = CrawlerService()
+        db = get_crawler_db()
+
+        while True:
+            # 获取任务列表（最新的20条）
+            # 注意：必须在session内构建响应数据，否则会触发 DetachedInstanceError
+            with db.session_scope() as session:
+                query = session.query(CrawlerTask)
+                total = query.count()
+                tasks = query.order_by(CrawlerTask.created_at.desc()).limit(20).all()
+                # 在session关闭前构建响应数据，并转换为字典
+                tasks_data = [t.model_dump() for t in (_build_task_response(task) for task in tasks)]
+
+            # 获取统计数据
+            stats_data = crawler_service.get_sync_status()
+
+            # 推送数据
+            await websocket.send_json({
+                "type": "status_update",
+                "timestamp": datetime.utcnow().isoformat(),
+                "tasks": tasks_data,
+                "total": total,
+                "stats": stats_data
+            })
+
+            # 每3秒推送一次
+            await asyncio.sleep(3)
+
+    except WebSocketDisconnect:
+        logger.info("爬虫状态 WebSocket 客户端断开")
+    except Exception as e:
+        logger.error(f"爬虫状态 WebSocket 错误: {e}", exc_info=True)
+        try:
+            await websocket.send_json({"error": str(e)})
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
 # ========== 工作流模板管理 ==========
 
 @router.post(
@@ -1766,6 +1826,47 @@ async def list_pending_equipment(
 
 
 @router.get(
+    "/pending-equipment/stats",
+    summary="获取待审核装备统计",
+    description="获取待审核装备的统计数据"
+)
+async def get_pending_equipment_stats(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取待审核装备统计数据
+
+    Returns:
+        统计数据字典
+    """
+    try:
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
+        from sqlalchemy import func
+
+        with get_db_session() as session:
+            # 统计各状态数量
+            stats = session.query(
+                PendingEquipment.status,
+                func.count(PendingEquipment.id)
+            ).group_by(PendingEquipment.status).all()
+
+            stat_dict = {s[0]: s[1] for s in stats}
+            total = sum(stat_dict.values())
+
+            return {
+                "total": total,
+                "pending": stat_dict.get("pending", 0),
+                "approved": stat_dict.get("approved", 0),
+                "rejected": stat_dict.get("rejected", 0),
+            }
+
+    except Exception as e:
+        logger.error(f"获取待审核装备统计失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取统计失败: {str(e)}")
+
+
+@router.get(
     "/pending-equipment/{pending_id}",
     response_model=PendingEquipmentResponse,
     summary="获取待审核装备详情",
@@ -1884,47 +1985,6 @@ async def review_pending_equipment(
     except Exception as e:
         logger.error(f"审核待审核装备失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"审核失败: {str(e)}")
-
-
-@router.get(
-    "/pending-equipment/stats",
-    summary="获取待审核装备统计",
-    description="获取待审核装备的统计数据"
-)
-async def get_pending_equipment_stats(
-    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
-):
-    """
-    获取待审核装备统计数据
-
-    Returns:
-        统计数据字典
-    """
-    try:
-        from packages.agents.equipment_import.models.pending import PendingEquipment
-        from apps.api.orm.session import get_db_session
-        from sqlalchemy import func
-
-        with get_db_session() as session:
-            # 统计各状态数量
-            stats = session.query(
-                PendingEquipment.status,
-                func.count(PendingEquipment.id)
-            ).group_by(PendingEquipment.status).all()
-
-            stat_dict = {s[0]: s[1] for s in stats}
-            total = sum(stat_dict.values())
-
-            return {
-                "total": total,
-                "pending": stat_dict.get("pending", 0),
-                "approved": stat_dict.get("approved", 0),
-                "rejected": stat_dict.get("rejected", 0),
-            }
-
-    except Exception as e:
-        logger.error(f"获取待审核装备统计失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取统计失败: {str(e)}")
 
 
 @router.delete(
