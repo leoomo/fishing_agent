@@ -79,8 +79,9 @@ const Monitor = () => {
     connectWebSocket()
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close()
+      const ws = wsRef.current
+      if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+        ws.close()
       }
       if (uptimeTimerRef.current) {
         clearInterval(uptimeTimerRef.current)
@@ -131,7 +132,18 @@ const Monitor = () => {
     const wsUrl = import.meta.env.DEV
       ? 'ws://localhost:8000/api/v1/admin/monitor/ws/realtime-stats'
       : `ws://${window.location.host}/api/v1/admin/monitor/ws/realtime-stats`
+
+    // Avoid duplicate connections
+    if (wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING) {
+      return
+    }
+
     const ws = new WebSocket(wsUrl)
+
+    ws.onopen = () => {
+      wsRef.current = ws
+    }
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
@@ -144,7 +156,12 @@ const Monitor = () => {
       // WebSocket 连接失败时静默处理
     }
 
-    wsRef.current = ws
+    ws.onclose = () => {
+      // 清理引用，避免内存泄漏
+      if (wsRef.current === ws) {
+        wsRef.current = null
+      }
+    }
   }
 
   const getHealthStatusIcon = (status: string) => {
