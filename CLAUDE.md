@@ -1,11 +1,6 @@
 <!-- OPENSPEC:START -->
-# OpenSpec Instructions
-Always open `@/openspec/AGENTS.md` when the request:
-- Mentions planning or proposals (words like proposal, spec, change, plan)
-- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
-- Sounds ambiguous and you need the authoritative spec before coding
 <!-- OPENSPEC:END -->
-
+-禁止自动执行git命令
 # 智能钓鱼助手 v5.0.2
 
 模块化 Agent 架构 + JWT认证系统 + React管理前端，基于 LangChain 1.0+ 和 7 因子科学评分系统。
