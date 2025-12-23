@@ -13,6 +13,7 @@ from packages.scraper.database import get_crawler_db
 from packages.scraper.models import CrawlerTask, TaskStatus
 from apps.api.orm.repositories.crawler_repo import CrawlerRepository
 
+from fastapi import UploadFile, File, Form
 from apps.api.schemas.crawler import (
     CrawlerTaskCreate,
     CrawlerTaskResponse,
@@ -44,6 +45,13 @@ from apps.api.schemas.crawler import (
     PendingEquipmentListResponse,
     PendingEquipmentReview,
     PendingEquipmentReviewResponse,
+    # Upload schemas
+    CrawlerProductUpload,
+    CrawlerUploadRequest,
+    CrawlerUploadResponse,
+    DownloadedProductsResponse,
+    CheckDuplicatesRequest,
+    CheckDuplicatesResponse,
 )
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
@@ -1766,6 +1774,156 @@ async def get_scheduler_status(
     except Exception as e:
         logger.error(f"获取调度器状态失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+# ========== 爬虫图片上传 ==========
+
+@router.post(
+    "/tasks/{task_id}/upload",
+    response_model=CrawlerUploadResponse,
+    summary="爬虫任务图片批量上传",
+    description="任务完成后批量上传产品图片并创建待审核记录"
+)
+async def upload_task_products(
+    task_id: int,
+    products: str = Form(..., description="产品列表JSON字符串"),
+    files: List[UploadFile] = File(..., description="图片文件列表"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    批量上传爬虫任务产品
+
+    - **products**: JSON 字符串，包含产品元数据列表
+    - **files**: 图片文件列表，文件名格式为 `{product_index}_{image_index}.{ext}`
+
+    产品 JSON 格式示例:
+    ```json
+    [
+        {
+            "product_id": "shimano_fx-2000",
+            "brand_name": "Shimano",
+            "product_name": "FX-2000",
+            "source_url": "https://...",
+            "image_count": 3,
+            "equipment_type": "渔轮"
+        }
+    ]
+    ```
+
+    Returns:
+        上传结果（成功/失败/跳过统计）
+    """
+    try:
+        from apps.api.services.crawler_upload_service import CrawlerUploadService
+
+        # 解析产品 JSON
+        try:
+            products_data = json.loads(products)
+            product_list = [CrawlerProductUpload(**p) for p in products_data]
+        except (json.JSONDecodeError, Exception) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"products JSON 解析失败: {str(e)}"
+            )
+
+        # 验证任务存在
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+            if not task:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"任务不存在: task_id={task_id}"
+                )
+
+        # 调用上传服务
+        service = CrawlerUploadService()
+        result = service.upload_products(
+            task_id=task_id,
+            products=product_list,
+            files=files
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"上传产品失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
+
+
+@router.get(
+    "/tasks/{task_id}/downloaded",
+    response_model=DownloadedProductsResponse,
+    summary="获取任务已下载产品列表",
+    description="查询爬虫任务已下载的产品标识，用于去重"
+)
+async def get_downloaded_products(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取已下载产品标识列表
+
+    Returns:
+        品牌_产品名 标识数组
+    """
+    try:
+        from apps.api.services.crawler_upload_service import CrawlerUploadService
+
+        # 验证任务存在
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+            if not task:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"任务不存在: task_id={task_id}"
+                )
+
+        service = CrawlerUploadService()
+        return service.get_downloaded_products(task_id)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取已下载产品失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.post(
+    "/check-duplicates",
+    response_model=CheckDuplicatesResponse,
+    summary="检查产品是否已下载",
+    description="批量检查产品标识是否已存在"
+)
+async def check_duplicates(
+    request: CheckDuplicatesRequest,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    检查产品是否已被爬取
+
+    Args:
+        task_id: 任务ID（可选，指定则只在该任务内查重）
+        product_ids: 品牌_产品名 标识列表
+
+    Returns:
+        {exists: ['id1', 'id2'], new: ['id3', 'id4']}
+    """
+    try:
+        from apps.api.services.crawler_upload_service import CrawlerUploadService
+
+        service = CrawlerUploadService()
+        return service.check_duplicates(
+            product_ids=request.product_ids,
+            task_id=request.task_id
+        )
+
+    except Exception as e:
+        logger.error(f"检查重复失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"检查失败: {str(e)}")
 
 
 # ========== 待审核装备管理 ==========

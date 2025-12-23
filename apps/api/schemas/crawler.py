@@ -421,3 +421,51 @@ class PendingEquipmentReviewResponse(BaseModel):
     success: bool
     message: str
     equipment_id: Optional[int] = Field(None, description="审核通过后创建的装备ID")
+
+
+# ========== 爬虫图片上传 Schema ==========
+
+class CrawlerProductUpload(BaseModel):
+    """爬虫产品上传数据（JSON 元数据部分）"""
+    product_id: str = Field(..., description="产品标识：品牌_产品名")
+    brand_name: str = Field(..., min_length=1, description="品牌名称")
+    product_name: str = Field(..., min_length=1, description="产品名称")
+    source_url: Optional[str] = Field(None, description="来源URL")
+    image_count: int = Field(..., ge=1, description="该产品的图片数量")
+    equipment_type: Optional[str] = Field(None, description="装备类型")
+
+
+class CrawlerUploadRequest(BaseModel):
+    """爬虫批量上传请求（multipart/form-data 的 JSON 部分）"""
+    products: List[CrawlerProductUpload] = Field(..., min_length=1, description="产品列表")
+
+
+class CrawlerUploadResponse(BaseModel):
+    """爬虫上传响应"""
+    success: bool
+    task_id: int
+    uploaded_count: int = Field(..., description="成功上传数量")
+    skipped_count: int = Field(..., description="跳过数量（重复）")
+    failed_count: int = Field(default=0, description="失败数量")
+    pending_ids: List[int] = Field(default_factory=list, description="创建的待审核记录ID")
+    skipped_products: List[str] = Field(default_factory=list, description="跳过的产品标识")
+    errors: List[str] = Field(default_factory=list, description="错误信息")
+
+
+class DownloadedProductsResponse(BaseModel):
+    """已下载产品列表响应"""
+    task_id: int
+    products: List[str] = Field(..., description="品牌_产品名 标识列表")
+    count: int
+
+
+class CheckDuplicatesRequest(BaseModel):
+    """去重检查请求"""
+    task_id: Optional[int] = Field(None, description="任务ID（可选，指定则只在该任务内查重）")
+    product_ids: List[str] = Field(..., min_length=1, description="产品标识列表")
+
+
+class CheckDuplicatesResponse(BaseModel):
+    """去重检查响应"""
+    exists: List[str] = Field(default_factory=list, description="已存在的产品标识")
+    new: List[str] = Field(default_factory=list, description="新产品标识")

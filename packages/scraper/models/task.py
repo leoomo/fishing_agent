@@ -74,6 +74,13 @@ class CrawlerTask(Base, TimestampMixin):
     duplicate_items = Column(Integer, default=0, comment='去重数量')
     invalid_items = Column(Integer, default=0, comment='无效数据量')
 
+    # === 已下载产品标识 ===
+    downloaded_products = Column(
+        Text,
+        nullable=True,
+        comment="已下载产品标识JSON数组，格式: ['品牌_产品名', ...]"
+    )
+
     # === 分布式执行字段 ===
     execution_mode = Column(
         String(20),
@@ -130,6 +137,7 @@ class CrawlerTask(Base, TimestampMixin):
             'error_message': self.error_message,
             'config': self.config,
             'result_summary': self.result_summary,
+            'downloaded_products': self.downloaded_products,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
