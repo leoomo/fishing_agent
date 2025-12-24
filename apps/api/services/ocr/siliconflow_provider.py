@@ -10,12 +10,14 @@ import time
 import tempfile
 import logging
 from typing import List, Optional, Tuple, Dict, Any
+from pathlib import Path
 
 import requests
 
 from .base import BaseOCRProvider
 from .exceptions import SiliconFlowError, OCRConfigurationError
 from packages.data_processing.image import ImageMerger
+from packages.data_processing.ocr import OCRMergeProcessor
 
 # 导入PIL用于图片处理
 try:
@@ -303,24 +305,93 @@ class SiliconFlowProvider(BaseOCRProvider):
                 "error": str(e)
             }
 
-    def _merge_images(self, image_paths: List[str]) -> Tuple[str, int]:
+    def _merge_images(self, image_paths: List[str]) -> Tuple[List[str], int]:
         """
-        合并多张图片
+        使用 OCRMergeProcessor 智能合并多张图片
+
+        流程：
+        1. 裁剪每张图片的空白区域（crop_single_image）
+        2. 跳过文字稀疏区域（skip_sparse_regions）
+        3. 智能分组合并（generate_smart_merge_groups）
+        4. 如果只有一个输出文件且超过限制，分割处理
 
         Args:
             image_paths: 图片路径列表
 
         Returns:
-            Tuple[str, int]: (合并后的图片路径, 合并数量)
+            Tuple[List[str], int]: (输出文件路径列表, 合并数量)
         """
         if len(image_paths) == 1:
-            return image_paths[0], 1
+            return [image_paths[0]], 1
 
-        # 创建临时文件
+        # 创建临时目录
+        temp_dir = tempfile.mkdtemp(prefix="ocr_merge_")
+        output_dir = tempfile.mkdtemp(prefix="ocr_output_")
+
+        try:
+            # 将所有图片复制到源目录（OCRMergeProcessor 需要源目录）
+            import shutil
+            source_dir = Path(temp_dir)
+            for i, path in enumerate(image_paths):
+                shutil.copy2(path, source_dir / f"{i+1}.jpg")
+
+            # 使用 OCRMergeProcessor 处理
+            processor = OCRMergeProcessor(
+                source_dir=str(source_dir),
+                output_dir=output_dir,
+                # 裁剪参数
+                padding=15,
+                min_text_area=100,
+                # 合并参数
+                quality=95,
+                spacing=0,
+                # 分割参数（如果合并后还是太大）
+                enable_split=True,
+                min_segment_height=300,
+                max_segment_height=4000,
+                # 其他参数
+                keep_empty_images=False,
+                skip_pure_images=True,
+                skip_sparse_regions=True,
+                min_chars_per_region=5,
+                verbose=False
+            )
+
+            result = processor.process()
+
+            if not result.success:
+                raise SiliconFlowError(f"图片处理失败: {result.error}", "OCR_MERGE_ERROR")
+
+            output_files = result.output_files
+
+            logger.info(f"智能合并完成: {len(image_paths)} 张图片 -> {len(output_files)} 个文件")
+            logger.info(f"统计: {result.statistics}")
+
+            return output_files, len(image_paths)
+
+        except SiliconFlowError:
+            raise
+        except Exception as e:
+            logger.error(f"OCRMergeProcessor 处理失败: {e}")
+            # 回退到简单合并
+            logger.info("回退到简单合并模式...")
+            return self._simple_merge_images(image_paths)
+        finally:
+            # 清理临时目录
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            # 注意：output_dir 需要保留，因为 merged_path 在里面
+
+    def _simple_merge_images(self, image_paths: List[str]) -> Tuple[List[str], int]:
+        """
+        简单合并模式（回退方案）
+
+        直接垂直合并所有图片，不进行裁剪和智能分组
+        """
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
             output_path = f.name
 
-        logger.info(f"合并 {len(image_paths)} 张图片...")
+        logger.info(f"简单合并 {len(image_paths)} 张图片...")
 
         success = self.image_merger.merge_vertically(image_paths, output_path)
 
@@ -328,7 +399,7 @@ class SiliconFlowProvider(BaseOCRProvider):
             raise SiliconFlowError("图片合并失败", "OCR_MERGE_ERROR")
 
         logger.info(f"图片合并成功: {output_path}")
-        return output_path, len(image_paths)
+        return [output_path], len(image_paths)
 
     def recognize_table(
         self,
@@ -363,7 +434,7 @@ class SiliconFlowProvider(BaseOCRProvider):
             dict: 识别结果
         """
         start_time = time.time()
-        merged_path = None
+        merged_paths = []
         images_merged = 1
 
         try:
@@ -380,43 +451,56 @@ class SiliconFlowProvider(BaseOCRProvider):
 
             # 3. 合并图片（如果多张）
             if len(image_paths) > 1:
-                merged_path, images_merged = self._merge_images(image_paths)
-                target_path = merged_path
+                merged_paths, images_merged = self._merge_images(image_paths)
             else:
-                target_path = image_paths[0]
+                merged_paths = [image_paths[0]]
 
-            # 4. 获取 MIME 类型和转换为 base64
-            mime_type = self._validate_image_format(target_path)
-            image_base64, file_size = self._image_to_base64(target_path)
+            # 4. 对所有输出文件进行 OCR，然后合并结果
+            all_markdown = []
+            total_file_size = 0
 
-            if verbose:
-                logger.info(f"图片大小: {file_size/1024:.1f}KB, 格式: {mime_type}")
+            for i, target_path in enumerate(merged_paths):
+                if verbose and len(merged_paths) > 1:
+                    logger.info(f"正在处理第 {i+1}/{len(merged_paths)} 个文件...")
 
-            # 5. 构建 payload 并调用 API
-            payload = self._build_payload(image_base64, mime_type)
+                # 获取 MIME 类型和转换为 base64
+                mime_type = self._validate_image_format(target_path)
+                image_base64, file_size = self._image_to_base64(target_path)
+                total_file_size += file_size
 
-            if verbose:
-                logger.info("正在调用硅基流动 API...")
+                if verbose:
+                    logger.info(f"  图片大小: {file_size/1024:.1f}KB, 格式: {mime_type}")
 
-            response = self._call_api(payload, verbose=verbose)
+                # 5. 构建 payload 并调用 API
+                payload = self._build_payload(image_base64, mime_type)
 
-            # 6. 解析响应
-            markdown = self._parse_response(response)
+                if verbose:
+                    logger.info("  正在调用硅基流动 API...")
 
-            # 7. 计算处理时间
+                response = self._call_api(payload, verbose=verbose)
+
+                # 6. 解析响应
+                markdown = self._parse_response(response)
+                all_markdown.append(markdown)
+
+            # 7. 合并所有 markdown 结果
+            final_markdown = "\n\n".join(all_markdown)
+
+            # 8. 计算处理时间
             processing_time_ms = int((time.time() - start_time) * 1000)
 
             if verbose:
-                logger.info(f"识别完成，耗时: {processing_time_ms}ms")
+                logger.info(f"识别完成，处理了 {len(merged_paths)} 个文件，耗时: {processing_time_ms}ms")
 
             return self._format_response(
                 success=True,
-                markdown=markdown,
+                markdown=final_markdown,
                 metadata={
                     "model": self.MODEL,
                     "processing_time_ms": processing_time_ms,
                     "images_merged": images_merged,
-                    "image_size_bytes": file_size
+                    "output_files_count": len(merged_paths),
+                    "total_file_size_bytes": total_file_size
                 }
             )
 
@@ -448,14 +532,8 @@ class SiliconFlowProvider(BaseOCRProvider):
                 }
             )
 
-        finally:
-            # 清理临时合并文件
-            if merged_path and os.path.exists(merged_path):
-                try:
-                    os.unlink(merged_path)
-                    logger.debug(f"已清理临时文件: {merged_path}")
-                except Exception as e:
-                    logger.warning(f"清理临时文件失败: {e}")
+        # 注意：OCRMergeProcessor 生成的临时文件在 /tmp/ocr_output_* 目录下
+        # 系统会定期清理 /tmp 目录，或者可以手动清理
 
     def recognize_table_from_bytes(
         self,

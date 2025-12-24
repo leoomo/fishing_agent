@@ -160,7 +160,7 @@ class OCRMergeProcessor:
     def merger(self):
         """延迟加载图片合并器"""
         if self._merger is None:
-            from .image_merger import ImageMerger
+            from packages.data_processing.image import ImageMerger
             self._merger = ImageMerger(
                 quality=self.quality,
                 spacing=self.spacing
@@ -171,7 +171,7 @@ class OCRMergeProcessor:
     def splitter(self):
         """延迟加载图片分割器"""
         if self._splitter is None:
-            from .merge_split_processor import BlankRowDetector, ImageSplitter
+            from packages.data_processing.image.splitter import BlankRowDetector, ImageSplitter
             self._blank_detector = BlankRowDetector()
             self._splitter = ImageSplitter(
                 min_segment_height=self.min_segment_height,
@@ -646,7 +646,7 @@ class OCRMergeProcessor:
             logger.warning("PIL 未安装，跳过分割")
             return [merged_path]
 
-        from .merge_split_processor import BlankRowDetector, ImageSplitter
+        from packages.data_processing.image.splitter import BlankRowDetector, ImageSplitter
 
         try:
             with Image.open(merged_path) as img:

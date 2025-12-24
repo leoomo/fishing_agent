@@ -97,6 +97,14 @@ class PendingEquipment(Base, TimestampMixin):
         comment="OCR 处理耗时(毫秒)"
     )
 
+    ocr_priority = Column(
+        Integer,
+        default=0,
+        nullable=False,
+        index=True,
+        comment="OCR任务优先级: 0=默认, 1=低, 5=高, 10=紧急"
+    )
+
     source_type = Column(
         String(50),
         default="unknown",
