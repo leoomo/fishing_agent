@@ -3,6 +3,7 @@ import authReducer from './slices/authSlice'
 import equipmentReducer from './slices/equipmentSlice'
 import crawlerReducer from './slices/crawlerSlice'
 import pendingEquipmentReducer from './slices/pendingEquipmentSlice'
+import ocrWorkerReducer from './slices/ocrWorkerSlice'
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     equipment: equipmentReducer,
     crawler: crawlerReducer,
     pendingEquipment: pendingEquipmentReducer,
+    ocrWorker: ocrWorkerReducer,
   },
 })
 
