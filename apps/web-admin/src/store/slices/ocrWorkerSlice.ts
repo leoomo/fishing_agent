@@ -5,7 +5,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { ocrWorkerApi } from '../../api/services/ocrWorker'
-import type { OCRStats, OCRTaskItem, OCRTaskFilters } from '../../types/ocrWorker'
+import type { OCRStats, OCRTaskItem, OCRTaskFilters, OCRTaskBatchRetryRequest } from '../../types/ocrWorker'
 
 interface OCRWorkerState {
   tasks: OCRTaskItem[]
@@ -61,6 +61,78 @@ export const fetchOCRTasks = createAsyncThunk(
   }
 )
 
+// ========== 管理员操作 ==========
+
+// 重试单个任务
+export const retryOCRTask = createAsyncThunk(
+  'ocrWorker/retryTask',
+  async (pendingId: number, { rejectWithValue }) => {
+    try {
+      const response = await ocrWorkerApi.retryTask(pendingId)
+      return { pendingId, response }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } }
+      return rejectWithValue(err.response?.data?.detail || '重试任务失败')
+    }
+  }
+)
+
+// 批量重试任务
+export const retryOCRTasksBatch = createAsyncThunk(
+  'ocrWorker/retryTasksBatch',
+  async (params: OCRTaskBatchRetryRequest, { rejectWithValue }) => {
+    try {
+      const response = await ocrWorkerApi.retryTasksBatch(params)
+      return response
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } }
+      return rejectWithValue(err.response?.data?.detail || '批量重试失败')
+    }
+  }
+)
+
+// 跳过任务
+export const skipOCRTask = createAsyncThunk(
+  'ocrWorker/skipTask',
+  async (pendingId: number, { rejectWithValue }) => {
+    try {
+      const response = await ocrWorkerApi.skipTask(pendingId)
+      return { pendingId, response }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } }
+      return rejectWithValue(err.response?.data?.detail || '跳过任务失败')
+    }
+  }
+)
+
+// 设置优先级
+export const setOCRTaskPriority = createAsyncThunk(
+  'ocrWorker/setPriority',
+  async ({ pendingId, priority }: { pendingId: number; priority: number }, { rejectWithValue }) => {
+    try {
+      const response = await ocrWorkerApi.setTaskPriority(pendingId, { priority })
+      return { pendingId, response }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } }
+      return rejectWithValue(err.response?.data?.detail || '设置优先级失败')
+    }
+  }
+)
+
+// 删除任务
+export const deleteOCRTask = createAsyncThunk(
+  'ocrWorker/deleteTask',
+  async (pendingId: number, { rejectWithValue }) => {
+    try {
+      const response = await ocrWorkerApi.deleteTask(pendingId)
+      return { pendingId, response }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } }
+      return rejectWithValue(err.response?.data?.detail || '删除任务失败')
+    }
+  }
+)
+
 const ocrWorkerSlice = createSlice({
   name: 'ocrWorker',
   initialState,
@@ -107,6 +179,14 @@ const ocrWorkerSlice = createSlice({
       .addCase(fetchOCRTasks.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
+      })
+
+    // 删除任务成功后从列表中移除
+    builder
+      .addCase(deleteOCRTask.fulfilled, (state, action) => {
+        const pendingId = action.meta.arg
+        state.tasks = state.tasks.filter(t => t.pending_id !== pendingId)
+        state.pagination.total = Math.max(0, state.pagination.total - 1)
       })
   },
 })

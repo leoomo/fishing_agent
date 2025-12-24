@@ -111,6 +111,7 @@ class OCRTaskItem(BaseModel):
     ocr_provider: Optional[str] = None
     ocr_retry_count: int = 0
     ocr_error_message: Optional[str] = None
+    ocr_priority: int = 0
     images_count: int = 0
     created_at: Optional[datetime] = None
 
@@ -122,3 +123,59 @@ class OCRTaskListResponse(BaseModel):
     total: int = 0
     page: int = 1
     page_size: int = 20
+
+
+# ========== 管理员操作 ==========
+
+class OCRTaskRetryResponse(BaseModel):
+    """重试任务响应"""
+    success: bool
+    message: str
+    pending_id: int
+    previous_status: str
+
+
+class OCRTaskBatchRetryRequest(BaseModel):
+    """批量重试请求"""
+    pending_ids: Optional[List[int]] = Field(None, description="指定任务ID列表，不指定则重试所有失败任务")
+    ocr_status: Optional[Literal["failed", "skipped", "processing"]] = Field(
+        default="failed",
+        description="筛选要重试的任务状态"
+    )
+
+
+class OCRTaskBatchRetryResponse(BaseModel):
+    """批量重试响应"""
+    success: bool
+    message: str
+    retried_count: int
+    skipped_count: int
+    pending_ids: List[int] = Field(default_factory=list)
+
+
+class OCRTaskSkipResponse(BaseModel):
+    """跳过任务响应"""
+    success: bool
+    message: str
+    pending_id: int
+
+
+class OCRTaskSetPriorityRequest(BaseModel):
+    """设置优先级请求"""
+    priority: int = Field(..., ge=0, le=10, description="优先级: 0=默认, 1=低, 5=高, 10=紧急")
+
+
+class OCRTaskSetPriorityResponse(BaseModel):
+    """设置优先级响应"""
+    success: bool
+    message: str
+    pending_id: int
+    old_priority: int
+    new_priority: int
+
+
+class OCRTaskDeleteResponse(BaseModel):
+    """删除任务响应"""
+    success: bool
+    message: str
+    pending_id: int

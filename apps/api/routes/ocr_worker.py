@@ -31,7 +31,18 @@ from apps.api.schemas.ocr_worker import (
     OCRStats,
     OCRTaskItem,
     OCRTaskListResponse,
+    # 管理员操作
+    OCRTaskRetryResponse,
+    OCRTaskBatchRetryRequest,
+    OCRTaskBatchRetryResponse,
+    OCRTaskSkipResponse,
+    OCRTaskSetPriorityRequest,
+    OCRTaskSetPriorityResponse,
+    OCRTaskDeleteResponse,
 )
+
+from apps.api.auth.dependencies import require_permission, CurrentUser
+from apps.api.auth.permissions import PermissionEnum
 
 logger = logging.getLogger(__name__)
 
@@ -402,6 +413,7 @@ async def list_ocr_tasks(
                 ocr_provider=item.ocr_provider,
                 ocr_retry_count=item.ocr_retry_count,
                 ocr_error_message=item.ocr_error_message,
+                ocr_priority=item.ocr_priority,
                 images_count=images_count,
                 created_at=item.created_at,
             ))
@@ -412,4 +424,250 @@ async def list_ocr_tasks(
             total=total,
             page=page,
             page_size=page_size,
+        )
+
+
+# ========== 管理员操作端点 ==========
+
+
+@router.post(
+    "/admin/tasks/{pending_id}/retry",
+    response_model=OCRTaskRetryResponse,
+    summary="手动重试OCR任务",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
+)
+async def retry_ocr_task(
+    pending_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """
+    将失败/跳过的任务重新设为pending状态
+    - 重置 retry_count 为 0
+    - 清空 error_message
+    """
+    with get_db_session() as session:
+        item = session.query(PendingEquipment).filter(
+            PendingEquipment.id == pending_id
+        ).first()
+
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"任务 {pending_id} 不存在"
+            )
+
+        # 允许 failed/skipped/completed 状态重试
+        if item.ocr_status not in ["failed", "skipped", "completed"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"只有失败、跳过或已完成的任务可以重试，当前状态: {item.ocr_status}"
+            )
+
+        previous_status = item.ocr_status
+
+        # 重置状态为 pending
+        item.ocr_status = "pending"
+        item.ocr_retry_count = 0
+        item.ocr_error_message = None
+        item.ocr_started_at = None
+        item.ocr_completed_at = None
+        item.ocr_worker_id = None
+
+        session.commit()
+
+        logger.info(
+            f"管理员 {current_user.username} 重试任务 {pending_id}, "
+            f"原状态: {previous_status}"
+        )
+
+        return OCRTaskRetryResponse(
+            success=True,
+            message="任务已重新加入队列（重试次数已重置）",
+            pending_id=pending_id,
+            previous_status=previous_status
+        )
+
+
+@router.post(
+    "/admin/tasks/retry-batch",
+    response_model=OCRTaskBatchRetryResponse,
+    summary="批量重试OCR任务",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
+)
+async def retry_ocr_tasks_batch(
+    request: OCRTaskBatchRetryRequest,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """批量重试失败/跳过的任务，全部重置重试次数"""
+    with get_db_session() as session:
+        query = session.query(PendingEquipment).filter(
+            PendingEquipment.ocr_status == request.ocr_status
+        )
+
+        # 如果指定了任务ID，只重试这些任务
+        if request.pending_ids:
+            query = query.filter(PendingEquipment.id.in_(request.pending_ids))
+
+        items = query.all()
+
+        if not items:
+            return OCRTaskBatchRetryResponse(
+                success=True,
+                message="没有找到需要重试的任务",
+                retried_count=0,
+                skipped_count=0,
+                pending_ids=[]
+            )
+
+        retried_ids = []
+        now = datetime.utcnow()
+
+        for item in items:
+            # 重置状态
+            item.ocr_status = "pending"
+            item.ocr_retry_count = 0
+            item.ocr_error_message = None
+            item.ocr_started_at = None
+            item.ocr_completed_at = None
+            item.ocr_worker_id = None
+            retried_ids.append(item.id)
+
+        session.commit()
+
+        logger.info(
+            f"管理员 {current_user.username} 批量重试了 {len(retried_ids)} 个任务: {retried_ids}"
+        )
+
+        return OCRTaskBatchRetryResponse(
+            success=True,
+            message=f"成功重试 {len(retried_ids)} 个任务",
+            retried_count=len(retried_ids),
+            skipped_count=0,
+            pending_ids=retried_ids
+        )
+
+
+@router.post(
+    "/admin/tasks/{pending_id}/skip",
+    response_model=OCRTaskSkipResponse,
+    summary="跳过OCR任务",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
+)
+async def skip_ocr_task(
+    pending_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """将任务标记为跳过状态"""
+    with get_db_session() as session:
+        item = session.query(PendingEquipment).filter(
+            PendingEquipment.id == pending_id
+        ).first()
+
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"任务 {pending_id} 不存在"
+            )
+
+        # 只有 pending/failed 状态可以跳过
+        if item.ocr_status not in ["pending", "failed"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"只有待处理或失败的任务可以跳过，当前状态: {item.ocr_status}"
+            )
+
+        item.ocr_status = "skipped"
+        session.commit()
+
+        logger.info(
+            f"管理员 {current_user.username} 跳过任务 {pending_id}"
+        )
+
+        return OCRTaskSkipResponse(
+            success=True,
+            message="任务已跳过",
+            pending_id=pending_id
+        )
+
+
+@router.put(
+    "/admin/tasks/{pending_id}/priority",
+    response_model=OCRTaskSetPriorityResponse,
+    summary="设置OCR任务优先级",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
+)
+async def set_task_priority(
+    pending_id: int,
+    request: OCRTaskSetPriorityRequest,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """设置任务优先级，高优先级任务先被Worker领取"""
+    with get_db_session() as session:
+        item = session.query(PendingEquipment).filter(
+            PendingEquipment.id == pending_id
+        ).first()
+
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"任务 {pending_id} 不存在"
+            )
+
+        old_priority = item.ocr_priority
+        item.ocr_priority = request.priority
+        session.commit()
+
+        logger.info(
+            f"管理员 {current_user.username} 设置任务 {pending_id} 优先级: {old_priority} -> {request.priority}"
+        )
+
+        return OCRTaskSetPriorityResponse(
+            success=True,
+            message="优先级已更新",
+            pending_id=pending_id,
+            old_priority=old_priority,
+            new_priority=request.priority
+        )
+
+
+@router.delete(
+    "/admin/tasks/{pending_id}",
+    response_model=OCRTaskDeleteResponse,
+    summary="删除OCR任务",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_DELETE))]
+)
+async def delete_ocr_task(
+    pending_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_DELETE))
+):
+    """删除任务记录（仅pending/failed/skipped状态可删除）"""
+    with get_db_session() as session:
+        item = session.query(PendingEquipment).filter(
+            PendingEquipment.id == pending_id
+        ).first()
+
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"任务 {pending_id} 不存在"
+            )
+
+        # processing 和 completed 状态不可删除
+        if item.ocr_status in ["processing", "completed"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"处理中或已完成的任务不可删除，当前状态: {item.ocr_status}"
+            )
+
+        session.delete(item)
+        session.commit()
+
+        logger.info(
+            f"管理员 {current_user.username} 删除任务 {pending_id}"
+        )
+
+        return OCRTaskDeleteResponse(
+            success=True,
+            message="任务已删除",
+            pending_id=pending_id
         )

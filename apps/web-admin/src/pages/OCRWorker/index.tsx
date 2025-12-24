@@ -2,7 +2,7 @@
  * OCR Worker 管理页面
  */
 
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   Card,
@@ -17,6 +17,7 @@ import {
   Typography,
   Tooltip,
   message,
+  Popconfirm,
 } from 'antd'
 import {
   ReloadOutlined,
@@ -25,10 +26,12 @@ import {
   SyncOutlined,
   ClockCircleOutlined,
   ExclamationCircleOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { AppDispatch } from '../../store/store'
 import type { OCRTaskItem } from '../../types/ocrWorker'
+import { OCR_PRIORITY_OPTIONS } from '../../types/ocrWorker'
 import {
   fetchOCRStats,
   fetchOCRTasks,
@@ -39,6 +42,11 @@ import {
   selectOCRFilters,
   setFilters,
   setPage,
+  retryOCRTask,
+  retryOCRTasksBatch,
+  skipOCRTask,
+  setOCRTaskPriority,
+  deleteOCRTask,
 } from '../../store/slices/ocrWorkerSlice'
 
 const { Title, Text } = Typography
@@ -50,6 +58,7 @@ const OCRWorkerPage: React.FC = () => {
   const loading = useSelector(selectOCRLoading)
   const pagination = useSelector(selectOCRPagination)
   const filters = useSelector(selectOCRFilters)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   // 加载数据
   const loadData = useCallback(() => {
@@ -87,6 +96,70 @@ const OCRWorkerPage: React.FC = () => {
     }))
   }
 
+  // ========== 管理员操作 ==========
+
+  // 重试任务
+  const handleRetry = async (pendingId: number) => {
+    const result = await dispatch(retryOCRTask(pendingId))
+    if (retryOCRTask.fulfilled.match(result)) {
+      message.success('任务已重新加入队列（重试次数已重置）')
+      loadData()
+    } else {
+      message.error('重试失败')
+    }
+  }
+
+  // 批量重试
+  const handleBatchRetry = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先选择要重试的任务')
+      return
+    }
+    const result = await dispatch(retryOCRTasksBatch({
+      pending_ids: selectedRowKeys as number[],
+    }))
+    if (retryOCRTasksBatch.fulfilled.match(result)) {
+      message.success(`成功重试 ${result.payload.retried_count} 个任务`)
+      setSelectedRowKeys([])
+      loadData()
+    } else {
+      message.error('批量重试失败')
+    }
+  }
+
+  // 跳过任务
+  const handleSkip = async (pendingId: number) => {
+    const result = await dispatch(skipOCRTask(pendingId))
+    if (skipOCRTask.fulfilled.match(result)) {
+      message.success('任务已跳过')
+      loadData()
+    } else {
+      message.error('跳过失败')
+    }
+  }
+
+  // 设置优先级
+  const handlePriorityChange = async (pendingId: number, priority: number) => {
+    const result = await dispatch(setOCRTaskPriority({ pendingId, priority }))
+    if (setOCRTaskPriority.fulfilled.match(result)) {
+      message.success('优先级已更新')
+      loadData()
+    } else {
+      message.error('设置优先级失败')
+    }
+  }
+
+  // 删除任务
+  const handleDelete = async (pendingId: number) => {
+    const result = await dispatch(deleteOCRTask(pendingId))
+    if (deleteOCRTask.fulfilled.match(result)) {
+      message.success('任务已删除')
+      // 无需刷新，Redux已处理
+    } else {
+      message.error('删除失败')
+    }
+  }
+
   // 状态标签配置
   const statusConfig: Record<string, { color: string; icon: React.ReactNode; text: string }> = {
     pending: { color: 'default', icon: <ClockCircleOutlined />, text: '待处理' },
@@ -116,7 +189,7 @@ const OCRWorkerPage: React.FC = () => {
       title: '产品名称',
       dataIndex: 'product_name',
       key: 'product_name',
-      width: 200,
+      width: 180,
       ellipsis: true,
       render: (text) => (
         <Tooltip title={text}>
@@ -128,14 +201,14 @@ const OCRWorkerPage: React.FC = () => {
       title: '图片数',
       dataIndex: 'images_count',
       key: 'images_count',
-      width: 80,
+      width: 70,
       align: 'center',
     },
     {
       title: '状态',
       dataIndex: 'ocr_status',
       key: 'ocr_status',
-      width: 100,
+      width: 90,
       render: (status: string) => {
         const config = statusConfig[status] || statusConfig.pending
         return (
@@ -146,25 +219,38 @@ const OCRWorkerPage: React.FC = () => {
       },
     },
     {
+      title: '优先级',
+      dataIndex: 'ocr_priority',
+      key: 'ocr_priority',
+      width: 100,
+      render: (priority: number, record: OCRTaskItem) => {
+        return (
+          <Select
+            size="small"
+            value={priority}
+            style={{ width: '100%' }}
+            onChange={(value) => handlePriorityChange(record.pending_id, value)}
+            options={OCR_PRIORITY_OPTIONS.map(opt => ({
+              label: opt.label,
+              value: opt.value,
+            }))}
+          />
+        )
+      },
+    },
+    {
       title: 'Worker',
       dataIndex: 'ocr_worker_id',
       key: 'ocr_worker_id',
-      width: 120,
+      width: 100,
       ellipsis: true,
       render: (text) => text || '-',
-    },
-    {
-      title: '提供商',
-      dataIndex: 'ocr_provider',
-      key: 'ocr_provider',
-      width: 100,
-      render: (text) => text ? <Tag>{text}</Tag> : '-',
     },
     {
       title: '耗时',
       dataIndex: 'ocr_processing_time_ms',
       key: 'ocr_processing_time_ms',
-      width: 100,
+      width: 80,
       render: (ms: number | undefined) => {
         if (!ms) return '-'
         if (ms < 1000) return `${ms}ms`
@@ -175,27 +261,57 @@ const OCRWorkerPage: React.FC = () => {
       title: '重试',
       dataIndex: 'ocr_retry_count',
       key: 'ocr_retry_count',
-      width: 60,
+      width: 50,
       align: 'center',
     },
     {
-      title: '错误信息',
-      dataIndex: 'ocr_error_message',
-      key: 'ocr_error_message',
-      width: 150,
-      ellipsis: true,
-      render: (text) => text ? (
-        <Tooltip title={text}>
-          <Text type="danger" ellipsis>{text}</Text>
-        </Tooltip>
-      ) : '-',
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 160,
-      render: (text) => text ? new Date(text).toLocaleString() : '-',
+      title: '操作',
+      key: 'actions',
+      width: 180,
+      fixed: 'right',
+      render: (_, record: OCRTaskItem) => (
+        <Space size="small">
+          {/* 重试按钮 */}
+          {['failed', 'skipped', 'completed'].includes(record.ocr_status) && (
+            <Button
+              type="link"
+              size="small"
+              icon={<ReloadOutlined />}
+              onClick={() => handleRetry(record.pending_id)}
+            >
+              重试
+            </Button>
+          )}
+          {/* 跳过按钮 */}
+          {['pending', 'failed'].includes(record.ocr_status) && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleSkip(record.pending_id)}
+            >
+              跳过
+            </Button>
+          )}
+          {/* 删除按钮 - 仅pending/failed/skipped可删除 */}
+          {!['processing', 'completed'].includes(record.ocr_status) && (
+            <Popconfirm
+              title="确定要删除这个任务吗？"
+              onConfirm={() => handleDelete(record.pending_id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
     },
   ]
 
@@ -292,10 +408,36 @@ const OCRWorkerPage: React.FC = () => {
         </Space>
       </Card>
 
+      {/* 批量操作栏 */}
+      {selectedRowKeys.length > 0 && (
+        <Card style={{ marginBottom: 16 }}>
+          <Space>
+            <Text strong>已选择 {selectedRowKeys.length} 项</Text>
+            <Button
+              type="primary"
+              icon={<ReloadOutlined />}
+              onClick={handleBatchRetry}
+            >
+              批量重试（重置次数）
+            </Button>
+            <Button onClick={() => setSelectedRowKeys([])}>
+              取消选择
+            </Button>
+          </Space>
+        </Card>
+      )}
+
       {/* 任务列表 */}
       <Card>
         <Table
           rowKey="pending_id"
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            getCheckboxProps: (record: OCRTaskItem) => ({
+              disabled: !['failed', 'skipped', 'completed'].includes(record.ocr_status),
+            }),
+          }}
           columns={columns}
           dataSource={tasks}
           loading={loading}

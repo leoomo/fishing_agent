@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ocr.worker</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>cd /Users/zen/projects/fishing_agent && PYTHONPATH=. uv run python -m packages.scraper.worker.ocr_cli --provider siliconflow</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/zen/projects/fishing_agent</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/zen/projects/fishing_agent/logs/ocr_worker.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/zen/projects/fishing_agent/logs/ocr_worker.err.log</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
