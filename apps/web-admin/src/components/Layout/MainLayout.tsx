@@ -12,6 +12,7 @@ import {
   SettingOutlined,
   LogoutOutlined,
   AuditOutlined,
+  ScanOutlined,
 } from '@ant-design/icons'
 import { useDispatch } from 'react-redux'
 import { logout } from '@/store/slices/authSlice'
@@ -56,6 +57,11 @@ const MainLayout = () => {
       key: '/pending-equipment',
       icon: <AuditOutlined />,
       label: '待审核装备',
+    },
+    {
+      key: '/ocr-worker',
+      icon: <ScanOutlined />,
+      label: 'OCR Worker',
     },
     {
       key: '/workflow',

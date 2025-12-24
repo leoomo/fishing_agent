@@ -19,6 +19,7 @@ const Crawler = lazy(() => import('@/pages/Crawler'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
 const Workflow = lazy(() => import('@/pages/Workflow'))
 const PendingEquipment = lazy(() => import('@/pages/PendingEquipment'))
+const OCRWorker = lazy(() => import('@/pages/OCRWorker'))
 
 // 加载中组件
 const PageLoading = () => (
@@ -88,6 +89,9 @@ const App = () => {
 
                 {/* Pending Equipment Review */}
                 <Route path="pending-equipment" element={<PendingEquipment />} />
+
+                {/* OCR Worker Management */}
+                <Route path="ocr-worker" element={<OCRWorker />} />
 
                 {/* Workflow Management */}
                 <Route path="workflow/*" element={<Workflow />} />

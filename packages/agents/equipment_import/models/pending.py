@@ -40,8 +40,61 @@ class PendingEquipment(Base, TimestampMixin):
     # === 原始输入 ===
     ocr_text = Column(
         Text,
-        nullable=False,
+        nullable=True,
         comment="OCR 识别的原始文本"
+    )
+
+    # === OCR 任务状态 ===
+    ocr_status = Column(
+        String(20),
+        default="pending",
+        nullable=False,
+        index=True,
+        comment="OCR状态: pending/processing/completed/failed/skipped"
+    )
+
+    ocr_started_at = Column(
+        DateTime,
+        nullable=True,
+        comment="OCR 开始处理时间"
+    )
+
+    ocr_completed_at = Column(
+        DateTime,
+        nullable=True,
+        comment="OCR 完成时间"
+    )
+
+    ocr_worker_id = Column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="处理该任务的 Worker ID"
+    )
+
+    ocr_error_message = Column(
+        Text,
+        nullable=True,
+        comment="OCR 错误信息"
+    )
+
+    ocr_retry_count = Column(
+        Integer,
+        default=0,
+        nullable=False,
+        comment="OCR 重试次数"
+    )
+
+    ocr_provider = Column(
+        String(50),
+        nullable=True,
+        comment="使用的 OCR 提供商: ollama/siliconflow"
+    )
+
+    ocr_processing_time_ms = Column(
+        Integer,
+        nullable=True,
+        comment="OCR 处理耗时(毫秒)"
     )
 
     source_type = Column(
