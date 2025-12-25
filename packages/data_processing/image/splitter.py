@@ -49,7 +49,9 @@ class BlankRowDetector:
         brightness_threshold: int = 250,
         min_blank_rows: int = 10,
         max_removable_blank: int = 100,
-        edge_margin: int = 50
+        edge_margin: int = 50,
+        use_variance: bool = True,
+        variance_threshold: float = 50.0
     ):
         """
         初始化空白行检测器
@@ -59,15 +61,23 @@ class BlankRowDetector:
             min_blank_rows: 切割点最小连续空白行数
             max_removable_blank: 可删除的空白区域最小高度
             edge_margin: 边缘忽略像素数
+            use_variance: 是否使用方差检测（更准确，避免误判表格行间距）
+            variance_threshold: 方差阈值，低于此值认为是空白
         """
         self.brightness_threshold = brightness_threshold
         self.min_blank_rows = min_blank_rows
         self.max_removable_blank = max_removable_blank
         self.edge_margin = edge_margin
+        self.use_variance = use_variance
+        self.variance_threshold = variance_threshold
 
     def _is_blank_row(self, row_pixels: np.ndarray) -> bool:
         """
         检测行是否为空白行
+
+        结合亮度和方差检测，避免误判表格行间距：
+        - 纯空白：高亮度 + 低方差
+        - 表格行间距：高亮度 + 较高方差（因为表格边框、文字）
 
         Args:
             row_pixels: 行像素数据 (width, 3)
@@ -83,7 +93,22 @@ class BlankRowDetector:
 
         # 计算平均亮度
         avg_brightness = np.mean(center_pixels)
-        return avg_brightness > self.brightness_threshold
+
+        # 亮度不达标，肯定不是空白
+        if avg_brightness < self.brightness_threshold:
+            return False
+
+        # 如果启用方差检测
+        if self.use_variance:
+            # 计算亮度方差（灰度值）
+            gray = np.mean(center_pixels, axis=1)  # 转为灰度
+            variance = np.var(gray)
+
+            # 高亮但方差大 = 有内容（如表格边框）
+            if variance > self.variance_threshold:
+                return False
+
+        return True
 
     def find_blank_regions(self, image: Image.Image) -> List[BlankRegion]:
         """
