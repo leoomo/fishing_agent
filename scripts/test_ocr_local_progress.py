@@ -69,9 +69,20 @@ def main():
     step += 1
     print_step(step, "扫描图片文件")
 
+    import re
+    def extract_sort_key(filepath):
+        """从文件名提取排序键值"""
+        stem = Path(filepath).stem
+        # 尝试提取文件名中的数字（支持 image_15.jpg, 15.jpg, 001.jpg 等格式）
+        match = re.search(r'(\d+)', stem)
+        if match:
+            return int(match.group(1))
+        # 如果没有数字，返回文件名本身作为后备
+        return stem
+
     image_paths = sorted(
         glob.glob(str(input_dir / "*.jpg")),
-        key=lambda x: int(Path(x).stem)
+        key=extract_sort_key
     )
 
     print(f"\n找到 {len(image_paths)} 张图片:")
