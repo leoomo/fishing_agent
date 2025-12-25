@@ -267,51 +267,81 @@ const OCRWorkerPage: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 180,
+      width: 200,
       fixed: 'right',
-      render: (_, record: OCRTaskItem) => (
-        <Space size="small">
-          {/* 重试按钮 */}
-          {['failed', 'skipped', 'completed'].includes(record.ocr_status) && (
-            <Button
-              type="link"
-              size="small"
-              icon={<ReloadOutlined />}
-              onClick={() => handleRetry(record.pending_id)}
-            >
-              重试
-            </Button>
-          )}
-          {/* 跳过按钮 */}
-          {['pending', 'failed'].includes(record.ocr_status) && (
-            <Button
-              type="link"
-              size="small"
-              onClick={() => handleSkip(record.pending_id)}
-            >
-              跳过
-            </Button>
-          )}
-          {/* 删除按钮 - 仅pending/failed/skipped可删除 */}
-          {!['processing', 'completed'].includes(record.ocr_status) && (
-            <Popconfirm
-              title="确定要删除这个任务吗？"
-              onConfirm={() => handleDelete(record.pending_id)}
-              okText="确定"
-              cancelText="取消"
-            >
+      render: (_, record: OCRTaskItem) => {
+        const status = record.ocr_status
+
+        // 处理中状态 - 显示取消按钮
+        if (status === 'processing') {
+          return (
+            <Space size="small">
+              <Popconfirm
+                title="确定要取消这个正在处理的任务吗？"
+                description="任务将被标记为跳过状态"
+                onConfirm={() => handleSkip(record.pending_id)}
+                okText="确定"
+                cancelText="取消"
+              >
+                <Button type="link" size="small" danger>
+                  取消
+                </Button>
+              </Popconfirm>
+            </Space>
+          )
+        }
+
+        // 其他状态
+        return (
+          <Space size="small">
+            {/* 重试按钮 - failed/skipped/completed 可重试 */}
+            {['failed', 'skipped', 'completed'].includes(status) && (
               <Button
                 type="link"
                 size="small"
-                danger
-                icon={<DeleteOutlined />}
+                icon={<ReloadOutlined />}
+                onClick={() => handleRetry(record.pending_id)}
               >
-                删除
+                重试
               </Button>
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+            )}
+            {/* 跳过按钮 - pending/failed 可跳过 */}
+            {['pending', 'failed'].includes(status) && (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => handleSkip(record.pending_id)}
+              >
+                跳过
+              </Button>
+            )}
+            {/* 删除按钮 - pending/failed/skipped 可删除 */}
+            {['pending', 'failed', 'skipped'].includes(status) && (
+              <Popconfirm
+                title="确定要删除这个任务吗？"
+                onConfirm={() => handleDelete(record.pending_id)}
+                okText="确定"
+                cancelText="取消"
+              >
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                >
+                  删除
+                </Button>
+              </Popconfirm>
+            )}
+            {/* 已完成状态 - 显示查看 */}
+            {status === 'completed' && (
+              <Button type="link" size="small" disabled>
+                已完成
+              </Button>
+            )}
+          </Space>
+        )
+      },
     },
   ]
 

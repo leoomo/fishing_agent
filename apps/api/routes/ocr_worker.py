@@ -550,14 +550,14 @@ async def retry_ocr_tasks_batch(
 @router.post(
     "/admin/tasks/{pending_id}/skip",
     response_model=OCRTaskSkipResponse,
-    summary="跳过OCR任务",
+    summary="跳过/取消OCR任务",
     dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
 )
 async def skip_ocr_task(
     pending_id: int,
     current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
 ):
-    """将任务标记为跳过状态"""
+    """将任务标记为跳过状态（支持取消处理中的任务）"""
     with get_db_session() as session:
         item = session.query(PendingEquipment).filter(
             PendingEquipment.id == pending_id
@@ -569,23 +569,26 @@ async def skip_ocr_task(
                 detail=f"任务 {pending_id} 不存在"
             )
 
-        # 只有 pending/failed 状态可以跳过
-        if item.ocr_status not in ["pending", "failed"]:
+        # 允许 pending/failed/processing 状态跳过/取消
+        if item.ocr_status not in ["pending", "failed", "processing"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"只有待处理或失败的任务可以跳过，当前状态: {item.ocr_status}"
+                detail=f"只有待处理、失败或处理中的任务可以跳过，当前状态: {item.ocr_status}"
             )
 
+        previous_status = item.ocr_status
         item.ocr_status = "skipped"
+        item.ocr_completed_at = datetime.utcnow()
         session.commit()
 
+        action = "取消" if previous_status == "processing" else "跳过"
         logger.info(
-            f"管理员 {current_user.username} 跳过任务 {pending_id}"
+            f"管理员 {current_user.username} {action}任务 {pending_id}, 原状态: {previous_status}"
         )
 
         return OCRTaskSkipResponse(
             success=True,
-            message="任务已跳过",
+            message=f"任务已{action}",
             pending_id=pending_id
         )
 
