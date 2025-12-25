@@ -683,10 +683,13 @@ class OCRMergeProcessor:
                 # 执行切割
                 segments = splitter.split_image(img, split_points)
 
+                # 获取原文件名（不含扩展名）
+                base_name = Path(merged_path).stem
+
                 # 保存分割后的图片
                 output_files = []
                 for i, segment in enumerate(segments):
-                    output_name = f"segment_{i+1:03d}.jpg"
+                    output_name = f"{base_name}_seg{i+1:02d}.jpg"
                     output_path = self.output_dir / output_name
                     segment.save(str(output_path), 'JPEG', quality=self.quality)
                     output_files.append(str(output_path))
@@ -820,10 +823,29 @@ class OCRMergeProcessor:
                     statistics=self.stats
                 )
 
-            # 4. 可选：分割图片（如果只输出一个文件且启用了分割）
-            if self.enable_split and len(output_files) == 1:
-                logger.info("Step 4: 分割图片...")
-                output_files = self.split_merged_image(output_files[0])
+            # 4. 可选：分割超过阈值的合并文件
+            if self.enable_split:
+                logger.info("Step 4: 检查并分割超大文件...")
+                final_output_files = []
+
+                for output_file in output_files:
+                    # 检查是否是合并文件（包含 "merged"）且超过阈值
+                    if "merged" in output_file:
+                        try:
+                            with Image.open(output_file) as img:
+                                if img.height > self.max_segment_height:
+                                    logger.info(f"分割 {Path(output_file).name} ({img.height}px > {self.max_segment_height}px)")
+                                    split_files = self.split_merged_image(output_file)
+                                    final_output_files.extend(split_files)
+                                else:
+                                    final_output_files.append(output_file)
+                        except Exception as e:
+                            logger.error(f"检查文件失败 {output_file}: {e}")
+                            final_output_files.append(output_file)
+                    else:
+                        final_output_files.append(output_file)
+
+                output_files = final_output_files
 
             # 5. 清理临时文件
             logger.info("Step 5: 清理临时文件...")
