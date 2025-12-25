@@ -6,7 +6,7 @@
 - 各个工具函数
 """
 from .basic import get_current_time
-from .weather import get_weather
+# from .weather import get_weather  # 已移除：统一使用 query_fishing_recommendation
 from .fishing_tool import query_fishing_recommendation
 from .lure_tools import recommend_equipment, compare_equipment, lookup_fishing_knowledge, query_equipment, identify_from_image
 from .user_equipment.tools import USER_EQUIPMENT_TOOLS
@@ -16,7 +16,7 @@ def get_all_tools():
     """返回钓鱼 Agent 的所有工具"""
     return [
         get_current_time,
-        get_weather,
+        # get_weather,  # 已移除：统一使用 query_fishing_recommendation
         query_fishing_recommendation,
         recommend_equipment,
         compare_equipment,
@@ -30,7 +30,7 @@ def get_all_tools():
 __all__ = [
     "get_all_tools",
     "get_current_time",
-    "get_weather",
+    # "get_weather",  # 已移除：统一使用 query_fishing_recommendation
     "query_fishing_recommendation",
     "recommend_equipment",
     "compare_equipment",
