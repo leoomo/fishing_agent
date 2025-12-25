@@ -71,8 +71,9 @@ class OCRMergeProcessor:
         spacing: int = 0,  # 默认间距 0 像素，通过 padding 避免重叠
         # 分割参数
         enable_split: bool = False,
-        min_segment_height: int = 300,
+        min_segment_height: int = 800,  # 提高到 800，避免切割小片段
         max_segment_height: int = 4000,
+        min_blank_rows: int = 50,  # 提高到 50，只切割大片空白区域
         # 其他参数
         keep_empty_images: bool = False,
         skip_pure_images: bool = True,  # 跳过纯图片（无文字）
@@ -106,6 +107,12 @@ class OCRMergeProcessor:
         self.output_dir = Path(output_dir) if output_dir else self.source_dir / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        # 创建专门的临时目录（在系统临时目录中，避免污染输出目录）
+        import uuid
+        temp_dir_name = f"ocr_merge_{uuid.uuid4().hex[:8]}"
+        self.temp_dir = Path(tempfile.gettempdir()) / temp_dir_name
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
+
         # 参数
         self.padding = padding
         self.min_text_area = min_text_area
@@ -114,6 +121,7 @@ class OCRMergeProcessor:
         self.enable_split = enable_split
         self.min_segment_height = min_segment_height
         self.max_segment_height = max_segment_height
+        self.min_blank_rows = min_blank_rows  # 新增参数
         self.keep_empty_images = keep_empty_images
         self.skip_pure_images = skip_pure_images
         self.skip_sparse_regions = skip_sparse_regions
@@ -172,7 +180,9 @@ class OCRMergeProcessor:
         """延迟加载图片分割器"""
         if self._splitter is None:
             from packages.data_processing.image.splitter import BlankRowDetector, ImageSplitter
-            self._blank_detector = BlankRowDetector()
+            self._blank_detector = BlankRowDetector(
+                min_blank_rows=self.min_blank_rows  # 使用配置的参数
+            )
             self._splitter = ImageSplitter(
                 min_segment_height=self.min_segment_height,
                 max_segment_height=self.max_segment_height
@@ -290,11 +300,11 @@ class OCRMergeProcessor:
             crop_height = y2 - y1
             result.cropped_size = (w, crop_height)
 
-            # 保存到临时文件
+            # 保存到临时文件（使用专门的临时目录）
             with tempfile.NamedTemporaryFile(
                 suffix='.jpg',
                 delete=False,
-                dir=str(self.output_dir)
+                dir=str(self.temp_dir)  # 使用临时目录而不是输出目录
             ) as f:
                 temp_path = f.name
 
@@ -650,8 +660,10 @@ class OCRMergeProcessor:
 
         try:
             with Image.open(merged_path) as img:
-                # 检测空白区域
-                blank_detector = BlankRowDetector()
+                # 检测空白区域（使用配置的 min_blank_rows）
+                blank_detector = BlankRowDetector(
+                    min_blank_rows=self.min_blank_rows
+                )
                 blank_regions = blank_detector.find_blank_regions(img)
 
                 # 选择切割点
@@ -698,13 +710,19 @@ class OCRMergeProcessor:
         for result in processed_images:
             if result.cropped_path and os.path.exists(result.cropped_path):
                 try:
-                    # 检查是否是临时文件（在 output_dir 中）
-                    if Path(result.cropped_path).parent == self.output_dir:
-                        # 检查文件名是否是临时格式
-                        if 'tmp' in result.cropped_path:
-                            os.unlink(result.cropped_path)
+                    # 删除所有临时文件（现在都在 self.temp_dir 中）
+                    os.unlink(result.cropped_path)
                 except Exception:
                     pass
+
+        # 清理整个临时目录
+        try:
+            import shutil
+            if self.temp_dir.exists():
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+                logger.info(f"已清理临时目录: {self.temp_dir}")
+        except Exception as e:
+            logger.warning(f"清理临时目录失败: {e}")
 
     def generate_metadata(
         self,
@@ -725,6 +743,9 @@ class OCRMergeProcessor:
                 "quality": self.quality,
                 "spacing": self.spacing,
                 "enable_split": self.enable_split,
+                "min_segment_height": self.min_segment_height,
+                "max_segment_height": self.max_segment_height,
+                "min_blank_rows": self.min_blank_rows,
                 "keep_empty_images": self.keep_empty_images,
                 "skip_pure_images": self.skip_pure_images,
                 "skip_sparse_regions": self.skip_sparse_regions,
