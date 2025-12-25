@@ -23,6 +23,11 @@ class OllamaError(OCRError):
     pass
 
 
+class BaiduError(OCRError):
+    """百度 OCR 相关错误"""
+    pass
+
+
 class OCRProviderNotAvailableError(OCRError):
     """OCR 提供商不可用错误"""
     pass
