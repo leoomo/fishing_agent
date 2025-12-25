@@ -51,7 +51,9 @@ class BlankRowDetector:
         max_removable_blank: int = 100,
         edge_margin: int = 50,
         use_variance: bool = True,
-        variance_threshold: float = 50.0
+        variance_threshold: float = 50.0,
+        detect_solid_color: bool = False,
+        solid_color_variance: float = 100.0
     ):
         """
         初始化空白行检测器
@@ -63,6 +65,8 @@ class BlankRowDetector:
             edge_margin: 边缘忽略像素数
             use_variance: 是否使用方差检测（更准确，避免误判表格行间距）
             variance_threshold: 方差阈值，低于此值认为是空白
+            detect_solid_color: 是否检测纯色区域（低方差，不管亮度）
+            solid_color_variance: 纯色区域的方差阈值（低于此值认为是纯色）
         """
         self.brightness_threshold = brightness_threshold
         self.min_blank_rows = min_blank_rows
@@ -70,20 +74,22 @@ class BlankRowDetector:
         self.edge_margin = edge_margin
         self.use_variance = use_variance
         self.variance_threshold = variance_threshold
+        self.detect_solid_color = detect_solid_color
+        self.solid_color_variance = solid_color_variance
 
     def _is_blank_row(self, row_pixels: np.ndarray) -> bool:
         """
-        检测行是否为空白行
+        检测行是否为空白行或纯色行
 
-        结合亮度和方差检测，避免误判表格行间距：
-        - 纯空白：高亮度 + 低方差
-        - 表格行间距：高亮度 + 较高方差（因为表格边框、文字）
+        支持两种检测模式：
+        1. 高亮度空白检测（原始模式）：高亮度 + 低方差
+        2. 纯色区域检测（新模式）：低方差，不管亮度
 
         Args:
             row_pixels: 行像素数据 (width, 3)
 
         Returns:
-            bool: 是否为空白行
+            bool: 是否为空白行或纯色行
         """
         # 忽略边缘
         if len(row_pixels) > self.edge_margin * 2:
@@ -94,16 +100,21 @@ class BlankRowDetector:
         # 计算平均亮度
         avg_brightness = np.mean(center_pixels)
 
+        # 计算方差（灰度值）
+        gray = np.mean(center_pixels, axis=1)
+        variance = np.var(gray)
+
+        # 模式1: 检测纯色区域（低方差，不管亮度）
+        if self.detect_solid_color:
+            return variance < self.solid_color_variance
+
+        # 模式2: 原始的高亮度空白检测
         # 亮度不达标，肯定不是空白
         if avg_brightness < self.brightness_threshold:
             return False
 
         # 如果启用方差检测
         if self.use_variance:
-            # 计算亮度方差（灰度值）
-            gray = np.mean(center_pixels, axis=1)  # 转为灰度
-            variance = np.var(gray)
-
             # 高亮但方差大 = 有内容（如表格边框）
             if variance > self.variance_threshold:
                 return False

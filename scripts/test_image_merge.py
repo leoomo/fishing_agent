@@ -116,11 +116,11 @@ def main():
         "min_text_area": 100,
         # 合并参数
         "quality": 95,
-        "spacing": 0,
-        # 分割参数（使用优化后的新参数，避免过度切分）
+        "spacing": 5,  # 添加5px间隙，便于分割时识别空白区域
+        # 分割参数（降低阈值以测试分割功能）
         "enable_split": True,
-        "min_segment_height": 800,   # 提高到 800，避免切得太碎
-        "max_segment_height": 4000,  # 提高到 4000
+        "min_segment_height": 800,   # 每个片段最小高度
+        "max_segment_height": 2500,  # 超过此高度则分割（降低以触发分割）
         "min_blank_rows": 50,        # 只切割 >=50px 的空白区域
         # 其他参数
         "keep_empty_images": False,
