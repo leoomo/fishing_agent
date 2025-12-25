@@ -228,128 +228,62 @@ def main():
     else:
         print(f"  ✅ 所有文件都符合阈值要求 (≤ {max_height}px)")
 
-    # ===== 步骤 6: 后处理分割 =====
+    # ===== 步骤 6: 分割结果检查 =====
+    # 注意: OCRMergeProcessor 已内置自动分割功能，无需手动后处理
+    # 此步骤仅用于展示分割结果统计
     step += 1
-    print_step(step, "后处理：分割超大文件")
+    print_step(step, "分割结果检查")
 
-    from packages.data_processing.image.splitter import BlankRowDetector, ImageSplitter
-
+    # 统计分割文件
+    segment_files = []
+    merged_files = []
     max_height = config['max_segment_height']
-    min_height = config['min_segment_height']
 
-    # 找出超过阈值的文件
-    large_files = []
     for file_path in result.output_files:
-        try:
-            with Image.open(file_path) as img:
-                if img.height > max_height:
-                    large_files.append((file_path, img.width, img.height))
-        except Exception:
-            pass
+        path = Path(file_path)
+        if '_seg' in path.name:
+            # 提取基础文件名
+            base_name = path.name.split('_seg')[0]
+            segment_files.append((base_name, path.name, file_path))
+        elif '_merged' in path.name:
+            merged_files.append((path.name, file_path))
 
-    if large_files:
-        print(f"\n发现 {len(large_files)} 个超大文件，开始分割...")
+    print(f"\n分割统计:")
+    print(f"  合并文件总数: {len(merged_files)}")
+    print(f"  分割片段总数: {len(segment_files)}")
 
-        split_results = []
-        remaining_files = []
+    # 按基础文件名分组展示
+    if segment_files:
+        from collections import defaultdict
+        seg_groups = defaultdict(list)
+        for base, seg_name, file_path in segment_files:
+            seg_groups[base].append((seg_name, file_path))
 
-        for file_path, width, height in large_files:
-            path = Path(file_path)
-            print(f"\n  处理: {path.name} ({width}x{height}px)")
+        print(f"\n分割详情:")
+        # 排序：按文件名
+        for base_name in sorted(seg_groups.keys()):
+            segments = seg_groups[base_name]
+            print(f"  {base_name}: {len(segments)} 个片段")
 
+        # 检查是否有超过阈值的文件
+        print_subsection("阈值检查")
+        over_threshold = []
+        for file_path in result.output_files:
             try:
                 with Image.open(file_path) as img:
-                    # 检测空白区域
-                    blank_detector = BlankRowDetector()
-                    blank_regions = blank_detector.find_blank_regions(img)
+                    if img.height > max_height:
+                        over_threshold.append((Path(file_path).name, img.height, img.width))
+            except Exception:
+                pass
 
-                    print(f"    检测到 {len(blank_regions)} 个空白区域")
-
-                    # 选择切割点
-                    splitter = ImageSplitter(
-                        min_segment_height=min_height,
-                        max_segment_height=max_height
-                    )
-                    split_points = splitter.select_split_points(
-                        blank_regions,
-                        img.height
-                    )
-
-                    print(f"    选择 {len(split_points)} 个切割点")
-
-                    if split_points:
-                        # 执行切割
-                        segments = splitter.split_image(img, split_points)
-                        print(f"    分割成 {len(segments)} 个片段")
-
-                        # 保存分割后的文件
-                        segment_files = []
-                        for i, segment in enumerate(segments):
-                            seg_name = f"{path.stem}_seg{i+1:02d}{path.suffix}"
-                            seg_path = output_dir / seg_name
-                            segment.save(str(seg_path), 'JPEG', quality=config['quality'])
-                            segment_size = os.path.getsize(seg_path)
-
-                            sw, sh = segment.size
-                            print(f"      片段 {i+1}: {sw}x{sh}px  {format_size(segment_size)}")
-                            segment_files.append(str(seg_path))
-
-                        split_results.append((file_path, segment_files))
-                    else:
-                        print(f"    未找到合适的切割点，保持原样")
-                        remaining_files.append(file_path)
-
-            except Exception as e:
-                print(f"    ❌ 分割失败: {e}")
-                remaining_files.append(file_path)
-
-        # 更新输出文件列表
-        if split_results:
-            print(f"\n  分割完成:")
-            final_files = []
-
-            for original, segments in split_results:
-                print(f"    {Path(original).name} → {len(segments)} 个片段")
-                final_files.extend(segments)
-
-            # 添加未分割的文件
-            for f in result.output_files:
-                if not any(f == orig for orig, _ in split_results):
-                    final_files.append(f)
-
-            # 删除原文件
-            import shutil
-            for original, segments in split_results:
-                try:
-                    os.unlink(original)
-                    print(f"    删除原文件: {Path(original).name}")
-                except Exception as e:
-                    print(f"    删除失败: {e}")
-
-            print(f"\n  最终文件数: {len(final_files)}")
-            print(f"  分割了 {len(split_results)} 个文件")
-
-            # 显示最终结果
-            print_subsection("最终输出文件")
-
-            final_files.sort()
-            total_size = 0
-            for i, file_path in enumerate(final_files, 1):
-                path = Path(file_path)
-                size = os.path.getsize(file_path)
-                total_size += size
-
-                try:
-                    with Image.open(file_path) as img:
-                        width, height = img.size
-                        status = "✓" if height <= max_height else "⚠️"
-                        print(f"  {status} {i:2d}. {path.name:35s} {width}x{height:4d}px  {format_size(size):>8s}")
-                except Exception as e:
-                    print(f"  ✗ {i:2d}. {path.name:35s} (无法读取)")
-
-            print(f"\n  总大小: {format_size(total_size)}")
+        if over_threshold:
+            print(f"  ⚠️  仍有 {len(over_threshold)} 个文件超过阈值 ({max_height}px):")
+            for name, h, w in over_threshold:
+                print(f"      {name}: {w}x{h}px")
+        else:
+            print(f"  ✅ 所有文件都符合阈值要求 (≤ {max_height}px)")
     else:
-        print("\n  ✅ 所有文件都符合阈值要求，无需分割")
+        print("\n  ℹ️  没有文件被分割 (所有文件都在阈值内)")
 
     # ===== 步骤 7: 查看元数据 =====
     step += 1
