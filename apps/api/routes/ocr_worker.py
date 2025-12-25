@@ -147,11 +147,17 @@ async def claim_ocr_tasks(
             item.ocr_started_at = now
             item.ocr_worker_id = worker_id
 
-            # 解析图片列表
+            # 解析图片列表（兼容新旧格式）
             images = []
             if item.images:
                 try:
-                    images = json.loads(item.images)
+                    data = json.loads(item.images)
+                    # 新格式: {"paths": [...], "metadata": [...]}
+                    if isinstance(data, dict) and "paths" in data:
+                        images = data["paths"]
+                    # 旧格式: ["path1", "path2", ...]
+                    elif isinstance(data, list):
+                        images = data
                 except json.JSONDecodeError:
                     images = []
 
@@ -294,7 +300,14 @@ async def download_images(
             )
 
         try:
-            image_paths = json.loads(item.images)
+            data = json.loads(item.images)
+            # 兼容新旧格式
+            if isinstance(data, dict) and "paths" in data:
+                image_paths = data["paths"]
+            elif isinstance(data, list):
+                image_paths = data
+            else:
+                image_paths = []
         except json.JSONDecodeError:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -393,11 +406,17 @@ async def list_ocr_tasks(
 
         tasks = []
         for item in items:
-            # 解析图片数量
+            # 解析图片数量（兼容新旧格式）
             images_count = 0
             if item.images:
                 try:
-                    images_count = len(json.loads(item.images))
+                    data = json.loads(item.images)
+                    # 新格式: {"paths": [...], "metadata": [...]}
+                    if isinstance(data, dict) and "paths" in data:
+                        images_count = len(data["paths"])
+                    # 旧格式: ["path1", "path2", ...]
+                    elif isinstance(data, list):
+                        images_count = len(data)
                 except json.JSONDecodeError:
                     pass
 
