@@ -660,11 +660,23 @@ class OCRMergeProcessor:
 
         try:
             with Image.open(merged_path) as img:
-                # 检测空白区域（使用配置的 min_blank_rows）
+                # 尝试两种检测模式：
+                # 1. 首先尝试高亮度空白检测（原始模式）
                 blank_detector = BlankRowDetector(
-                    min_blank_rows=self.min_blank_rows
+                    min_blank_rows=self.min_blank_rows,
+                    detect_solid_color=False
                 )
                 blank_regions = blank_detector.find_blank_regions(img)
+
+                # 2. 如果没找到，尝试纯色区域检测（新模式）
+                if not blank_regions:
+                    logger.info("未找到高亮度空白区域，尝试纯色区域检测...")
+                    blank_detector = BlankRowDetector(
+                        min_blank_rows=min(10, self.min_blank_rows),  # 降低要求
+                        detect_solid_color=True,
+                        solid_color_variance=100.0  # 纯色方差阈值
+                    )
+                    blank_regions = blank_detector.find_blank_regions(img)
 
                 # 选择切割点
                 splitter = ImageSplitter(
@@ -823,26 +835,23 @@ class OCRMergeProcessor:
                     statistics=self.stats
                 )
 
-            # 4. 可选：分割超过阈值的合并文件
+            # 4. 可选：分割超过阈值的文件
             if self.enable_split:
                 logger.info("Step 4: 检查并分割超大文件...")
                 final_output_files = []
 
                 for output_file in output_files:
-                    # 检查是否是合并文件（包含 "merged"）且超过阈值
-                    if "merged" in output_file:
-                        try:
-                            with Image.open(output_file) as img:
-                                if img.height > self.max_segment_height:
-                                    logger.info(f"分割 {Path(output_file).name} ({img.height}px > {self.max_segment_height}px)")
-                                    split_files = self.split_merged_image(output_file)
-                                    final_output_files.extend(split_files)
-                                else:
-                                    final_output_files.append(output_file)
-                        except Exception as e:
-                            logger.error(f"检查文件失败 {output_file}: {e}")
-                            final_output_files.append(output_file)
-                    else:
+                    # 检查所有超过阈值的文件（不再只检查 merged 文件）
+                    try:
+                        with Image.open(output_file) as img:
+                            if img.height > self.max_segment_height:
+                                logger.info(f"分割 {Path(output_file).name} ({img.height}px > {self.max_segment_height}px)")
+                                split_files = self.split_merged_image(output_file)
+                                final_output_files.extend(split_files)
+                            else:
+                                final_output_files.append(output_file)
+                    except Exception as e:
+                        logger.error(f"检查文件失败 {output_file}: {e}")
                         final_output_files.append(output_file)
 
                 output_files = final_output_files
