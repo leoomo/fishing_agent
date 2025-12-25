@@ -2,13 +2,17 @@
 """
 本地 OCR 测试脚本（带详细进度显示）
 
-读取 shared/images/pending/1 中的图片，使用远程 Ollama 服务进行 OCR 识别，
-结果保存到 shared/images/output/ 目录
+使用 OCRMergeProcessor 处理图片，然后使用远程 Ollama 服务进行 OCR 识别。
+- 文字区域检测与裁剪
+- 智能图片合并（spacing=0）
+- 支持纯色区域检测的分割功能
+
+输入: shared/images/pending/1
+输出: shared/images/output/
 """
 
 import os
 import sys
-import glob
 import time
 import logging
 from pathlib import Path
@@ -27,6 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
+from packages.data_processing.ocr import OCRMergeProcessor
 from apps.api.services.ocr.ollama_provider import OllamaProvider
 
 logger = logging.getLogger(__name__)
@@ -40,6 +45,16 @@ def print_step(step_num, description):
     logger.info(f"步骤 {step_num}: {description}")
 
 
+def format_size(bytes_size):
+    """格式化文件大小"""
+    if bytes_size < 1024:
+        return f"{bytes_size}B"
+    elif bytes_size < 1024 * 1024:
+        return f"{bytes_size / 1024:.1f}KB"
+    else:
+        return f"{bytes_size / 1024 / 1024:.2f}MB"
+
+
 def main():
     step = 0
 
@@ -48,7 +63,8 @@ def main():
     print_step(step, "配置检查")
 
     input_dir = Path("shared/images/pending/1")
-    output_dir = Path("shared/images/output")
+    output_dir = Path("shared/images/merge_output")
+    ocr_output_dir = Path("shared/images/output")
 
     # 检查环境变量
     print(f"\n环境变量:")
@@ -59,40 +75,87 @@ def main():
     if not input_dir.exists():
         print(f"  ❌ 输入目录不存在: {input_dir.absolute()}")
         return
-    print(f"  ✓ 输入目录存在: {input_dir.absolute()}")
+    print(f"  ✓ 输入目录: {input_dir.absolute()}")
 
     # 创建输出目录
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"  ✓ 输出目录: {output_dir.absolute()}")
+    ocr_output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"  ✓ 合并输出: {output_dir.absolute()}")
+    print(f"  ✓ OCR输出: {ocr_output_dir.absolute()}")
 
-    # ===== 步骤 2: 扫描图片 =====
+    # ===== 步骤 2: 初始化 OCRMergeProcessor =====
     step += 1
-    print_step(step, "扫描图片文件")
+    print_step(step, "初始化 OCR 合并处理器")
 
-    import re
-    def extract_sort_key(filepath):
-        """从文件名提取排序键值"""
-        stem = Path(filepath).stem
-        # 尝试提取文件名中的数字（支持 image_15.jpg, 15.jpg, 001.jpg 等格式）
-        match = re.search(r'(\d+)', stem)
-        if match:
-            return int(match.group(1))
-        # 如果没有数字，返回文件名本身作为后备
-        return stem
+    # 使用优化后的默认配置
+    processor_config = {
+        "source_dir": str(input_dir),
+        "output_dir": str(output_dir),
+    }
 
-    image_paths = sorted(
-        glob.glob(str(input_dir / "*.jpg")),
-        key=extract_sort_key
-    )
+    try:
+        processor = OCRMergeProcessor(**processor_config)
+        print(f"\n✓ 处理器初始化成功")
+        print(f"  裁剪边距: {processor.padding}px")
+        print(f"  合并间距: {processor.spacing}px")
+        print(f"  分割启用: {processor.enable_split}")
+        print(f"  最小片段: {processor.min_segment_height}px")
+        print(f"  最大片段: {processor.max_segment_height}px")
+    except Exception as e:
+        print(f"\n❌ 初始化失败: {e}")
+        logger.error(f"初始化失败", exc_info=True)
+        return
 
-    print(f"\n找到 {len(image_paths)} 张图片:")
-    for i, path in enumerate(image_paths[:5]):
-        size = os.path.getsize(path)
-        print(f"  {i+1}. {Path(path).name} ({size/1024:.1f}KB)")
-    if len(image_paths) > 5:
-        print(f"  ... 还有 {len(image_paths)-5} 张")
+    # ===== 步骤 3: 执行图片处理 =====
+    step += 1
+    print_step(step, "执行图片处理（裁剪+合并+分割）")
 
-    # ===== 步骤 3: 初始化 OCR 提供商 =====
+    try:
+        start_time = time.time()
+        result = processor.process()
+        elapsed = time.time() - start_time
+
+        print(f"\n✓ 处理完成，耗时: {elapsed:.2f} 秒")
+
+    except Exception as e:
+        print(f"\n❌ 处理失败: {e}")
+        logger.error(f"处理失败", exc_info=True)
+        return
+
+    if not result.success:
+        print(f"\n❌ 处理失败")
+        print(f"  错误: {result.error}")
+        return
+
+    # 统计信息
+    stats = result.statistics
+    print(f"\n统计信息:")
+    print(f"  输入图片: {stats.get('total_images', 0)} 张")
+    print(f"  有文字的图片: {stats.get('images_with_text', 0)} 张")
+    print(f"  跳过的稀疏区域: {stats.get('sparse_regions_skipped', 0)} 个")
+    print(f"  跳过的空白图片: {stats.get('empty_images_skipped', 0)} 张")
+    print(f"  输出文件: {stats.get('output_count', 0)} 个")
+    print(f"  合并组数: {stats.get('merge_groups', 0)} 个")
+
+    # 输出文件列表
+    print(f"\n输出文件:")
+    from PIL import Image
+    total_size = 0
+    for i, file_path in enumerate(result.output_files, 1):
+        path = Path(file_path)
+        size = os.path.getsize(file_path)
+        total_size += size
+
+        try:
+            with Image.open(file_path) as img:
+                width, height = img.size
+                print(f"  {i:2d}. {path.name:35s} {width}x{height:4d}px  {format_size(size):>8s}")
+        except Exception as e:
+            print(f"  {i:2d}. {path.name:35s} (无法读取: {e})")
+
+    print(f"  总大小: {format_size(total_size)}")
+
+    # ===== 步骤 4: 初始化 OCR 提供商 =====
     step += 1
     print_step(step, "初始化 OCR 提供商")
 
@@ -109,7 +172,7 @@ def main():
         logger.error(f"初始化 OCR 提供商失败: {e}", exc_info=True)
         return
 
-    # ===== 步骤 4: 测试远程服务连接 =====
+    # ===== 步骤 5: 测试远程服务连接 =====
     step += 1
     print_step(step, "测试远程服务连接")
 
@@ -122,10 +185,9 @@ def main():
 
         # 测试 list API
         print(f"\n正在调用 list() API...")
-        result = client.list()
+        api_result = client.list()
         print(f"  ✓ API 调用成功")
-        print(f"  返回类型: {type(result)}")
-        print(f"  返回内容: {result}")
+        print(f"  可用模型数: {len(api_result.get('models', []))}")
 
     except Exception as e:
         print(f"\n❌ 连接失败")
@@ -138,104 +200,50 @@ def main():
         print(f"  3. 防火墙阻止连接")
         return
 
-    # ===== 步骤 5: 检查模型可用性 =====
-    step += 1
-    print_step(step, "检查 OCR 模型")
-
-    try:
-        print(f"\n正在检查模型 {provider._model}...")
-        logger.info(f"检查模型: {provider._model}")
-
-        model_info = client.show(provider._model)
-        print(f"  ✓ 模型已存在")
-        print(f"  模型信息: {model_info}")
-
-    except Exception as e:
-        print(f"\n⚠️  模型检查失败: {e}")
-        print(f"  尝试拉取模型...")
-
-        try:
-            print(f"\n正在拉取模型 {provider._model}...")
-            import sys
-            for digest in client.pull(provider._model, stream=True):
-                if 'status' in digest:
-                    print(f"  {digest['status']}")
-            print(f"  ✓ 模型拉取完成")
-
-        except Exception as pull_error:
-            print(f"\n❌ 模型拉取失败: {pull_error}")
-            logger.error(f"模型拉取失败", exc_info=True)
-            return
-
-    # ===== 步骤 6: 图片处理 =====
-    step += 1
-    print_step(step, "图片预处理")
-
-    try:
-        print(f"\n正在处理 {len(image_paths)} 张图片...")
-        logger.info(f"开始图片处理，共 {len(image_paths)} 张")
-
-        merged_paths, images_merged = provider._merge_images(image_paths)
-
-        print(f"  ✓ 处理完成")
-        print(f"  输入: {images_merged} 张")
-        print(f"  输出: {len(merged_paths)} 个文件")
-
-        # 显示输出文件信息
-        from PIL import Image
-        total_size = 0
-        for i, path in enumerate(merged_paths):
-            with Image.open(path) as img:
-                size = os.path.getsize(path)
-                total_size += size
-                print(f"    文件 {i+1}: {img.width}x{img.height}, {size/1024:.1f}KB")
-
-        print(f"  总大小: {total_size/1024/1024:.2f}MB")
-
-    except Exception as e:
-        print(f"\n❌ 图片处理失败: {e}")
-        logger.error(f"图片处理失败", exc_info=True)
-        return
-
-    # ===== 步骤 7: OCR 识别 =====
+    # ===== 步骤 6: OCR 识别 =====
     step += 1
     print_step(step, "OCR 文字识别")
 
     try:
-        print(f"\n开始 OCR 识别...")
+        print(f"\n开始 OCR 识别 {len(result.output_files)} 个文件...")
         logger.info("开始 OCR 识别")
 
+        import base64
         start_time = time.time()
         all_markdown = []
 
-        for i, target_path in enumerate(merged_paths):
-            print(f"\n  处理文件 {i+1}/{len(merged_paths)}: {Path(target_path).name}")
+        for i, image_path in enumerate(result.output_files):
+            path = Path(image_path)
+            print(f"\n  [{i+1}/{len(result.output_files)}] {path.name}")
+            logger.info(f"处理文件 {i+1}/{len(result.output_files)}: {path.name}")
 
             # 编码图片
-            print(f"    - 编码图片...")
-            import base64
-            with open(target_path, "rb") as f:
+            with open(image_path, "rb") as f:
                 img_data = base64.b64encode(f.read()).decode('utf-8')
-            file_size = os.path.getsize(target_path)
-            print(f"    - 图片大小: {file_size/1024:.1f}KB")
+            file_size = os.path.getsize(image_path)
+            print(f"    大小: {format_size(file_size)}")
 
             # 调用 OCR
-            print(f"    - 调用 OCR API (模型: {provider._model})...")
-            logger.info(f"调用 OCR API: {provider._model}")
-
+            print(f"    调用 OCR API...")
             api_start = time.time()
-            response = client.generate(
-                model=provider._model,
-                prompt="Extract all text from this image and return it in a structured markdown format.",
-                images=[img_data],
-                options={'temperature': 0.1}
-            )
-            api_elapsed = time.time() - api_start
 
-            markdown = response['response'].strip()
-            all_markdown.append(markdown)
+            try:
+                response = client.generate(
+                    model=provider._model,
+                    prompt="Extract all text from this image and return it in a structured markdown format.",
+                    images=[img_data],
+                    options={'temperature': 0.1}
+                )
+                markdown = response['response'].strip()
+                all_markdown.append(f"## {path.name}\n\n{markdown}")
 
-            print(f"    - ✓ 完成 (耗时: {api_elapsed:.1f}s, 文本长度: {len(markdown)} 字符)")
+                api_elapsed = time.time() - api_start
+                print(f"    ✓ 完成 (耗时: {api_elapsed:.1f}s, 文本: {len(markdown)} 字符)")
+
+            except Exception as e:
+                logger.error(f"文件 {path.name} OCR 失败: {e}")
+                all_markdown.append(f"## {path.name}\n\n*[OCR 失败: {e}]*")
+                print(f"    ✗ 失败: {e}")
 
         # 合并结果
         final_markdown = "\n\n".join(all_markdown)
@@ -252,7 +260,7 @@ def main():
         logger.error(f"OCR 识别失败", exc_info=True)
 
         # 保存错误信息
-        error_file = output_dir / f"ocr_error_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        error_file = ocr_output_dir / f"ocr_error_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         with open(error_file, "w", encoding="utf-8") as f:
             f.write(f"OCR 识别失败\n\n")
             f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -261,19 +269,24 @@ def main():
         print(f"  错误信息已保存到: {error_file}")
         return
 
-    # ===== 步骤 8: 保存结果 =====
+    # ===== 步骤 7: 保存结果 =====
     step += 1
     print_step(step, "保存结果")
 
-    output_file = output_dir / "ocr_result.md"
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_file = ocr_output_dir / f"ocr_result_{timestamp}.md"
 
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(f"# OCR 识别结果\n\n")
         f.write(f"**时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"**输入图片**: {len(image_paths)} 张\n")
+        f.write(f"**输入图片**: {stats.get('total_images', 0)} 张\n")
+        f.write(f"**有文字图片**: {stats.get('images_with_text', 0)} 张\n")
+        f.write(f"**输出文件**: {stats.get('output_count', 0)} 个\n")
+        f.write(f"**合并组数**: {stats.get('merge_groups', 0)} 个\n")
         f.write(f"**提供商**: ollama\n")
         f.write(f"**模型**: {provider._model}\n")
-        f.write(f"**耗时**: {elapsed:.1f} 秒\n")
+        f.write(f"**OCR耗时**: {elapsed:.1f} 秒\n")
+        f.write(f"**处理耗时**: {stats.get('processing_time_ms', 0) / 1000:.1f} 秒\n")
         f.write(f"**服务地址**: {provider.base_url}\n\n")
         f.write(f"**文本长度**: {len(final_markdown)} 字符\n\n")
         f.write("---\n\n")
@@ -281,15 +294,15 @@ def main():
 
     print(f"\n✓ 结果已保存到: {output_file.absolute()}")
 
-    # ===== 步骤 9: 完成 =====
+    # ===== 步骤 8: 完成 =====
     step += 1
     print_step(step, "测试完成")
 
     print(f"\n✅ 全部步骤完成!")
-    print(f"   输入图片: {len(image_paths)} 张")
-    print(f"   输出文件: {output_file.name}")
-    print(f"   文本长度: {len(final_markdown)} 字符")
-    print(f"   总耗时: {elapsed:.1f} 秒")
+    print(f"   输入图片: {stats.get('total_images', 0)} 张")
+    print(f"   输出文件: {stats.get('output_count', 0)} 个")
+    print(f"   OCR文本: {len(final_markdown)} 字符")
+    print(f"   总耗时: {stats.get('processing_time_ms', 0) / 1000 + elapsed:.1f} 秒")
 
     # 显示前500字符预览
     print(f"\n--- 文本预览 (前500字符) ---")
