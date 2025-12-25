@@ -68,18 +68,18 @@ class OCRMergeProcessor:
         min_text_area: int = 100,
         # 合并参数
         quality: int = 95,
-        spacing: int = 0,  # 默认间距 0 像素，通过 padding 避免重叠
-        # 分割参数
-        enable_split: bool = False,
-        min_segment_height: int = 800,  # 提高到 800，避免切割小片段
+        spacing: int = 0,
+        # 分割参数（优化后的默认值，支持纯色区域检测）
+        enable_split: bool = True,
+        min_segment_height: int = 800,
         max_segment_height: int = 4000,
-        min_blank_rows: int = 50,  # 提高到 50，只切割大片空白区域
+        min_blank_rows: int = 50,
         # 其他参数
         keep_empty_images: bool = False,
-        skip_pure_images: bool = True,  # 跳过纯图片（无文字）
-        skip_sparse_regions: bool = True,  # 跳过文字稀疏区域
-        min_chars_per_region: int = 5,  # 区域最小文字数量
-        verbose: bool = False
+        skip_pure_images: bool = True,
+        skip_sparse_regions: bool = True,
+        min_chars_per_region: int = 5,
+        verbose: bool = True
     ):
         """
         初始化处理器
@@ -90,15 +90,16 @@ class OCRMergeProcessor:
             padding: 裁剪边距
             min_text_area: 最小文字区域面积
             quality: 输出图片质量
-            spacing: 合并时的间距（默认0像素，通过padding避免重叠）
-            enable_split: 是否启用分割
+            spacing: 合并时的间距（默认0，纯色区域检测不依赖间隙）
+            enable_split: 是否启用分割（默认启用，支持纯色区域检测）
             min_segment_height: 最小片段高度
             max_segment_height: 最大片段高度
-            keep_empty_images: 是否保留无文字的图片（即使没有文字也合并）
+            min_blank_rows: 最小空白行数（用于高亮度空白检测）
+            keep_empty_images: 是否保留无文字的图片
             skip_pure_images: 跳过纯图片（无文字的图片不参与合并）
-            skip_sparse_regions: 跳过文字稀疏区域（文字数少于阈值的横向区域）
+            skip_sparse_regions: 跳过文字稀疏区域
             min_chars_per_region: 区域最小文字数量阈值
-            verbose: 详细日志
+            verbose: 详细日志（默认启用）
         """
         self.source_dir = Path(source_dir).resolve()
         if not self.source_dir.exists():

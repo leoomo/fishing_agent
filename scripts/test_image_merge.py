@@ -107,36 +107,16 @@ def main():
 
     from packages.data_processing.ocr import OCRMergeProcessor
 
-    # 配置参数
+    # 配置参数（只覆盖需要修改的默认值）
     config = {
         "source_dir": str(input_dir),
         "output_dir": str(output_dir),
-        # 裁剪参数
-        "padding": 15,
-        "min_text_area": 100,
-        # 合并参数
-        "quality": 95,
-        "spacing": 5,  # 添加5px间隙，便于分割时识别空白区域
-        # 分割参数（降低阈值以测试分割功能）
-        "enable_split": True,
-        "min_segment_height": 800,   # 每个片段最小高度
-        "max_segment_height": 2500,  # 超过此高度则分割（降低以触发分割）
-        "min_blank_rows": 50,        # 只切割 >=50px 的空白区域
-        # 其他参数
-        "keep_empty_images": False,
-        "skip_pure_images": True,
-        "skip_sparse_regions": True,
-        "min_chars_per_region": 5,
-        "verbose": True
+        # 分割参数：降低阈值以测试分割功能（默认 max_segment_height=4000）
+        "max_segment_height": 2500,
     }
 
     print(f"\n配置参数:")
-    print(f"  padding: {config['padding']}px")
-    print(f"  min_segment_height: {config['min_segment_height']}px")
-    print(f"  max_segment_height: {config['max_segment_height']}px")
-    print(f"  min_blank_rows: {config.get('min_blank_rows', 50)}px")
-    print(f"  enable_split: {config['enable_split']}")
-    print(f"  skip_sparse_regions: {config['skip_sparse_regions']}")
+    print(f"  max_segment_height: {config.get('max_segment_height', 4000)}px (其他使用默认值)")
 
     try:
         processor = OCRMergeProcessor(**config)
