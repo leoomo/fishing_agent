@@ -6,7 +6,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 
 from fastapi import UploadFile
 
@@ -125,11 +125,12 @@ class CrawlerUploadService:
                     product=product
                 )
 
-                # 保存图片
-                image_paths = self._save_images(pending_id, product_files)
+                # 保存图片（传递原始文件名）
+                original_filenames = [f.filename for f in product_files]
+                image_paths, metadata = self._save_images(pending_id, product_files, original_filenames)
 
                 # 更新 PendingEquipment 的 images 字段
-                self._update_pending_images(pending_id, image_paths)
+                self._update_pending_images(pending_id, image_paths, metadata)
 
                 # 更新任务的已下载列表
                 downloaded.add(product_id)
@@ -286,23 +287,27 @@ class CrawlerUploadService:
     def _save_images(
         self,
         pending_id: int,
-        files: List[UploadFile]
-    ) -> List[str]:
+        files: List[UploadFile],
+        original_filenames: List[str] = None
+    ) -> Tuple[List[str], List[Dict]]:
         """
-        保存图片文件
+        保存图片文件（零填充命名 + 元数据记录）
 
         Args:
             pending_id: 待审核记录ID
             files: 上传的文件列表
+            original_filenames: 原始文件名列表（如 ["0_0.jpg", "0_1.jpg", "1_0.jpg"]）
 
         Returns:
-            List[str]: 保存的图片相对路径列表
+            Tuple[List[str], List[Dict]]: (图片路径列表, 元数据列表)
         """
         # 创建目录
         save_dir = self.images_base_path / "pending" / str(pending_id)
         save_dir.mkdir(parents=True, exist_ok=True)
 
         image_paths = []
+        metadata = []
+
         for idx, file in enumerate(files, 1):
             # 确定扩展名
             ext = "jpg"
@@ -312,8 +317,9 @@ class CrawlerUploadService:
                 elif "webp" in file.content_type:
                     ext = "webp"
 
-            # 保存文件
-            filename = f"{idx}.{ext}"
+            # 零填充命名：001.jpg, 002.jpg, ..., 010.jpg
+            # 确保字母排序 = 数字排序
+            filename = f"{idx:03d}.{ext}"
             file_path = save_dir / filename
             with open(file_path, "wb") as f:
                 content = file.file.read()
@@ -323,16 +329,43 @@ class CrawlerUploadService:
             # 记录相对路径
             relative_path = f"pending/{pending_id}/{filename}"
             image_paths.append(relative_path)
-            logger.debug(f"图片已保存: {relative_path}")
 
-        return image_paths
+            # 记录元数据（包含原始文件名）
+            original_name = original_filenames[idx-1] if original_filenames and idx-1 < len(original_filenames) else (file.filename or "")
+            metadata.append({
+                "saved_name": filename,
+                "original_name": original_name,
+                "order": idx,
+                "relative_path": relative_path
+            })
 
-    def _update_pending_images(self, pending_id: int, image_paths: List[str]):
-        """更新待审核记录的图片路径"""
+            logger.debug(f"图片已保存: {relative_path} (原始: {original_name})")
+
+        return image_paths, metadata
+
+    def _update_pending_images(
+        self,
+        pending_id: int,
+        image_paths: List[str],
+        metadata: List[Dict] = None
+    ):
+        """
+        更新待审核记录的图片路径（包含元数据）
+
+        Args:
+            pending_id: 待审核记录ID
+            image_paths: 图片相对路径列表
+            metadata: 元数据列表（包含原始文件名等）
+        """
         with get_db_session() as session:
             pending = session.query(PendingEquipment).get(pending_id)
             if pending:
-                pending.images = json.dumps(image_paths, ensure_ascii=False)
+                # 新格式：保存路径列表 + 元数据
+                images_data = {
+                    "paths": image_paths,
+                    "metadata": metadata or []
+                }
+                pending.images = json.dumps(images_data, ensure_ascii=False)
 
     def _update_task_downloaded_products(self, task_id: int, products: List[str]):
         """更新任务的已下载产品列表"""
