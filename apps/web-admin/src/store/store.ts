@@ -2,16 +2,14 @@ import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './slices/authSlice'
 import equipmentReducer from './slices/equipmentSlice'
 import crawlerReducer from './slices/crawlerSlice'
-import pendingEquipmentReducer from './slices/pendingEquipmentSlice'
-import ocrWorkerReducer from './slices/ocrWorkerSlice'
+import dataWorkflowReducer from './slices/dataWorkflowSlice'
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     equipment: equipmentReducer,
     crawler: crawlerReducer,
-    pendingEquipment: pendingEquipmentReducer,
-    ocrWorker: ocrWorkerReducer,
+    dataWorkflow: dataWorkflowReducer,
   },
 })
 
