@@ -9,7 +9,11 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
+from pathlib import Path
+from typing import List
+
 from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, and_, or_
 
 from apps.api.orm.session import get_db_session
@@ -24,7 +28,15 @@ from apps.api.schemas.data_workflow import (
     ReviewTaskListResponse,
     ReviewAction,
     OperationResponse,
+    ExtractResponse,
+    ExtractedEquipmentItem,
+    ExtractedDataUpdate,
+    ImageInfo,
+    TaskImagesResponse,
 )
+
+# 图片存储基础路径
+IMAGES_BASE_PATH = Path(__file__).parents[3] / "shared" / "images"
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
 
@@ -503,6 +515,14 @@ async def list_review_tasks(
                 except json.JSONDecodeError:
                     pass
 
+            # 解析审核历史
+            review_history = None
+            if item.review_history:
+                try:
+                    review_history = json.loads(item.review_history)
+                except json.JSONDecodeError:
+                    pass
+
             tasks.append(ReviewTaskItem(
                 id=item.id,
                 status=item.status,
@@ -519,6 +539,7 @@ async def list_review_tasks(
                 reviewed_at=item.reviewed_at,
                 reviewed_by=item.reviewed_by,
                 review_notes=item.review_notes,
+                review_history=review_history,
             ))
 
         return ReviewTaskListResponse(
@@ -533,6 +554,7 @@ async def list_review_tasks(
     "/review/tasks/{task_id}/review",
     response_model=OperationResponse,
     summary="审核任务",
+    description="审核任务（通过或拒绝），支持重新审核已审核的任务",
     dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
 )
 async def review_task(
@@ -540,7 +562,7 @@ async def review_task(
     action: ReviewAction,
     current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
 ):
-    """审核任务（通过或拒绝）"""
+    """审核任务（通过或拒绝），支持重新审核"""
     with get_db_session() as session:
         item = session.query(PendingEquipment).filter(
             PendingEquipment.id == task_id
@@ -552,18 +574,36 @@ async def review_task(
                 detail=f"任务 {task_id} 不存在"
             )
 
-        if item.status != "pending":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"任务已被审核，当前状态: {item.status}"
-            )
-
         if action.action not in ["approve", "reject"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="操作类型必须是 approve 或 reject"
             )
 
+        # 保存旧状态用于历史记录
+        previous_status = item.status
+        is_re_review = previous_status != "pending"
+
+        # 构建历史记录条目
+        history_entry = {
+            "reviewed_by": current_user.user_id,
+            "reviewed_at": datetime.utcnow().isoformat(),
+            "action": action.action,
+            "review_notes": action.review_notes,
+            "previous_status": previous_status
+        }
+
+        # 追加到历史记录
+        existing_history = []
+        if item.review_history:
+            try:
+                existing_history = json.loads(item.review_history)
+            except (json.JSONDecodeError, TypeError):
+                existing_history = []
+        existing_history.append(history_entry)
+        item.review_history = json.dumps(existing_history, ensure_ascii=False)
+
+        # 更新当前状态
         item.status = "approved" if action.action == "approve" else "rejected"
         item.reviewed_at = datetime.utcnow()
         item.reviewed_by = current_user.user_id
@@ -571,13 +611,22 @@ async def review_task(
 
         session.commit()
 
-        logger.info(
-            f"管理员 {current_user.username} 审核任务 {task_id}: {action.action}"
-        )
+        action_text = "通过" if action.action == "approve" else "拒绝"
+        if is_re_review:
+            logger.info(
+                f"管理员 {current_user.username} 重新审核任务 {task_id}: "
+                f"{previous_status} -> {action.action}"
+            )
+            message = f"任务已重新审核: {action_text}"
+        else:
+            logger.info(
+                f"管理员 {current_user.username} 审核任务 {task_id}: {action.action}"
+            )
+            message = f"任务已{action_text}"
 
         return OperationResponse(
             success=True,
-            message=f"任务已{'通过' if action.action == 'approve' else '拒绝'}",
+            message=message,
             affected_count=1,
         )
 
@@ -614,3 +663,298 @@ async def delete_review_task(
             message="任务已删除",
             affected_count=1,
         )
+
+
+# ========== 装备提取功能 ==========
+
+@router.post(
+    "/review/tasks/{task_id}/extract",
+    response_model=ExtractResponse,
+    summary="一键提取装备信息",
+    description="从 OCR 识别的文本中提取装备详细信息",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
+)
+async def extract_equipment(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """
+    一键提取装备信息
+
+    从 PendingEquipment 的 ocr_text 中提取装备详细信息，
+    并保存到 extracted_data 字段。
+    """
+    with get_db_session() as session:
+        item = session.query(PendingEquipment).filter(
+            PendingEquipment.id == task_id
+        ).first()
+
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"任务 {task_id} 不存在"
+            )
+
+        if not item.ocr_text:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="该任务没有 OCR 识别文本"
+            )
+
+        try:
+            # 导入并调用装备提取 Agent
+            from packages.agents.equipment_import import EquipmentImportAgent
+
+            agent = EquipmentImportAgent(
+                model_provider="zhipu",
+                enable_logging=True,
+                enable_monitoring=False  # 不需要监控
+            )
+
+            # 使用批量提取（不保存）
+            extracted_list = agent.batch_extract_only(
+                text=item.ocr_text,
+                source_type=item.source_type or "unknown"
+            )
+
+            if not extracted_list:
+                return ExtractResponse(
+                    success=False,
+                    message="无法从文本中提取装备信息",
+                    extracted_count=0,
+                    items=[]
+                )
+
+            # 转换为响应格式
+            items = []
+            for extracted in extracted_list:
+                items.append(ExtractedEquipmentItem(
+                    equipment_type=extracted.equipment_type,
+                    brand_name=extracted.brand_name,
+                    model=extracted.model,
+                    name=extracted.name,
+                    price_min=extracted.price_min,
+                    price_max=extracted.price_max,
+                    description=extracted.description,
+                    features=extracted.features,
+                    target_fish=extracted.target_fish,
+                    user_level=extracted.user_level,
+                    specs=extracted.specs,
+                    confidence=extracted.confidence,
+                    extraction_notes=extracted.extraction_notes,
+                ))
+
+            # 保存提取结果到数据库
+            extracted_data = [item.model_dump() for item in items]
+            item.extracted_data = json.dumps(extracted_data, ensure_ascii=False)
+            session.commit()
+
+            logger.info(
+                f"管理员 {current_user.username} 提取任务 {task_id} 的装备信息，"
+                f"提取到 {len(items)} 个型号"
+            )
+
+            return ExtractResponse(
+                success=True,
+                message=f"成功提取 {len(items)} 个装备型号",
+                extracted_count=len(items),
+                items=items
+            )
+
+        except Exception as e:
+            logger.error(f"提取装备信息失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"提取失败: {str(e)}"
+            )
+
+
+@router.put(
+    "/review/tasks/{task_id}/extracted-data",
+    response_model=OperationResponse,
+    summary="保存编辑后的装备数据",
+    description="保存人工编辑修正后的装备信息",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
+)
+async def save_extracted_data(
+    task_id: int,
+    data: ExtractedDataUpdate,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """
+    保存编辑后的装备数据
+
+    将人工修正后的装备信息保存到 extracted_data 字段。
+    """
+    with get_db_session() as session:
+        item = session.query(PendingEquipment).filter(
+            PendingEquipment.id == task_id
+        ).first()
+
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"任务 {task_id} 不存在"
+            )
+
+        try:
+            # 转换为 JSON 格式保存
+            extracted_data = [item_data.model_dump() for item_data in data.items]
+            item.extracted_data = json.dumps(extracted_data, ensure_ascii=False)
+            session.commit()
+
+            logger.info(
+                f"管理员 {current_user.username} 保存任务 {task_id} 的装备数据，"
+                f"共 {len(data.items)} 个型号"
+            )
+
+            return OperationResponse(
+                success=True,
+                message=f"成功保存 {len(data.items)} 个装备型号",
+                affected_count=len(data.items)
+            )
+
+        except Exception as e:
+            logger.error(f"保存装备数据失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"保存失败: {str(e)}"
+            )
+
+
+# ========== 图片访问功能 ==========
+
+@router.get(
+    "/review/tasks/{task_id}/images",
+    response_model=TaskImagesResponse,
+    summary="获取任务图片列表",
+    description="获取审核任务关联的所有图片信息",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_READ))]
+)
+async def get_task_images(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """获取任务的图片列表"""
+    with get_db_session() as session:
+        item = session.query(PendingEquipment).filter(
+            PendingEquipment.id == task_id
+        ).first()
+
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"任务 {task_id} 不存在"
+            )
+
+        images: List[ImageInfo] = []
+
+        if item.images:
+            try:
+                data = json.loads(item.images)
+
+                # 新格式: {"paths": [...], "metadata": [...]}
+                if isinstance(data, dict) and "paths" in data:
+                    paths = data.get("paths", [])
+                    metadata = data.get("metadata", [])
+
+                    for idx, path in enumerate(paths):
+                        filename = Path(path).name
+                        meta = metadata[idx] if idx < len(metadata) else {}
+
+                        images.append(ImageInfo(
+                            filename=filename,
+                            url=f"/api/v1/admin/workflow/images/{path}",
+                            order=meta.get("order", idx + 1),
+                            original_name=meta.get("original_name")
+                        ))
+
+                # 旧格式: [...]
+                elif isinstance(data, list):
+                    for idx, path in enumerate(data):
+                        filename = Path(path).name
+                        images.append(ImageInfo(
+                            filename=filename,
+                            url=f"/api/v1/admin/workflow/images/{path}",
+                            order=idx + 1,
+                            original_name=None
+                        ))
+
+            except json.JSONDecodeError:
+                logger.warning(f"任务 {task_id} 的 images 字段解析失败")
+
+        return TaskImagesResponse(
+            task_id=task_id,
+            images=images,
+            total=len(images)
+        )
+
+
+@router.get(
+    "/images/{path:path}",
+    summary="获取图片文件",
+    description="根据路径获取图片文件（支持通过 token 查询参数认证）",
+)
+async def get_image(
+    path: str,
+    token: str = Query(None, description="JWT token（用于 img 标签认证）")
+):
+    """
+    获取图片文件
+
+    由于浏览器的 <img> 标签无法携带 Authorization header，
+    支持通过 query parameter 传递 token 进行认证。
+    """
+    # 验证 token
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="需要提供 token 参数"
+        )
+
+    from ..auth.dependencies import verify_token
+    try:
+        verify_token(token)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Token 验证失败: {str(e)}"
+        )
+    # 安全检查：防止路径遍历攻击
+    if ".." in path or path.startswith("/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无效的图片路径"
+        )
+
+    image_path = IMAGES_BASE_PATH / path
+
+    if not image_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"图片不存在: {path}"
+        )
+
+    if not image_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="路径不是有效的文件"
+        )
+
+    # 检查文件扩展名
+    suffix = image_path.suffix.lower()
+    media_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+
+    media_type = media_types.get(suffix, "application/octet-stream")
+
+    return FileResponse(
+        path=str(image_path),
+        media_type=media_type,
+        filename=image_path.name
+    )

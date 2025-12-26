@@ -180,6 +180,12 @@ class PendingEquipment(Base, TimestampMixin):
         comment="审核备注"
     )
 
+    review_history = Column(
+        Text,
+        nullable=True,
+        comment="审核历史记录 (JSON数组)"
+    )
+
     # 最终装备 ID（审核通过后关联到正式表）
     equipment_id = Column(
         Integer,

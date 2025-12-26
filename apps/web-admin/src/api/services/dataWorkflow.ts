@@ -12,6 +12,9 @@ import type {
   ReviewTaskFilters,
   ReviewAction,
   OperationResponse,
+  ExtractResponse,
+  ExtractedDataUpdate,
+  TaskImagesResponse,
 } from '../../types/dataWorkflow'
 
 const BASE_URL = '/admin/workflow'
@@ -102,6 +105,40 @@ export const dataWorkflowApi = {
    */
   deleteReviewTask: (taskId: number): Promise<OperationResponse> => {
     return client.delete(`${BASE_URL}/review/tasks/${taskId}`)
+  },
+
+  // ========== 装备提取 ==========
+
+  /**
+   * 一键提取装备信息
+   */
+  extractEquipment: (taskId: number): Promise<ExtractResponse> => {
+    return client.post(`${BASE_URL}/review/tasks/${taskId}/extract`)
+  },
+
+  /**
+   * 保存编辑后的装备数据
+   */
+  saveExtractedData: (taskId: number, data: ExtractedDataUpdate): Promise<OperationResponse> => {
+    return client.put(`${BASE_URL}/review/tasks/${taskId}/extracted-data`, data)
+  },
+
+  // ========== 图片查看 ==========
+
+  /**
+   * 获取任务图片列表
+   */
+  getTaskImages: (taskId: number): Promise<TaskImagesResponse> => {
+    return client.get(`${BASE_URL}/review/tasks/${taskId}/images`)
+  },
+
+  /**
+   * 获取图片 URL（用于 <img> 标签）
+   * 由于 img 标签无法携带 Authorization header，需要通过 query parameter 传递 token
+   */
+  getImageUrl: (imagePath: string): string => {
+    const token = localStorage.getItem('fishing_admin_token')
+    return `/api/v1${BASE_URL}/images/${imagePath}?token=${token || ''}`
   },
 }
 

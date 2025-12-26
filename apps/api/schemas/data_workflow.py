@@ -3,7 +3,7 @@
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
 
 
@@ -83,6 +83,15 @@ class OCRTaskFilters(BaseModel):
 
 # ========== 审核任务相关 ==========
 
+class ReviewHistoryItem(BaseModel):
+    """审核历史记录项"""
+    reviewed_by: int = Field(..., description="审核人 ID")
+    reviewed_at: str = Field(..., description="审核时间 (ISO 格式)")
+    action: str = Field(..., description="操作: approve 或 reject")
+    review_notes: Optional[str] = Field(None, description="审核备注")
+    previous_status: str = Field(..., description="操作前的状态")
+
+
 class ReviewTaskItem(BaseModel):
     """审核任务项"""
     id: int
@@ -93,13 +102,14 @@ class ReviewTaskItem(BaseModel):
     product_name: Optional[str] = None
     confidence: float = 0.0
     ocr_text: Optional[str] = None
-    extracted_data: Optional[dict] = None
+    extracted_data: Any = None  # 可以是 dict 或 List[dict]
     source_url: Optional[str] = None
     images_count: int = 0
     created_at: Optional[datetime] = None
     reviewed_at: Optional[datetime] = None
     reviewed_by: Optional[int] = None
     review_notes: Optional[str] = None
+    review_history: Optional[List[ReviewHistoryItem]] = None  # 审核历史
 
 
 class ReviewTaskListResponse(BaseModel):
@@ -132,3 +142,52 @@ class OperationResponse(BaseModel):
     success: bool
     message: str
     affected_count: int = 0
+
+
+# ========== 装备提取相关 ==========
+
+class ExtractedEquipmentItem(BaseModel):
+    """提取的装备项"""
+    equipment_type: str = ""
+    brand_name: Optional[str] = None
+    model: Optional[str] = None
+    name: Optional[str] = None
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    description: Optional[str] = None
+    features: List[str] = []
+    target_fish: List[str] = []
+    user_level: Optional[str] = None
+    specs: dict = {}
+    confidence: float = 0.0
+    extraction_notes: str = ""
+
+
+class ExtractResponse(BaseModel):
+    """装备提取响应"""
+    success: bool
+    message: str
+    extracted_count: int = 0
+    items: List[ExtractedEquipmentItem] = []
+
+
+class ExtractedDataUpdate(BaseModel):
+    """更新提取数据的请求"""
+    items: List[ExtractedEquipmentItem] = Field(..., description="编辑后的装备列表")
+
+
+# ========== 图片相关 ==========
+
+class ImageInfo(BaseModel):
+    """图片信息"""
+    filename: str = Field(..., description="文件名")
+    url: str = Field(..., description="图片访问 URL")
+    order: int = Field(default=0, description="排序顺序")
+    original_name: Optional[str] = Field(None, description="原始文件名")
+
+
+class TaskImagesResponse(BaseModel):
+    """任务图片列表响应"""
+    task_id: int
+    images: List[ImageInfo] = []
+    total: int = 0

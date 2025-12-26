@@ -86,6 +86,19 @@ export const OCR_PRIORITY_OPTIONS = [
 
 // ========== 审核任务 ==========
 
+export type ReviewStatus = 'pending' | 'approved' | 'rejected'
+
+/**
+ * 审核历史记录项
+ */
+export interface ReviewHistoryItem {
+  reviewed_by: number
+  reviewed_at: string
+  action: 'approve' | 'reject'
+  review_notes: string | null
+  previous_status: ReviewStatus
+}
+
 export interface ReviewTaskItem {
   id: number
   status: ReviewStatus
@@ -102,9 +115,8 @@ export interface ReviewTaskItem {
   reviewed_at: string | null
   reviewed_by: number | null
   review_notes: string | null
+  review_history: ReviewHistoryItem[] | null  // 审核历史
 }
-
-export type ReviewStatus = 'pending' | 'approved' | 'rejected'
 
 export interface ReviewTaskListResponse {
   items: ReviewTaskItem[]
@@ -218,4 +230,84 @@ export const EQUIPMENT_TYPE_CONFIG: Record<string, string> = {
   lure: '拟饵',
   accessory: '配件',
   unknown: '未知',
+}
+
+// ========== 装备提取相关 ==========
+
+/**
+ * 提取的装备项
+ */
+export interface ExtractedEquipmentItem {
+  equipment_type: string
+  brand_name: string | null
+  model: string | null
+  name: string | null
+  price_min: number | null
+  price_max: number | null
+  description: string | null
+  features: string[]
+  target_fish: string[]
+  user_level: string | null
+  specs: Record<string, unknown>
+  confidence: number
+  extraction_notes: string
+}
+
+/**
+ * 装备提取响应
+ */
+export interface ExtractResponse {
+  success: boolean
+  message: string
+  extracted_count: number
+  items: ExtractedEquipmentItem[]
+}
+
+/**
+ * 更新提取数据请求
+ */
+export interface ExtractedDataUpdate {
+  items: ExtractedEquipmentItem[]
+}
+
+// ========== 装备规格字段配置 ==========
+
+/**
+ * 鱼竿调性选项
+ */
+export const ROD_POWER_OPTIONS = ['UL', 'L', 'ML', 'M', 'MH', 'H', 'XH']
+
+/**
+ * 鱼竿动作选项
+ */
+export const ROD_ACTION_OPTIONS = ['慢调', '中调', '快调', '超快调']
+
+/**
+ * 用户级别选项
+ */
+export const USER_LEVEL_OPTIONS = ['新手', '进阶', '高手']
+
+/**
+ * 装备类型选项
+ */
+export const EQUIPMENT_TYPE_OPTIONS = [
+  { value: '鱼竿', label: '鱼竿' },
+  { value: '渔轮', label: '渔轮' },
+  { value: '鱼线', label: '鱼线' },
+  { value: '拟饵', label: '拟饵' },
+]
+
+// ========== 图片相关 ==========
+
+export interface ImageInfo {
+  filename: string
+  url: string
+  order: number
+  original_name: string | null
+}
+
+export interface TaskImagesResponse {
+  task_id: number
+  images: ImageInfo[]
+  total: number
 }
