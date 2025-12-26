@@ -9,6 +9,13 @@ OCR Worker Debug 脚本 - 用于 IDE 调试运行
 
 import sys
 import os
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # 添加项目根目录到 path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

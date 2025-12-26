@@ -5,12 +5,15 @@ OCR Worker CLI - 命令行启动 OCR Worker
 用法:
     python -m packages.scraper.worker.ocr_cli --server http://localhost:8000
     python -m packages.scraper.worker.ocr_cli --provider siliconflow -v
+    python -m packages.scraper.worker.ocr_cli --log-file /var/log/ocr_worker.log
 """
 
 import argparse
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import sys
+from typing import Optional
 
 # 添加项目根目录到 Python 路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -23,14 +26,49 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def setup_logging(verbose: bool = False):
-    """配置日志"""
+def setup_logging(verbose: bool = False, log_file: Optional[str] = None):
+    """
+    配置日志
+
+    Args:
+        verbose: 是否启用详细日志 (DEBUG 级别)
+        log_file: 可选的日志文件路径
+    """
     level = logging.DEBUG if verbose else logging.INFO
+
+    # 更详细的格式（包含毫秒）
+    fmt = "%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
+
+    # 创建处理器列表
+    handlers = [logging.StreamHandler()]
+
+    # 可选文件日志（带轮转）
+    if log_file:
+        try:
+            file_handler = RotatingFileHandler(
+                log_file,
+                maxBytes=10 * 1024 * 1024,  # 10MB
+                backupCount=5,
+                encoding="utf-8",
+            )
+            file_handler.setFormatter(logging.Formatter(fmt, datefmt))
+            handlers.append(file_handler)
+        except Exception as e:
+            print(f"警告: 无法创建日志文件 {log_file}: {e}", file=sys.stderr)
+
     logging.basicConfig(
         level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler()],
+        format=fmt,
+        datefmt=datefmt,
+        handlers=handlers,
     )
+
+    # 降低第三方库日志级别
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
 
 
 def main():
@@ -97,13 +135,20 @@ def main():
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="详细日志输出",
+        help="详细日志输出 (DEBUG 级别)",
+    )
+
+    parser.add_argument(
+        "--log-file",
+        type=str,
+        default=None,
+        help="日志文件路径 (可选，支持自动轮转)",
     )
 
     args = parser.parse_args()
 
     # 配置日志
-    setup_logging(args.verbose)
+    setup_logging(args.verbose, args.log_file)
 
     logger = logging.getLogger(__name__)
     logger.info("=" * 50)

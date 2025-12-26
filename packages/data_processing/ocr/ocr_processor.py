@@ -72,13 +72,13 @@ class OCRMergeProcessor:
         # 分割参数（优化后的默认值，支持纯色区域检测）
         enable_split: bool = True,
         min_segment_height: int = 800,
-        max_segment_height: int = 4000,
-        min_blank_rows: int = 50,
+        max_segment_height: int = 2200,
+        min_blank_rows: int = 15,
         # 其他参数
         keep_empty_images: bool = False,
         skip_pure_images: bool = True,
         skip_sparse_regions: bool = True,
-        min_chars_per_region: int = 5,
+        min_chars_per_region: int = 2,
         verbose: bool = True
     ):
         """
@@ -293,8 +293,19 @@ class OCRMergeProcessor:
                 y_max = max(box.y_max for box in text_boxes)
 
             # 应用 padding 并防止越界
-            y1 = max(0, y_min - self.padding)
-            y2 = min(h, y_max + self.padding)
+            # 顶部：如果文字离顶部很近（<50px），不裁剪顶部
+            # 底部：如果文字离底部很近（<50px），不裁剪底部
+            edge_threshold = 50
+
+            if y_min < edge_threshold:
+                y1 = 0  # 顶部有文字，保留完整顶部
+            else:
+                y1 = max(0, y_min - self.padding)
+
+            if h - y_max < edge_threshold:
+                y2 = h  # 底部有文字，保留完整底部
+            else:
+                y2 = min(h, y_max + self.padding)
 
             # 裁剪图片（只裁剪上下，保留完整宽度）
             cropped = img[y1:y2, 0:w]
@@ -337,10 +348,14 @@ class OCRMergeProcessor:
             List[ProcessedImage]: 处理结果列表
         """
         results = []
+        total = len(image_files)
 
         for i, image_path in enumerate(image_files):
-            if self.verbose:
-                logger.info(f"处理 {i+1}/{len(image_files)}: {Path(image_path).name}")
+            # 始终显示进度（每10张或最后一张）
+            if (i + 1) % 10 == 0 or i == 0 or i == total - 1:
+                logger.info(f"  文字检测进度: [{i+1}/{total}] {Path(image_path).name}")
+            elif self.verbose:
+                logger.info(f"处理 {i+1}/{total}: {Path(image_path).name}")
 
             result = self.crop_single_image(image_path)
             results.append(result)
@@ -642,7 +657,7 @@ class OCRMergeProcessor:
 
     def split_merged_image(self, merged_path: str) -> List[str]:
         """
-        分割合并后的图片
+        分割合并后的图片 - 自适应背景检测 + 安全距离验证
 
         Args:
             merged_path: 合并后的图片路径
@@ -658,35 +673,65 @@ class OCRMergeProcessor:
             return [merged_path]
 
         from packages.data_processing.image.splitter import BlankRowDetector, ImageSplitter
+        import numpy as np
 
         try:
             with Image.open(merged_path) as img:
-                # 尝试两种检测模式：
-                # 1. 首先尝试高亮度空白检测（原始模式）
+                # 检测背景类型
+                pixels = np.array(img)
+                avg_brightness = np.mean(pixels)
+                is_dark_background = avg_brightness < 100
+
+                if is_dark_background:
+                    logger.info(
+                        f"检测到暗色背景 (亮度={avg_brightness:.0f})，"
+                        "启用纯色检测模式"
+                    )
+
+                # 根据背景类型选择检测模式
                 blank_detector = BlankRowDetector(
                     min_blank_rows=self.min_blank_rows,
-                    detect_solid_color=False
+                    detect_solid_color=is_dark_background,
+                    solid_color_variance=80.0 if is_dark_background else 100.0
                 )
-                blank_regions = blank_detector.find_blank_regions(img)
+                # 关闭自动检测，因为我们已经手动检测过了
+                blank_regions = blank_detector.find_blank_regions(
+                    img, auto_detect_background=False
+                )
 
-                # 2. 如果没找到，尝试纯色区域检测（新模式）
-                if not blank_regions:
+                # 如果暗色背景没找到纯色区域，回退到高亮度检测
+                if not blank_regions and is_dark_background:
+                    logger.info("纯色检测未找到区域，回退到高亮度检测...")
+                    blank_detector = BlankRowDetector(
+                        min_blank_rows=self.min_blank_rows,
+                        detect_solid_color=False
+                    )
+                    blank_regions = blank_detector.find_blank_regions(
+                        img, auto_detect_background=False
+                    )
+
+                # 如果亮色背景没找到高亮度空白，尝试纯色检测
+                if not blank_regions and not is_dark_background:
                     logger.info("未找到高亮度空白区域，尝试纯色区域检测...")
                     blank_detector = BlankRowDetector(
-                        min_blank_rows=min(10, self.min_blank_rows),  # 降低要求
+                        min_blank_rows=min(10, self.min_blank_rows),
                         detect_solid_color=True,
-                        solid_color_variance=100.0  # 纯色方差阈值
+                        solid_color_variance=100.0
                     )
-                    blank_regions = blank_detector.find_blank_regions(img)
+                    blank_regions = blank_detector.find_blank_regions(
+                        img, auto_detect_background=False
+                    )
 
-                # 选择切割点
+                # 选择切割点（带安全距离验证）
                 splitter = ImageSplitter(
                     min_segment_height=self.min_segment_height,
                     max_segment_height=self.max_segment_height
                 )
                 split_points = splitter.select_split_points(
                     blank_regions,
-                    img.height
+                    img.height,
+                    image=img,              # 传入图片用于安全检查
+                    min_content_distance=30  # 最小30px安全距离
                 )
 
                 if not split_points:

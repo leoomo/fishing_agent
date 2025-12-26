@@ -62,10 +62,11 @@ class OCRProviderFactory:
         try:
             provider = provider_class()
 
-            # 检查提供商是否可用
-            if not provider.is_available():
+            # 检查提供商是否可用（使用详细检查方法）
+            available, error_reason = provider.check_availability()
+            if not available:
                 raise OCRProviderNotAvailableError(
-                    f"OCR提供商 '{provider_type}' 不可用",
+                    f"OCR提供商 '{provider_type}' 不可用: {error_reason}",
                     "OCR_PROVIDER_NOT_AVAILABLE"
                 )
 

@@ -313,20 +313,21 @@ class OllamaProvider(BaseOCRProvider):
             total_file_size = 0
             client = self._get_client()
 
+            total_files = len(merged_paths)
             for i, target_path in enumerate(merged_paths):
-                if verbose and len(merged_paths) > 1:
-                    logger.info(f"正在处理第 {i+1}/{len(merged_paths)} 个文件...")
+                # 始终显示 OCR 进度
+                file_size = os.path.getsize(target_path)
+                total_file_size += file_size
+                logger.info(
+                    f"  OCR 进度: [{i+1}/{total_files}] "
+                    f"{os.path.basename(target_path)} ({file_size/1024:.1f}KB)"
+                )
 
                 # 编码图片为base64
                 img_data = self._encode_image_to_base64(target_path)
-                file_size = os.path.getsize(target_path)
-                total_file_size += file_size
 
                 if verbose:
-                    logger.info(f"  图片大小: {file_size/1024:.1f}KB, 模型: {self._model}")
-
-                if verbose:
-                    logger.info("  正在调用Ollama API...")
+                    logger.info(f"  正在调用Ollama API (模型: {self._model})...")
 
                 response = client.generate(
                     model=self._model,
@@ -472,22 +473,49 @@ class OllamaProvider(BaseOCRProvider):
             "base_url": self.base_url
         }
 
-    def is_available(self) -> bool:
-        """检查服务是否可用"""
+    def check_availability(self) -> Tuple[bool, Optional[str]]:
+        """
+        检查服务是否可用，返回详细信息
+
+        Returns:
+            Tuple[bool, Optional[str]]: (是否可用, 错误原因)
+        """
+        # 1. 检查 ollama 包是否安装
         try:
-            # 尝试连接Ollama服务
+            import ollama  # noqa: F401
+        except ImportError:
+            return (False, "未安装 ollama 包，请运行: pip install ollama")
+
+        # 2. 尝试连接 Ollama 服务
+        try:
             client = self._get_client()
-
-            # 检查服务状态
-            client.list()
-
-            # 确保模型可用
-            self._ensure_model_available()
-
-            return True
+        except OCRConfigurationError as e:
+            return (False, f"无法连接到 Ollama 服务 ({self.base_url}): {e.message}")
         except Exception as e:
-            logger.debug(f"Ollama服务不可用: {e}")
-            return False
+            return (False, f"无法连接到 Ollama 服务 ({self.base_url}): {e}")
+
+        # 3. 检查服务状态
+        try:
+            client.list()
+        except Exception as e:
+            return (False, f"Ollama 服务响应异常: {e}")
+
+        # 4. 确保模型可用
+        try:
+            self._ensure_model_available()
+        except OCRModelNotFoundError as e:
+            return (False, f"模型 '{self._model}' 不可用: {e.message}")
+        except Exception as e:
+            return (False, f"模型 '{self._model}' 不可用: {e}")
+
+        return (True, None)
+
+    def is_available(self) -> bool:
+        """检查服务是否可用（兼容旧接口）"""
+        available, error_reason = self.check_availability()
+        if not available:
+            logger.debug(f"Ollama服务不可用: {error_reason}")
+        return available
 
     def list_available_models(self) -> List[str]:
         """列出可用的模型"""

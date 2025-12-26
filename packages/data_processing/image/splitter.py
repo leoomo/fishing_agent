@@ -121,12 +121,17 @@ class BlankRowDetector:
 
         return True
 
-    def find_blank_regions(self, image: Image.Image) -> List[BlankRegion]:
+    def find_blank_regions(
+        self,
+        image: Image.Image,
+        auto_detect_background: bool = True
+    ) -> List[BlankRegion]:
         """
         查找所有连续空白区域
 
         Args:
             image: PIL图片对象
+            auto_detect_background: 自动检测背景类型（亮色/暗色）
 
         Returns:
             List[BlankRegion]: 空白区域列表
@@ -136,6 +141,17 @@ class BlankRowDetector:
 
         pixels = np.array(image)
         height = pixels.shape[0]
+
+        # 自动检测背景类型
+        if auto_detect_background and not self.detect_solid_color:
+            avg_brightness = np.mean(pixels)
+            # 暗色背景（亮度<100）启用纯色检测
+            if avg_brightness < 100:
+                self.detect_solid_color = True
+                logger.info(
+                    f"检测到暗色背景 (亮度={avg_brightness:.0f})，"
+                    "启用纯色检测模式"
+                )
 
         blank_regions = []
         current_start = None
@@ -172,6 +188,59 @@ class BlankRowDetector:
 
         logger.info(f"Found {len(blank_regions)} blank regions")
         return blank_regions
+
+    def get_safe_split_point(
+        self,
+        image: Image.Image,
+        region: BlankRegion,
+        min_distance: int = 30
+    ) -> Optional[int]:
+        """
+        验证切割点是否安全（距离内容足够远）
+
+        Args:
+            image: PIL图片
+            region: 空白区域
+            min_distance: 最小安全距离（默认30px）
+
+        Returns:
+            安全的切割点y坐标，如果不安全返回None
+        """
+        if not HAS_PIL:
+            return region.center
+
+        pixels = np.array(image)
+        gray = np.mean(pixels, axis=2)
+        height = image.height
+        center = region.center
+
+        # 向上查找最近内容
+        dist_up = 0
+        for y in range(center, -1, -1):
+            if np.var(gray[y]) > 100:  # 有内容
+                dist_up = center - y
+                break
+
+        # 向下查找最近内容
+        dist_down = 0
+        for y in range(center, height):
+            if np.var(gray[y]) > 100:  # 有内容
+                dist_down = y - center
+                break
+
+        # 检查安全距离
+        if dist_up >= min_distance and dist_down >= min_distance:
+            logger.debug(
+                f"切割点 y={center}: 距上方内容 {dist_up}px, "
+                f"距下方内容 {dist_down}px ✓ 安全"
+            )
+            return center
+
+        logger.debug(
+            f"切割点 y={center}: 距上方内容 {dist_up}px, "
+            f"距下方内容 {dist_down}px ✗ 不安全"
+        )
+        return None
 
     def find_content_regions(self, image: Image.Image) -> List[ContentRegion]:
         """
@@ -243,7 +312,9 @@ class ImageSplitter:
     def select_split_points(
         self,
         blank_regions: List[BlankRegion],
-        image_height: int
+        image_height: int,
+        image: Image.Image = None,
+        min_content_distance: int = 30
     ) -> List[int]:
         """
         选择切割点
@@ -251,6 +322,8 @@ class ImageSplitter:
         Args:
             blank_regions: 空白区域列表
             image_height: 图片总高度
+            image: PIL图片（用于安全距离检查）
+            min_content_distance: 距离内容的最小安全距离
 
         Returns:
             List[int]: 切割点y坐标列表
@@ -258,26 +331,92 @@ class ImageSplitter:
         if not blank_regions:
             return []
 
+        # 如果提供了图片，进行安全距离验证
+        if image is not None:
+            detector = BlankRowDetector()
+            safe_regions = []
+            for region in blank_regions:
+                safe_point = detector.get_safe_split_point(
+                    image, region, min_content_distance
+                )
+                if safe_point is not None:
+                    safe_regions.append(region)
+                    logger.debug(
+                        f"切割点 y={region.center}: 安全距离验证通过"
+                    )
+                else:
+                    logger.debug(
+                        f"切割点 y={region.center}: 安全距离不足，跳过"
+                    )
+            blank_regions = safe_regions
+            logger.info(
+                f"安全距离验证: {len(safe_regions)} 个候选切割点通过 "
+                f"(最小距离={min_content_distance}px)"
+            )
+
         split_points = []
         last_split = 0
 
+        # 对于超大图片，放宽顶部限制
+        # 如果图片高度超过 max_segment_height，允许更靠近顶部的切割点
+        is_oversized = image_height > self.max_segment_height
+        top_margin = self.min_segment_height // 2 if is_oversized else self.min_segment_height
+
+        # 过滤边界区域
+        valid_regions = []
         for region in blank_regions:
             # 跳过图片顶部和底部的空白
-            if region.start < self.min_segment_height:
+            if region.start < top_margin:
                 continue
             if region.end > image_height - self.min_segment_height:
                 continue
+            valid_regions.append(region)
 
-            # 计算如果在此切割，前一片段的高度
-            segment_height = region.center - last_split
+        # 对于超大图片，使用贪心算法选择最优切割点
+        # 目标：使每个片段尽可能接近 max_segment_height 但不超过
+        if is_oversized and valid_regions:
+            while last_split + self.max_segment_height < image_height:
+                # 找到最佳切割点：尽可能远但不超过 max_segment_height
+                best_region = None
+                best_distance = 0
 
-            # 确保片段不会太小
-            if segment_height < self.min_segment_height:
-                continue
+                # 第一个切割点允许更小的距离（使用 top_margin）
+                min_distance = top_margin if last_split == 0 else self.min_segment_height
 
-            # 添加切割点
-            split_points.append(region.center)
-            last_split = region.center
+                for region in valid_regions:
+                    distance = region.center - last_split
+                    # 切割点必须在 [min_distance, max_segment_height] 范围内
+                    if distance >= min_distance and distance <= self.max_segment_height:
+                        if distance > best_distance:
+                            best_distance = distance
+                            best_region = region
+
+                if best_region:
+                    split_points.append(best_region.center)
+                    last_split = best_region.center
+                    logger.debug(
+                        f"选择切割点 y={best_region.center}, "
+                        f"片段高度={best_distance}px"
+                    )
+                else:
+                    # 没有合适的切割点，停止
+                    break
+        else:
+            # 普通逻辑：按顺序选择切割点
+            for region in valid_regions:
+                # 计算如果在此切割，前一片段的高度
+                segment_height = region.center - last_split
+
+                # 对于第一个切割点，使用放宽的阈值
+                min_height = top_margin if last_split == 0 else self.min_segment_height
+
+                # 确保片段不会太小
+                if segment_height < min_height:
+                    continue
+
+                # 添加切割点
+                split_points.append(region.center)
+                last_split = region.center
 
         # 过滤太小的最后一个片段
         split_points = self._filter_small_segments(split_points, image_height)
@@ -303,6 +442,10 @@ class ImageSplitter:
         if not split_points:
             return []
 
+        # 对于超大图片，放宽第一个片段的高度限制
+        is_oversized = image_height > self.max_segment_height
+        first_segment_min = self.min_segment_height // 2 if is_oversized else self.min_segment_height
+
         filtered = []
         points = [0] + split_points + [image_height]
 
@@ -321,7 +464,9 @@ class ImageSplitter:
                 continue
 
             # 如果当前片段太小，也跳过
-            if current_height < self.min_segment_height:
+            # 第一个片段使用放宽的阈值
+            min_height = first_segment_min if prev_point == 0 else self.min_segment_height
+            if current_height < min_height:
                 continue
 
             filtered.append(current_point)
