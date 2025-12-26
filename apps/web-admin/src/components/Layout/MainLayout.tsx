@@ -11,8 +11,7 @@ import {
   BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
-  AuditOutlined,
-  ScanOutlined,
+  NodeIndexOutlined,
 } from '@ant-design/icons'
 import { useDispatch } from 'react-redux'
 import { logout } from '@/store/slices/authSlice'
@@ -54,14 +53,9 @@ const MainLayout = () => {
       label: '数据采集管理',
     },
     {
-      key: '/pending-equipment',
-      icon: <AuditOutlined />,
-      label: '待审核装备',
-    },
-    {
-      key: '/ocr-worker',
-      icon: <ScanOutlined />,
-      label: 'OCR Worker',
+      key: '/data-workflow',
+      icon: <NodeIndexOutlined />,
+      label: '数据处理工作流',
     },
     {
       key: '/workflow',
