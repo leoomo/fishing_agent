@@ -343,6 +343,7 @@ const DataWorkflowPage: React.FC = () => {
                 dispatch(showReviewModal({ task, action }))
               }
               onHideReviewModal={() => dispatch(hideReviewModal())}
+              onRefresh={() => dispatch(fetchReviewTasks(reviewFilters))}
             />
           </Card>
         </>
