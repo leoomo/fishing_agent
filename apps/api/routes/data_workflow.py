@@ -566,7 +566,7 @@ async def review_task(
 
         item.status = "approved" if action.action == "approve" else "rejected"
         item.reviewed_at = datetime.utcnow()
-        item.reviewed_by = current_user.id
+        item.reviewed_by = current_user.user_id
         item.review_notes = action.review_notes
 
         session.commit()
