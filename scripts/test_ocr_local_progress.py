@@ -92,7 +92,7 @@ def main():
         "source_dir": str(input_dir),
         "output_dir": str(output_dir),
         # 分割参数：降低阈值以测试分割功能（默认 max_segment_height=4000）
-        "max_segment_height": 2500,
+        "max_segment_height": 2000,
     }
 
     try:

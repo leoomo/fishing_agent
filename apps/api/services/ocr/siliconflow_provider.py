@@ -581,12 +581,26 @@ class SiliconFlowProvider(BaseOCRProvider):
             "api_url": self.API_URL
         }
 
-    def is_available(self) -> bool:
-        """检查服务是否可用"""
+    def check_availability(self) -> Tuple[bool, Optional[str]]:
+        """
+        检查服务是否可用，返回详细信息
+
+        Returns:
+            Tuple[bool, Optional[str]]: (是否可用, 错误原因)
+        """
+        # 1. 检查 API 密钥
         try:
             self._validate_api_key()
-            return True
-        except OCRConfigurationError:
-            return False
-        except Exception:
-            return False
+        except OCRConfigurationError as e:
+            return (False, f"API 密钥配置错误: {e.message}")
+        except Exception as e:
+            return (False, f"API 密钥验证失败: {e}")
+
+        return (True, None)
+
+    def is_available(self) -> bool:
+        """检查服务是否可用（兼容旧接口）"""
+        available, error_reason = self.check_availability()
+        if not available:
+            logger.debug(f"SiliconFlow服务不可用: {error_reason}")
+        return available

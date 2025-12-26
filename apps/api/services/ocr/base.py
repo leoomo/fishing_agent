@@ -5,7 +5,7 @@ OCR 提供商抽象基类
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 
 class BaseOCRProvider(ABC):
@@ -78,6 +78,24 @@ class BaseOCRProvider(ABC):
             bool: 服务可用性
         """
         pass
+
+    def check_availability(self) -> Tuple[bool, Optional[str]]:
+        """
+        检查服务是否可用，返回详细信息
+
+        子类应该重写此方法以提供详细的错误原因。
+        默认实现调用 is_available() 并返回通用错误消息。
+
+        Returns:
+            Tuple[bool, Optional[str]]: (是否可用, 错误原因)
+        """
+        try:
+            if self.is_available():
+                return (True, None)
+            else:
+                return (False, "服务不可用")
+        except Exception as e:
+            return (False, f"检查可用性时出错: {e}")
 
     def _validate_image_path(self, image_path: str) -> None:
         """验证图片路径"""
