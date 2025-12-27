@@ -321,6 +321,17 @@ const DataWorkflowPage: React.FC = () => {
               onDelete={handleOCRDelete}
             />
           </Card>
+
+          {/* Worker 日志面板 - 仅在 OCR 处理中显示 */}
+          <div style={{ marginTop: 16 }}>
+            <WorkerLogPanel
+              logs={workerLogs}
+              collapsed={logsPanelCollapsed}
+              onToggleCollapse={() => dispatch(toggleLogsPanelCollapsed())}
+              onClear={() => dispatch(clearWorkerLogs())}
+              maxHeight={250}
+            />
+          </div>
         </>
       ),
     },
@@ -437,17 +448,6 @@ const DataWorkflowPage: React.FC = () => {
 
       {/* 任务列表 Tabs */}
       <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems} />
-
-      {/* Worker 日志面板 */}
-      <div style={{ marginTop: 16 }}>
-        <WorkerLogPanel
-          logs={workerLogs}
-          collapsed={logsPanelCollapsed}
-          onToggleCollapse={() => dispatch(toggleLogsPanelCollapsed())}
-          onClear={() => dispatch(clearWorkerLogs())}
-          maxHeight={250}
-        />
-      </div>
     </div>
   )
 }
