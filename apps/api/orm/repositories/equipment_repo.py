@@ -259,16 +259,24 @@ class EquipmentRepository(BaseRepository[Equipment]):
             category = equipment_data.get('category')
             spec_data['equipment_id'] = equipment.equipment_id
 
+            # 根据类别选择模型并过滤有效字段
+            spec = None
             if category == '鱼竿':
-                spec = RodSpec(**spec_data)
+                valid_fields = {c.name for c in RodSpec.__table__.columns}
+                filtered_data = {k: v for k, v in spec_data.items() if k in valid_fields and v is not None}
+                spec = RodSpec(**filtered_data)
             elif category == '渔轮':
-                spec = ReelSpec(**spec_data)
+                valid_fields = {c.name for c in ReelSpec.__table__.columns}
+                filtered_data = {k: v for k, v in spec_data.items() if k in valid_fields and v is not None}
+                spec = ReelSpec(**filtered_data)
             elif category == '鱼线':
-                spec = LineSpec(**spec_data)
+                valid_fields = {c.name for c in LineSpec.__table__.columns}
+                filtered_data = {k: v for k, v in spec_data.items() if k in valid_fields and v is not None}
+                spec = LineSpec(**filtered_data)
             elif category == '拟饵':
-                spec = LureSpec(**spec_data)
-            else:
-                spec = None
+                valid_fields = {c.name for c in LureSpec.__table__.columns}
+                filtered_data = {k: v for k, v in spec_data.items() if k in valid_fields and v is not None}
+                spec = LureSpec(**filtered_data)
 
             if spec:
                 self.session.add(spec)

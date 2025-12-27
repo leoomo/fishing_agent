@@ -74,8 +74,8 @@ async def create_equipment(
                     detail=f"品牌不存在: brand_id={equipment_data.brand_id}"
                 )
 
-            # 准备装备数据
-            equipment_dict = equipment_data.model_dump(exclude={'specs'})
+            # 准备装备数据（排除非模型字段）
+            equipment_dict = equipment_data.model_dump(exclude={'specs', 'price_currency'})
             spec_dict = equipment_data.specs.model_dump() if equipment_data.specs else None
 
             # 创建装备（包含规格）
@@ -293,33 +293,38 @@ async def get_equipment(equipment_id: int):
                     "lure_weight_min": equipment.rod_spec.lure_weight_min,
                     "lure_weight_max": equipment.rod_spec.lure_weight_max,
                     "sections": equipment.rod_spec.sections,
-                    "closed_length": equipment.rod_spec.closed_length,
-                    "weight": equipment.rod_spec.weight
+                    "weight": equipment.rod_spec.weight,
+                    "line_weight_min": equipment.rod_spec.line_weight_min,
+                    "line_weight_max": equipment.rod_spec.line_weight_max,
+                    "handle_length": equipment.rod_spec.handle_length,
                 }
             elif equipment.category == "渔轮" and equipment.reel_spec:
                 specs = {
+                    "reel_type": equipment.reel_spec.reel_type,
                     "gear_ratio": equipment.reel_spec.gear_ratio,
                     "bearings": equipment.reel_spec.bearings,
                     "max_drag": equipment.reel_spec.max_drag,
                     "line_capacity": equipment.reel_spec.line_capacity,
                     "weight": equipment.reel_spec.weight,
-                    "spool_type": equipment.reel_spec.spool_type
+                    "retrieve_per_turn": equipment.reel_spec.retrieve_per_turn,
                 }
             elif equipment.category == "鱼线" and equipment.line_spec:
                 specs = {
                     "line_type": equipment.line_spec.line_type,
                     "diameter": equipment.line_spec.diameter,
-                    "breaking_strength": equipment.line_spec.breaking_strength,
-                    "length": equipment.line_spec.length,
-                    "material": equipment.line_spec.material
+                    "strength_lb": equipment.line_spec.strength_lb,
+                    "length_m": equipment.line_spec.length_m,
+                    "color": equipment.line_spec.color,
+                    "material": equipment.line_spec.material,
                 }
             elif equipment.category == "拟饵" and equipment.lure_spec:
                 specs = {
                     "lure_type": equipment.lure_spec.lure_type,
                     "weight": equipment.lure_spec.weight,
                     "length": equipment.lure_spec.length,
-                    "diving_depth": equipment.lure_spec.diving_depth,
-                    "action_type": equipment.lure_spec.action_type
+                    "diving_depth_min": equipment.lure_spec.diving_depth_min,
+                    "diving_depth_max": equipment.lure_spec.diving_depth_max,
+                    "color": equipment.lure_spec.color,
                 }
 
             return EquipmentResponse(
