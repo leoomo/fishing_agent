@@ -15,9 +15,15 @@ import type {
   ReviewTaskFilters,
   ReviewAction,
   WorkflowTab,
+  OCRProgressInfo,
+  WorkerLogItem,
+  WSConnectionStatus,
 } from '../../types/dataWorkflow'
 
 // ========== State 定义 ==========
+
+// 日志保留条数限制
+const MAX_LOG_ENTRIES = 100
 
 interface DataWorkflowState {
   // 统计数据
@@ -48,6 +54,12 @@ interface DataWorkflowState {
 
   // 通用
   activeTab: WorkflowTab
+
+  // ========== WebSocket 实时更新 ==========
+  wsConnected: WSConnectionStatus
+  taskProgress: Record<number, OCRProgressInfo>
+  workerLogs: WorkerLogItem[]
+  logsPanelCollapsed: boolean
 }
 
 const initialState: DataWorkflowState = {
@@ -74,6 +86,12 @@ const initialState: DataWorkflowState = {
   reviewAction: null,
 
   activeTab: 'ocr',
+
+  // WebSocket
+  wsConnected: 'disconnected',
+  taskProgress: {},
+  workerLogs: [],
+  logsPanelCollapsed: true,
 }
 
 // ========== Async Thunks ==========
@@ -231,6 +249,61 @@ const dataWorkflowSlice = createSlice({
       state.currentReviewTask = null
       state.reviewAction = null
     },
+
+    // ========== WebSocket 实时更新 ==========
+
+    // 设置 WebSocket 连接状态
+    setWsConnected: (state, action: PayloadAction<WSConnectionStatus>) => {
+      state.wsConnected = action.payload
+    },
+
+    // 直接更新统计数据（来自 WebSocket）
+    updateStats: (state, action: PayloadAction<WorkflowStats>) => {
+      state.stats = action.payload
+    },
+
+    // 直接更新 Worker 列表（来自 WebSocket）
+    updateWorkers: (state, action: PayloadAction<WorkerInfo[]>) => {
+      state.workers = action.payload
+    },
+
+    // 更新单个 OCR 任务状态
+    updateOCRTask: (state, action: PayloadAction<Partial<OCRTaskItem> & { pending_id: number }>) => {
+      const { pending_id, ...updates } = action.payload
+      const task = state.ocrTasks.find((t) => t.pending_id === pending_id)
+      if (task) {
+        Object.assign(task, updates)
+      }
+    },
+
+    // 更新任务进度
+    updateTaskProgress: (state, action: PayloadAction<OCRProgressInfo>) => {
+      state.taskProgress[action.payload.pending_id] = action.payload
+    },
+
+    // 清除任务进度（任务完成/失败时）
+    clearTaskProgress: (state, action: PayloadAction<number>) => {
+      delete state.taskProgress[action.payload]
+    },
+
+    // 追加 Worker 日志
+    appendWorkerLog: (state, action: PayloadAction<WorkerLogItem>) => {
+      state.workerLogs.push(action.payload)
+      // 限制日志条数
+      if (state.workerLogs.length > MAX_LOG_ENTRIES) {
+        state.workerLogs = state.workerLogs.slice(-MAX_LOG_ENTRIES)
+      }
+    },
+
+    // 清除所有日志
+    clearWorkerLogs: (state) => {
+      state.workerLogs = []
+    },
+
+    // 日志面板折叠状态
+    toggleLogsPanelCollapsed: (state) => {
+      state.logsPanelCollapsed = !state.logsPanelCollapsed
+    },
   },
   extraReducers: (builder) => {
     // 统计数据
@@ -366,6 +439,16 @@ export const {
   setReviewPage,
   showReviewModal,
   hideReviewModal,
+  // WebSocket 相关
+  setWsConnected,
+  updateStats,
+  updateWorkers,
+  updateOCRTask,
+  updateTaskProgress,
+  clearTaskProgress,
+  appendWorkerLog,
+  clearWorkerLogs,
+  toggleLogsPanelCollapsed,
 } = dataWorkflowSlice.actions
 
 // ========== Selectors ==========
@@ -392,5 +475,15 @@ export const selectReviewModalVisible = (state: RootState) => state.dataWorkflow
 export const selectReviewAction = (state: RootState) => state.dataWorkflow.reviewAction
 
 export const selectActiveTab = (state: RootState) => state.dataWorkflow.activeTab
+
+// WebSocket 相关
+export const selectWsConnected = (state: RootState) => state.dataWorkflow.wsConnected
+export const selectTaskProgress = (state: RootState) => state.dataWorkflow.taskProgress
+export const selectWorkerLogs = (state: RootState) => state.dataWorkflow.workerLogs
+export const selectLogsPanelCollapsed = (state: RootState) => state.dataWorkflow.logsPanelCollapsed
+
+// 获取单个任务的进度
+export const selectTaskProgressById = (pendingId: number) => (state: RootState) =>
+  state.dataWorkflow.taskProgress[pendingId]
 
 export default dataWorkflowSlice.reducer

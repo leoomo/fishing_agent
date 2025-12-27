@@ -191,3 +191,41 @@ class TaskImagesResponse(BaseModel):
     task_id: int
     images: List[ImageInfo] = []
     total: int = 0
+
+
+# ========== WebSocket 实时更新相关 ==========
+
+class OCRProgressReport(BaseModel):
+    """OCR 处理进度上报"""
+    pending_id: int = Field(..., description="任务 ID")
+    stage: str = Field(
+        ...,
+        description="处理阶段: downloading, merging, ocr_processing, extracting"
+    )
+    progress: int = Field(..., ge=0, le=100, description="进度百分比 (0-100)")
+    message: Optional[str] = Field(None, description="进度描述")
+    current_image: Optional[int] = Field(None, description="当前处理的图片索引")
+    total_images: Optional[int] = Field(None, description="总图片数")
+
+
+class WorkerLogSubmit(BaseModel):
+    """Worker 日志提交"""
+    level: str = Field(
+        default="info",
+        description="日志级别: debug, info, warning, error"
+    )
+    message: str = Field(..., description="日志内容")
+    pending_id: Optional[int] = Field(None, description="关联的任务 ID")
+
+
+class WorkflowWSEvent(BaseModel):
+    """WebSocket 事件"""
+    type: str = Field(
+        ...,
+        description="事件类型: init, stats_update, worker_update, task_claimed, "
+                    "ocr_started, ocr_progress, ocr_completed, ocr_failed, "
+                    "review_update, worker_log"
+    )
+    data: Any = Field(None, description="事件数据")
+    pending_id: Optional[int] = Field(None, description="关联的任务 ID")
+    timestamp: str = Field(..., description="事件时间戳 (ISO 格式)")

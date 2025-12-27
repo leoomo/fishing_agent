@@ -6,16 +6,21 @@
 
 import React, { useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Typography, Button, Card, Tabs, Space, Select, message } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { Typography, Button, Card, Tabs, Space, Select, message, Tag, Tooltip } from 'antd'
+import { ReloadOutlined, WifiOutlined, DisconnectOutlined } from '@ant-design/icons'
 import type { AppDispatch } from '../../store/store'
 import type { WorkflowTab, OCRStatus, ReviewStatus } from '../../types/dataWorkflow'
+import { WS_STATUS_CONFIG } from '../../types/dataWorkflow'
 
 // 组件
 import WorkflowPipeline from './components/WorkflowPipeline'
 import WorkerMonitorPanel from './components/WorkerMonitorPanel'
 import OCRTaskList from './components/OCRTaskList'
 import ReviewTaskList from './components/ReviewTaskList'
+import WorkerLogPanel from './components/WorkerLogPanel'
+
+// WebSocket Hook
+import { useWorkflowWebSocket } from '../../hooks/useWorkflowWebSocket'
 
 // Redux
 import {
@@ -56,6 +61,13 @@ import {
   selectReviewModalVisible,
   selectReviewAction,
   selectActiveTab,
+  // WebSocket 相关
+  selectWsConnected,
+  selectTaskProgress,
+  selectWorkerLogs,
+  selectLogsPanelCollapsed,
+  clearWorkerLogs,
+  toggleLogsPanelCollapsed,
 } from '../../store/slices/dataWorkflowSlice'
 
 const { Title } = Typography
@@ -90,6 +102,23 @@ const DataWorkflowPage: React.FC = () => {
 
   // Active Tab
   const activeTab = useSelector(selectActiveTab)
+
+  // WebSocket 相关
+  const wsConnected = useSelector(selectWsConnected)
+  const taskProgress = useSelector(selectTaskProgress)
+  const workerLogs = useSelector(selectWorkerLogs)
+  const logsPanelCollapsed = useSelector(selectLogsPanelCollapsed)
+
+  // 使用 WebSocket Hook
+  const { isConnected } = useWorkflowWebSocket({
+    autoConnect: true,
+    onConnected: () => {
+      console.log('工作流 WebSocket 已连接')
+    },
+    onDisconnected: () => {
+      console.log('工作流 WebSocket 已断开')
+    },
+  })
 
   // 初始化数据
   useEffect(() => {
@@ -282,6 +311,7 @@ const DataWorkflowPage: React.FC = () => {
               page={ocrFilters.page || 1}
               pageSize={ocrFilters.page_size || 20}
               selectedKeys={ocrSelectedKeys}
+              taskProgress={taskProgress}
               onPageChange={handleOCRPageChange}
               onSelectChange={(keys) => dispatch(setOCRSelectedKeys(keys))}
               onRetry={handleOCRRetry}
@@ -362,9 +392,20 @@ const DataWorkflowPage: React.FC = () => {
           alignItems: 'center',
         }}
       >
-        <Title level={4} style={{ margin: 0 }}>
-          数据处理工作流
-        </Title>
+        <Space>
+          <Title level={4} style={{ margin: 0 }}>
+            数据处理工作流
+          </Title>
+          {/* WebSocket 连接状态 */}
+          <Tooltip title={`实时更新: ${WS_STATUS_CONFIG[wsConnected].text}`}>
+            <Tag
+              color={WS_STATUS_CONFIG[wsConnected].color}
+              icon={wsConnected === 'connected' ? <WifiOutlined /> : <DisconnectOutlined />}
+            >
+              {WS_STATUS_CONFIG[wsConnected].text}
+            </Tag>
+          </Tooltip>
+        </Space>
         <Button
           icon={<ReloadOutlined />}
           onClick={handleRefresh}
@@ -396,6 +437,17 @@ const DataWorkflowPage: React.FC = () => {
 
       {/* 任务列表 Tabs */}
       <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems} />
+
+      {/* Worker 日志面板 */}
+      <div style={{ marginTop: 16 }}>
+        <WorkerLogPanel
+          logs={workerLogs}
+          collapsed={logsPanelCollapsed}
+          onToggleCollapse={() => dispatch(toggleLogsPanelCollapsed())}
+          onClear={() => dispatch(clearWorkerLogs())}
+          maxHeight={250}
+        />
+      </div>
     </div>
   )
 }

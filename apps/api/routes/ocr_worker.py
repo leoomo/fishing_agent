@@ -43,6 +43,8 @@ from apps.api.schemas.ocr_worker import (
 
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
+from apps.api.schemas.data_workflow import OCRProgressReport, WorkerLogSubmit
+from apps.api.services.workflow_ws_manager import get_workflow_ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +178,26 @@ async def claim_ocr_tasks(
             f"{[t.pending_id for t in claimed_tasks]}"
         )
 
+        # 广播任务领取事件
+        ws_manager = get_workflow_ws_manager()
+        for task in claimed_tasks:
+            import asyncio
+            asyncio.create_task(ws_manager.broadcast_task_event(
+                task.pending_id,
+                "task_claimed",
+                {
+                    "pending_id": task.pending_id,
+                    "worker_id": worker_id,
+                    "brand_name": task.brand_name,
+                    "product_name": task.product_name,
+                }
+            ))
+
+        # 广播统计更新
+        from apps.api.routes.data_workflow import broadcast_stats_update
+        import asyncio
+        asyncio.create_task(broadcast_stats_update())
+
         return OCRTaskClaimResponse(
             success=True,
             tasks=claimed_tasks,
@@ -245,6 +267,28 @@ async def report_ocr_result(
             f"OCR Worker {worker_id} 汇报任务 {report.pending_id}: "
             f"status={report.status}, message={message}"
         )
+
+        # 广播处理结果事件
+        ws_manager = get_workflow_ws_manager()
+        event_type = "ocr_completed" if report.status == "success" else "ocr_failed"
+        import asyncio
+        asyncio.create_task(ws_manager.broadcast_task_event(
+            report.pending_id,
+            event_type,
+            {
+                "pending_id": report.pending_id,
+                "worker_id": worker_id,
+                "status": report.status,
+                "ocr_status": item.ocr_status,
+                "processing_time_ms": report.processing_time_ms,
+                "error_message": report.error_message if report.status == "failed" else None,
+                "retry_count": item.ocr_retry_count,
+            }
+        ))
+
+        # 广播统计更新
+        from apps.api.routes.data_workflow import broadcast_stats_update
+        asyncio.create_task(broadcast_stats_update())
 
         return OCRTaskReportResponse(success=True, message=message)
 
@@ -693,3 +737,66 @@ async def delete_ocr_task(
             message="任务已删除",
             pending_id=pending_id
         )
+
+
+# ========== 实时进度和日志上报 ==========
+
+@router.post(
+    "/progress",
+    summary="上报 OCR 处理进度",
+    description="Worker 上报当前任务的处理进度（阶段和百分比）"
+)
+async def report_ocr_progress(
+    progress: OCRProgressReport,
+    worker_id: str = Depends(verify_ocr_worker_token)
+):
+    """
+    Worker 上报 OCR 处理进度
+
+    阶段说明：
+    - downloading: 下载图片
+    - merging: 合并图片
+    - ocr_processing: OCR 识别
+    - extracting: 提取数据
+    """
+    ws_manager = get_workflow_ws_manager()
+
+    # 广播进度事件
+    await ws_manager.broadcast_task_event(
+        progress.pending_id,
+        "ocr_progress",
+        {
+            "pending_id": progress.pending_id,
+            "worker_id": worker_id,
+            "stage": progress.stage,
+            "progress": progress.progress,
+            "message": progress.message,
+            "current_image": progress.current_image,
+            "total_images": progress.total_images,
+        }
+    )
+
+    return {"success": True, "message": "进度已更新"}
+
+
+@router.post(
+    "/log",
+    summary="提交 Worker 日志",
+    description="Worker 提交处理过程中的日志信息"
+)
+async def submit_worker_log(
+    log: WorkerLogSubmit,
+    worker_id: str = Depends(verify_ocr_worker_token)
+):
+    """Worker 提交处理日志"""
+    ws_manager = get_workflow_ws_manager()
+
+    # 广播日志事件
+    await ws_manager.broadcast_log(
+        worker_id=worker_id,
+        level=log.level,
+        message=log.message,
+        pending_id=log.pending_id,
+    )
+
+    return {"success": True, "message": "日志已提交"}
