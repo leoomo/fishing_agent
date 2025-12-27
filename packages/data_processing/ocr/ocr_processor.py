@@ -347,17 +347,23 @@ class OCRMergeProcessor:
         Returns:
             List[ProcessedImage]: 处理结果列表
         """
+        import time
+
         results = []
         total = len(image_files)
+        step_start = time.time()
+        cumulative_time = 0
 
         for i, image_path in enumerate(image_files):
-            # 始终显示进度（每10张或最后一张）
-            if (i + 1) % 10 == 0 or i == 0 or i == total - 1:
-                logger.info(f"  文字检测进度: [{i+1}/{total}] {Path(image_path).name}")
-            elif self.verbose:
-                logger.info(f"处理 {i+1}/{total}: {Path(image_path).name}")
+            # 先输出开始处理的信息（第一张会触发 PaddleOCR 初始化，比较慢）
+            if i == 0:
+                logger.info(f"  处理第1张图片（首次会初始化 OCR 模型，请稍候）...")
 
+            img_start = time.time()
             result = self.crop_single_image(image_path)
+            img_elapsed = time.time() - img_start
+            cumulative_time += img_elapsed
+
             results.append(result)
 
             # 更新统计
@@ -368,6 +374,20 @@ class OCRMergeProcessor:
                 self.stats["cropped_total_height"] += result.cropped_size[1]
             else:
                 self.stats["images_without_text"] += 1
+
+            # 显示进度（每5张或首尾）
+            if (i + 1) % 5 == 0 or i == 0 or i == total - 1:
+                avg_time = cumulative_time / (i + 1)
+                remaining = avg_time * (total - i - 1)
+                status = "有文字" if result.has_text else "无文字"
+                logger.info(
+                    f"  文字检测: [{i+1}/{total}] {Path(image_path).name} "
+                    f"({img_elapsed:.1f}s, {status}) "
+                    f"[预计剩余: {remaining:.0f}s]"
+                )
+
+        total_elapsed = time.time() - step_start
+        logger.info(f"  文字检测完成: {total}张, 总耗时: {total_elapsed:.1f}s, 平均: {total_elapsed/total:.2f}s/张")
 
         return results
 
@@ -847,11 +867,14 @@ class OCRMergeProcessor:
         """
         import time
         start_time = time.time()
+        step_times = {}
 
         try:
             # 1. 扫描图片
+            step_start = time.time()
             logger.info("Step 1: 扫描图片...")
             image_files = self.scan_images()
+            step_times["scan"] = time.time() - step_start
             if not image_files:
                 return ProcessingResult(
                     success=False,
@@ -859,8 +882,10 @@ class OCRMergeProcessor:
                 )
 
             # 2. 裁剪所有图片
+            step_start = time.time()
             logger.info("Step 2: 检测文字区域并裁剪...")
             processed_images = self.crop_all_images(image_files)
+            step_times["crop"] = time.time() - step_start
 
             # 检查是否有成功处理的图片
             successful_crops = [r for r in processed_images if r.cropped_path]
@@ -872,8 +897,10 @@ class OCRMergeProcessor:
                 )
 
             # 3. 智能合并图片
+            step_start = time.time()
             logger.info("Step 3: 智能合并图片...")
             output_files = self.merge_cropped_images(processed_images)
+            step_times["merge"] = time.time() - step_start
             if not output_files:
                 return ProcessingResult(
                     success=False,
@@ -883,6 +910,7 @@ class OCRMergeProcessor:
 
             # 4. 可选：分割超过阈值的文件
             if self.enable_split:
+                step_start = time.time()
                 logger.info("Step 4: 检查并分割超大文件...")
                 final_output_files = []
 
@@ -891,7 +919,7 @@ class OCRMergeProcessor:
                     try:
                         with Image.open(output_file) as img:
                             if img.height > self.max_segment_height:
-                                logger.info(f"分割 {Path(output_file).name} ({img.height}px > {self.max_segment_height}px)")
+                                logger.info(f"  分割 {Path(output_file).name} ({img.height}px > {self.max_segment_height}px)")
                                 split_files = self.split_merged_image(output_file)
                                 final_output_files.extend(split_files)
                             else:
@@ -901,20 +929,30 @@ class OCRMergeProcessor:
                         final_output_files.append(output_file)
 
                 output_files = final_output_files
+                step_times["split"] = time.time() - step_start
 
             # 5. 清理临时文件
+            step_start = time.time()
             logger.info("Step 5: 清理临时文件...")
             self.cleanup_temp_files(processed_images)
+            step_times["cleanup"] = time.time() - step_start
 
             # 6. 更新统计
+            total_time = time.time() - start_time
             self.stats["output_count"] = len(output_files)
-            self.stats["processing_time_ms"] = int((time.time() - start_time) * 1000)
+            self.stats["processing_time_ms"] = int(total_time * 1000)
 
             # 7. 生成元数据
             metadata = self.generate_metadata(image_files, processed_images, output_files)
             metadata_path = self.save_metadata(metadata)
 
+            # 输出耗时统计
             logger.info("处理完成!")
+            logger.info(f"耗时统计: 扫描={step_times.get('scan', 0):.1f}s, "
+                       f"裁剪={step_times.get('crop', 0):.1f}s, "
+                       f"合并={step_times.get('merge', 0):.1f}s, "
+                       f"分割={step_times.get('split', 0):.1f}s, "
+                       f"总计={total_time:.1f}s")
             logger.info(f"统计: {self.stats}")
 
             return ProcessingResult(

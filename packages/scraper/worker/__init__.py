@@ -8,7 +8,7 @@ from .client import WorkerClient
 from .worker import CrawlerWorker, WorkerConfig
 from .api_client import ApiWorkerClient
 from .api_worker import ApiWorker, TaobaoWorker
-from .ocr_worker import OCRWorker, OCRWorkerClient
+from .ocr_worker import OCRWorker
 
 __all__ = [
     "WorkerClient",
@@ -18,5 +18,4 @@ __all__ = [
     "ApiWorker",
     "TaobaoWorker",
     "OCRWorker",
-    "OCRWorkerClient",
 ]

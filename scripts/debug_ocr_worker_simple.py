@@ -29,22 +29,22 @@ from packages.scraper.worker.ocr_worker import OCRWorker
 
 SERVER_URL = "http://localhost:8000"
 WORKER_ID = "debug-ocr-worker"
-OCR_PROVIDER = "ollama"  # ollama 或 siliconflow
+OCR_PROVIDER = "ollama"  # ollama, siliconflow, baidu
 POLL_INTERVAL = 5  # 轮询间隔 (秒)
-HEARTBEAT_INTERVAL = 30  # 心跳间隔 (秒)
+HEARTBEAT_EVERY = 6  # 每 N 次轮询发送心跳 (6*5=30秒)
 CACHE_DIR = "/tmp/ocr_worker_cache"
 
 
 def main():
     """调试入口"""
     print("=" * 50)
-    print("  OCR Worker Debug 模式")
+    print("  OCR Worker Debug 模式 (单线程同步)")
     print("=" * 50)
     print(f"  服务器: {SERVER_URL}")
     print(f"  Worker ID: {WORKER_ID}")
     print(f"  OCR 提供商: {OCR_PROVIDER}")
     print(f"  轮询间隔: {POLL_INTERVAL}s")
-    print(f"  心跳间隔: {HEARTBEAT_INTERVAL}s")
+    print(f"  心跳: 每 {HEARTBEAT_EVERY} 次轮询")
     print("=" * 50)
     print()
 
@@ -54,7 +54,7 @@ def main():
         worker_id=WORKER_ID,
         ocr_provider=OCR_PROVIDER,
         poll_interval=POLL_INTERVAL,
-        heartbeat_interval=HEARTBEAT_INTERVAL,
+        heartbeat_every=HEARTBEAT_EVERY,
         cache_dir=CACHE_DIR,
     )
 

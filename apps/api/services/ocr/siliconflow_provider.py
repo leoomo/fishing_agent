@@ -336,24 +336,10 @@ class SiliconFlowProvider(BaseOCRProvider):
                 shutil.copy2(path, source_dir / f"{i+1}.jpg")
 
             # 使用 OCRMergeProcessor 处理
+            # 注意：使用默认参数即可，已在 OCRMergeProcessor 中优化
             processor = OCRMergeProcessor(
                 source_dir=str(source_dir),
                 output_dir=output_dir,
-                # 裁剪参数
-                padding=15,
-                min_text_area=100,
-                # 合并参数
-                quality=95,
-                spacing=0,
-                # 分割参数（如果合并后还是太大）
-                enable_split=True,
-                min_segment_height=300,
-                max_segment_height=4000,
-                # 其他参数
-                keep_empty_images=False,
-                skip_pure_images=True,
-                skip_sparse_regions=True,
-                min_chars_per_region=5,
                 verbose=False
             )
 

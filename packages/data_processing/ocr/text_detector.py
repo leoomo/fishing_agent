@@ -43,6 +43,10 @@ def _get_ocr_instance(with_rec: bool = False):
     """
     global _ocr_instance
 
+    # 保存当前的日志级别（PaddleOCR 会修改全局日志配置）
+    root_logger = logging.getLogger()
+    original_level = root_logger.level
+
     # 如果需要识别功能，创建新实例
     if with_rec:
         from paddleocr import PaddleOCR
@@ -55,6 +59,8 @@ def _get_ocr_instance(with_rec: bool = False):
             rec=True,  # 启用识别
             cls=False
         )
+        # 恢复日志级别
+        root_logger.setLevel(original_level)
         logger.info("PaddleOCR 检测+识别模型已加载")
         return ocr
 
@@ -70,6 +76,8 @@ def _get_ocr_instance(with_rec: bool = False):
             rec=False,
             cls=False
         )
+        # 恢复日志级别
+        root_logger.setLevel(original_level)
         logger.info("PaddleOCR 检测模型已加载")
     return _ocr_instance
 
