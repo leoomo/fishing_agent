@@ -54,17 +54,16 @@ class UserEquipmentResponse(BaseModel):
 
 class FishingLogResponse(BaseModel):
     """钓鱼记录响应"""
-    log_id: int
+    id: int  # 使用 id 而非 log_id
     user_id: int
-    fishing_date: str
-    location: str
+    date: str  # 使用 date 而非 fishing_date
+    location: Optional[str] = None
     weather_condition: Optional[str] = None
     temperature: Optional[float] = None
-    fish_species: Optional[str] = None
-    fish_count: Optional[int] = None
-    fish_total_weight: Optional[float] = None
+    fish_caught: Optional[str] = None  # 使用 fish_caught 而非 fish_species
+    total_count: Optional[int] = None  # 使用 total_count 而非 fish_count
+    total_weight: Optional[float] = None  # 使用 total_weight 而非 fish_total_weight
     equipment_used: Optional[str] = None
-    lure_used: Optional[str] = None
     notes: Optional[str] = None
     created_at: str
 
