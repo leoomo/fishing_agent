@@ -421,6 +421,19 @@ class OCRMergeProcessor:
         if not (current.has_text and next_img.has_text):
             return False
 
+        # 检查宽度差异：如果宽度差异超过20%，不合并
+        current_width = current.original_size[0]
+        next_width = next_img.original_size[0]
+        if current_width > 0 and next_width > 0:
+            width_ratio = min(current_width, next_width) / max(current_width, next_width)
+            if width_ratio < 0.8:  # 宽度差异超过20%
+                if self.verbose:
+                    logger.info(
+                        f"图片 {index + 1}({current_width}px) 与图片 {index + 2}({next_width}px) "
+                        f"宽度差异过大 ({width_ratio:.1%})，不合并"
+                    )
+                return False
+
         # 检测当前图片底部是否有文字
         current_has_bottom_text = self._detect_text_at_edge(
             current.original_path if not current.cropped_path else current.cropped_path,
