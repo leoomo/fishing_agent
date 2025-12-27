@@ -143,9 +143,9 @@ async def get_user(user_id: int):
                 phone=user.phone,
                 user_level=user.user_level,
                 fishing_experience_years=user.fishing_experience_years,
-                favorite_fish_species=user.favorite_fish_species,
-                preferred_fishing_method=user.preferred_fishing_method,
-                location=user.location,
+                favorite_fish_species=user.preferred_fish,
+                preferred_fishing_method=user.preferred_scenarios,
+                location=None,  # users 表没有 location 字段
                 created_at=user.created_at.isoformat(),
                 updated_at=user.updated_at.isoformat()
             )
@@ -276,7 +276,7 @@ async def get_user_fishing_logs(
             logs = (
                 session.query(FishingLog)
                 .filter(FishingLog.user_id == user_id)
-                .order_by(FishingLog.fishing_date.desc())
+                .order_by(FishingLog.date.desc())
                 .offset(offset)
                 .limit(limit)
                 .all()
@@ -286,17 +286,16 @@ async def get_user_fishing_logs(
             responses = []
             for log in logs:
                 responses.append(FishingLogResponse(
-                    log_id=log.log_id,
+                    id=log.id,
                     user_id=log.user_id,
-                    fishing_date=log.fishing_date.isoformat(),
+                    date=log.date.isoformat() if log.date else "",
                     location=log.location,
                     weather_condition=log.weather_condition,
                     temperature=log.temperature,
-                    fish_species=log.fish_species,
-                    fish_count=log.fish_count,
-                    fish_total_weight=log.fish_total_weight,
+                    fish_caught=log.fish_caught,
+                    total_count=log.total_count,
+                    total_weight=log.total_weight,
                     equipment_used=log.equipment_used,
-                    lure_used=log.lure_used,
                     notes=log.notes,
                     created_at=log.created_at.isoformat()
                 ))
