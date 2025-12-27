@@ -230,6 +230,70 @@ class OCRWorker:
             logger.debug(f"心跳失败: {e}")
             return False
 
+    def _report_progress(
+        self,
+        pending_id: int,
+        stage: str,
+        progress: int,
+        message: Optional[str] = None,
+        current_image: Optional[int] = None,
+        total_images: Optional[int] = None,
+    ):
+        """
+        上报处理进度到服务端（用于 WebSocket 实时推送）
+
+        Args:
+            pending_id: 任务 ID
+            stage: 处理阶段 (downloading/merging/ocr_processing/extracting)
+            progress: 进度百分比 (0-100)
+            message: 进度消息
+            current_image: 当前处理的图片序号
+            total_images: 总图片数
+        """
+        try:
+            self._request(
+                "POST", "/progress",
+                json={
+                    "pending_id": pending_id,
+                    "stage": stage,
+                    "progress": progress,
+                    "message": message,
+                    "current_image": current_image,
+                    "total_images": total_images,
+                },
+                timeout=5,  # 进度上报使用较短超时
+            )
+        except Exception as e:
+            # 进度上报失败不影响主流程
+            logger.debug(f"进度上报失败: {e}")
+
+    def _report_log(
+        self,
+        level: str,
+        message: str,
+        pending_id: Optional[int] = None,
+    ):
+        """
+        上报日志到服务端（用于 WebSocket 实时推送）
+
+        Args:
+            level: 日志级别 (debug/info/warning/error)
+            message: 日志内容
+            pending_id: 关联的任务 ID (可选)
+        """
+        try:
+            self._request(
+                "POST", "/log",
+                json={
+                    "level": level,
+                    "message": message,
+                    "pending_id": pending_id,
+                },
+                timeout=5,
+            )
+        except Exception as e:
+            logger.debug(f"日志上报失败: {e}")
+
     def download_images(self, pending_id: int, output_dir: Path) -> List[Path]:
         """下载任务图片"""
         import re
@@ -286,15 +350,43 @@ class OCRWorker:
 
         logger.info(f"[任务 {pending_id}] 开始处理: brand={brand_name}, images={images_count}")
 
+        # 上报日志：开始处理
+        self._report_log("info", f"开始处理任务: {brand_name}", pending_id)
+
         task_cache_dir = self.cache_dir / str(pending_id)
 
         try:
-            # 1. 下载图片
+            # ========== 阶段1: 下载图片 ==========
+            self._report_progress(
+                pending_id, "downloading", 0,
+                "开始下载图片...", total_images=images_count
+            )
+
             image_files = self.download_images(pending_id, task_cache_dir)
             if not image_files:
                 raise Exception("下载图片失败")
 
-            # 2. OCR 识别
+            # 下载完成
+            self._report_progress(
+                pending_id, "downloading", 25,
+                f"下载完成: {len(image_files)}张图片",
+                current_image=len(image_files),
+                total_images=len(image_files)
+            )
+
+            # ========== 阶段2: 合并图片 ==========
+            self._report_progress(
+                pending_id, "merging", 30,
+                "合并图片中..."
+            )
+
+            # ========== 阶段3: OCR 识别 ==========
+            self._report_progress(
+                pending_id, "ocr_processing", 50,
+                "OCR 识别中..."
+            )
+            self._report_log("info", "开始 OCR 识别", pending_id)
+
             logger.info(f"[任务 {pending_id}] 开始 OCR...")
             ocr_start = time.time()
             provider = self._get_ocr_provider()
@@ -305,6 +397,19 @@ class OCRWorker:
                 raise Exception(result.get("error", "OCR 失败"))
 
             ocr_text = result.get("markdown", "")
+
+            # OCR 完成
+            self._report_progress(
+                pending_id, "ocr_processing", 75,
+                f"OCR 完成: {len(ocr_text)}字符"
+            )
+
+            # ========== 阶段4: 数据提取 ==========
+            self._report_progress(
+                pending_id, "extracting", 85,
+                "提取数据中..."
+            )
+
             total_time = int((time.time() - start_time) * 1000)
 
             logger.info(
@@ -312,7 +417,14 @@ class OCRWorker:
                 f"耗时={total_time}ms (OCR={ocr_time}ms)"
             )
 
-            # 3. 汇报成功
+            # 完成
+            self._report_progress(
+                pending_id, "extracting", 100,
+                "处理完成"
+            )
+            self._report_log("info", f"处理完成: {len(ocr_text)}字符, 耗时{total_time}ms", pending_id)
+
+            # 汇报成功
             self.report_result(
                 pending_id=pending_id,
                 status="success",
@@ -328,6 +440,9 @@ class OCRWorker:
         except Exception as e:
             total_time = int((time.time() - start_time) * 1000)
             logger.error(f"[任务 {pending_id}] 处理失败: {e}")
+
+            # 上报错误日志
+            self._report_log("error", f"处理失败: {e}", pending_id)
 
             self.report_result(
                 pending_id=pending_id,

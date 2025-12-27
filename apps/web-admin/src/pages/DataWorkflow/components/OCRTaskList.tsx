@@ -25,8 +25,9 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import type { OCRTaskItem, OCRStatus } from '../../../types/dataWorkflow'
+import type { OCRTaskItem, OCRStatus, OCRProgressInfo } from '../../../types/dataWorkflow'
 import { OCR_STATUS_CONFIG, OCR_PRIORITY_OPTIONS } from '../../../types/dataWorkflow'
+import OCRProgressBar from './OCRProgressBar'
 
 const { Text } = Typography
 
@@ -37,6 +38,8 @@ interface OCRTaskListProps {
   page: number
   pageSize: number
   selectedKeys: number[]
+  /** 任务进度信息（按 pending_id 索引） */
+  taskProgress?: Record<number, OCRProgressInfo>
   onPageChange: (page: number, pageSize: number) => void
   onSelectChange: (keys: number[]) => void
   onRetry: (pendingId: number) => void
@@ -61,6 +64,7 @@ const OCRTaskList: React.FC<OCRTaskListProps> = ({
   page,
   pageSize,
   selectedKeys,
+  taskProgress = {},
   onPageChange,
   onSelectChange,
   onRetry,
@@ -77,31 +81,46 @@ const OCRTaskList: React.FC<OCRTaskListProps> = ({
   }
 
   // 可展开行内容
-  const expandedRowRender = (record: OCRTaskItem) => (
-    <Descriptions size="small" column={4} style={{ marginBottom: 0 }}>
-      <Descriptions.Item label="任务ID">{record.pending_id}</Descriptions.Item>
-      <Descriptions.Item label="Worker">{record.ocr_worker_id || '-'}</Descriptions.Item>
-      <Descriptions.Item label="开始时间">
-        {record.ocr_started_at?.replace('T', ' ').substring(0, 19) || '-'}
-      </Descriptions.Item>
-      <Descriptions.Item label="处理耗时">
-        {formatTime(record.ocr_processing_time_ms)}
-      </Descriptions.Item>
-      <Descriptions.Item label="OCR提供商">{record.ocr_provider || '-'}</Descriptions.Item>
-      <Descriptions.Item label="重试次数">{record.ocr_retry_count}</Descriptions.Item>
-      <Descriptions.Item label="创建时间">
-        {record.created_at?.replace('T', ' ').substring(0, 19) || '-'}
-      </Descriptions.Item>
-      <Descriptions.Item label="图片数量">{record.images_count}</Descriptions.Item>
-      {record.ocr_error_message && (
-        <Descriptions.Item label="错误信息" span={4}>
-          <Text type="danger" style={{ fontSize: 12 }}>
-            {record.ocr_error_message}
-          </Text>
-        </Descriptions.Item>
-      )}
-    </Descriptions>
-  )
+  const expandedRowRender = (record: OCRTaskItem) => {
+    const progress = taskProgress[record.pending_id]
+    const showProgress = record.ocr_status === 'processing' && progress
+
+    return (
+      <div>
+        {/* 处理进度条 */}
+        {showProgress && (
+          <div style={{ marginBottom: 16 }}>
+            <OCRProgressBar progress={progress} showDetail />
+          </div>
+        )}
+
+        {/* 详细信息 */}
+        <Descriptions size="small" column={4} style={{ marginBottom: 0 }}>
+          <Descriptions.Item label="任务ID">{record.pending_id}</Descriptions.Item>
+          <Descriptions.Item label="Worker">{record.ocr_worker_id || '-'}</Descriptions.Item>
+          <Descriptions.Item label="开始时间">
+            {record.ocr_started_at?.replace('T', ' ').substring(0, 19) || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="处理耗时">
+            {formatTime(record.ocr_processing_time_ms)}
+          </Descriptions.Item>
+          <Descriptions.Item label="OCR提供商">{record.ocr_provider || '-'}</Descriptions.Item>
+          <Descriptions.Item label="重试次数">{record.ocr_retry_count}</Descriptions.Item>
+          <Descriptions.Item label="创建时间">
+            {record.created_at?.replace('T', ' ').substring(0, 19) || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="图片数量">{record.images_count}</Descriptions.Item>
+          {record.ocr_error_message && (
+            <Descriptions.Item label="错误信息" span={4}>
+              <Text type="danger" style={{ fontSize: 12 }}>
+                {record.ocr_error_message}
+              </Text>
+            </Descriptions.Item>
+          )}
+        </Descriptions>
+      </div>
+    )
+  }
 
   // 表格列定义
   const columns: ColumnsType<OCRTaskItem> = [
@@ -126,9 +145,20 @@ const OCRTaskList: React.FC<OCRTaskListProps> = ({
       title: '状态',
       dataIndex: 'ocr_status',
       key: 'ocr_status',
-      width: 100,
-      render: (status: OCRStatus) => {
+      width: 180,
+      render: (status: OCRStatus, record: OCRTaskItem) => {
         const config = OCR_STATUS_CONFIG[status]
+        const progress = taskProgress[record.pending_id]
+
+        // 处理中状态显示进度条
+        if (status === 'processing' && progress) {
+          return (
+            <div style={{ minWidth: 150 }}>
+              <OCRProgressBar progress={progress} compact />
+            </div>
+          )
+        }
+
         return (
           <Tag color={config.color} icon={STATUS_ICONS[status]}>
             {config.text}

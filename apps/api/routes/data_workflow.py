@@ -12,7 +12,7 @@ from typing import Optional
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi import APIRouter, HTTPException, Depends, Query, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from sqlalchemy import func, and_, or_
 
@@ -33,7 +33,10 @@ from apps.api.schemas.data_workflow import (
     ExtractedDataUpdate,
     ImageInfo,
     TaskImagesResponse,
+    OCRProgressReport,
+    WorkerLogSubmit,
 )
+from apps.api.services.workflow_ws_manager import get_workflow_ws_manager
 
 # 图片存储基础路径
 IMAGES_BASE_PATH = Path(__file__).parents[3] / "shared" / "images"
@@ -958,3 +961,270 @@ async def get_image(
         media_type=media_type,
         filename=image_path.name
     )
+
+
+# ========== WebSocket 实时更新 ==========
+
+async def get_current_stats() -> dict:
+    """获取当前工作流统计数据（用于 WebSocket 初始状态）"""
+    with get_db_session() as session:
+        # OCR 状态统计
+        ocr_stats = session.query(
+            PendingEquipment.ocr_status,
+            func.count(PendingEquipment.id)
+        ).group_by(PendingEquipment.ocr_status).all()
+
+        ocr_status_map = {status: count for status, count in ocr_stats}
+
+        # 审核状态统计
+        review_stats = session.query(
+            PendingEquipment.status,
+            func.count(PendingEquipment.id)
+        ).filter(
+            PendingEquipment.ocr_status == "completed"
+        ).group_by(PendingEquipment.status).all()
+
+        review_status_map = {status: count for status, count in review_stats}
+
+        # 今日处理量
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_processed = session.query(func.count(PendingEquipment.id)).filter(
+            PendingEquipment.ocr_completed_at >= today_start,
+            PendingEquipment.ocr_status == "completed"
+        ).scalar() or 0
+
+        # 平均处理时间
+        avg_time_result = session.query(
+            func.avg(PendingEquipment.ocr_processing_time_ms)
+        ).filter(
+            PendingEquipment.ocr_status == "completed",
+            PendingEquipment.ocr_processing_time_ms.isnot(None)
+        ).scalar()
+        avg_processing_time_ms = int(avg_time_result) if avg_time_result else 0
+
+        # 成功率
+        total_finished = (
+            ocr_status_map.get("completed", 0) +
+            ocr_status_map.get("failed", 0)
+        )
+        success_rate = (
+            ocr_status_map.get("completed", 0) / total_finished
+            if total_finished > 0 else 0.0
+        )
+
+        return {
+            "crawl_pending": 0,
+            "ocr_pending": ocr_status_map.get("pending", 0),
+            "ocr_processing": ocr_status_map.get("processing", 0),
+            "ocr_completed": ocr_status_map.get("completed", 0),
+            "ocr_failed": ocr_status_map.get("failed", 0),
+            "ocr_skipped": ocr_status_map.get("skipped", 0),
+            "review_pending": review_status_map.get("pending", 0),
+            "review_approved": review_status_map.get("approved", 0),
+            "review_rejected": review_status_map.get("rejected", 0),
+            "today_processed": today_processed,
+            "avg_processing_time_ms": avg_processing_time_ms,
+            "success_rate": round(success_rate, 3),
+        }
+
+
+async def get_current_workers() -> list[dict]:
+    """获取当前 Worker 状态（用于 WebSocket 初始状态）"""
+    workers = []
+    now = datetime.utcnow()
+    active_threshold = now - timedelta(minutes=5)
+
+    with get_db_session() as session:
+        for worker_id in OCR_WORKER_API_KEYS.keys():
+            # 查询当前正在处理的任务
+            current_task = session.query(PendingEquipment).filter(
+                PendingEquipment.ocr_worker_id == worker_id,
+                PendingEquipment.ocr_status == "processing"
+            ).first()
+
+            # 查询最近完成的任务
+            last_task = session.query(PendingEquipment).filter(
+                PendingEquipment.ocr_worker_id == worker_id
+            ).order_by(PendingEquipment.ocr_completed_at.desc()).first()
+
+            # 统计已完成任务数
+            tasks_completed = session.query(func.count(PendingEquipment.id)).filter(
+                PendingEquipment.ocr_worker_id == worker_id,
+                PendingEquipment.ocr_status == "completed"
+            ).scalar() or 0
+
+            # 判断是否活跃
+            last_heartbeat = None
+            if last_task and last_task.ocr_completed_at:
+                last_heartbeat = last_task.ocr_completed_at
+            elif current_task and current_task.ocr_started_at:
+                last_heartbeat = current_task.ocr_started_at
+
+            is_active = (
+                current_task is not None or
+                (last_heartbeat and last_heartbeat > active_threshold)
+            )
+
+            workers.append({
+                "id": worker_id,
+                "status": "active" if is_active else "inactive",
+                "current_task": current_task.id if current_task else None,
+                "last_heartbeat": last_heartbeat.isoformat() if last_heartbeat else None,
+                "ocr_provider": last_task.ocr_provider if last_task else None,
+                "tasks_completed": tasks_completed,
+            })
+
+    return workers
+
+
+@router.websocket("/ws/workflow")
+async def websocket_workflow_status(websocket: WebSocket):
+    """
+    工作流全局状态 WebSocket
+
+    功能：
+    - 连接时发送初始状态（stats, workers）
+    - 实时推送 stats/workers/tasks 更新
+
+    客户端消息：
+    - {"type": "ping"} -> 心跳响应
+    - {"type": "subscribe_task", "pending_id": 123} -> 订阅单任务进度
+    - {"type": "unsubscribe_task", "pending_id": 123} -> 取消订阅
+    - {"type": "subscribe_logs"} -> 订阅日志流
+    """
+    ws_manager = get_workflow_ws_manager()
+
+    try:
+        await ws_manager.connect_global(websocket)
+
+        # 发送初始状态
+        stats = await get_current_stats()
+        workers = await get_current_workers()
+        await ws_manager.send_init_state(websocket, stats=stats, workers=workers)
+
+        # 处理客户端消息
+        subscribed_tasks: set[int] = set()
+        subscribed_logs = False
+
+        while True:
+            try:
+                data = await websocket.receive_json()
+                msg_type = data.get("type")
+
+                if msg_type == "ping":
+                    await websocket.send_json({"type": "pong"})
+
+                elif msg_type == "subscribe_task":
+                    pending_id = data.get("pending_id")
+                    if pending_id:
+                        await ws_manager.subscribe_task(websocket, pending_id)
+                        subscribed_tasks.add(pending_id)
+                        await websocket.send_json({
+                            "type": "subscribed",
+                            "pending_id": pending_id
+                        })
+
+                elif msg_type == "unsubscribe_task":
+                    pending_id = data.get("pending_id")
+                    if pending_id:
+                        await ws_manager.unsubscribe_task(websocket, pending_id)
+                        subscribed_tasks.discard(pending_id)
+
+                elif msg_type == "subscribe_logs":
+                    if not subscribed_logs:
+                        await ws_manager.log_subscribers.add(websocket)
+                        subscribed_logs = True
+                        await websocket.send_json({"type": "logs_subscribed"})
+
+            except Exception as e:
+                logger.warning(f"处理 WebSocket 消息时出错: {e}")
+                break
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket 客户端断开连接")
+    except Exception as e:
+        logger.error(f"WebSocket 连接错误: {e}")
+    finally:
+        # 清理订阅
+        await ws_manager.disconnect_global(websocket)
+        for task_id in subscribed_tasks:
+            await ws_manager.unsubscribe_task(websocket, task_id)
+        if subscribed_logs:
+            ws_manager.log_subscribers.discard(websocket)
+
+
+@router.websocket("/ws/workflow/task/{pending_id}")
+async def websocket_task_progress(websocket: WebSocket, pending_id: int):
+    """
+    单任务 OCR 进度 WebSocket
+
+    专门用于监听单个任务的处理进度
+    """
+    ws_manager = get_workflow_ws_manager()
+
+    try:
+        await websocket.accept()
+        await ws_manager.subscribe_task(websocket, pending_id)
+
+        logger.info(f"客户端订阅任务 {pending_id} 进度")
+
+        while True:
+            try:
+                data = await websocket.receive_json()
+                if data.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except Exception:
+                break
+
+    except WebSocketDisconnect:
+        logger.info(f"任务 {pending_id} 进度订阅断开")
+    except Exception as e:
+        logger.error(f"任务进度 WebSocket 错误: {e}")
+    finally:
+        await ws_manager.unsubscribe_task(websocket, pending_id)
+
+
+@router.websocket("/ws/workflow/logs")
+async def websocket_worker_logs(websocket: WebSocket):
+    """
+    Worker 日志流 WebSocket
+
+    实时推送 Worker 处理日志
+    """
+    ws_manager = get_workflow_ws_manager()
+
+    try:
+        await ws_manager.connect_logs(websocket)
+
+        logger.info("客户端订阅日志流")
+
+        while True:
+            try:
+                data = await websocket.receive_json()
+                if data.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except Exception:
+                break
+
+    except WebSocketDisconnect:
+        logger.info("日志流订阅断开")
+    except Exception as e:
+        logger.error(f"日志流 WebSocket 错误: {e}")
+    finally:
+        await ws_manager.disconnect_logs(websocket)
+
+
+# ========== 广播辅助函数（供其他模块调用）==========
+
+async def broadcast_stats_update():
+    """广播统计数据更新"""
+    ws_manager = get_workflow_ws_manager()
+    stats = await get_current_stats()
+    await ws_manager.broadcast_stats(stats)
+
+
+async def broadcast_workers_update():
+    """广播 Worker 状态更新"""
+    ws_manager = get_workflow_ws_manager()
+    workers = await get_current_workers()
+    await ws_manager.broadcast_workers(workers)

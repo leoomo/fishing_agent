@@ -311,3 +311,134 @@ export interface TaskImagesResponse {
   images: ImageInfo[]
   total: number
 }
+
+// ========== WebSocket 实时更新相关 ==========
+
+/**
+ * WebSocket 事件类型
+ */
+export type WorkflowEventType =
+  | 'init'
+  | 'stats_update'
+  | 'worker_update'
+  | 'task_claimed'
+  | 'ocr_started'
+  | 'ocr_progress'
+  | 'ocr_completed'
+  | 'ocr_failed'
+  | 'review_update'
+  | 'worker_log'
+
+/**
+ * OCR 处理阶段
+ */
+export type OCRStage = 'downloading' | 'merging' | 'ocr_processing' | 'extracting'
+
+/**
+ * OCR 阶段配置
+ */
+export const OCR_STAGE_CONFIG: Record<OCRStage, { order: number; text: string; icon: string }> = {
+  downloading: { order: 0, text: '下载图片', icon: 'DownloadOutlined' },
+  merging: { order: 1, text: '合并图片', icon: 'MergeCellsOutlined' },
+  ocr_processing: { order: 2, text: 'OCR识别', icon: 'ScanOutlined' },
+  extracting: { order: 3, text: '数据提取', icon: 'FileSearchOutlined' },
+}
+
+/**
+ * OCR 进度信息
+ */
+export interface OCRProgressInfo {
+  pending_id: number
+  stage: OCRStage
+  progress: number // 0-100
+  message: string | null
+  current_image: number | null
+  total_images: number | null
+  timestamp: string
+}
+
+/**
+ * Worker 日志级别
+ */
+export type WorkerLogLevel = 'debug' | 'info' | 'warning' | 'error'
+
+/**
+ * Worker 日志项
+ */
+export interface WorkerLogItem {
+  timestamp: string
+  worker_id: string
+  level: WorkerLogLevel
+  message: string
+  pending_id: number | null
+}
+
+/**
+ * WebSocket 事件数据
+ */
+export interface WorkflowWSEvent<T = unknown> {
+  type: WorkflowEventType
+  data: T
+  pending_id?: number
+  timestamp: string
+}
+
+/**
+ * 初始化事件数据
+ */
+export interface WSInitData {
+  stats: WorkflowStats | null
+  workers: WorkerInfo[] | null
+}
+
+/**
+ * 任务领取事件数据
+ */
+export interface WSTaskClaimedData {
+  worker_id: string
+  ocr_provider: string | null
+}
+
+/**
+ * OCR 完成事件数据
+ */
+export interface WSOCRCompletedData {
+  success: boolean
+  processing_time_ms: number
+  ocr_text_length: number | null
+  extracted_count: number | null
+}
+
+/**
+ * OCR 失败事件数据
+ */
+export interface WSOCRFailedData {
+  error_code: string
+  error_message: string
+  retry_count: number
+}
+
+/**
+ * 日志级别颜色配置
+ */
+export const LOG_LEVEL_CONFIG: Record<WorkerLogLevel, { color: string; tag: string }> = {
+  debug: { color: '#8c8c8c', tag: 'DEBUG' },
+  info: { color: '#1890ff', tag: 'INFO' },
+  warning: { color: '#faad14', tag: 'WARN' },
+  error: { color: '#ff4d4f', tag: 'ERROR' },
+}
+
+/**
+ * WebSocket 连接状态
+ */
+export type WSConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+
+/**
+ * WebSocket 连接状态配置
+ */
+export const WS_STATUS_CONFIG: Record<WSConnectionStatus, { color: string; text: string }> = {
+  connecting: { color: 'processing', text: '连接中' },
+  connected: { color: 'success', text: '已连接' },
+  disconnected: { color: 'default', text: '已断开' },
+  error: { color: 'error', text: '连接错误' },
+}
