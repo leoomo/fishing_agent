@@ -232,6 +232,8 @@ class OCRWorker:
 
     def download_images(self, pending_id: int, output_dir: Path) -> List[Path]:
         """下载任务图片"""
+        import re
+
         try:
             response = self._request(
                 "GET", f"/images/{pending_id}",
@@ -253,6 +255,16 @@ class OCRWorker:
                 f for f in output_dir.rglob("*")
                 if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp"]
             ]
+
+            # 自然排序（确保 image_2 在 image_10 之前）
+            def natural_sort_key(path: Path) -> tuple:
+                numbers = re.findall(r'\d+', path.stem)
+                if numbers:
+                    # 使用最后一个数字作为排序键
+                    return (path.suffix.lower(), int(numbers[-1]))
+                return (path.suffix.lower(), path.name)
+
+            image_files.sort(key=natural_sort_key)
 
             total_size = sum(f.stat().st_size for f in image_files) / 1024 / 1024
             logger.info(f"[任务 {pending_id}] 下载完成: {len(image_files)}张, {total_size:.2f}MB")
