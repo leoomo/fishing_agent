@@ -11,6 +11,7 @@ import MainLayout from '@/components/Layout/MainLayout'
 const Login = lazy(() => import('@/pages/Login'))
 const EquipmentList = lazy(() => import('@/pages/Equipment/List'))
 const EquipmentForm = lazy(() => import('@/pages/Equipment/Form'))
+const EquipmentBatchCreate = lazy(() => import('@/pages/Equipment/BatchCreate'))
 const UserList = lazy(() => import('@/pages/Users/List'))
 const UserDetail = lazy(() => import('@/pages/Users/Detail'))
 const Analytics = lazy(() => import('@/pages/Analytics'))
@@ -72,6 +73,7 @@ const App = () => {
                 {/* Equipment Management */}
                 <Route path="equipment" element={<EquipmentList />} />
                 <Route path="equipment/create" element={<EquipmentForm />} />
+                <Route path="equipment/batch-create" element={<EquipmentBatchCreate />} />
                 <Route path="equipment/edit/:id" element={<EquipmentForm />} />
 
                 {/* User Management */}

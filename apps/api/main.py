@@ -217,6 +217,7 @@ from .routes.ocr import router as ocr_router
 from .routes.worker import router as worker_router
 from .routes.ocr_worker import router as ocr_worker_router
 from .routes.data_workflow import router as data_workflow_router
+from .routes.equipment_batch import router as equipment_batch_router
 from .middleware import install_api_logging_middleware
 
 # GZip 压缩中间件（响应大于 500 字节时压缩）
@@ -267,6 +268,9 @@ app.include_router(ocr_worker_router, prefix="/api/v1/ocr-worker", tags=["ocr-wo
 
 # 数据处理工作流 API 路由
 app.include_router(data_workflow_router, prefix="/api/v1/admin/workflow", tags=["workflow"])
+
+# 装备批量添加 API 路由
+app.include_router(equipment_batch_router, prefix="/api/v1/admin/equipment", tags=["equipment-batch"])
 
 
 @app.get("/")
