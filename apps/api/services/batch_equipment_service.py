@@ -208,9 +208,14 @@ class BatchEquipmentService:
         model = variant['model']
         product_line = template['product_line']
 
-        # 合并价格（变体覆盖模板）
+        # 合并字段（变体覆盖模板）
         price_min = variant.get('price_min') or template.get('price_min')
         price_max = variant.get('price_max') or template.get('price_max')
+        sections = variant.get('sections') or template.get('sections')
+        guide_type = variant.get('guide_type') or template.get('guide_type')
+        handle_type = variant.get('handle_type') or template.get('handle_type')
+        material = variant.get('material') or template.get('material')
+        features = variant.get('features') or template.get('features')
 
         # 构建装备数据
         equipment_data = {
@@ -221,7 +226,13 @@ class BatchEquipmentService:
             'price_min': price_min,
             'price_max': price_max,
             'description': template.get('description'),
-            'features': self._build_rod_features(template, variant),
+            'features': self._build_rod_features_v2(
+                sections=sections,
+                guide_type=guide_type,
+                handle_type=handle_type,
+                material=material,
+                features=features,
+            ),
             'user_level': template.get('user_level', '进阶'),
             'is_active': True,
             'source': 'batch_import',
@@ -234,7 +245,7 @@ class BatchEquipmentService:
             'action': variant.get('action', 'Fast'),
             'lure_weight_min': variant.get('lure_weight_min', 0),
             'lure_weight_max': variant.get('lure_weight_max', 0),
-            'sections': template.get('sections'),
+            'sections': sections,
             'closed_length': variant.get('closed_length'),
             'weight': variant.get('weight'),
         }
@@ -364,7 +375,7 @@ class BatchEquipmentService:
         template: Dict[str, Any],
         variant: Dict[str, Any]
     ) -> str:
-        """构建鱼竿特点描述"""
+        """构建鱼竿特点描述（旧版，保留兼容性）"""
         features = []
 
         if template.get('sections'):
@@ -383,6 +394,34 @@ class BatchEquipmentService:
             features.append(template['features'])
 
         return ', '.join(features) if features else ''
+
+    def _build_rod_features_v2(
+        self,
+        sections: Optional[int] = None,
+        guide_type: Optional[str] = None,
+        handle_type: Optional[str] = None,
+        material: Optional[str] = None,
+        features: Optional[str] = None,
+    ) -> str:
+        """构建鱼竿特点描述（新版，支持变体覆盖）"""
+        result = []
+
+        if sections:
+            result.append(f"{sections}节设计")
+
+        if guide_type:
+            result.append(guide_type)
+
+        if handle_type:
+            result.append(handle_type)
+
+        if material:
+            result.append(material)
+
+        if features:
+            result.append(features)
+
+        return ', '.join(result) if result else ''
 
     def _summarize_results(
         self,
