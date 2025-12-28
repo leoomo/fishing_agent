@@ -152,6 +152,14 @@ async def lifespan(app: FastAPI):
         init_db(create_tables=True)
         logger.info("数据库表创建完成")
 
+        # 初始化装备选项默认配置
+        try:
+            from apps.api.services.config_service import init_default_equipment_options
+            init_default_equipment_options()
+            logger.info("装备选项默认配置初始化完成")
+        except Exception as e:
+            logger.warning(f"装备选项配置初始化失败（可忽略）: {e}")
+
         # 配置 scraper 包的数据库连接（依赖注入）
         configure_database(get_db)
 

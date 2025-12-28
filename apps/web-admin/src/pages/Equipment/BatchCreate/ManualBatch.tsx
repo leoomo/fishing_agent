@@ -26,6 +26,7 @@ import {
   Card,
   Typography,
   Switch,
+  Spin,
 } from 'antd'
 import {
   PlusOutlined,
@@ -34,6 +35,7 @@ import {
 } from '@ant-design/icons'
 import type { Brand } from '@/api/services/equipment'
 import type { ColumnsType } from 'antd/es/table'
+import { useAllEquipmentOptions, DEFAULT_OPTIONS, EQUIPMENT_OPTION_KEYS } from '@/hooks/useEquipmentOptions'
 
 const { Option } = Select
 const { TextArea } = Input
@@ -59,20 +61,23 @@ interface VariantRow {
   weight?: number | null
   lure_weight_min?: number | null
   lure_weight_max?: number | null
+  // 可覆盖模板的字段
+  sections?: number | null
+  guide_type?: string
+  handle_type?: string
+  material?: string
+  features?: string
   price_min?: number | null
   price_max?: number | null
 }
 
-const CATEGORIES = [
+// 默认类别选项 (作为 fallback)
+const DEFAULT_CATEGORIES = [
   { value: '鱼竿', label: '鱼竿' },
   { value: '渔轮', label: '渔轮' },
   { value: '鱼线', label: '鱼线' },
   { value: '拟饵', label: '拟饵' },
 ]
-
-const POWER_OPTIONS = ['UL', 'L', 'ML', 'M', 'MH', 'H', 'XH']
-const ACTION_OPTIONS = ['Fast', 'Medium', 'Slow']
-const USER_LEVEL_OPTIONS = ['新手', '进阶', '高手']
 
 const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
   brands,
@@ -84,6 +89,20 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
   const [templateForm] = Form.useForm()
   const [variants, setVariants] = useState<VariantRow[]>([])
   const [skipDuplicates, setSkipDuplicates] = useState(true)
+
+  // 从配置 API 加载选项
+  const {
+    powerOptions,
+    actionOptions,
+    userLevelOptions,
+    categoryOptions,
+    loading: optionsLoading,
+  } = useAllEquipmentOptions()
+
+  // 构建类别选项
+  const categories = categoryOptions.length > 0
+    ? categoryOptions.map((c) => ({ value: c, label: c }))
+    : DEFAULT_CATEGORIES
 
   // 生成唯一 key
   const generateKey = () => `row_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -101,6 +120,12 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
         weight: null,
         lure_weight_min: null,
         lure_weight_max: null,
+        // 可覆盖模板的字段（默认为空，使用模板值）
+        sections: null,
+        guide_type: '',
+        handle_type: '',
+        material: '',
+        features: '',
         price_min: null,
         price_max: null,
       },
@@ -217,7 +242,7 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
           }
           style={{ width: '100%' }}
         >
-          {POWER_OPTIONS.map((p) => (
+          {powerOptions.map((p) => (
             <Option key={p} value={p}>
               {p}
             </Option>
@@ -238,7 +263,7 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
           style={{ width: '100%' }}
           allowClear
         >
-          {ACTION_OPTIONS.map((a) => (
+          {actionOptions.map((a) => (
             <Option key={a} value={a}>
               {a}
             </Option>
@@ -290,6 +315,106 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
       ),
     },
     {
+      title: '节数',
+      dataIndex: 'sections',
+      width: 70,
+      render: (_, record) => (
+        <InputNumber
+          value={record.sections}
+          onChange={(value) =>
+            handleUpdateVariant(record.key, 'sections', value)
+          }
+          min={1}
+          max={10}
+          style={{ width: '100%' }}
+        />
+      ),
+    },
+    {
+      title: '导环类型',
+      dataIndex: 'guide_type',
+      width: 100,
+      render: (_, record) => (
+        <Input
+          value={record.guide_type}
+          onChange={(e) =>
+            handleUpdateVariant(record.key, 'guide_type', e.target.value)
+          }
+          placeholder="如富士K"
+        />
+      ),
+    },
+    {
+      title: '握把类型',
+      dataIndex: 'handle_type',
+      width: 100,
+      render: (_, record) => (
+        <Input
+          value={record.handle_type}
+          onChange={(e) =>
+            handleUpdateVariant(record.key, 'handle_type', e.target.value)
+          }
+          placeholder="如EVA"
+        />
+      ),
+    },
+    {
+      title: '材质',
+      dataIndex: 'material',
+      width: 80,
+      render: (_, record) => (
+        <Input
+          value={record.material}
+          onChange={(e) =>
+            handleUpdateVariant(record.key, 'material', e.target.value)
+          }
+          placeholder="高碳素"
+        />
+      ),
+    },
+    {
+      title: '特点',
+      dataIndex: 'features',
+      width: 120,
+      render: (_, record) => (
+        <Input
+          value={record.features}
+          onChange={(e) =>
+            handleUpdateVariant(record.key, 'features', e.target.value)
+          }
+          placeholder="特点描述"
+        />
+      ),
+    },
+    {
+      title: '价格范围',
+      dataIndex: 'price',
+      width: 140,
+      render: (_, record) => (
+        <Space size={4}>
+          <InputNumber
+            value={record.price_min}
+            onChange={(value) =>
+              handleUpdateVariant(record.key, 'price_min', value)
+            }
+            min={0}
+            style={{ width: 60 }}
+            placeholder="最低"
+          />
+          <span>-</span>
+          <InputNumber
+            value={record.price_max}
+            onChange={(value) =>
+              handleUpdateVariant(record.key, 'price_max', value)
+            }
+            min={0}
+            style={{ width: 60 }}
+            placeholder="最高"
+          />
+        </Space>
+      ),
+    },
+    {
       title: '操作',
       width: 80,
       render: (_, record) => (
@@ -324,8 +449,9 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
         onChange={setCategory}
         style={{ width: 200 }}
         size="large"
+        loading={optionsLoading}
       >
-        {CATEGORIES.map((c) => (
+        {categories.map((c) => (
           <Option key={c.value} value={c.value}>
             {c.label}
           </Option>
@@ -372,8 +498,8 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
         </Col>
         <Col span={8}>
           <Form.Item name="user_level" label="适用水平">
-            <Select>
-              {USER_LEVEL_OPTIONS.map((l) => (
+            <Select loading={optionsLoading}>
+              {userLevelOptions.map((l) => (
                 <Option key={l} value={l}>
                   {l}
                 </Option>
@@ -514,20 +640,68 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
         >
           <Table
             columns={[
-              { title: '型号', dataIndex: 'model', width: 100 },
+              { title: '型号', dataIndex: 'model', width: 80 },
               {
                 title: '预览名称',
+                width: 200,
                 render: (_, record: VariantRow) =>
                   `${previewBrand?.name_cn || ''} ${template.product_line || ''} ${record.model}`,
               },
-              { title: '长度', dataIndex: 'length', render: (v: number | null) => v ? `${v}m` : '-' },
-              { title: '调性', dataIndex: 'power' },
-              { title: '自重', dataIndex: 'weight', render: (v: number | null) => v ? `${v}g` : '-' },
+              { title: '长度', dataIndex: 'length', width: 60, render: (v: number | null) => v ? `${v}m` : '-' },
+              { title: '调性', dataIndex: 'power', width: 50 },
+              { title: '自重', dataIndex: 'weight', width: 60, render: (v: number | null) => v ? `${v}g` : '-' },
+              {
+                title: '节数',
+                dataIndex: 'sections',
+                width: 50,
+                render: (v: number | null, record: VariantRow) => {
+                  const value = v || template.sections
+                  const isOverride = v !== null && v !== undefined
+                  return value ? <Text type={isOverride ? 'success' : undefined}>{value}</Text> : '-'
+                },
+              },
+              {
+                title: '导环',
+                dataIndex: 'guide_type',
+                width: 80,
+                render: (v: string, record: VariantRow) => {
+                  const value = v || template.guide_type
+                  const isOverride = v && v.length > 0
+                  return value ? <Text type={isOverride ? 'success' : undefined}>{value}</Text> : '-'
+                },
+              },
+              {
+                title: '握把',
+                dataIndex: 'handle_type',
+                width: 80,
+                render: (v: string, record: VariantRow) => {
+                  const value = v || template.handle_type
+                  const isOverride = v && v.length > 0
+                  return value ? <Text type={isOverride ? 'success' : undefined}>{value}</Text> : '-'
+                },
+              },
+              {
+                title: '价格',
+                width: 100,
+                render: (_, record: VariantRow) => {
+                  const min = record.price_min || template.price_min
+                  const max = record.price_max || template.price_max
+                  const isOverride = record.price_min !== null || record.price_max !== null
+                  if (!min && !max) return '-'
+                  return <Text type={isOverride ? 'success' : undefined}>¥{min || 0}-{max || 0}</Text>
+                },
+              },
             ]}
             dataSource={variants}
             pagination={false}
             size="small"
+            scroll={{ x: 'max-content' }}
           />
+          <div style={{ marginTop: 8 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              提示：<Text type="success" style={{ fontSize: 12 }}>绿色</Text> 表示该型号覆盖了模板值
+            </Text>
+          </div>
         </Card>
 
         <Card size="small">

@@ -16,6 +16,7 @@ const UserList = lazy(() => import('@/pages/Users/List'))
 const UserDetail = lazy(() => import('@/pages/Users/Detail'))
 const Analytics = lazy(() => import('@/pages/Analytics'))
 const Settings = lazy(() => import('@/pages/Settings'))
+const EquipmentOptions = lazy(() => import('@/pages/Settings/EquipmentOptions'))
 const Crawler = lazy(() => import('@/pages/Crawler'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
 const Workflow = lazy(() => import('@/pages/Workflow'))
@@ -102,6 +103,7 @@ const App = () => {
 
                 {/* Settings */}
                 <Route path="settings" element={<Settings />} />
+                <Route path="settings/equipment-options" element={<EquipmentOptions />} />
               </Route>
 
               {/* 404 redirect */}
