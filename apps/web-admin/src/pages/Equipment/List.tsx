@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Table, Button, Input, Select, Space, Modal, message, Tag } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ExportOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ExportOutlined, AppstoreAddOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { equipmentApi } from '@/api/services/equipment'
 import type { Equipment } from '@/types/equipment'
@@ -241,6 +241,12 @@ const EquipmentList = () => {
         <Space>
           <Button icon={<ExportOutlined />} onClick={handleExport}>
             导出
+          </Button>
+          <Button
+            icon={<AppstoreAddOutlined />}
+            onClick={() => navigate('/equipment/batch-create')}
+          >
+            批量添加
           </Button>
           <Button
             type="primary"
