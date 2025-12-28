@@ -141,10 +141,18 @@ const EquipmentForm = () => {
             {category === '鱼竿' && (
               <>
                 <Space size="large">
-                  <Form.Item label="长度(米)" name={['specs', 'length']}>
+                  <Form.Item
+                    label="长度(米)"
+                    name={['specs', 'length']}
+                    rules={[{ required: true, message: '请输入长度' }]}
+                  >
                     <InputNumber placeholder="例: 2.1" min={0.5} max={10} step={0.1} />
                   </Form.Item>
-                  <Form.Item label="调性" name={['specs', 'power']}>
+                  <Form.Item
+                    label="调性"
+                    name={['specs', 'power']}
+                    rules={[{ required: true, message: '请选择调性' }]}
+                  >
                     <Select placeholder="请选择调性" style={{ width: 120 }}>
                       <Select.Option value="UL">UL</Select.Option>
                       <Select.Option value="L">L</Select.Option>
@@ -155,7 +163,11 @@ const EquipmentForm = () => {
                       <Select.Option value="XH">XH</Select.Option>
                     </Select>
                   </Form.Item>
-                  <Form.Item label="动作" name={['specs', 'action']}>
+                  <Form.Item
+                    label="动作"
+                    name={['specs', 'action']}
+                    rules={[{ required: true, message: '请选择动作' }]}
+                  >
                     <Select placeholder="请选择动作" style={{ width: 120 }}>
                       <Select.Option value="Fast">Fast</Select.Option>
                       <Select.Option value="Moderate">Moderate</Select.Option>
@@ -165,13 +177,25 @@ const EquipmentForm = () => {
                 </Space>
 
                 <Space size="large">
-                  <Form.Item label="重量(克)" name={['specs', 'weight']}>
+                  <Form.Item
+                    label="重量(克)"
+                    name={['specs', 'weight']}
+                    rules={[{ required: true, message: '请输入重量' }]}
+                  >
                     <InputNumber placeholder="例: 105" min={0} />
                   </Form.Item>
-                  <Form.Item label="节数" name={['specs', 'sections']}>
+                  <Form.Item
+                    label="节数"
+                    name={['specs', 'sections']}
+                    rules={[{ required: true, message: '请输入节数' }]}
+                  >
                     <InputNumber placeholder="例: 2" min={1} max={10} />
                   </Form.Item>
-                  <Form.Item label="收缩长度(厘米)" name={['specs', 'closed_length']}>
+                  <Form.Item
+                    label="收缩长度(厘米)"
+                    name={['specs', 'closed_length']}
+                    rules={[{ required: true, message: '请输入收缩长度' }]}
+                  >
                     <InputNumber placeholder="例: 105" min={0} />
                   </Form.Item>
                 </Space>
