@@ -73,9 +73,13 @@ const MainLayout = () => {
       label: '数据分析',
     },
     {
-      key: '/settings',
+      key: 'settings-menu',
       icon: <SettingOutlined />,
       label: '配置管理',
+      children: [
+        { key: '/settings', label: 'API 配置' },
+        { key: '/settings/equipment-options', label: '装备属性选项' },
+      ],
     },
   ]
 

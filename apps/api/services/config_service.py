@@ -8,6 +8,30 @@ from apps.api.utils.encryption import encrypt_value, decrypt_value
 
 logger = logging.getLogger(__name__)
 
+# 装备选项默认配置
+EQUIPMENT_OPTION_DEFAULTS = {
+    'equipment.rod.power_options': {
+        'value': ['UL', 'L', 'ML', 'M', 'MH', 'H', 'XH'],
+        'description': '鱼竿调性选项（从超软到超硬）',
+    },
+    'equipment.rod.action_options': {
+        'value': ['Fast', 'Medium', 'Slow'],
+        'description': '鱼竿动作选项（弯曲恢复速度）',
+    },
+    'equipment.rod.action_options_cn': {
+        'value': ['慢调', '中调', '快调', '超快调'],
+        'description': '鱼竿动作选项（中文表述）',
+    },
+    'equipment.user_level_options': {
+        'value': ['新手', '进阶', '高手'],
+        'description': '装备适合的用户水平',
+    },
+    'equipment.category_options': {
+        'value': ['鱼竿', '渔轮', '鱼线', '拟饵'],
+        'description': '装备分类选项',
+    },
+}
+
 
 class ConfigService:
     """配置管理服务"""
@@ -241,3 +265,62 @@ class ConfigService:
                 "valid": False,
                 "message": f"测试失败: {str(e)}"
             }
+
+    def init_equipment_options(self) -> Dict[str, bool]:
+        """
+        初始化装备选项默认配置
+
+        只创建不存在的配置，不覆盖已存在的配置。
+
+        Returns:
+            dict: 配置键 -> 是否创建 (True=新建, False=已存在)
+        """
+        results = {}
+
+        with get_db_session() as session:
+            for config_key, config_data in EQUIPMENT_OPTION_DEFAULTS.items():
+                # 检查是否已存在
+                existing = session.query(SystemConfig).filter_by(
+                    config_key=config_key
+                ).first()
+
+                if existing:
+                    results[config_key] = False
+                    logger.debug(f"配置已存在，跳过: {config_key}")
+                    continue
+
+                # 创建新配置
+                config = SystemConfig(
+                    config_key=config_key,
+                    config_value=json.dumps(config_data['value'], ensure_ascii=False),
+                    config_type='system',
+                    description=config_data['description'],
+                    is_encrypted=False
+                )
+                session.add(config)
+                results[config_key] = True
+                logger.info(f"创建装备选项配置: {config_key}")
+
+            session.commit()
+
+        return results
+
+
+def init_default_equipment_options():
+    """
+    初始化装备选项默认配置的便捷函数
+
+    可在应用启动时调用，确保默认配置存在。
+    """
+    service = ConfigService()
+    results = service.init_equipment_options()
+
+    created = [k for k, v in results.items() if v]
+    skipped = [k for k, v in results.items() if not v]
+
+    if created:
+        logger.info(f"创建了 {len(created)} 个装备选项配置")
+    if skipped:
+        logger.debug(f"跳过了 {len(skipped)} 个已存在的配置")
+
+    return results
