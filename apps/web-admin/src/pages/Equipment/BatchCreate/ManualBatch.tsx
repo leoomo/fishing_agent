@@ -90,18 +90,18 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
   const [variants, setVariants] = useState<VariantRow[]>([])
   const [skipDuplicates, setSkipDuplicates] = useState(true)
 
-  // 从配置 API 加载选项
+  // 从配置 API 加载选项（使用纯值列表）
   const {
-    powerOptions,
-    actionOptions,
-    userLevelOptions,
-    categoryOptions,
+    powerValues,
+    actionValues,
+    userLevelValues,
+    categoryValues,
     loading: optionsLoading,
   } = useAllEquipmentOptions()
 
   // 构建类别选项
-  const categories = categoryOptions.length > 0
-    ? categoryOptions.map((c) => ({ value: c, label: c }))
+  const categories = categoryValues.length > 0
+    ? categoryValues.map((c) => ({ value: c, label: c }))
     : DEFAULT_CATEGORIES
 
   // 生成唯一 key
@@ -242,7 +242,7 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
           }
           style={{ width: '100%' }}
         >
-          {powerOptions.map((p) => (
+          {powerValues.map((p) => (
             <Option key={p} value={p}>
               {p}
             </Option>
@@ -263,7 +263,7 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
           style={{ width: '100%' }}
           allowClear
         >
-          {actionOptions.map((a) => (
+          {actionValues.map((a) => (
             <Option key={a} value={a}>
               {a}
             </Option>
@@ -499,7 +499,7 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
         <Col span={8}>
           <Form.Item name="user_level" label="适用水平">
             <Select loading={optionsLoading}>
-              {userLevelOptions.map((l) => (
+              {userLevelValues.map((l) => (
                 <Option key={l} value={l}>
                   {l}
                 </Option>
