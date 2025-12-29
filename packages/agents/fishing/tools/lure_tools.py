@@ -107,12 +107,12 @@ def recommend_equipment(
         equipment_type: 装备类型（鱼竿/渔轮/鱼线/拟饵/套装）
         budget: 预算金额（元），如 500、1000
         specifications: 规格要求JSON字符串，如 '{"硬度": "ML", "长度": "2.1m", "适用饵范围": "2-10g", "重量": "<120g"}'
-        target_fish: 目标鱼种，如 鲈鱼、翘嘴、鳜鱼
-        scenario: 使用场景（水草区/深水区/障碍区/岸钓/船钓）
+        target_fish: [保留字段] 目标鱼种，当前版本暂未使用
+        scenario: [保留字段] 使用场景，当前版本暂未使用
         user_level: 用户水平（新手/进阶/高手）
 
     Returns:
-        Markdown格式的推荐报告
+        Markdown格式的推荐报告，突出最佳推荐并引导对比
 
     Examples:
         >>> recommend_equipment("鱼竿", budget=500, specifications='{"硬度": "ML"}')
@@ -160,72 +160,93 @@ def recommend_equipment(
     if not results:
         return f"未找到符合条件的{normalized_type}，建议放宽筛选条件"
 
-    # 6. 格式化输出
-    output = f"# 路亚{normalized_type}推荐报告\n\n"
+    # 6. 格式化输出（方案A：突出第一名 + 引导对比）
+    output = f"# 路亚{normalized_type}推荐\n\n"
 
-    # 需求分析
-    output += "## 需求分析\n\n"
-    output += f"- **装备类型**: {normalized_type}\n"
-    if budget:
-        output += f"- **预算范围**: ¥{budget}\n"
-    if specs:
-        for k, v in specs.items():
-            output += f"- **{k}要求**: {v}\n"
-    if target_fish:
-        output += f"- **目标鱼种**: {target_fish}\n"
-    if scenario:
-        output += f"- **使用场景**: {scenario}\n"
-    if user_level:
-        output += f"- **用户水平**: {user_level}\n"
+    # 第一名：最佳推荐（详细展示）
+    best = results[0]
+    output += f"## 最佳推荐：{best.name}\n\n"
 
-    # 推荐产品（带评分）
-    output += f"\n## 推荐产品（共{len(results)}款）\n\n"
+    # 获取主图
+    main_image = image_manager.get_main_image(best.equipment_id)
+    if main_image:
+        output += f"![{best.name}]({main_image})\n\n"
 
-    for i, rec in enumerate(results, 1):
-        output += f"### {i}. {rec.name}\n\n"
+    # 关键信息一行展示
+    info_parts = [f"评分: {best.total_score:.0f}/100"]
+    if best.price:
+        info_parts.append(f"价格: ¥{best.price:.0f}")
+    # 添加关键规格（最多3个）
+    key_specs = list(best.specs.items())[:3]
+    for spec_name, spec_value in key_specs:
+        info_parts.append(f"{spec_name}: {spec_value}")
+    output += " | ".join(info_parts) + "\n\n"
 
-        # 获取主图
-        main_image = image_manager.get_main_image(rec.equipment_id)
-        if main_image:
-            output += f"![{rec.name}]({main_image})\n\n"
+    # 为什么推荐（基于得分生成个性化文案）
+    why_reasons = _generate_why_recommend(best, user_specs)
+    output += f"**为什么推荐**：{why_reasons}\n\n"
 
-        # 综合评分
-        output += f"**综合评分**: {rec.total_score:.1f}/100\n\n"
+    # 其他候选（简洁展示）
+    if len(results) > 1:
+        output += "---\n\n"
+        output += "**其他候选**：\n"
+        for rec in results[1:]:
+            price_str = f"¥{rec.price:.0f}" if rec.price else "价格未知"
+            output += f"- {rec.name} ({rec.total_score:.0f}分, {price_str})\n"
+        output += "\n"
 
-        output += "| 参数 | 值 |\n|------|-----|\n"
-        if rec.brand:
-            output += f"| 品牌 | {rec.brand} |\n"
-        if rec.price:
-            output += f"| 价格 | ¥{rec.price} |\n"
-
-        # 规格参数
-        for spec_name, spec_value in rec.specs.items():
-            output += f"| {spec_name} | {spec_value} |\n"
-
-        # 匹配理由
-        if rec.match_reasons:
-            output += f"\n**推荐理由**: {' · '.join(rec.match_reasons)}\n"
-
-        # 评分明细
-        output += "\n<details>\n<summary>评分明细</summary>\n\n"
-        output += "| 维度 | 得分 | 权重 |\n|------|------|------|\n"
-        weights = {"price_match": "35%", "spec_match": "35%", "brand_reputation": "15%", "user_level": "15%"}
-        names = {"price_match": "价格匹配", "spec_match": "规格匹配", "brand_reputation": "品牌声誉", "user_level": "水平匹配"}
-        for key, score in rec.score_breakdown.items():
-            output += f"| {names.get(key, key)} | {score:.1f} | {weights.get(key, '-')} |\n"
-        output += "\n</details>\n"
-
-        output += "\n---\n\n"
-
-    # 选购建议
-    output += "## 选购建议\n\n"
-    if user_level in ["新手", "初学者", "入门"]:
-        output += "1. 新手建议选择大品牌，质量和售后有保障\n"
-        output += "2. 不必追求顶级配置，先熟悉手感再升级\n"
-    if budget and budget < 300:
-        output += "3. 预算有限可考虑国产品牌，性价比更高\n"
+        # 引导对比
+        equipment_names = ", ".join([r.name for r in results])
+        output += f"> 想详细对比？请说「对比 {equipment_names}」\n"
 
     return output
+
+
+def _generate_why_recommend(rec, user_specs: Dict) -> str:
+    """基于得分生成个性化推荐理由"""
+    reasons = []
+    scores = rec.score_breakdown
+
+    # 找出得分最高的维度
+    score_names = {
+        "price_match": "价格匹配",
+        "spec_match": "规格匹配",
+        "brand_reputation": "品牌声誉",
+        "user_level": "水平匹配"
+    }
+
+    # 按得分排序
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+    for key, score in sorted_scores:
+        if score >= 90:
+            if key == "price_match":
+                reasons.append("价格完美匹配预算")
+            elif key == "spec_match":
+                reasons.append("规格完全符合需求")
+            elif key == "brand_reputation":
+                reasons.append("一线品牌质量有保障")
+            elif key == "user_level":
+                reasons.append("非常适合当前水平")
+        elif score >= 75:
+            if key == "price_match":
+                reasons.append("性价比高")
+            elif key == "spec_match":
+                reasons.append("规格基本符合")
+            elif key == "brand_reputation":
+                reasons.append("知名品牌")
+            elif key == "user_level":
+                reasons.append("适合当前水平")
+
+        # 最多3个理由
+        if len(reasons) >= 3:
+            break
+
+    # 如果没有高分理由，使用通用理由
+    if not reasons:
+        reasons = ["综合评分最高"]
+
+    return " + ".join(reasons)
 
 
 def _recommend_package(

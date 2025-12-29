@@ -342,12 +342,12 @@ class LureRecommender:
             if target_length and actual_length:
                 scores.append(self._match_length(target_length, actual_length))
 
-        # 调性匹配（鱼竿）
+        # 调性匹配（鱼竿）- 按等级距离给分
         if "调性" in specifications and category == "鱼竿":
             target_action = specifications["调性"]
             actual_action = eq_specs.get("调性")
             if actual_action:
-                scores.append(100 if target_action == actual_action else 50)
+                scores.append(self._match_action(target_action, actual_action))
 
         # 速比匹配（渔轮）
         if "速比" in specifications and category == "渔轮":
@@ -553,6 +553,38 @@ class LureRecommender:
             return 70
         else:
             return 40
+
+    def _match_action(self, target: str, actual: str) -> float:
+        """
+        匹配调性等级
+
+        调性等级: S(慢) -> M(中) -> MF(中快) -> F(快) -> XF(超快)
+        按等级距离给分：
+        - 差0级: 100分（完全匹配）
+        - 差1级: 80分（接近）
+        - 差2级: 50分（相关）
+        - 差>2级: 20分（不匹配）
+        """
+        try:
+            # 标准化调性名称
+            target_std = ACTION_NAME_MAP.get(target, target.upper().replace("+", ""))
+            actual_std = ACTION_NAME_MAP.get(actual, actual.upper().replace("+", ""))
+
+            target_idx = ACTION_ORDER.index(target_std)
+            actual_idx = ACTION_ORDER.index(actual_std)
+            diff = abs(target_idx - actual_idx)
+
+            if diff == 0:
+                return 100
+            elif diff == 1:
+                return 80
+            elif diff == 2:
+                return 50
+            else:
+                return 20
+        except ValueError:
+            # 无法识别的调性，返回中等分
+            return 60
 
     def _parse_length(self, length_str) -> Optional[float]:
         """解析长度字符串"""
