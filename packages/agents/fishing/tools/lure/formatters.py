@@ -1,9 +1,9 @@
 """
-输出格式化模块
+输出格式化模块（优化版）
 
 提供Markdown格式的报告生成功能：
 - 推荐报告
-- 对比报告
+- 对比报告（增强版：综合评分、关键差异、对比总结）
 - 知识内容
 - 识别结果
 """
@@ -11,6 +11,7 @@
 from typing import List, Dict, Any, Optional
 from .fish_knowledge import FishInfo, KnowledgeItem
 from .comparator import ComparisonResult, ComparisonItem
+from .diff_analyzer import SpecDifference
 
 
 def format_recommendation(
@@ -99,7 +100,7 @@ def format_recommendation(
 
 def format_comparison(comparison: ComparisonResult) -> str:
     """
-    格式化对比报告
+    格式化对比报告（增强版）
 
     Args:
         comparison: ComparisonResult对象
@@ -113,10 +114,60 @@ def format_comparison(comparison: ComparisonResult) -> str:
     if len(items) < 2:
         return output + "对比数据不足\n"
 
-    # 基础参数对比表格
-    output += "## 基础参数对比\n\n"
+    # 1. 对比总结（新增）
+    if comparison.summary:
+        output += "## 快速结论\n\n"
+        output += f"> {comparison.summary}\n\n"
 
-    # 构建表头
+    # 2. 关键差异分析（核心新增）
+    if comparison.key_differences:
+        output += "## 关键差异\n\n"
+        output += "> 以下是对比中差异最显著的参数，帮助您快速做出决策\n\n"
+
+        for diff in comparison.key_differences:
+            # 差异程度标记
+            magnitude_icon = {
+                "large": "显著差异",
+                "medium": "明显差异",
+                "small": "轻微差异"
+            }.get(diff.diff_magnitude, "")
+
+            output += f"### {diff.spec_name} ({magnitude_icon})\n\n"
+            output += f"{diff.analysis}\n\n"
+
+            # 展示各装备的值
+            output += "| 装备 | 数值 |\n"
+            output += "|------|------|\n"
+            for name, val in diff.values.items():
+                # 标记最优/最差
+                marker = ""
+                if diff.best_item and name == diff.best_item:
+                    marker = " (最优)"
+                elif diff.worst_item and name == diff.worst_item:
+                    marker = " (较弱)"
+                output += f"| {name} | {val}{marker} |\n"
+
+            output += "\n"
+
+        output += "---\n\n"
+
+    # 3. 综合评分表格（新增）
+    output += "## 综合评分\n\n"
+    output += "| 装备 | 综合评分 | 价格 | 品牌 |\n"
+    output += "|------|---------|------|------|\n"
+
+    # 按评分排序展示
+    sorted_items = sorted(items, key=lambda x: x.overall_score, reverse=True)
+    for i, item in enumerate(sorted_items):
+        rank = "第1名" if i == 0 else (f"第{i+1}名")
+        price_str = f"¥{item.price:.0f}" if item.price else "-"
+        output += f"| {rank} {item.name} | **{item.overall_score:.1f}**/100 | {price_str} | {item.brand or '-'} |\n"
+
+    output += "\n"
+
+    # 4. 详细参数对比表格
+    output += "## 详细参数对比\n\n"
+
     headers = ["参数"] + [item.name for item in items]
     output += "| " + " | ".join(headers) + " |\n"
     output += "|" + "|".join(["------"] * len(headers)) + "|\n"
@@ -134,14 +185,18 @@ def format_comparison(comparison: ComparisonResult) -> str:
     for item in items:
         all_spec_keys.update(item.specs.keys())
 
-    # 规格行
-    for key in sorted(all_spec_keys):
-        row = [key] + [item.specs.get(key, "-") for item in items]
-        output += "| " + " | ".join(str(v) for v in row) + " |\n"
+    # 按重要性排序的规格键
+    priority_keys = ["自重", "长度", "硬度", "调性", "速比", "刹车力", "适用饵范围"]
+    sorted_keys = [k for k in priority_keys if k in all_spec_keys]
+    sorted_keys += [k for k in sorted(all_spec_keys) if k not in priority_keys]
+
+    for key in sorted_keys:
+        row = [key] + [str(item.specs.get(key, "-")) for item in items]
+        output += "| " + " | ".join(row) + " |\n"
 
     output += "\n"
 
-    # 优劣势分析
+    # 5. 优劣势分析
     output += "## 优劣势分析\n\n"
 
     for item in items:
@@ -151,25 +206,156 @@ def format_comparison(comparison: ComparisonResult) -> str:
             output += f"![{item.name}]({item.main_image})\n\n"
 
         if item.strengths:
+            output += "**优势**：\n"
             for strength in item.strengths:
-                output += f"✅ **优势**: {strength}\n"
+                output += f"- {strength}\n"
+            output += "\n"
 
         if item.weaknesses:
+            output += "**不足**：\n"
             for weakness in item.weaknesses:
-                output += f"❌ **劣势**: {weakness}\n"
+                output += f"- {weakness}\n"
+            output += "\n"
 
-        output += "\n---\n\n"
+        output += "---\n\n"
 
-    # 选购建议
+    # 6. 选购建议
     if comparison.recommendations:
         output += "## 选购建议\n\n"
-        output += "| 需求场景 | 推荐选择 |\n"
+        output += "| 使用场景 | 推荐选择 |\n"
         output += "|---------|--------|\n"
 
+        # 优先展示综合最优
+        priority_scenarios = ["综合最优", "预算有限", "长时间作钓"]
+        for scenario in priority_scenarios:
+            if scenario in comparison.recommendations:
+                product = comparison.recommendations[scenario]
+                output += f"| **{scenario}** | {product} |\n"
+
+        # 其他建议
         for scenario, product in comparison.recommendations.items():
-            output += f"| {scenario} | {product} |\n"
+            if scenario not in priority_scenarios:
+                output += f"| {scenario} | {product} |\n"
 
         output += "\n"
+
+    # 7. 对比总结表格（核心新增：相同项 vs 差异项）
+    output += format_comparison_summary_table(comparison)
+
+    return output
+
+
+def format_comparison_summary_table(comparison: ComparisonResult) -> str:
+    """
+    生成对比总结表格
+
+    清晰区分：相同项 vs 差异项
+    """
+    output = "## 对比总结\n\n"
+
+    items = comparison.items
+    if len(items) < 2:
+        return output
+
+    # 收集所有规格
+    all_specs = {}
+    for item in items:
+        for key, value in item.specs.items():
+            if key not in all_specs:
+                all_specs[key] = {}
+            all_specs[key][item.name] = value
+
+    # 添加价格
+    all_specs["价格"] = {item.name: f"¥{item.price:.0f}" if item.price else "-" for item in items}
+
+    # 添加品牌
+    all_specs["品牌"] = {item.name: item.brand or "-" for item in items}
+
+    # 分类：相同项 vs 差异项
+    same_specs = []
+    diff_specs = []
+
+    for spec_name, values in all_specs.items():
+        unique_values = set(str(v) for v in values.values() if v and v != "-")
+        if len(unique_values) <= 1:
+            same_specs.append((spec_name, values))
+        else:
+            diff_specs.append((spec_name, values))
+
+    # 获取差异分析信息
+    diff_info = {d.spec_name: d for d in comparison.spec_differences} if comparison.spec_differences else {}
+
+    # 表头
+    headers = ["参数"] + [item.name for item in items] + ["差异说明"]
+    output += "| " + " | ".join(headers) + " |\n"
+    output += "|" + "|".join(["------"] * len(headers)) + "|\n"
+
+    # 差异项（优先展示，带高亮）
+    if diff_specs:
+        output += "| **== 差异项 ==** |" + " |".join([""] * (len(items) + 1)) + "\n"
+
+        # 按差异程度排序
+        def get_diff_priority(spec_tuple):
+            spec_name = spec_tuple[0]
+            if spec_name in diff_info:
+                magnitude = diff_info[spec_name].diff_magnitude
+                return {"large": 0, "medium": 1, "small": 2}.get(magnitude, 3)
+            return 3
+
+        diff_specs.sort(key=get_diff_priority)
+
+        for spec_name, values in diff_specs:
+            # 获取差异信息
+            diff = diff_info.get(spec_name)
+
+            # 差异程度标记
+            if diff:
+                magnitude_mark = {
+                    "large": "[显著]",
+                    "medium": "[明显]",
+                    "small": "[轻微]"
+                }.get(diff.diff_magnitude, "")
+            else:
+                magnitude_mark = ""
+
+            # 构建每个值的展示（标记最优/最差）
+            value_cells = []
+            for item in items:
+                val = str(values.get(item.name, "-"))
+                if diff:
+                    if diff.best_item == item.name:
+                        val = f"**{val}** (优)"
+                    elif diff.worst_item == item.name:
+                        val = f"{val} (弱)"
+                value_cells.append(val)
+
+            # 差异说明
+            if diff and diff.diff_percent > 0:
+                diff_note = f"{magnitude_mark} 差异{diff.diff_percent:.0f}%"
+            elif diff:
+                diff_note = f"{magnitude_mark} {diff.analysis[:15]}..."
+            else:
+                diff_note = "不同"
+
+            row = [f"**{spec_name}**"] + value_cells + [diff_note]
+            output += "| " + " | ".join(row) + " |\n"
+
+    # 相同项
+    if same_specs:
+        output += "| **== 相同项 ==** |" + " |".join([""] * (len(items) + 1)) + "\n"
+
+        for spec_name, values in same_specs:
+            # 获取共同值
+            common_value = next((str(v) for v in values.values() if v and v != "-"), "-")
+            value_cells = [common_value] * len(items)
+
+            row = [spec_name] + value_cells + ["相同"]
+            output += "| " + " | ".join(row) + " |\n"
+
+    output += "\n"
+
+    # 添加图例
+    output += "> **说明**: [显著]差异>30% | [明显]差异10-30% | [轻微]差异<10% | (优)该项最优 | (弱)该项较弱\n\n"
 
     return output
 
