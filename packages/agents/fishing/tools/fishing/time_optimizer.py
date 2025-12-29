@@ -364,7 +364,7 @@ def generate_score_trend(hourly_scores: List[Dict[str, Any]]) -> str:
     生成24小时评分趋势（4时段+进度条，适配手机屏幕）
 
     Args:
-        hourly_scores: 24小时评分列表
+        hourly_scores: 24小时评分列表，每个元素包含 'hour' 或 'time_str' 字段表示对应的小时
 
     Returns:
         4时段进度条格式的趋势图字符串
@@ -386,13 +386,33 @@ def generate_score_trend(hourly_scores: List[Dict[str, Any]]) -> str:
             filled = int((score / 100) * width)
             return "█" * filled + "░" * (width - filled)
 
-        # 计算每个时段平均分
+        def get_hour_from_score(score_item: Dict[str, Any]) -> int:
+            """从评分数据中提取小时数"""
+            # 优先使用 hour 字段
+            if 'hour' in score_item:
+                return score_item['hour']
+            # 其次从 time_str 解析
+            if 'time_str' in score_item:
+                try:
+                    return int(score_item['time_str'].split(':')[0])
+                except (ValueError, IndexError):
+                    pass
+            # 从 datetime 字段获取
+            if 'datetime' in score_item:
+                dt = score_item['datetime']
+                if hasattr(dt, 'hour'):
+                    return dt.hour
+            return -1  # 无法确定小时
+
+        # 计算每个时段平均分（根据实际小时而非列表索引）
         period_scores = []
         for name, start, end in periods:
-            # 确保不超出列表范围
-            actual_end = min(end, len(hourly_scores))
-            if start < actual_end:
-                segment = hourly_scores[start:actual_end]
+            # 筛选属于该时段的评分数据
+            segment = [
+                s for s in hourly_scores
+                if start <= get_hour_from_score(s) < end
+            ]
+            if segment:
                 avg = sum(s['score'] for s in segment) / len(segment)
                 period_scores.append((name, start, end, avg))
 
