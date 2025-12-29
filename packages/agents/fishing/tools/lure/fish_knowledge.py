@@ -42,7 +42,7 @@ class KnowledgeItem:
     content: str
     summary: Optional[str] = None
     tags: List[str] = field(default_factory=list)
-    fish_species_id: Optional[int] = None
+    species_id: Optional[int] = None
     fish_name: Optional[str] = None
 
 
@@ -66,7 +66,7 @@ class FishKnowledgeService:
 
     def get_fish_by_id(self, fish_id: int) -> Optional[FishInfo]:
         """根据ID查询鱼类"""
-        query = "SELECT * FROM fish_species WHERE id = ?"
+        query = "SELECT * FROM fish_species WHERE species_id = ?"
         rows = self.db.execute(query, (fish_id,))
 
         if rows:
@@ -196,8 +196,8 @@ class FishKnowledgeService:
         query = """
             SELECT fk.*, fs.name_cn as fish_name
             FROM fish_knowledge fk
-            LEFT JOIN fish_species fs ON fk.fish_species_id = fs.id
-            WHERE fk.fish_species_id = ?
+            LEFT JOIN fish_species fs ON fk.species_id = fs.species_id
+            WHERE fk.species_id = ?
         """
         params = [fish_id]
 
@@ -217,7 +217,7 @@ class FishKnowledgeService:
         """获取通用知识（不关联特定鱼类）"""
         query = """
             SELECT * FROM fish_knowledge
-            WHERE fish_species_id IS NULL
+            WHERE species_id IS NULL
         """
         params = []
 
@@ -235,7 +235,7 @@ class FishKnowledgeService:
         query = """
             SELECT fk.*, fs.name_cn as fish_name
             FROM fish_knowledge fk
-            LEFT JOIN fish_species fs ON fk.fish_species_id = fs.id
+            LEFT JOIN fish_species fs ON fk.species_id = fs.species_id
             WHERE fk.id = ?
         """
         rows = self.db.execute(query, (knowledge_id,))
@@ -254,7 +254,7 @@ class FishKnowledgeService:
         query = """
             SELECT fk.*, fs.name_cn as fish_name
             FROM fish_knowledge fk
-            LEFT JOIN fish_species fs ON fk.fish_species_id = fs.id
+            LEFT JOIN fish_species fs ON fk.species_id = fs.species_id
             WHERE fk.title LIKE ?
                OR fk.content LIKE ?
                OR fk.keywords LIKE ?
@@ -311,7 +311,7 @@ class FishKnowledgeService:
         query = f"""
             SELECT fk.*, fs.name_cn as fish_name
             FROM fish_knowledge fk
-            LEFT JOIN fish_species fs ON fk.fish_species_id = fs.id
+            LEFT JOIN fish_species fs ON fk.species_id = fs.species_id
             WHERE fk.id IN ({placeholders})
         """
         rows = self.db.execute(query, tuple(knowledge_ids))
@@ -405,7 +405,7 @@ class FishKnowledgeService:
         title: str,
         content: str,
         knowledge_type: str,
-        fish_species_id: Optional[int] = None,
+        species_id: Optional[int] = None,
         summary: Optional[str] = None,
         tags: Optional[List[str]] = None,
         keywords: Optional[str] = None,
@@ -414,12 +414,12 @@ class FishKnowledgeService:
         """添加知识条目"""
         query = """
             INSERT INTO fish_knowledge (
-                fish_species_id, knowledge_type, title, content,
+                species_id, knowledge_type, title, content,
                 summary, tags, keywords, source
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            fish_species_id, knowledge_type, title, content,
+            species_id, knowledge_type, title, content,
             summary,
             json.dumps(tags, ensure_ascii=False) if tags else None,
             keywords, source
@@ -431,7 +431,7 @@ class FishKnowledgeService:
     def _row_to_fish_info(self, row: Dict) -> FishInfo:
         """将数据库行转换为FishInfo对象"""
         return FishInfo(
-            id=row['id'],
+            id=row.get('species_id') or row.get('id'),
             name_cn=row['name_cn'],
             name_en=row.get('name_en'),
             category=row.get('category', ''),
@@ -455,7 +455,7 @@ class FishKnowledgeService:
             content=row['content'],
             summary=row.get('summary'),
             tags=self._parse_json_list(row.get('tags')),
-            fish_species_id=row.get('fish_species_id'),
+            species_id=row.get('species_id'),
             fish_name=row.get('fish_name')
         )
 

@@ -262,7 +262,7 @@ class ImageManager:
 
     def get_fish_images(
         self,
-        fish_species_id: int,
+        species_id: int,
         image_type: Optional[str] = None
     ) -> List[ImageInfo]:
         """获取鱼类的图片列表"""
@@ -270,9 +270,9 @@ class ImageManager:
             SELECT image_id, image_url, image_type, description, display_order,
                    file_size, width, height, format
             FROM product_images
-            WHERE fish_species_id = ?
+            WHERE species_id = ?
         """
-        params = [fish_species_id]
+        params = [species_id]
 
         if image_type:
             query += " AND image_type = ?"
@@ -308,7 +308,7 @@ class ImageManager:
         image_type: str,
         equipment_id: Optional[int] = None,
         rig_type_id: Optional[int] = None,
-        fish_species_id: Optional[int] = None,
+        species_id: Optional[int] = None,
         description: Optional[str] = None,
         display_order: int = 0
     ) -> int:
@@ -321,7 +321,7 @@ class ImageManager:
             image_type: 图片类型 (main/detail/infographic/action/color等)
             equipment_id: 关联装备ID
             rig_type_id: 关联钓组ID
-            fish_species_id: 关联鱼类ID
+            species_id: 关联鱼类ID
             description: 图片描述
             display_order: 展示顺序
 
@@ -332,7 +332,7 @@ class ImageManager:
         entity_count = sum([
             equipment_id is not None,
             rig_type_id is not None,
-            fish_species_id is not None
+            species_id is not None
         ])
         if entity_count != 1:
             raise ValueError("必须且只能关联一个实体（equipment/rig/fish）")
@@ -346,13 +346,13 @@ class ImageManager:
         # 写入数据库
         query = """
             INSERT INTO product_images (
-                equipment_id, rig_type_id, fish_species_id,
+                equipment_id, rig_type_id, species_id,
                 image_url, image_type, description, display_order,
                 file_size, width, height, format
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            equipment_id, rig_type_id, fish_species_id,
+            equipment_id, rig_type_id, species_id,
             image_url, image_type, description, display_order,
             metadata.file_size if metadata else None,
             metadata.width if metadata else None,
@@ -369,7 +369,7 @@ class ImageManager:
         image_type: str,
         equipment_id: Optional[int] = None,
         rig_type_id: Optional[int] = None,
-        fish_species_id: Optional[int] = None,
+        species_id: Optional[int] = None,
         description: Optional[str] = None,
         display_order: int = 0
     ) -> int:
@@ -383,7 +383,7 @@ class ImageManager:
             image_type=image_type,
             equipment_id=equipment_id,
             rig_type_id=rig_type_id,
-            fish_species_id=fish_species_id,
+            species_id=species_id,
             description=description,
             display_order=display_order
         )
@@ -394,7 +394,7 @@ class ImageManager:
         image_type: str,
         equipment_id: Optional[int] = None,
         rig_type_id: Optional[int] = None,
-        fish_species_id: Optional[int] = None,
+        species_id: Optional[int] = None,
         description: Optional[str] = None,
         display_order: int = 0
     ) -> int:
@@ -403,19 +403,19 @@ class ImageManager:
         entity_count = sum([
             equipment_id is not None,
             rig_type_id is not None,
-            fish_species_id is not None
+            species_id is not None
         ])
         if entity_count != 1:
             raise ValueError("必须且只能关联一个实体（equipment/rig/fish）")
 
         query = """
             INSERT INTO product_images (
-                equipment_id, rig_type_id, fish_species_id,
+                equipment_id, rig_type_id, species_id,
                 image_url, image_type, description, display_order
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            equipment_id, rig_type_id, fish_species_id,
+            equipment_id, rig_type_id, species_id,
             image_url, image_type, description, display_order
         )
 
@@ -482,7 +482,7 @@ class ImageManager:
         """获取未向量化的图片列表"""
         query = """
             SELECT image_id, image_url, description,
-                   equipment_id, rig_type_id, fish_species_id
+                   equipment_id, rig_type_id, species_id
             FROM product_images
             WHERE is_vectorized = 0
             LIMIT ?
