@@ -36,6 +36,7 @@ class DatabaseMigrations:
             self._migration_004_add_crawler_task_tables,
             self._migration_005_add_workflow_support,
             self._migration_006_add_pending_equipment_table,
+            self._migration_007_rename_fish_species_id_to_species_id,
         ]
 
         for i, migration in enumerate(migrations, 1):
@@ -531,6 +532,87 @@ class DatabaseMigrations:
             "CREATE INDEX IF NOT EXISTS idx_pending_equipment_created ON pending_equipment(created_at)"
         )
         logger.info("  创建索引: idx_pending_equipment_*")
+
+    def _migration_007_rename_fish_species_id_to_species_id(self):
+        """
+        迁移007: 统一字段命名 fish_species_id -> species_id
+
+        SQLite 不支持直接 RENAME COLUMN，需要通过重建表实现。
+        涉及表：
+        - product_images: fish_species_id -> species_id
+        """
+        logger.info("执行迁移007: 统一 fish_species_id -> species_id")
+
+        # 检查 product_images 表是否需要迁移
+        columns = self._get_table_columns("product_images")
+        column_names = [col[1] for col in columns]
+
+        # 如果已经是 species_id，跳过
+        if "species_id" in column_names and "fish_species_id" not in column_names:
+            logger.info("  product_images 表已迁移，跳过")
+            return
+
+        # 如果还是 fish_species_id，需要迁移
+        if "fish_species_id" in column_names:
+            logger.info("  开始迁移 product_images 表...")
+
+            # 1. 创建新表
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS product_images_new (
+                    image_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    equipment_id INTEGER,
+                    rig_type_id INTEGER,
+                    species_id INTEGER,
+                    image_url TEXT NOT NULL,
+                    image_type TEXT NOT NULL,
+                    description TEXT,
+                    display_order INTEGER DEFAULT 0,
+                    embedding_id TEXT,
+                    is_vectorized INTEGER DEFAULT 0,
+                    file_size INTEGER,
+                    width INTEGER,
+                    height INTEGER,
+                    format TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id) ON DELETE CASCADE,
+                    FOREIGN KEY (rig_type_id) REFERENCES rig_types(id) ON DELETE CASCADE,
+                    FOREIGN KEY (species_id) REFERENCES fish_species(species_id) ON DELETE CASCADE
+                )
+            """)
+
+            # 2. 复制数据
+            self.cursor.execute("""
+                INSERT INTO product_images_new (
+                    image_id, equipment_id, rig_type_id, species_id,
+                    image_url, image_type, description, display_order,
+                    embedding_id, is_vectorized, file_size, width, height, format,
+                    created_at, updated_at
+                )
+                SELECT
+                    image_id, equipment_id, rig_type_id, fish_species_id,
+                    image_url, image_type, description, display_order,
+                    embedding_id, is_vectorized, file_size, width, height, format,
+                    created_at, updated_at
+                FROM product_images
+            """)
+
+            # 3. 删除旧表
+            self.cursor.execute("DROP TABLE product_images")
+
+            # 4. 重命名新表
+            self.cursor.execute("ALTER TABLE product_images_new RENAME TO product_images")
+
+            # 5. 重建索引
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_equipment ON product_images(equipment_id)")
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_rig ON product_images(rig_type_id)")
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_fish ON product_images(species_id)")
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_type ON product_images(image_type)")
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_vectorized ON product_images(is_vectorized)")
+
+            logger.info("  product_images 表迁移完成")
+        else:
+            logger.info("  product_images 表没有 fish_species_id 字段，跳过")
 
     def _get_table_columns(self, table_name: str) -> list:
         """

@@ -182,7 +182,7 @@ class LureDatabase:
                 image_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 equipment_id INTEGER,
                 rig_type_id INTEGER,
-                fish_species_id INTEGER,
+                species_id INTEGER,
                 image_url TEXT NOT NULL,
                 image_type TEXT NOT NULL,
                 description TEXT,
@@ -197,14 +197,14 @@ class LureDatabase:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id) ON DELETE CASCADE,
                 FOREIGN KEY (rig_type_id) REFERENCES rig_types(id) ON DELETE CASCADE,
-                FOREIGN KEY (fish_species_id) REFERENCES fish_species(id) ON DELETE CASCADE
+                FOREIGN KEY (species_id) REFERENCES fish_species(species_id) ON DELETE CASCADE
             )
         """)
 
         # ========== 鱼类基础表 ==========
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS fish_species (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                species_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name_cn TEXT NOT NULL UNIQUE,
                 name_en TEXT,
                 name_latin TEXT,
@@ -248,7 +248,7 @@ class LureDatabase:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS fish_knowledge (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                fish_species_id INTEGER,
+                species_id INTEGER,
                 knowledge_type TEXT NOT NULL,
                 title TEXT NOT NULL,
                 content TEXT NOT NULL,
@@ -262,7 +262,7 @@ class LureDatabase:
                 reliability_score REAL DEFAULT 0.8,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (fish_species_id) REFERENCES fish_species(id) ON DELETE CASCADE
+                FOREIGN KEY (species_id) REFERENCES fish_species(species_id) ON DELETE CASCADE
             )
         """)
 
@@ -338,7 +338,7 @@ class LureDatabase:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS fish_season_activity (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                fish_species_id INTEGER NOT NULL,
+                species_id INTEGER NOT NULL,
                 season TEXT NOT NULL,
                 activity_level INTEGER,
                 best_time_of_day TEXT,
@@ -346,7 +346,7 @@ class LureDatabase:
                 feeding_intensity TEXT,
                 recommended_lure_types TEXT,
                 notes TEXT,
-                FOREIGN KEY (fish_species_id) REFERENCES fish_species(id) ON DELETE CASCADE
+                FOREIGN KEY (species_id) REFERENCES fish_species(species_id) ON DELETE CASCADE
             )
         """)
 
@@ -373,18 +373,18 @@ class LureDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipment_vectorized ON equipment(is_vectorized)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_equipment ON product_images(equipment_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_rig ON product_images(rig_type_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_fish ON product_images(fish_species_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_fish ON product_images(species_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_type ON product_images(image_type)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_vectorized ON product_images(is_vectorized)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_fish_name ON fish_species(name_cn)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_fish_category ON fish_species(category)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_fish ON fish_knowledge(fish_species_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_fish ON fish_knowledge(species_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_type ON fish_knowledge(knowledge_type)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_vectorized ON fish_knowledge(is_vectorized)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rig_types_vectorized ON rig_types(is_vectorized)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_lure_types_category ON lure_types(category)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rod_lure_fitness_power ON rod_lure_fitness(rod_power)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_fish_season_activity ON fish_season_activity(fish_species_id, season)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_fish_season_activity ON fish_season_activity(species_id, season)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rig_components ON rig_components(rig_type_id)")
 
         conn.commit()

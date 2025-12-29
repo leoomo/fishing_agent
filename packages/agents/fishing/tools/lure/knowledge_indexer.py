@@ -48,11 +48,11 @@ class KnowledgeIndexer:
         """
         # 获取未索引的知识
         query = """
-            SELECT fk.id, fk.fish_species_id, fk.knowledge_type,
+            SELECT fk.id, fk.species_id, fk.knowledge_type,
                    fk.title, fk.content, fk.tags, fk.keywords,
                    fs.name_cn as fish_name
             FROM fish_knowledge fk
-            LEFT JOIN fish_species fs ON fk.fish_species_id = fs.id
+            LEFT JOIN fish_species fs ON fk.species_id = fs.species_id
             WHERE fk.is_vectorized = 0 OR fk.is_vectorized IS NULL
             LIMIT ?
         """
@@ -84,7 +84,7 @@ class KnowledgeIndexer:
 
             metadatas.append({
                 "knowledge_id": row['id'],
-                "fish_id": row.get('fish_species_id'),
+                "fish_id": row.get('species_id'),
                 "type": row['knowledge_type'],
                 "fish_name": row.get('fish_name') or "",
                 "tags": row.get('tags') or ""
@@ -248,7 +248,7 @@ class KnowledgeIndexer:
         """
         query = """
             SELECT image_id, image_url, description, image_type,
-                   equipment_id, rig_type_id, fish_species_id
+                   equipment_id, rig_type_id, species_id
             FROM product_images
             WHERE is_vectorized = 0 OR is_vectorized IS NULL
             LIMIT ?
@@ -271,9 +271,9 @@ class KnowledgeIndexer:
             elif row.get('rig_type_id'):
                 entity_type = "rig"
                 entity_id = row['rig_type_id']
-            elif row.get('fish_species_id'):
+            elif row.get('species_id'):
                 entity_type = "fish"
-                entity_id = row['fish_species_id']
+                entity_id = row['species_id']
             else:
                 continue
 

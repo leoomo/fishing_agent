@@ -486,7 +486,7 @@ class KnowledgeSearchService:
         query = f"""
             SELECT fk.*, fs.name_cn as fish_name
             FROM fish_knowledge fk
-            LEFT JOIN fish_species fs ON fk.fish_species_id = fs.id
+            LEFT JOIN fish_species fs ON fk.species_id = fs.species_id
             WHERE fk.id IN ({placeholders})
         """
         rows = self.db.execute(query, tuple(knowledge_ids))

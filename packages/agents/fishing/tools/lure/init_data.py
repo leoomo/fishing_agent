@@ -279,7 +279,7 @@ def init_fish_knowledge():
 
     knowledge_data = [
         {
-            "fish_species_id": bass_id,
+            "species_id": bass_id,
             "knowledge_type": "behavior",
             "title": "大嘴鲈的捕食行为",
             "content": """## 捕食特点
@@ -310,7 +310,7 @@ def init_fish_knowledge():
             "tags": json.dumps(["习性", "捕食", "伏击", "标点"], ensure_ascii=False),
         },
         {
-            "fish_species_id": bass_id,
+            "species_id": bass_id,
             "knowledge_type": "season",
             "title": "春季鲈鱼钓法详解",
             "content": """## 春季鲈鱼特点
@@ -340,7 +340,7 @@ def init_fish_knowledge():
             "tags": json.dumps(["春季", "产卵", "浅水", "水草"], ensure_ascii=False),
         },
         {
-            "fish_species_id": None,
+            "species_id": None,
             "knowledge_type": "technique",
             "title": "德州钓组完全指南",
             "content": """## 什么是德州钓组
