@@ -424,18 +424,59 @@ def calc_weather_score(condition: str) -> float:
     - 多云/阴天：鱼类在弱光条件下更大胆，愿意在开阔水域觅食
     - 小雨：虽带来氧气，但也会浑浊水体、降低水温，评分从95降至75
     - 晴天：总体条件好，但夏季中午会造成水层温差
+
+    支持的天气代码：
+    - 中文：多云、阴、晴、雾、小雨、中雨、大雨、暴雨
+    - 彩云API英文代码：CLEAR_DAY, PARTLY_CLOUDY_DAY, CLOUDY, LIGHT_RAIN 等
     """
-    if condition in ['多云', '阴']:
-        return 95.0            # 最佳条件
-    elif condition in ['晴', '雾']:
+    if not condition:
+        return 70.0  # 默认值
+
+    # 标准化：转为大写便于匹配
+    cond_upper = condition.upper()
+
+    # 最佳条件：多云/阴天 (95分)
+    if condition in ['多云', '阴'] or cond_upper in [
+        'CLOUDY',  # 阴天
+        'PARTLY_CLOUDY_DAY', 'PARTLY_CLOUDY_NIGHT',  # 多云
+    ]:
+        return 95.0
+
+    # 良好条件：晴天/雾 (80分)
+    elif condition in ['晴', '雾'] or cond_upper in [
+        'CLEAR_DAY', 'CLEAR_NIGHT',  # 晴天
+        'FOG',  # 雾
+    ]:
         return 80.0
-    elif condition in ['小雨']:
-        return 75.0            # 从95分降低（小雨效果不如多云/阴天稳定）
-    elif condition in ['中雨']:
+
+    # 一般条件：小雨/轻度霾 (75分)
+    elif condition in ['小雨'] or cond_upper in [
+        'LIGHT_RAIN',  # 小雨
+        'LIGHT_HAZE',  # 轻度霾
+    ]:
+        return 75.0
+
+    # 较差条件：中雨/中度霾 (50分)
+    elif condition in ['中雨'] or cond_upper in [
+        'MODERATE_RAIN',  # 中雨
+        'MODERATE_HAZE',  # 中度霾
+        'LIGHT_SNOW',  # 小雪
+    ]:
         return 50.0
-    elif condition in ['大雨', '暴雨']:
+
+    # 恶劣条件：大雨/暴雨/大风/沙尘 (20分)
+    elif condition in ['大雨', '暴雨'] or cond_upper in [
+        'HEAVY_RAIN', 'STORM_RAIN',  # 大雨/暴雨
+        'HEAVY_HAZE',  # 重度霾
+        'MODERATE_SNOW', 'HEAVY_SNOW',  # 中雪/大雪
+        'WIND',  # 大风
+        'DUST', 'SAND',  # 沙尘
+    ]:
         return 20.0
+
     else:
+        # 未识别的天气条件，返回中等评分
+        logger.debug(f"未识别的天气条件: {condition}")
         return 70.0
 
 

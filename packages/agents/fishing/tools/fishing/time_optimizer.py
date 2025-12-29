@@ -422,8 +422,18 @@ def generate_score_trend(hourly_scores: List[Dict[str, Any]]) -> str:
         # 找最佳时段
         best_idx = max(range(len(period_scores)), key=lambda i: period_scores[i][3])
 
+        # 检查数据完整性（是否覆盖全部4个时段）
+        is_partial = len(period_scores) < 4
+
         # 生成输出
-        lines = ["📊 24小时评分概览", ""]
+        if is_partial:
+            # 获取数据覆盖的时间范围
+            hours = [get_hour_from_score(s) for s in hourly_scores]
+            min_hour, max_hour = min(hours), max(hours)
+            lines = [f"📊 评分概览 ({min_hour:02d}:00-{max_hour+1:02d}:00)", ""]
+        else:
+            lines = ["📊 24小时评分概览", ""]
+
         for i, (name, start, end, avg) in enumerate(period_scores):
             bar = make_progress_bar(avg)
             best_mark = " ⬅️最佳" if i == best_idx else ""
@@ -437,7 +447,10 @@ def generate_score_trend(hourly_scores: List[Dict[str, Any]]) -> str:
         max_time = hourly_scores[max_idx]['time_str']
 
         lines.append("")
-        lines.append(f"📈 全天均分: {avg_score:.0f}分 | 峰值: {max_score:.0f}分({max_time})")
+        if is_partial:
+            lines.append(f"📈 时段均分: {avg_score:.0f}分 | 峰值: {max_score:.0f}分({max_time})")
+        else:
+            lines.append(f"📈 全天均分: {avg_score:.0f}分 | 峰值: {max_score:.0f}分({max_time})")
         lines.append("")
 
         return "\n".join(lines)
