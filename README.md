@@ -68,14 +68,14 @@ cd apps/web-admin && npm install && npm run dev
 
 ```python
 # Agent 核心功能
-from packages.agent_fishing import create_agent
+from packages.agents.fishing import create_agent
 
 agent = create_agent(model_provider="zhipu")
 response = agent.run("明天杭州钓鱼怎么样？")
 print(response)
 
 # 装备导入Agent (新增)
-from packages.agent_equipment_import import EquipmentImportAgent
+from packages.agents.equipment_import import EquipmentImportAgent
 
 agent = EquipmentImportAgent(model_provider="zhipu")
 # 对话式提取
@@ -213,7 +213,7 @@ SILICONFLOW_OCR_TIMEOUT=30
 ### 使用示例
 
 ```python
-from packages.agent_equipment_import import EquipmentImportAgent
+from packages.agents.equipment_import import EquipmentImportAgent
 
 # 创建Agent(支持文本压缩)
 agent = EquipmentImportAgent(

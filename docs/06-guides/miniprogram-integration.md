@@ -54,7 +54,7 @@ JWT认证
 
 #### 项目结构
 ```
-miniprogram/
+fishing_agent_app/
 ├── app.js                 # 小程序入口文件
 ├── app.json              # 全局配置文件
 ├── app.wxss              # 全局样式文件

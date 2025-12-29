@@ -19,9 +19,13 @@
 
 ### 🎣 [核心接口](./endpoints/)
 - **[钓鱼API](./endpoints/fishing-api.md)** - 智能钓鱼推荐
-- **[装备API](./endpoints/equipment-api.md)** - 装备管理功能
+- **[聊天API](./endpoints/chat-api.md)** - 对话会话管理 ⭐v5.0.2
+- **[用户装备API](./endpoints/user-equipment-api.md)** - 用户装备管理 ⭐v5.0.2
+- **[装备API](./endpoints/equipment-api.md)** - 装备库管理
 - **[用户管理](./endpoints/user-management.md)** - 用户和认证
-- **[数据分析](./endpoints/analytics-api.md)** - 统计分析
+- **[数据采集API](./endpoints/crawler-api.md)** - 爬虫任务管理 ⭐v5.1.0
+- **[OCR工作流API](./endpoints/ocr-workflow-api.md)** - OCR工作流 ⭐v5.1.0
+- **[Worker API](./endpoints/worker-api.md)** - Worker节点 ⭐v5.1.0
 - **[管理接口](./endpoints/admin-api.md)** - 管理员功能
 
 ### 📊 [数据结构](./data-schemas.md)

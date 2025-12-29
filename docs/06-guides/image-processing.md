@@ -22,7 +22,7 @@
 - **结果优化**: 自动优化识别结果和格式
 
 ### 技术特点
-- **多提供商支持**: Ollama本地OCR + SiliconFlow云端OCR
+- **多提供商支持**: Ollama本地OCR + SiliconFlow云端OCR + 百度OCR
 - **智能分组算法**: 基于图像内容的自动分组
 - **格式转换**: 支持多种输入输出格式
 - **容错机制**: 处理失败时的自动重试和降级
@@ -35,6 +35,7 @@
 |--------|------|------|------|----------|
 | **Ollama** | 本地 | 隐私保护、无延迟 | 需要GPU、模型文件大 | 敏感数据、高频调用 |
 | **SiliconFlow** | 云端 | 高精度、无需资源 | 网络依赖、产生费用 | 精度要求高、处理量大 |
+| **百度OCR** | 云端 | 中文识别强、稳定 | 需要配额、网络依赖 | 中文场景、表格识别 |
 
 ### 配置Ollama本地OCR
 
@@ -60,6 +61,20 @@ from packages.data_processing.ocr import OCRMergeProcessor
 # 配置云端OCR
 processor = OCRMergeProcessor(provider="siliconflow")
 processor.api_key = "your-siliconflow-api-key"
+
+# 执行识别
+result = await processor.recognize_table(["image1.jpg", "image2.jpg"])
+```
+
+### 配置百度OCR
+
+```python
+from packages.data_processing.ocr import OCRMergeProcessor
+
+# 配置百度OCR
+processor = OCRMergeProcessor(provider="baidu")
+processor.api_key = "your-baidu-api-key"
+processor.secret_key = "your-baidu-secret-key"
 
 # 执行识别
 result = await processor.recognize_table(["image1.jpg", "image2.jpg"])
@@ -477,10 +492,12 @@ print(f"合并任务ID: {result['task_id']}")
 ### 环境变量配置
 ```bash
 # OCR配置
-OCR_PROVIDER=ollama                    # ollama 或 siliconflow
+OCR_PROVIDER=ollama                    # ollama/siliconflow/baidu
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=deepseek-ocr
 SILICONFLOW_API_KEY=your-api-key
+BAIDU_API_KEY=your-baidu-api-key
+BAIDU_SECRET_KEY=your-baidu-secret-key
 
 # 图片处理配置
 IMAGE_MAX_SIZE=10MB                  # 最大图片大小

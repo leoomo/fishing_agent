@@ -1,11 +1,11 @@
 <!-- OPENSPEC:START -->
 <!-- OPENSPEC:END -->
 -禁止自动执行git命令
-# 智能钓鱼助手 v5.2.0
+# 智能钓鱼助手 v5.0.2
 
 模块化 Agent 架构 + JWT认证系统 + React管理前端，基于 LangChain 1.0+ 和 7 因子科学评分系统。
 
-**当前版本**: v5.2.0 | **当前分支**: feat/crawler-data-persistence (数据库模型迁移)
+**当前版本**: v5.0.2 | **当前分支**: feat/ocr-optimization
 
 ## 核心特性
 - JWT认证系统 (RBAC权限管理 + Token安全) + 模块化Agent包 + 7因子评分 (温度/天气/风力/气压/湿度/季节/月相)
@@ -22,8 +22,9 @@ packages/                       # 模块化包目录
 │   │   └── monitoring/         # 统一监控回调 (MonitoringCallback)
 │   ├── fishing/                # 钓鱼助手 Agent
 │   │   ├── core/               # agent.py, model_factory.py, prompts.py
-│   │   ├── tools/              # basic, weather, fishing, lure/, scoring/
-│   │   │   └── lure/           # 路亚工具 (兼容层，重导出 apps.api)
+│   │   ├── tools/              # basic, weather, fishing, lure/, user_equipment/
+│   │   │   ├── lure/           # 路亚工具 (兼容层，重导出 apps.api)
+│   │   │   └── user_equipment/ # 用户装备管理 (manager, recommender)
 │   │   ├── middleware/         # dynamic_prompt.py
 │   │   └── utils/
 │   └── equipment_import/       # 装备导入 Agent
@@ -60,7 +61,7 @@ apps/                           # 应用层
 │   │   └── repositories/       # 仓储模式
 │   └── database.py             # ⭐ 数据库访问 (v5.2.0 迁移)
 └── web-admin/                  # React管理前端
-miniprogram/                    # 微信小程序
+fishing_agent_app/             # 微信小程序
 shared/                         # 共享资源
 ├── config/                     # 全局配置
 └── data/                       # ⭐ 数据库文件 (equipment.db)
@@ -90,6 +91,12 @@ from packages.agents.agent_component.monitoring import MonitoringCallback
 from packages.agents.equipment_import import EquipmentImportAgent
 from packages.agents.equipment_import.core import TextCompressor
 
+# 用户装备管理
+from packages.agents.fishing.tools.user_equipment import (
+    UserEquipmentManager,
+    EquipmentRecommender
+)
+
 # 数据库模型和 ORM (v5.2.0 迁移到 apps.api)
 from apps.api.models import Base, Equipment, Brand, AdminUser, ChatSession
 from apps.api.orm import get_db_session, EquipmentRepository, BrandRepository
@@ -113,6 +120,8 @@ from packages.scraper.workflow import WorkflowManager
 POST /api/v1/fishing/chat           # 对话接口
 GET  /api/v1/fishing/tools          # 工具列表
 GET  /health                        # 健康检查
+POST /api/v1/chat/message           # 聊天消息
+GET  /api/v1/chat/sessions          # 会话列表
 
 # 认证API
 POST /api/v1/auth/login             # 用户登录
@@ -120,20 +129,82 @@ GET  /api/v1/auth/me                # 获取用户信息
 POST /api/v1/auth/wechat/login      # 微信登录
 POST /api/v1/auth/wechat/bind       # 绑定微信账号
 
-# 功能API
+# 用户装备API
+GET  /api/v1/user-equipment/equipment          # 用户装备列表
+POST /api/v1/user-equipment/equipment          # 添加装备
+PUT  /api/v1/user-equipment/equipment/{id}     # 更新装备
+DELETE /api/v1/user-equipment/equipment/{id}   # 删除装备
+GET  /api/v1/user-equipment/recommendations    # 装备推荐
+POST /api/v1/user-equipment/recommend          # 获取推荐
+
+# 装备管理API
+GET  /api/v1/equipment/equipment       # 装备列表
+POST /api/v1/equipment/batch            # 批量添加
+PUT  /api/v1/equipment/equipment/{id}   # 更新装备
+DELETE /api/v1/equipment/equipment/{id} # 删除装备
+GET  /api/v1/equipment/attributes       # 属性选项
+
+# 数据导入API
+POST /api/v1/import-export/import           # 导入装备
+POST /api/v1/import-export/export           # 导出装备
+POST /api/v1/import-export/preview          # 预览导入
+GET  /api/v1/import-export/templates        # 导入模板
+
+# OCR API
 POST /api/v1/ocr/recognize-table    # OCR表格识别
 GET  /api/v1/ocr/status             # OCR服务状态
+POST /api/v1/ocr/workflow/execute   # OCR工作流
 
-# 管理API
+# 爬虫API
+GET  /api/v1/crawler/tasks                # 采集任务列表
+POST /api/v1/crawler/tasks                # 创建任务
+PUT  /api/v1/crawler/tasks/{id}           # 更新任务
+DELETE /api/v1/crawler/tasks/{id}         # 删除任务
+POST /api/v1/crawler/tasks/{id}/trigger   # 触发任务
+GET  /api/v1/crawler/tasks/{id}/logs      # 任务日志
+
+# Worker API
+GET  /api/v1/worker/status                # Worker状态
+GET  /api/v1/worker/tasks                 # 待领取任务
+POST /api/v1/worker/tasks/{id}/claim      # 领取任务
+POST /api/v1/worker/tasks/{id}/complete   # 完成任务
+
+# OCR Worker API
+GET  /api/v1/ocr-worker/status            # OCR Worker状态
+POST /api/v1/ocr-worker/process           # 处理OCR任务
+GET  /api/v1/ocr-worker/queue             # 任务队列
+
+# 数据工作流API
+GET  /api/v1/admin/workflow/stats         # 工作流统计
+GET  /api/v1/admin/workflow/workers       # Worker列表
+GET  /api/v1/admin/workflow/ocr/tasks     # OCR任务列表
+POST /api/v1/admin/workflow/ocr/tasks/{id}/retry  # 重试任务
+GET  /api/v1/admin/workflow/review/tasks   # 审核任务列表
+POST /api/v1/admin/workflow/review/tasks/{id}/review  # 审核任务
+
+# 监控API
+GET  /api/v1/admin/monitor/api-stats            # API统计
+GET  /api/v1/admin/monitor/llm-stats            # LLM统计
+GET  /api/v1/admin/monitor/crawler-stats        # 采集统计
+GET  /api/v1/admin/monitor/agent-stats          # Agent统计
+
+# 数据分析API
 GET  /api/v1/admin/analytics/equipment/stats    # 装备统计
 GET  /api/v1/admin/analytics/equipment/trends   # 趋势分析
 POST /api/v1/admin/analytics/reports/generate   # 生成报表
+
+# 配置管理API
 GET  /api/v1/admin/config/configs               # 查询配置
 POST /api/v1/admin/config/configs               # 创建配置
-GET  /api/v1/admin/crawler/tasks                # 爬虫任务列表
-POST /api/v1/admin/crawler/tasks/trigger        # 触发爬虫
-GET  /api/v1/admin/monitor/api-stats            # API统计
-GET  /api/v1/admin/monitor/llm-stats            # LLM统计
+PUT  /api/v1/admin/config/configs/{id}          # 更新配置
+DELETE /api/v1/admin/config/configs/{id}        # 删除配置
+
+# 用户管理API
+GET  /api/v1/admin/users/users                 # 用户列表
+GET  /api/v1/admin/users/{id}                   # 用户详情
+PUT  /api/v1/admin/users/{id}                   # 更新用户
+DELETE /api/v1/admin/users/{id}                 # 删除用户
+GET  /api/v1/admin/users/{id}/equipment         # 用户装备
 ```
 
 ## 环境变量

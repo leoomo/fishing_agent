@@ -63,56 +63,63 @@
 ### packages/ 模块化包目录
 ```
 packages/                           # 模块化包目录
-├── agent_fishing/                  # 钓鱼Agent包
-│   ├── __init__.py                 # 包入口和导出
-│   ├── core/                       # Agent核心逻辑
-│   │   ├── __init__.py
-│   │   ├── agent.py                # 主要Agent类
-│   │   ├── model_factory.py        # LLM模型工厂
-│   │   ├── prompts.py              # 系统提示词
-│   │   └── callbacks.py            # 回调处理
-│   ├── tools/                      # 工具集合
-│   │   ├── __init__.py             # 工具注册和导出
-│   │   ├── basic.py                # 基础工具(时间等)
-│   │   ├── weather.py              # 天气相关工具
-│   │   ├── fishing_tool.py         # 钓鱼推荐工具
-│   │   ├── lure_tools.py           # 路亚装备工具
-│   │   ├── lure/                   # 路亚装备子模块
+├── agents/                        # Agent统一目录 (v5.1.0 重构)
+│   ├── agent_component/           # 共享组件
+│   │   └── monitoring/            # 统一监控回调
+│   │       └── callback.py        # MonitoringCallback
+│   ├── fishing/                   # 钓鱼Agent包
+│   │   ├── __init__.py            # 包入口和导出
+│   │   ├── core/                  # Agent核心逻辑
 │   │   │   ├── __init__.py
-│   │   │   ├── database.py         # 装备数据库
-│   │   │   ├── search.py           # 装备搜索
-│   │   │   └── recommendation.py    # 装备推荐
-│   │   └── scoring/                # 评分系统
+│   │   │   ├── agent.py           # 主要Agent类
+│   │   │   ├── model_factory.py   # LLM模型工厂
+│   │   │   ├── prompts.py         # 系统提示词
+│   │   │   └── callbacks.py       # 回调处理
+│   │   ├── tools/                 # 工具集合
+│   │   │   ├── __init__.py        # 工具注册和导出
+│   │   │   ├── basic.py           # 基础工具(时间等)
+│   │   │   ├── weather.py         # 天气相关工具
+│   │   │   ├── fishing_tool.py    # 钓鱼推荐工具
+│   │   │   ├── lure_tools.py      # 路亚装备工具
+│   │   │   ├── lure/              # 路亚装备子模块
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── database.py    # 装备数据库
+│   │   │   │   ├── search.py      # 装备搜索
+│   │   │   │   └── recommendation.py # 装备推荐
+│   │   │   ├── user_equipment/    # 用户装备管理 ⭐v5.1.0
+│   │   │   │   ├── manager.py     # 装备管理器
+│   │   │   │   ├── recommender.py # 装备推荐器
+│   │   │   │   └── tools.py       # Agent工具
+│   │   │   └── fishing/           # 钓鱼工具
+│   │   │       ├── scorer.py      # 评分器
+│   │   │       └── ...
+│   │   ├── middleware/            # 中间件
+│   │   │   ├── __init__.py
+│   │   │   └── dynamic_prompt.py  # 动态Prompt选择
+│   │   └── utils/                 # 工具函数
 │   │       ├── __init__.py
-│   │       ├── weather_scoring.py  # 天气评分
-│   │       └── fishing_scoring.py  # 钓鱼评分
-│   ├── middleware/                 # 中间件
-│   │   ├── __init__.py
-│   │   └── dynamic_prompt.py       # 动态Prompt选择
-│   └── utils/                      # 工具函数
+│   │       ├── coordinate.py      # 坐标处理
+│   │       ├── date_parser.py     # 日期解析
+│   │       └── weather_parser.py  # 天气解析
+│   └── equipment_import/          # 装备导入Agent包 ⭐v5.0.2
 │       ├── __init__.py
-│       ├── coordinate.py           # 坐标处理
-│       ├── date_parser.py          # 日期解析
-│       └── weather_parser.py       # 天气解析
-├── agent_equipment_import/         # 装备导入Agent包 ⭐v5.0.2
-│   ├── __init__.py
-│   ├── core/
-│   │   ├── agent.py                # 装备导入Agent
-│   │   ├── extractor.py            # 信息提取器
-│   │   └── prompts.py              # 提取提示词
-│   ├── middleware/
-│   │   ├── __init__.py
-│   │   ├── patterns.py             # 提取模式
-│   │   └── text_compressor.py      # 文本压缩中间件
-│   ├── models/                     # 数据模型
-│   │   ├── __init__.py
-│   │   └── pending.py              # 待审核装备模型
-│   ├── schemas/                    # 数据模式
-│   │   ├── __init__.py
-│   │   └── extracted.py            # 提取结果模式
-│   └── tools/
-│       ├── __init__.py
-│       └── import_tool.py          # 导入工具
+│       ├── core/
+│       │   ├── agent.py           # 装备导入Agent
+│       │   ├── extractor.py       # 信息提取器
+│       │   └── prompts.py         # 提取提示词
+│       ├── middleware/
+│       │   ├── __init__.py
+│       │   ├── patterns.py        # 提取模式
+│       │   └── text_compressor.py # 文本压缩中间件
+│       ├── models/                # 数据模型
+│       │   ├── __init__.py
+│       │   └── pending.py         # 待审核装备模型
+│       ├── schemas/               # 数据模式
+│       │   ├── __init__.py
+│       │   └── extracted.py       # 提取结果模式
+│       └── tools/
+│           ├── __init__.py
+│           └── import_tool.py     # 导入工具
 ├── data_processing/                # 数据处理包 ⭐v5.0.2
 │   ├── __init__.py
 │   ├── image/                      # 图片处理
@@ -142,32 +149,42 @@ packages/                           # 模块化包目录
     │   ├── taobao_spider.py        # 淘宝爬虫
     │   ├── jd_spider.py            # 京东爬虫
     │   └── forum_spider.py         # 论坛爬虫
-    ├── rpa/                        # RPA自动化
-    │   ├── __init__.py
-    │   ├── taobao_rpa.py           # 淘宝RPA
-    │   └── base_rpa.py             # RPA基类
+    ├── rpa/                        # RPA自动化 (Playwright)
+    │   ├── core/                   # 核心RPA引擎 ⭐v5.1.0
+    │   ├── extractors/             # 数据提取器
+    │   ├── pages/                  # 页面对象
+    │   └── utils/                  # 工具函数
     ├── platform/                   # 平台抽象层
     │   ├── __init__.py
     │   ├── taobao_platform.py      # 淘宝平台
     │   └── jd_platform.py          # 京东平台
-    ├── workflow/                   # 工作流引擎
+    ├── workflow/                   # 工作流引擎 (DAG)
     │   ├── __init__.py
     │   ├── manager.py              # 工作流管理器
     │   └── executor.py             # 任务执行器
+    ├── executor/                   # 任务执行器 ⭐v5.1.0
+    │   ├── __init__.py
+    │   └── crawler_executor.py     # 爬虫执行器
     ├── monitoring/                 # 监控告警
     │   ├── __init__.py
     │   ├── monitor.py              # 监控器
     │   └── alerting.py             # 告警器
-    ├── scheduler/                  # 定时调度
+    ├── scheduler/                  # 定时调度 ⭐v5.1.0
     │   ├── __init__.py
-    │   └── cron_scheduler.py       # 定时任务
+    │   └── workflow_scheduler.py   # 工作流调度
     ├── persister/                  # 数据持久化 ⭐v5.0.2
     │   ├── __init__.py
     │   └── equipment_persister.py  # 装备数据持久化
-    ├── worker/                     # 分布式Worker ⭐v5.0.2
-    │   ├── __init__.py
-    │   ├── worker.py               # Worker实现
-    │   └── client.py               # Worker客户端
+    ├── master/                     # Master节点服务 ⭐v5.1.0
+    │   ├── app.py                  # FastAPI应用
+    │   ├── auth/                   # 节点认证
+    │   ├── routes/                 # API路由
+    │   └── schemas/                # 数据模式
+    ├── worker/                     # Worker节点 ⭐v5.1.0
+    │   ├── worker.py               # Worker基类
+    │   ├── api_worker.py           # API Worker
+    │   ├── ocr_worker.py           # OCR Worker
+    │   └── client.py               # Master客户端
     └── models/                     # 爬虫模型
         ├── __init__.py
         ├── base.py                 # 基础模型
@@ -200,23 +217,25 @@ apps/                              # 应用层
 │   │   ├── __init__.py
 │   │   ├── cors.py                # CORS中间件
 │   │   └── auth.py                # 认证中间件
-│   ├── routes/                    # API路由
+│   ├── routes/                    # API路由 (17个模块)
 │   │   ├── __init__.py
 │   │   ├── fishing.py             # 钓鱼相关API
-│   │   ├── equipment.py           # 装备管理API
+│   │   ├── chat.py                # 聊天API ⭐v5.0.2
+│   │   ├── auth.py                # 认证API ⭐v3.1.1
+│   │   ├── user_equipment.py      # 用户装备API ⭐v5.0.2
 │   │   ├── equipment_admin.py     # 装备管理API ⭐v5.0.2
-    │   │   ├── import_export.py       # 导入导出API ⭐v5.0.2
-    │   │   ├── auth.py                # 认证API ⭐v3.1.1
-    │   │   ├── user_admin.py          # 用户管理API ⭐v5.0.2
-    │   │   ├── user_equipment.py      # 用户装备API ⭐v5.0.2
-    │   │   ├── admin.py               # 管理员API
-    │   │   ├── analytics.py           # 数据分析API ⭐v5.0.2
+│   │   ├── equipment_batch.py     # 批量操作API ⭐v5.0.2
+│   │   ├── import_export.py       # 导入导出API ⭐v5.0.2
+│   │   ├── user_admin.py          # 用户管理API ⭐v5.0.2
+│   │   ├── admin.py               # 管理员API
+│   │   ├── analytics.py           # 数据分析API ⭐v5.0.2
 │   │   ├── config.py              # 配置管理API ⭐v5.0.2
-│   │   ├── crawler.py             # 爬虫管理API ⭐v4.0.0
+│   │   ├── crawler.py             # 数据采集API ⭐v4.0.0
 │   │   ├── monitor.py             # 监控API ⭐v4.0.0
-    │   │   ├── ocr.py                 # OCR API ⭐v5.0.2
-    │   │   ├── chat.py                # 聊天API ⭐v5.0.2
-    │   │   └── worker.py              # Worker API ⭐v5.0.2
+│   │   ├── ocr.py                 # OCR API ⭐v5.0.2
+│   │   ├── ocr_worker.py          # OCR Worker API ⭐v5.0.2
+│   │   ├── worker.py              # Worker API ⭐v5.0.2
+│   │   └── data_workflow.py       # 数据工作流API ⭐v5.0.2
 │   ├── schemas/                   # 数据模型
 │   │   ├── __init__.py
 │   │   ├── fishing.py             # 钓鱼相关模型
@@ -227,7 +246,33 @@ apps/                              # 应用层
 │   │   ├── __init__.py
 │   │   ├── fishing_service.py     # 钓鱼服务
 │   │   ├── equipment_service.py   # 装备服务
-│   │   └── analytics_service.py   # 分析服务
+│   │   ├── analytics_service.py   # 分析服务
+│   │   ├── ocr/                   # OCR服务
+│   │   ├── config_service.py      # 配置服务
+│   │   ├── crawler_service.py     # 爬虫服务
+│   │   ├── monitor_service.py     # 监控服务
+│   │   ├── websocket_manager.py   # WebSocket管理
+│   │   └── workflow_ws_manager.py # 工作流WebSocket管理
+│   ├── models/                    # 数据库模型 (30个) ⭐v5.2.0
+│   │   ├── base.py                # Base, TimestampMixin
+│   │   ├── equipment.py           # Equipment, RodSpec, ReelSpec, LineSpec, LureSpec
+│   │   ├── brand.py               # Brand
+│   │   ├── user.py                # User, UserEquipment, FishingLog
+│   │   ├── fish.py                # FishSpecies, FishKnowledge, FishSeasonActivity
+│   │   ├── rig.py                 # RigType, RigSpec, RigComponent
+│   │   ├── lure.py                # LureType, RodLureFitness
+│   │   ├── admin_user.py          # AdminUser
+│   │   ├── system.py              # CrawlerTask, CrawlerLog, APILog, LLMLog, SystemConfig, AnalyticsReport
+│   │   ├── agent_log.py           # AgentExecutionLog, ToolCallLog
+│   │   └── chat.py                # ChatSession, ChatMessage
+│   ├── orm/                       # ORM层 ⭐v5.2.0
+│   │   ├── session.py             # 会话管理
+│   │   └── repositories/          # 仓储模式
+│   │       ├── equipment.py       # EquipmentRepository
+│   │       ├── brand.py           # BrandRepository
+│   │       ├── user.py            # UserRepository, UserEquipmentRepository
+│   │       ├── fish.py            # FishSpeciesRepository
+│   │       └── admin_user.py      # AdminUserRepository
 │   └── database/                  # 数据库配置
 │       ├── __init__.py
 │       ├── connection.py          # 数据库连接
@@ -420,11 +465,24 @@ class EquipmentBuilder:
 
 ### 核心功能导入
 ```python
-# Agent 核心功能
-from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
-from packages.agent_fishing.core import ModelFactory
-from packages.agent_fishing.tools import get_weather, query_fishing_recommendation
-from packages.agent_fishing.utils import get_coordinates, parse_date_input
+# Agent 核心功能 (v5.1.0 新路径)
+from packages.agents.fishing import FishingAgent, create_agent, get_all_tools
+from packages.agents.fishing.core import ModelFactory
+from packages.agents.fishing.tools import get_weather, query_fishing_recommendation
+from packages.agents.fishing.utils import get_coordinates, parse_date_input
+
+# 统一监控组件 (v5.1.0 新增)
+from packages.agents.agent_component.monitoring import MonitoringCallback
+
+# 用户装备管理 (v5.1.0 新增)
+from packages.agents.fishing.tools.user_equipment import (
+    UserEquipmentManager,
+    EquipmentRecommender
+)
+
+# 装备导入功能
+from packages.agents.equipment_import import EquipmentImportAgent
+from packages.agents.equipment_import.core import TextCompressor
 
 # 图片处理功能（位于 data_processing 包）
 from packages.data_processing.image import BatchMergeProcessor, ImageMerger
@@ -441,7 +499,7 @@ from packages.data_processing.dedup import Deduplicator
 from packages.data_processing.dedup.deduplicator import Deduplicator
 
 # 爬虫功能（位于 scraper 包）
-from packages.scraper import BaseSpider, CrawlItem, EquipmentData
+from packages.scraper import BaseSpider, CrawlItem
 from packages.scraper.spider import BaseSpider, CrawlItem
 from packages.scraper.spiders import TaobaoSpider, JDSpider, ForumSpider
 from packages.scraper.rpa import TaobaoRPA

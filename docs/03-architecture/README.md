@@ -63,7 +63,15 @@
 │                    领域层                                 │
 ├───────────┬───────────┬───────────┬─────────────────────┤
 │ 钓鱼Agent  │ 装备导入   │ 数据处理   │     爬虫框架         │
-│           │   Agent   │   系统    │                      │
+│(fishing/) │(equipment_│   系统    │  (Master-Worker)     │
+│           │  import/) │           │                      │
+└───────────┴───────────┴───────────┴─────────────────────┘
+                           │
+┌─────────────────────────────────────────────────────────┐
+│                  OCR工作流系统                            │
+├───────────┬───────────┬───────────┬─────────────────────┤
+│ 图片合并   │ 文字检测   │ OCR识别    │      结果处理        │
+│ ImageMerger│TextRegion │ Provider  │    PostProcess      │
 └───────────┴───────────┴───────────┴─────────────────────┘
                            │
 ┌─────────────────────────────────────────────────────────┐
@@ -173,6 +181,65 @@ class PromptSelector:
         return BASE_PROMPT
 ```
 
+### 4. Master-Worker模式 (分布式爬虫)
+```python
+# 分布式爬虫架构
+class MasterNode:
+    def __init__(self):
+        self.task_queue = Queue()
+        self.result_queue = Queue()
+        self.workers = []
+
+    def distribute_tasks(self, tasks: List[CrawlItem]):
+        for task in tasks:
+            self.task_queue.put(task)
+
+    def collect_results(self) -> List[CrawlResult]:
+        results = []
+        while not self.result_queue.empty():
+            results.append(self.result_queue.get())
+        return results
+
+class WorkerNode:
+    def __init__(self, worker_id: str):
+        self.worker_id = worker_id
+        self.spider = self._init_spider()
+
+    def process_task(self, task: CrawlItem) -> CrawlResult:
+        return self.spider.crawl(task)
+
+    def run(self, task_queue: Queue, result_queue: Queue):
+        while True:
+            task = task_queue.get()
+            result = self.process_task(task)
+            result_queue.put(result)
+```
+
+### 5. 工作流模式 (OCR系统)
+```python
+# OCR工作流管道
+class OCRWorkflow:
+    def __init__(self):
+        self.merger = ImageMerger()
+        self.detector = TextRegionDetector()
+        self.ocr = OCRFactory.create()
+        self.post_processor = PostProcessor()
+
+    def execute(self, images: List[Image]) -> OCRResult:
+        # 1. 图片合并
+        merged = self.merger.merge(images)
+
+        # 2. 文字区域检测
+        regions = self.detector.detect(merged)
+
+        # 3. OCR识别
+        texts = self.ocr.recognize(regions)
+
+        # 4. 后处理
+        result = self.post_processor.process(texts)
+        return result
+```
+
 ## 📊 数据流架构
 
 ### 请求处理流程
@@ -190,6 +257,148 @@ class PromptSelector:
     ↑           ↑           ↑           ↑           ↑           ↑
   历史记录   参数验证   Prompt选择   API调用   数据聚合   缓存更新
 ```
+
+## 🕷️ 分布式爬虫架构
+
+### Master-Worker模式设计
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Master节点                            │
+├───────────┬───────────┬───────────┬─────────────────────┤
+│  任务调度   │  结果聚合   │  状态监控   │     故障恢复         │
+│ Scheduler │  Aggregator│  Monitor   │    Recovery         │
+└───────────┴───────────┴───────────┴─────────────────────┘
+         │                   │                   │
+    ┌────┴────┐         ┌────┴────┐         ┌────┴────┐
+    │ 任务队列  │         │ 结果队列  │         │ 状态队列  │
+    └─────────┘         └─────────┘         └─────────┘
+         │                   │                   │
+┌────────┼────────┬────────┼────────┬────────┼────────┐
+│        │        │        │        │        │        │
+▼        ▼        ▼        ▼        ▼        ▼        ▼
+Worker1  Worker2  Worker3  Worker4  Worker5  WorkerN  ...
+└────────┴────────┴────────┴────────┴────────┴────────┘
+```
+
+### 核心组件
+
+1. **Master节点职责**
+   - 任务分发和调度
+   - Worker状态监控
+   - 结果聚合和去重
+   - 故障检测和恢复
+
+2. **Worker节点职责**
+   - 从任务队列获取任务
+   - 执行具体爬虫逻辑
+   - 上报执行结果
+   - 心跳保活机制
+
+3. **队列系统**
+   - 任务队列 (Task Queue)
+   - 结果队列 (Result Queue)
+   - 延迟队列 (Delayed Queue)
+   - 死信队列 (Dead Letter Queue)
+
+### 分布式爬虫包结构
+```
+packages/scraper/
+├── spider/              # 爬虫核心
+│   ├── base.py         # BaseSpider基类
+│   └── item.py         # CrawlItem数据模型
+├── spiders/            # 具体爬虫实现
+│   ├── taobao.py       # 淘宝爬虫
+│   ├── jd.py           # 京东爬虫
+│   └── forum.py        # 论坛爬虫
+├── rpa/                # RPA自动化框架
+│   └── taobao_rpa.py   # 淘宝RPA
+├── platform/           # 平台抽象层
+│   └── base_platform.py
+├── workflow/           # 工作流引擎
+│   └── workflow_manager.py
+├── executor/           # 任务执行器
+│   └── task_executor.py
+├── monitoring/         # 监控告警
+│   └── crawler_monitor.py
+├── scheduler/          # 定时调度
+│   └── task_scheduler.py
+├── persister/          # 数据持久化
+│   └── result_persister.py
+└── models/             # 独立的爬虫模型
+    └── crawl_models.py
+```
+
+## 🖼️ OCR工作流系统
+
+### 工作流管道架构
+
+```
+输入图片
+    │
+    ▼
+┌─────────────────┐
+│   图片预处理     │  → 尺寸调整、格式转换、质量优化
+│  ImageMerger    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   文字区域检测   │  → 检测文字区域、过滤无关区域
+│ TextRegion      │
+│  Detector       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   OCR识别        │  → 支持多提供商 (Ollama/SiliconFlow)
+│  OCRProvider    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   结果后处理     │  → 文字校正、格式化、结构化
+│ PostProcessor   │
+└────────┬────────┘
+         │
+         ▼
+    输出结果
+```
+
+### OCR系统包结构
+```
+packages/data_processing/
+├── image/              # 图片处理模块
+│   ├── merger.py       # ImageMerger图片合并
+│   └── batch_merger.py # BatchMergeProcessor批量处理
+├── ocr/                # OCR识别模块
+│   ├── detector.py     # TextRegionDetector文字检测
+│   ├── processor.py    # OCRMergeProcessor处理器
+│   └── providers/      # OCR提供商
+│       ├── base.py     # BaseOCRProvider基类
+│       ├── ollama.py   # Ollama本地OCR
+│       └── silicon.py  # SiliconFlow云端OCR
+└── dedup/              # 去重工具
+    └── deduplicator.py # Deduplicator去重器
+```
+
+### 工作流特性
+
+1. **模块化设计**
+   - 每个处理步骤独立可配置
+   - 支持自定义处理器
+   - 易于扩展和测试
+
+2. **多提供商支持**
+   - 本地OCR (Ollama)
+   - 云端OCR (SiliconFlow)
+   - 自动降级策略
+   - 负载均衡
+
+3. **批量处理**
+   - 支持多图片合并
+   - 并行处理优化
+   - 错误恢复机制
 
 ## 🔒 安全架构
 

@@ -31,7 +31,7 @@ cp .env.example .env
 # 编辑 .env 添加必要的API密钥
 
 # 4. 验证安装
-uv run python -c "from packages.agent_fishing import get_all_tools; print('✅ Agent包正常')"
+uv run python -c "from packages.agents.fishing import get_all_tools; print('✅ Agent包正常')"
 ```
 
 ### 多端开发启动
@@ -48,7 +48,7 @@ uv run uvicorn apps.api.main:app --reload
 cd apps/web-admin && npm run dev
 
 # 微信小程序开发
-# 使用微信开发者工具打开 miniprogram/ 目录
+# 使用微信开发者工具打开 fishing_agent_app/ 目录
 ```
 
 ## 📁 项目结构导航
@@ -57,22 +57,29 @@ cd apps/web-admin && npm run dev
 ```
 fishing-agent/
 ├── packages/                   # 模块化包开发
-│   ├── agent_fishing/          # 钓鱼Agent包 ⭐ 核心业务
-│   ├── agent_equipment_import/ # 装备导入Agent包 ⭐ v5.0.2新增
+│   ├── agents/                 # Agent统一目录
+│   │   ├── agent_component/    # 共享组件
+│   │   │   └── monitoring/     # 统一监控回调
+│   │   ├── fishing/            # 钓鱼Agent包 ⭐ 核心业务
+│   │   │   └── tools/
+│   │   │       └── user_equipment/  # 用户装备工具
+│   │   └── equipment_import/   # 装备导入Agent包 ⭐ v5.0.2新增
 │   ├── data_processing/        # 数据处理包 ⭐ 图片/OCR
 │   └── scraper/                # 爬虫框架包 ⭐ 数据采集
 ├── apps/                       # 应用层开发
 │   ├── cli/                    # CLI应用
 │   ├── api/                    # FastAPI后端 ⭐ REST接口
 │   └── web-admin/              # React前端 ⭐ 管理界面
-├── miniprogram/                # 微信小程序 ⭐ v5.0.2新增
+├── fishing_agent_app/          # 微信小程序 ⭐ v5.0.2新增
 └── shared/                     # 共享资源
 ```
 
 ### 关键开发文件
 ```python
 # 核心包入口
-packages/agent_fishing/__init__.py          # 钓鱼Agent包入口
+packages/agents/fishing/__init__.py         # 钓鱼Agent包入口
+packages/agents/agent_component/__init__.py # 共享组件入口
+packages/agents/equipment_import/__init__.py # 装备导入Agent包入口
 packages/data_processing/__init__.py        # 数据处理包入口
 packages/scraper/__init__.py                # 爬虫包入口
 
@@ -80,7 +87,7 @@ packages/scraper/__init__.py                # 爬虫包入口
 apps/cli/main.py                            # CLI应用入口
 apps/api/main.py                            # API服务入口
 apps/web-admin/src/App.tsx                  # React前端入口
-miniprogram/app.js                          # 微信小程序入口
+fishing_agent_app/app.js                    # 微信小程序入口
 
 # 配置文件
 pyproject.toml                              # 项目配置
@@ -99,7 +106,7 @@ git checkout -b feature/your-feature-name
 
 #### A. Agent包开发
 ```python
-# 在 packages/agent_fishing/tools/ 下创建新工具
+# 在 packages/agents/fishing/tools/ 下创建新工具
 # your_new_tool.py
 from langchain_core.tools import tool
 
@@ -123,7 +130,7 @@ def get_all_tools():
 # 在 apps/api/routes/ 下创建路由
 # your_feature.py
 from fastapi import APIRouter, Depends
-from packages.agent_fishing import create_agent
+from packages.agents.fishing import create_agent
 
 router = APIRouter(prefix="/api/v1/your-feature", tags=["your-feature"])
 
@@ -164,7 +171,7 @@ export default YourFeature;
 
 #### D. 微信小程序开发
 ```javascript
-// 在 miniprogram/pages/ 下创建页面
+// 在 fishing_agent_app/pages/ 下创建页面
 // your-feature/index.js
 Page({
   data: {
@@ -180,7 +187,7 @@ Page({
   }
 });
 
-// 在 miniprogram/app.json 中注册页面
+// 在 fishing_agent_app/app.json 中注册页面
 {
   "pages": [
     "pages/your-feature/index"
@@ -191,7 +198,7 @@ Page({
 ### Step 3: 测试开发
 ```bash
 # Python测试
-uv run pytest tests/agent_fishing/test_your_tool.py
+uv run pytest tests/agents/fishing/test_your_tool.py
 
 # 前端测试
 cd apps/web-admin && npm test
@@ -225,7 +232,7 @@ uv run uvicorn apps.api.main:app --reload --log-level debug
 ```python
 # tests/test_fix.py
 import pytest
-from packages.agent_fishing.tools.your_tool import your_new_tool
+from packages.agents.fishing.tools.your_tool import your_new_tool
 
 def test_your_tool_fix():
     """测试bug修复"""
@@ -247,19 +254,19 @@ uv run pytest
 ### 准备发布
 ```bash
 # 1. 更新版本号
-# packages/agent_fishing/pyproject.toml
+# packages/agents/fishing/pyproject.toml
 version = "1.2.3"
 
 # 2. 更新CHANGELOG
-# packages/agent_fishing/CHANGELOG.md
+# packages/agents/fishing/CHANGELOG.md
 
 # 3. 运行完整测试
-uv run pytest packages/agent_fishing/tests/
+uv run pytest packages/agents/fishing/tests/
 ```
 
 ### 发布到PyPI
 ```bash
-cd packages/agent_fishing
+cd packages/agents/fishing
 uv build
 uv publish --username __token__ --password your-pypi-token
 ```
@@ -287,9 +294,9 @@ uv publish --username __token__ --password your-pypi-token
 
 #### 单元测试
 ```python
-# tests/agent_fishing/tools/test_weather.py
+# tests/agents/fishing/tools/test_weather.py
 import pytest
-from packages.agent_fishing.tools.weather import get_weather_by_date
+from packages.agents.fishing.tools.weather import get_weather_by_date
 
 def test_get_weather_by_date():
     """测试天气工具"""
@@ -340,10 +347,10 @@ test('renders component correctly', () => {
 uv run pytest
 
 # 运行特定包测试
-uv run pytest packages/agent_fishing/tests/
+uv run pytest packages/agents/fishing/tests/
 
 # 运行覆盖率测试
-uv run pytest --cov=packages.agent_fishing
+uv run pytest --cov=packages.agents.fishing
 
 # 前端测试
 cd apps/web-admin && npm run test
@@ -365,7 +372,7 @@ uv run isort packages/ apps/
 uv run flake8 packages/ apps/
 
 # 使用 mypy 类型检查
-uv run mypy packages/agent_fishing/
+uv run mypy packages/agents/fishing/
 ```
 
 #### TypeScript代码规范

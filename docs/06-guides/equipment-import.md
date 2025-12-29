@@ -32,7 +32,7 @@
 
 ### 提取器架构
 ```python
-# packages/agent_equipment_import/core/extractors/custom_extractor.py
+# packages/agents/equipment_import/core/extractors/custom_extractor.py
 from typing import List, Dict, Optional
 import re
 
@@ -166,7 +166,7 @@ class CustomExtractor:
 ### 提取示例
 ```python
 # 使用示例
-from packages.agent_equipment_import.core import EquipmentImportAgent
+from packages.agents.equipment_import.core import EquipmentImportAgent
 
 # 创建导入Agent
 agent = EquipmentImportAgent(
@@ -201,7 +201,7 @@ for result in results:
 
 ### 压缩策略
 ```python
-# packages/agent_equipment_import/core/compressor.py
+# packages/agents/equipment_import/core/compressor.py
 class TextCompressor:
     def __init__(self):
         # 冗余词汇列表
@@ -338,7 +338,7 @@ class CompressionResult:
 
 ### 批量处理架构
 ```python
-# packages/agent_equipment_import/core/batch_processor.py
+# packages/agents/equipment_import/core/batch_processor.py
 class BatchImportProcessor:
     def __init__(self, batch_size: int = 50, max_workers: int = 4):
         self.batch_size = batch_size
@@ -470,7 +470,7 @@ if __name__ == "__main__":
 
 ### 数据验证规则
 ```python
-# packages/agent_equipment_import/core/validator.py
+# packages/agents/equipment_import/core/validator.py
 class EquipmentValidator:
     def __init__(self):
         self.brand_whitelist = {
@@ -524,7 +524,7 @@ class ValidationResult:
 
 ### 去重处理
 ```python
-# packages/agent_equipment_import/core/deduplicator.py
+# packages/agents/equipment_import/core/deduplicator.py
 class EquipmentDeduplicator:
     def __init__(self):
         self.existing_equipment = set()
