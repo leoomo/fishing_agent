@@ -14,9 +14,20 @@ from langchain_core.runnables import Runnable
 from .extractor import EquipmentExtractor
 from .prompts import EQUIPMENT_IMPORT_SYSTEM_PROMPT
 from ..tools import get_import_tools
+from ..tools.import_tool import (
+    _check_duplicate_equipment,
+    _check_duplicate_pending
+)
 from ..schemas.extracted import ExtractedEquipment, ImportResult
 from ..models.pending import save_pending_equipment
 from ..middleware import TextCompressorMiddleware, TextCompressor
+from ..constants import (
+    EQUIPMENT_TYPES,
+    CONFIDENCE_THRESHOLD_LOW,
+    DEFAULT_MODEL_PROVIDER,
+    COMPRESSION_MIN_LENGTH,
+    BATCH_OCR_TEXT_LIMIT
+)
 from packages.agents.agent_component.monitoring import MonitoringCallback
 
 logger = logging.getLogger(__name__)
@@ -33,11 +44,11 @@ class EquipmentImportAgent:
 
     def __init__(
         self,
-        model_provider: str = "zhipu",
+        model_provider: str = DEFAULT_MODEL_PROVIDER,
         timeout: int = 60,
         enable_logging: bool = True,
         enable_compression: bool = True,
-        compression_min_length: int = 2000,
+        compression_min_length: int = COMPRESSION_MIN_LENGTH,
         enable_monitoring: bool = True,
         user_id: Optional[int] = None,
         session_id: Optional[int] = None
@@ -202,7 +213,10 @@ class EquipmentImportAgent:
         self,
         text: str,
         source_type: str = "unknown",
-        source_url: Optional[str] = None
+        source_url: Optional[str] = None,
+        check_duplicates: bool = True,
+        brand_hint: str = "",
+        dry_run: bool = False
     ) -> ImportResult:
         """
         直接 API 调用：提取装备信息并存入待审核表
@@ -211,6 +225,9 @@ class EquipmentImportAgent:
             text: 包含装备信息的文本内容
             source_type: 来源类型 (ecommerce/official/forum/unknown)
             source_url: 来源 URL
+            check_duplicates: 是否检查重复装备
+            brand_hint: 品牌提示
+            dry_run: 仅提取不保存
 
         Returns:
             ImportResult: 导入结果
@@ -227,8 +244,13 @@ class EquipmentImportAgent:
                     message="文本内容为空"
                 )
 
+            # 如果有品牌提示，添加到文本开头
+            processed_text = text
+            if brand_hint:
+                processed_text = f"[品牌提示: {brand_hint}]\n\n{text}"
+
             # 使用 LLM 提取装备信息
-            extracted = self.extractor.extract(text, source_type)
+            extracted = self.extractor.extract(processed_text, source_type)
 
             # 检查提取结果
             if not extracted.equipment_type:
@@ -239,10 +261,70 @@ class EquipmentImportAgent:
                     extracted=extracted
                 )
 
+            # 验证装备类型
+            if extracted.equipment_type not in EQUIPMENT_TYPES:
+                self.monitoring_callback.set_error(f"不支持的装备类型: {extracted.equipment_type}")
+                return ImportResult(
+                    success=False,
+                    message=f"不支持的装备类型: {extracted.equipment_type}",
+                    extracted=extracted
+                )
+
+            # 检查置信度
+            if extracted.confidence < CONFIDENCE_THRESHOLD_LOW:
+                return ImportResult(
+                    success=False,
+                    message=f"提取置信度过低 ({extracted.confidence:.0%})",
+                    extracted=extracted
+                )
+
+            # 检查重复
+            duplicate_info = None
+            if check_duplicates:
+                dup_equipment = _check_duplicate_equipment(
+                    extracted.brand_name,
+                    extracted.model,
+                    extracted.equipment_type
+                )
+                if dup_equipment:
+                    duplicate_info = {
+                        "type": "equipment",
+                        "id": dup_equipment.get("id"),
+                        "name": dup_equipment.get("name")
+                    }
+
+                if not duplicate_info:
+                    dup_pending = _check_duplicate_pending(
+                        extracted.brand_name,
+                        extracted.model
+                    )
+                    if dup_pending:
+                        duplicate_info = {
+                            "type": "pending",
+                            "id": dup_pending.get("id"),
+                            "name": f"{dup_pending.get('brand_name')} {dup_pending.get('model_name')}"
+                        }
+
+            # dry_run 模式：只返回提取结果，不保存
+            if dry_run:
+                message = f"预览模式：成功提取 {extracted.equipment_type} 信息"
+                if duplicate_info:
+                    message += f"（注意：已存在相似记录）"
+
+                self.monitoring_callback.set_success(True)
+                self.monitoring_callback.end_execution()
+
+                result = ImportResult(
+                    success=True,
+                    message=message,
+                    extracted=extracted
+                )
+                return result
+
             # 存入待审核表
             pending_id = save_pending_equipment(
                 extracted=extracted,
-                ocr_text=text,  # 数据库字段名保持不变
+                ocr_text=text,
                 source_type=source_type,
                 source_url=source_url
             )
@@ -251,10 +333,14 @@ class EquipmentImportAgent:
             self.monitoring_callback.set_success(True)
             self.monitoring_callback.end_execution()
 
+            message = f"成功提取 {extracted.equipment_type} 信息，已存入待审核表"
+            if duplicate_info:
+                message += f"（注意：已存在相似记录 {duplicate_info['name']}）"
+
             return ImportResult(
                 success=True,
                 pending_id=pending_id,
-                message=f"成功提取 {extracted.equipment_type} 信息，已存入待审核表",
+                message=message,
                 extracted=extracted
             )
 
@@ -322,7 +408,7 @@ class EquipmentImportAgent:
 
             # 如果启用压缩，先压缩文本
             processed_text = text
-            if self.compressor and len(text) > 2000:
+            if self.compressor and len(text) > COMPRESSION_MIN_LENGTH:
                 compressed = self.compressor.compress(text)
                 processed_text = compressed.content
                 if self.enable_logging:
@@ -355,7 +441,7 @@ class EquipmentImportAgent:
                     # 存入待审核表
                     pending_id = save_pending_equipment(
                         extracted=extracted,
-                        ocr_text=text[:1000],  # 只保存原文前 1000 字符
+                        ocr_text=text[:BATCH_OCR_TEXT_LIMIT],  # 只保存原文前 N 字符
                         source_type=source_type,
                         source_url=source_url
                     )
@@ -416,7 +502,7 @@ class EquipmentImportAgent:
         """
         # 如果启用压缩，先压缩文本
         processed_text = text
-        if self.compressor and len(text) > 2000:
+        if self.compressor and len(text) > COMPRESSION_MIN_LENGTH:
             compressed = self.compressor.compress(text)
             processed_text = compressed.content
             if self.enable_logging:
