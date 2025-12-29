@@ -363,8 +363,10 @@ def calculate_hourly_scores(weather_data: Dict[str, Any], target_date: date = No
                 )
 
                 # 构建该小时的评分记录
+                # 从 datetime 对象获取实际的小时值
+                actual_hour = hour_datetime.hour if hasattr(hour_datetime, 'hour') else i
                 hour_score = {
-                    'hour': i,
+                    'hour': actual_hour,
                     'datetime': hour_datetime,
                     'time_str': hour_datetime.strftime('%H:%M'),
                     'score': hour_scores_dict['overall'],
