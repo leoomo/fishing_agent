@@ -47,39 +47,61 @@
 ### 核心目录结构 (v5.0.2)
 ```
 packages/                      # 模块化包目录
-├── agent_fishing/             # 钓鱼Agent包
-│   ├── core/                  # Agent核心
-│   ├── tools/                 # 工具集
-│   └── middleware/            # 动态Prompt中间件
-├── agent_equipment_import/    # 装备导入Agent包 ⭐ v5.0.2
-├── data_processing/           # 数据处理包
-│   ├── image/                 # 图片处理
-│   ├── ocr/                   # OCR多提供商
-│   └── dedup/                 # 去重工具
-└── scraper/                   # 爬虫框架包
+├── agents/                   # Agent统一目录 (v5.1.0 重构)
+│   ├── agent_component/      # 共享组件
+│   │   └── monitoring/       # 统一监控回调
+│   ├── fishing/              # 钓鱼Agent包
+│   │   ├── core/             # Agent核心
+│   │   ├── tools/            # 工具集
+│   │   │   ├── user_equipment/ # 用户装备管理
+│   │   │   └── lure/          # 路亚工具
+│   │   └── middleware/       # 动态Prompt中间件
+│   └── equipment_import/     # 装备导入Agent包 ⭐ v5.0.2
+├── data_processing/          # 数据处理包
+│   ├── image/                # 图片处理
+│   ├── ocr/                  # OCR多提供商
+│   └── dedup/                # 去重工具
+└── scraper/                  # 爬虫框架包 (分布式Master-Worker)
+    ├── master/               # Master节点服务 ⭐v5.1.0
+    ├── worker/               # Worker节点 ⭐v5.1.0
+    └── rpa/                  # RPA自动化 (Playwright)
 
 apps/                          # 应用层
-├── cli/                       # CLI应用
-├── api/                       # FastAPI后端
-└── web-admin/                 # React管理前端
+├── cli/                      # CLI应用
+├── api/                      # FastAPI后端
+└── web-admin/                # React管理前端
 
-miniprogram/                   # 微信小程序 ⭐ v5.0.2新增
+fishing_agent_app/            # 微信小程序 ⭐ v5.0.2新增
 shared/                        # 共享资源
 ```
 
 ### 模块职责
-- **agent_fishing**: 钓鱼核心功能，完全自包含
+- **agents/fishing**: 钓鱼核心功能，完全自包含
+- **agents/equipment_import**: 装备导入功能，支持文本压缩
+- **agents/agent_component**: 统一监控组件 (MonitoringCallback)
 - **data_processing**: 图片处理、OCR、去重，独立可用
-- **scraper**: 爬虫框架，通过configure_database()接收数据库连接
+- **scraper**: 分布式爬虫框架 (Master-Worker架构，77个文件)
 - **apps**: 各端应用实现，调用Agent包处理业务逻辑
-- **miniprogram**: 微信小程序，面向终端用户的移动端应用
+- **fishing_agent_app**: 微信小程序，面向终端用户的移动端应用
 
 ## 🎯 主要入口点
 
 ```python
-# 编程接口
-from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
+# Agent 核心功能 (v5.1.0 新路径)
+from packages.agents.fishing import FishingAgent, create_agent, get_all_tools
 agent = create_agent(model_provider="zhipu")
+
+# 统一监控组件 (v5.1.0 新增)
+from packages.agents.agent_component.monitoring import MonitoringCallback
+
+# 用户装备管理 (v5.1.0 新增)
+from packages.agents.fishing.tools.user_equipment import (
+    UserEquipmentManager,
+    EquipmentRecommender
+)
+
+# 装备导入功能
+from packages.agents.equipment_import import EquipmentImportAgent
 
 # 图片处理
 from packages.data_processing.image import BatchMergeProcessor
@@ -89,8 +111,9 @@ processor = BatchMergeProcessor(source_dir="./images")
 from packages.data_processing.ocr import OCRMergeProcessor
 ocr_processor = OCRMergeProcessor(provider="siliconflow")
 
-# 爬虫功能
+# 爬虫功能 (分布式Master-Worker)
 from packages.scraper import BaseSpider, WorkflowManager
+from packages.scraper.worker import CrawlerWorker
 ```
 
 ## 🔧 核心组件
@@ -181,7 +204,7 @@ apps/web-admin/src/App.tsx
 // 使用React 19.2.0 + TypeScript + Ant Design
 
 # 微信小程序应用
-miniprogram/app.js
+fishing_agent_app/app.js
 // 微信登录 + API调用
 ```
 
@@ -229,8 +252,10 @@ Cache Layers:
 
 ### 关键文件导航
 ```python
-# 核心包架构
-packages/agent_fishing/__init__.py           # 钓鱼Agent包入口
+# 核心包架构 (v5.1.0 新路径)
+packages/agents/fishing/__init__.py           # 钓鱼Agent包入口
+packages/agents/agent_component/monitoring/  # 统一监控组件
+packages/agents/equipment_import/__init__.py  # 装备导入Agent包入口
 packages/data_processing/__init__.py         # 数据处理包入口
 packages/scraper/__init__.py                 # 爬虫包入口
 
@@ -238,7 +263,7 @@ packages/scraper/__init__.py                 # 爬虫包入口
 apps/cli/main.py                             # CLI应用
 apps/api/main.py                             # FastAPI后端
 apps/web-admin/src/App.tsx                   # React前端
-miniprogram/app.js                           # 微信小程序 ⭐ v5.0.2
+fishing_agent_app/app.js                    # 微信小程序 ⭐ v5.0.2
 
 # 项目配置
 pyproject.toml                              # 项目配置

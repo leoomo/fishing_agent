@@ -90,7 +90,7 @@ uv run uvicorn apps.api.main:app --reload
 cd apps/web-admin && npm run dev
 
 # 微信小程序开发
-# 使用微信开发者工具打开 miniprogram/ 目录
+# 使用微信开发者工具打开 fishing_agent_app/ 目录
 ```
 
 ### 3. 运行测试
@@ -99,22 +99,26 @@ cd apps/web-admin && npm run dev
 uv run pytest
 
 # 特定包测试
-uv run pytest packages/agent_fishing/tests/
+uv run pytest packages/agents/fishing/tests/
 
 # 测试覆盖率
-uv run pytest --cov=packages.agent_fishing
+uv run pytest --cov=packages.agents.fishing
 ```
 
 ## 📦 包结构概览
 
 ```
 packages/                          # 模块化包目录
-├── agent_fishing/                # 钓鱼Agent包
-│   ├── core/                     # Agent核心逻辑
-│   ├── tools/                    # 工具集合
-│   ├── middleware/               # 中间件
-│   └── utils/                    # 工具函数
-├── agent_equipment_import/       # 装备导入Agent包
+├── agents/                       # Agent统一目录
+│   ├── agent_component/          # 共享组件
+│   │   └── monitoring/           # 统一监控回调 (MonitoringCallback)
+│   ├── fishing/                  # 钓鱼Agent包
+│   │   ├── core/                 # Agent核心逻辑
+│   │   ├── tools/                # 工具集合
+│   │   │   └── user_equipment/   # 用户装备工具
+│   │   ├── middleware/           # 中间件
+│   │   └── utils/                # 工具函数
+│   └── equipment_import/         # 装备导入Agent包
 ├── data_processing/              # 数据处理包
 │   ├── image/                    # 图片处理
 │   ├── ocr/                      # OCR识别
@@ -128,13 +132,24 @@ apps/                             # 应用层
 ├── cli/                          # CLI应用
 ├── api/                          # FastAPI后端
 └── web-admin/                    # React管理前端
+
+fishing_agent_app/                # 微信小程序
 ```
 
 ## 🔗 关键导入
 
 ```python
 # Agent 核心功能
-from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
+from packages.agents.fishing import FishingAgent, create_agent, get_all_tools
+from packages.agents.fishing.tools import get_weather, query_fishing_recommendation
+from packages.agents.fishing.utils import get_coordinates, parse_date_input
+
+# 统一监控组件
+from packages.agents.agent_component.monitoring import MonitoringCallback
+
+# 装备导入功能
+from packages.agents.equipment_import import EquipmentImportAgent
+from packages.agents.equipment_import.core import TextCompressor
 
 # 图片处理功能
 from packages.data_processing.image import BatchMergeProcessor, ImageMerger
@@ -144,9 +159,6 @@ from packages.data_processing.ocr import OCRMergeProcessor
 
 # 爬虫功能
 from packages.scraper import BaseSpider, CrawlItem
-
-# 装备导入功能
-from packages.agent_equipment_import import EquipmentImportAgent
 ```
 
 ## 🎨 开发约定

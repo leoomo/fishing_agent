@@ -48,7 +48,7 @@ agent.run("武汉东湖钓鱼条件怎么样？")
 agent.run("杭州西湖现在天气如何？能钓鱼吗？")
 
 # 坐标查询（高级功能）
-from packages.agent_fishing.utils import get_coordinates
+from packages.agents.fishing.utils import get_coordinates
 coords = get_coordinates("北京")
 print(f"北京坐标: {coords}")
 ```
@@ -58,14 +58,14 @@ print(f"北京坐标: {coords}")
 获取详细的天气信息：
 
 ```python
-from packages.agent_fishing.tools import get_weather
+from packages.agents.fishing.tools import get_weather
 
 # 获取当前天气
 weather = get_weather("北京", "today")
 print(f"天气: {weather}")
 
 # 获取钓鱼评分
-from packages.agent_fishing.tools import query_fishing_recommendation
+from packages.agents.fishing.tools import query_fishing_recommendation
 recommendation = query_fishing_recommendation("北京", "明天")
 print(f"钓鱼推荐: {recommendation}")
 ```
@@ -144,7 +144,7 @@ print(f"钓鱼推荐: {recommendation}")
 系统能够从各种文本中提取装备信息：
 
 ```python
-from packages.agent_equipment_import import EquipmentImportAgent
+from packages.agents.equipment_import import EquipmentImportAgent
 
 # 创建导入Agent
 agent = EquipmentImportAgent(model_provider="zhipu")

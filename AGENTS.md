@@ -44,27 +44,63 @@ openspec archive <id> --yes    # 归档变更
 ## 目录结构
 ```
 packages/
-├── agent_fishing/         # 核心Agent包 (自包含)
-├── data_processing/       # 数据处理包 (独立可用)
-└── scraper/               # 爬虫框架包 (独立可用)
+├── agents/                # Agent统一目录 (v5.1.0重构)
+│   ├── agent_component/   # 共享组件
+│   │   └── monitoring/    # 统一监控回调 (MonitoringCallback)
+│   ├── fishing/           # 钓鱼助手Agent
+│   │   ├── core/          # agent.py, model_factory.py, prompts.py
+│   │   ├── tools/         # basic, weather, fishing, lure/, scoring/
+│   │   │   └── lure/      # 路亚工具 (兼容层，重导出 apps.api)
+│   │   ├── middleware/    # dynamic_prompt.py
+│   │   └── utils/
+│   └── equipment_import/  # 装备导入Agent
+│       ├── core/          # agent.py, extractor.py
+│       ├── tools/         # 导入工具
+│       └── middleware/    # 文本压缩
+├── data_processing/       # 数据处理包
+│   ├── image/             # 图片处理 (ImageMerger, BatchMergeProcessor)
+│   ├── ocr/               # OCR文字检测 (TextRegionDetector)
+│   └── dedup/             # 去重工具
+└── scraper/               # 爬虫框架包
+    ├── spider/            # 爬虫核心 (BaseSpider, CrawlItem)
+    ├── spiders/           # 具体爬虫实现 (taobao, jd, forum)
+    ├── rpa/               # RPA自动化框架
+    ├── platform/          # 平台抽象层
+    ├── workflow/          # 工作流引擎
+    ├── executor/          # 任务执行器
+    ├── monitoring/        # 监控告警
+    ├── scheduler/         # 定时调度
+    ├── persister/         # 数据持久化
+    └── models/            # 独立的爬虫模型
 apps/
-├── cli/                   # CLI应用
+├── cli/                   # CLI应用 (main.py)
 ├── api/                   # FastAPI后端
+│   ├── main.py            # API服务器
+│   ├── auth/              # JWT认证模块
+│   ├── middleware/        # 认证中间件
+│   ├── routes/            # API路由
+│   ├── schemas/           # 请求/响应模型
+│   ├── services/          # 业务服务层
+│   ├── models/            # 数据库模型
+│   ├── orm/               # ORM层
+│   │   ├── session.py     # 会话管理
+│   │   └── repositories/  # 仓储模式
+│   └── database.py        # 数据库访问
 └── web-admin/             # React管理前端
-miniprogram/               # 微信小程序 (uni-app)
+fishing_agent_app/         # 微信小程序 (uni-app)
 shared/
 ├── config/                # 全局配置
-└── data/                  # 共享数据
+└── data/                  # 数据库文件 (equipment.db)
 ```
 
 ## 关键导入
 
-### Agent核心功能
+### Agent核心功能 (v5.1.0 新路径)
 ```python
-from packages.agent_fishing import FishingAgent, create_agent, get_all_tools
-from packages.agent_fishing.core import ModelFactory
-from packages.agent_fishing.tools import get_weather, query_fishing_recommendation
-from packages.agent_fishing.utils import get_coordinates, parse_date_input
+from packages.agents.fishing import FishingAgent, create_agent, get_all_tools
+from packages.agents.fishing.core import ModelFactory
+from packages.agents.fishing.tools import get_weather, query_fishing_recommendation
+from packages.agents.fishing.utils import get_coordinates, parse_date_input
 ```
 
 ### 数据处理功能
@@ -82,10 +118,15 @@ from packages.scraper.rpa import TaobaoRPA
 from packages.scraper.workflow import WorkflowManager
 ```
 
+### 统一监控组件 (v5.1.0 新增)
+```python
+from packages.agents.agent_component.monitoring import MonitoringCallback
+```
+
 ### 装备导入功能
 ```python
-from packages.agent_equipment_import import EquipmentImportAgent
-from packages.agent_equipment_import.core import TextCompressor
+from packages.agents.equipment_import import EquipmentImportAgent
+from packages.agents.equipment_import.core import TextCompressor
 ```
 
 ## API端点
@@ -161,7 +202,7 @@ uv run uvicorn apps.api.main:app --reload
 cd apps/web-admin && npm run dev
 
 # 小程序
-# 1. 使用微信开发者工具打开 miniprogram/fishing_agent/
+# 1. 使用微信开发者工具打开 fishing_agent_app/
 # 2. 配置小程序AppID和服务器域名
 ```
 
@@ -171,16 +212,18 @@ PYTHONPATH=src uv run pytest               # 运行测试
 ```
 
 ## 架构原则
-1. **Agent自包含** (独立发布)
-2. **基础设施模块化** (scraper/data_processing独立)
-3. **同步优先** (requests)
-4. **诚实数据** (无假数据)
-5. **LangChain 1.0+** (@tool装饰器)
+1. Agent统一管理 (packages/agents/) | 2. 共享组件抽取 (agent_component) | 3. 同步优先 (requests) | 4. 诚实数据 (无假数据) | 5. LangChain 1.0+ (@tool装饰器)
 
 ## 包依赖说明
-- **agent_fishing**: 核心Agent包，独立自包含
-- **data_processing**: 数据处理包，独立可用，不依赖agent_fishing
-- **scraper**: 爬虫框架包，独立可用，通过configure_database()接收数据库连接
+- **apps/api/models**: 数据库模型（v5.2.0 从 lure 迁移）
+- **apps/api/orm**: ORM 层和仓储模式（v5.2.0 从 lure 迁移）
+- **apps/api/database**: 数据库访问层（v5.2.0 从 lure 迁移）
+- **agents/fishing**: 钓鱼助手Agent，使用统一监控组件
+- **agents/fishing/tools/lure**: 路亚工具（兼容层，重导出 apps.api）
+- **agents/equipment_import**: 装备导入Agent，使用统一监控组件
+- **agents/agent_component**: 共享组件（MonitoringCallback等）
+- **data_processing**: 数据处理包，独立可用
+- **scraper**: 爬虫框架包，独立可用
 
 ## 文档导航
 

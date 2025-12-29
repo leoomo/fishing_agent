@@ -50,7 +50,7 @@ CREATE INDEX idx_equipment_search ON equipment(brand, model, category);
 
 #### 2. 查询优化示例
 ```python
-# packages/agent_fishing/tools/lure/database.py
+# packages/agents/fishing/tools/lure/database.py
 from sqlalchemy import text
 
 # 优化前的查询
@@ -66,7 +66,7 @@ def get_equipment_slow(category: str, price_range: tuple):
 
 # 优化后的查询
 def get_equipment_optimized(category: str, price_range: tuple, limit: int = 50):
-    from packages.agent_fishing.tools.lure.database import Equipment
+    from packages.agents.fishing.tools.lure.database import Equipment
     
     query = Equipment.query.filter(
         Equipment.category == category,
@@ -231,7 +231,7 @@ def get_weather_data(location: str, date: str):
 
 ### 智能缓存策略
 ```python
-# packages/agent_fishing/core/cache.py
+# packages/agents/fishing/core/cache.py
 class SmartCache:
     def __init__(self):
         self.cache_stats = {
@@ -567,7 +567,7 @@ export default LazyImage;
 
 ### 动态Prompt优化
 ```python
-# packages/agent_fishing/middleware/dynamic_prompt.py
+# packages/agents/fishing/middleware/dynamic_prompt.py
 from typing import Dict, List
 import hashlib
 
@@ -634,7 +634,7 @@ class DynamicPromptManager:
 
 ### 工具选择优化
 ```python
-# packages/agent_fishing/core/tool_optimizer.py
+# packages/agents/fishing/core/tool_optimizer.py
 import time
 from typing import Dict, Any, List
 

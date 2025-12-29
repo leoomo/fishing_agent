@@ -5,6 +5,25 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.2.0] - 2024-12-29
+
+### 新增
+- 🤖 **用户装备管理系统** - UserEquipmentManager和EquipmentRecommender
+- 📊 **统一监控组件** - MonitoringCallback适用于所有Agent
+- 🕷️ **分布式爬虫架构** - Master-Worker模式，支持多种Worker类型
+- 🔧 **OCR工作流** - 完整的OCR图片处理工作流
+- 📦 **装备批量操作** - 支持批量添加和管理装备
+- 🎯 **OCR Worker** - 专用的OCR处理Worker节点
+
+### 改进
+- 🏗️ **Agent包路径重构** - 统一为packages/agents/ (复数形式)
+- 📂 **小程序目录重命名** - fishing_agent_app/
+- 🔌 **API路由扩展** - 新增7个路由模块，总计17个
+- 📊 **数据库模型完善** - 30个模型，覆盖所有业务
+
+### 文档
+- 📚 **文档全面更新** - 同步更新所有30+个文档
+
 ## [5.0.2] - 2024-12-22
 
 ### 新增
