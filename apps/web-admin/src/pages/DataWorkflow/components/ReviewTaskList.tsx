@@ -32,8 +32,6 @@ import {
 } from 'antd'
 import {
   EyeOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
   DeleteOutlined,
   ShoppingOutlined,
   GlobalOutlined,
@@ -377,35 +375,18 @@ const ReviewTaskList: React.FC<ReviewTaskListProps> = ({
     {
       title: '操作',
       key: 'actions',
-      width: 180,
+      width: 120,
       render: (_, record: ReviewTaskItem) => (
         <Space size="small">
-          <Tooltip title="查看详情">
+          <Tooltip title="查看详情并审核">
             <Button
-              type="link"
+              type="primary"
               size="small"
               icon={<EyeOutlined />}
               onClick={() => handleViewDetail(record)}
-            />
-          </Tooltip>
-          <Tooltip title={record.status === 'pending' ? '通过' : '重新审核为通过'}>
-            <Button
-              type="link"
-              size="small"
-              icon={<CheckCircleOutlined />}
-              style={{ color: record.status === 'approved' ? '#52c41a' : undefined }}
-              onClick={() => onShowReviewModal(record, 'approve')}
-            />
-          </Tooltip>
-          <Tooltip title={record.status === 'pending' ? '拒绝' : '重新审核为拒绝'}>
-            <Button
-              type="link"
-              size="small"
-              icon={<CloseCircleOutlined />}
-              danger={record.status !== 'rejected'}
-              style={{ color: record.status === 'rejected' ? '#ff4d4f' : undefined }}
-              onClick={() => onShowReviewModal(record, 'reject')}
-            />
+            >
+              审核
+            </Button>
           </Tooltip>
           <Popconfirm
             title="确定要删除这条记录吗？"

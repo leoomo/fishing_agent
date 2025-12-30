@@ -1,13 +1,25 @@
 /**
- * 数据处理工作流页面
+ * 数据工作流页面
  *
- * 整合 OCR Worker 和待审核装备管理
+ * 统一入口，整合：
+ * - Tab 1: 采集任务 (原 /crawler)
+ * - Tab 2: OCR处理
+ * - Tab 3: 人工审核
+ * - Tab 4: Worker监控
  */
 
 import React, { useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Typography, Button, Card, Tabs, Space, Select, message, Tag, Tooltip } from 'antd'
-import { ReloadOutlined, WifiOutlined, DisconnectOutlined } from '@ant-design/icons'
+import {
+  ReloadOutlined,
+  WifiOutlined,
+  DisconnectOutlined,
+  RobotOutlined,
+  ScanOutlined,
+  AuditOutlined,
+  TeamOutlined,
+} from '@ant-design/icons'
 import type { AppDispatch } from '../../store/store'
 import type { WorkflowTab, OCRStatus, ReviewStatus } from '../../types/dataWorkflow'
 import { WS_STATUS_CONFIG } from '../../types/dataWorkflow'
@@ -18,11 +30,12 @@ import WorkerMonitorPanel from './components/WorkerMonitorPanel'
 import OCRTaskList from './components/OCRTaskList'
 import ReviewTaskList from './components/ReviewTaskList'
 import WorkerLogPanel from './components/WorkerLogPanel'
+import CollectionTab from './components/CollectionTab'
 
 // WebSocket Hook
 import { useWorkflowWebSocket } from '../../hooks/useWorkflowWebSocket'
 
-// Redux
+// Redux - DataWorkflow
 import {
   fetchWorkflowStats,
   fetchWorkers,
@@ -36,7 +49,6 @@ import {
   reviewTask,
   deleteReviewTask,
   setActiveTab,
-  toggleWorkersPanelCollapsed,
   setOCRFilters,
   setOCRSelectedKeys,
   setReviewFilters,
@@ -47,7 +59,6 @@ import {
   selectStatsLoading,
   selectWorkers,
   selectWorkersLoading,
-  selectWorkersPanelCollapsed,
   selectOCRTasks,
   selectOCRTasksTotal,
   selectOCRTasksLoading,
@@ -70,6 +81,11 @@ import {
   toggleLogsPanelCollapsed,
 } from '../../store/slices/dataWorkflowSlice'
 
+// Redux - Crawler
+import {
+  selectStats as selectCrawlerStats,
+} from '../../store/slices/crawlerSlice'
+
 const { Title } = Typography
 
 const DataWorkflowPage: React.FC = () => {
@@ -79,10 +95,12 @@ const DataWorkflowPage: React.FC = () => {
   const stats = useSelector(selectWorkflowStats)
   const statsLoading = useSelector(selectStatsLoading)
 
+  // Crawler Stats
+  const crawlerStats = useSelector(selectCrawlerStats)
+
   // Workers
   const workers = useSelector(selectWorkers)
   const workersLoading = useSelector(selectWorkersLoading)
-  const workersPanelCollapsed = useSelector(selectWorkersPanelCollapsed)
 
   // OCR Tasks
   const ocrTasks = useSelector(selectOCRTasks)
@@ -110,7 +128,7 @@ const DataWorkflowPage: React.FC = () => {
   const logsPanelCollapsed = useSelector(selectLogsPanelCollapsed)
 
   // 使用 WebSocket Hook
-  const { isConnected } = useWorkflowWebSocket({
+  useWorkflowWebSocket({
     autoConnect: true,
     onConnected: () => {
       console.log('工作流 WebSocket 已连接')
@@ -265,16 +283,52 @@ const DataWorkflowPage: React.FC = () => {
     }
   }
 
+  // 计算 Tab 数字
+  const getCollectionCount = () => {
+    return crawlerStats?.running_tasks || 0
+  }
+
+  const getOCRCount = () => {
+    if (!stats) return 0
+    return stats.ocr_pending + stats.ocr_processing
+  }
+
+  const getReviewCount = () => {
+    return stats?.review_pending || 0
+  }
+
+  const getActiveWorkerCount = () => {
+    return workers.filter(w => w.status === 'active').length
+  }
+
   // Tab items
   const tabItems = [
+    {
+      key: 'collection',
+      label: (
+        <span>
+          <RobotOutlined style={{ marginRight: 4 }} />
+          采集任务
+          {getCollectionCount() > 0 && (
+            <span style={{ marginLeft: 4, color: '#999' }}>
+              ({getCollectionCount()})
+            </span>
+          )}
+        </span>
+      ),
+      children: (
+        <CollectionTab onRefresh={() => dispatch(fetchWorkflowStats())} />
+      ),
+    },
     {
       key: 'ocr',
       label: (
         <span>
+          <ScanOutlined style={{ marginRight: 4 }} />
           OCR处理
-          {stats && (
+          {getOCRCount() > 0 && (
             <span style={{ marginLeft: 4, color: '#999' }}>
-              ({stats.ocr_pending + stats.ocr_processing})
+              ({getOCRCount()})
             </span>
           )}
         </span>
@@ -339,9 +393,10 @@ const DataWorkflowPage: React.FC = () => {
       key: 'review',
       label: (
         <span>
-          待审核
-          {stats && (
-            <span style={{ marginLeft: 4, color: '#999' }}>({stats.review_pending})</span>
+          <AuditOutlined style={{ marginRight: 4 }} />
+          人工审核
+          {getReviewCount() > 0 && (
+            <span style={{ marginLeft: 4, color: '#999' }}>({getReviewCount()})</span>
           )}
         </span>
       ),
@@ -390,6 +445,41 @@ const DataWorkflowPage: React.FC = () => {
         </>
       ),
     },
+    {
+      key: 'worker',
+      label: (
+        <span>
+          <TeamOutlined style={{ marginRight: 4 }} />
+          Worker监控
+          {getActiveWorkerCount() > 0 && (
+            <span style={{ marginLeft: 4, color: '#52c41a' }}>({getActiveWorkerCount()})</span>
+          )}
+        </span>
+      ),
+      children: (
+        <>
+          {/* Worker 监控面板 */}
+          <WorkerMonitorPanel
+            workers={workers}
+            stats={stats}
+            loading={workersLoading}
+            collapsed={false}
+            onToggleCollapse={() => {}}
+          />
+
+          {/* Worker 日志面板 */}
+          <div style={{ marginTop: 16 }}>
+            <WorkerLogPanel
+              logs={workerLogs}
+              collapsed={logsPanelCollapsed}
+              onToggleCollapse={() => dispatch(toggleLogsPanelCollapsed())}
+              onClear={() => dispatch(clearWorkerLogs())}
+              maxHeight={400}
+            />
+          </div>
+        </>
+      ),
+    },
   ]
 
   return (
@@ -405,7 +495,7 @@ const DataWorkflowPage: React.FC = () => {
       >
         <Space>
           <Title level={4} style={{ margin: 0 }}>
-            数据处理工作流
+            数据工作流
           </Title>
           {/* WebSocket 连接状态 */}
           <Tooltip title={`实时更新: ${WS_STATUS_CONFIG[wsConnected].text}`}>
@@ -432,17 +522,6 @@ const DataWorkflowPage: React.FC = () => {
           stats={stats}
           loading={statsLoading}
           onStageClick={handlePipelineStageClick}
-        />
-      </div>
-
-      {/* Worker 监控面板 */}
-      <div style={{ marginBottom: 16 }}>
-        <WorkerMonitorPanel
-          workers={workers}
-          stats={stats}
-          loading={workersLoading}
-          collapsed={workersPanelCollapsed}
-          onToggleCollapse={() => dispatch(toggleWorkersPanelCollapsed())}
         />
       </div>
 

@@ -198,7 +198,7 @@ export const WORKFLOW_STAGES: WorkflowStage[] = [
 
 // ========== Tab 配置 ==========
 
-export type WorkflowTab = 'ocr' | 'review' | 'completed'
+export type WorkflowTab = 'collection' | 'ocr' | 'review' | 'worker'
 
 // ========== 状态映射 ==========
 

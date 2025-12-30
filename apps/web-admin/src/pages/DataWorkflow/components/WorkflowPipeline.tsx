@@ -35,6 +35,7 @@ interface StageConfig {
 const STAGES: StageConfig[] = [
   {
     key: 'crawl',
+    tab: 'collection',
     title: '采集队列',
     icon: <RobotOutlined />,
     color: '#1890ff',
@@ -69,7 +70,7 @@ const STAGES: StageConfig[] = [
   },
   {
     key: 'done',
-    tab: 'completed',
+    tab: undefined,  // 已入库阶段不可点击
     title: '已入库',
     icon: <CheckCircleOutlined />,
     color: '#52c41a',

@@ -85,7 +85,7 @@ const initialState: DataWorkflowState = {
   reviewModalVisible: false,
   reviewAction: null,
 
-  activeTab: 'ocr',
+  activeTab: 'collection',
 
   // WebSocket
   wsConnected: 'disconnected',
