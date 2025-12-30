@@ -19,6 +19,7 @@ import {
   ScanOutlined,
   AuditOutlined,
   TeamOutlined,
+  ImportOutlined,
 } from '@ant-design/icons'
 import type { AppDispatch } from '../../store/store'
 import type { WorkflowTab, OCRStatus, ReviewStatus } from '../../types/dataWorkflow'
@@ -31,6 +32,7 @@ import OCRTaskList from './components/OCRTaskList'
 import ReviewTaskList from './components/ReviewTaskList'
 import WorkerLogPanel from './components/WorkerLogPanel'
 import CollectionTab from './components/CollectionTab'
+import ImportTab from './components/ImportTab'
 
 // WebSocket Hook
 import { useWorkflowWebSocket } from '../../hooks/useWorkflowWebSocket'
@@ -253,6 +255,12 @@ const DataWorkflowPage: React.FC = () => {
     dispatch(fetchReviewTasks(newFilters))
   }
 
+  const handleReviewSourceTypeFilterChange = (value: string | undefined) => {
+    const newFilters = { ...reviewFilters, source_type: value, page: 1 }
+    dispatch(setReviewFilters(newFilters))
+    dispatch(fetchReviewTasks(newFilters))
+  }
+
   const handleReviewPageChange = (page: number, pageSize: number) => {
     const newFilters = { ...reviewFilters, page, page_size: pageSize }
     dispatch(setReviewFilters(newFilters))
@@ -390,6 +398,24 @@ const DataWorkflowPage: React.FC = () => {
       ),
     },
     {
+      key: 'import',
+      label: (
+        <span>
+          <ImportOutlined style={{ marginRight: 4 }} />
+          数据导入
+        </span>
+      ),
+      children: (
+        <ImportTab
+          onSuccess={() => {
+            dispatch(setActiveTab('review'))
+            dispatch(fetchReviewTasks(reviewFilters))
+            dispatch(fetchWorkflowStats())
+          }}
+        />
+      ),
+    },
+    {
       key: 'review',
       label: (
         <span>
@@ -404,7 +430,7 @@ const DataWorkflowPage: React.FC = () => {
         <>
           {/* 审核筛选器 */}
           <Card size="small" style={{ marginBottom: 16 }}>
-            <Space>
+            <Space wrap>
               <span>状态筛选:</span>
               <Select
                 style={{ width: 150 }}
@@ -416,6 +442,20 @@ const DataWorkflowPage: React.FC = () => {
                   { value: 'pending', label: '待审核' },
                   { value: 'approved', label: '已通过' },
                   { value: 'rejected', label: '已拒绝' },
+                ]}
+              />
+              <span style={{ marginLeft: 16 }}>数据来源:</span>
+              <Select
+                style={{ width: 150 }}
+                placeholder="全部来源"
+                allowClear
+                value={reviewFilters.source_type}
+                onChange={handleReviewSourceTypeFilterChange}
+                options={[
+                  { value: 'ecommerce', label: '电商平台' },
+                  { value: 'official', label: '官方网站' },
+                  { value: 'forum', label: '论坛' },
+                  { value: 'excel_import', label: 'Excel导入' },
                 ]}
               />
             </Space>

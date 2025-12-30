@@ -12,8 +12,8 @@ from typing import Optional
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Depends, Query, status, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, Depends, Query, status, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import func, and_, or_
 
 from apps.api.orm.session import get_db_session
@@ -35,6 +35,12 @@ from apps.api.schemas.data_workflow import (
     TaskImagesResponse,
     OCRProgressReport,
     WorkerLogSubmit,
+    ImportPreviewRow,
+    ImportPreviewResponse,
+    ImportResponse,
+    ImportError,
+    ImportTemplateInfo,
+    ImportTemplateListResponse,
 )
 from apps.api.services.workflow_ws_manager import get_workflow_ws_manager
 
@@ -1228,3 +1234,210 @@ async def broadcast_workers_update():
     ws_manager = get_workflow_ws_manager()
     workers = await get_current_workers()
     await ws_manager.broadcast_workers(workers)
+
+
+# ========== Excel 导入功能 ==========
+
+# 装备类型映射
+EQUIPMENT_TYPES = {
+    "rod": "鱼竿",
+    "reel": "渔轮",
+    "line": "鱼线",
+    "lure": "拟饵",
+}
+
+
+@router.get(
+    "/import/templates",
+    response_model=ImportTemplateListResponse,
+    summary="获取导入模板列表",
+    description="获取所有装备类型的导入模板信息",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_READ))]
+)
+async def get_import_templates():
+    """获取导入模板列表"""
+    templates = []
+    for key, label in EQUIPMENT_TYPES.items():
+        templates.append(ImportTemplateInfo(
+            equipment_type=key,
+            equipment_type_label=label,
+            download_url=f"/api/v1/admin/workflow/import/template/{key}"
+        ))
+    return ImportTemplateListResponse(templates=templates)
+
+
+@router.get(
+    "/import/template/{equipment_type}",
+    summary="下载导入模板",
+    description="下载指定装备类型的 Excel 导入模板",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_READ))]
+)
+async def download_import_template(
+    equipment_type: str,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """下载导入模板"""
+    if equipment_type not in EQUIPMENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不支持的装备类型: {equipment_type}"
+        )
+
+    from apps.api.services.excel_import_service import get_excel_import_service
+    service = get_excel_import_service()
+
+    try:
+        content = service.generate_template(equipment_type)
+        filename = f"{EQUIPMENT_TYPES[equipment_type]}导入模板.xlsx"
+
+        return Response(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+    except Exception as e:
+        logger.error(f"生成模板失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"生成模板失败: {str(e)}"
+        )
+
+
+@router.post(
+    "/import/preview",
+    response_model=ImportPreviewResponse,
+    summary="预览导入数据",
+    description="上传 Excel 文件并预览导入数据，不实际导入",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
+)
+async def preview_import(
+    file: UploadFile = File(...),
+    equipment_type: str = Query(..., description="装备类型: rod/reel/line/lure"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """预览导入数据"""
+    if equipment_type not in EQUIPMENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不支持的装备类型: {equipment_type}"
+        )
+
+    # 验证文件类型
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="只支持 .xlsx 或 .xls 格式的 Excel 文件"
+        )
+
+    from apps.api.services.excel_import_service import get_excel_import_service
+    service = get_excel_import_service()
+
+    try:
+        content = await file.read()
+        preview_rows = service.parse_excel(content, equipment_type)
+
+        # 转换为响应格式
+        preview_data = []
+        for row in preview_rows:
+            preview_data.append(ImportPreviewRow(
+                row_number=row.row_number,
+                data=row.data,
+                is_valid=row.is_valid,
+                errors=row.errors
+            ))
+
+        valid_count = sum(1 for r in preview_rows if r.is_valid)
+        invalid_count = len(preview_rows) - valid_count
+
+        return ImportPreviewResponse(
+            success=True,
+            message=f"解析成功，共 {len(preview_rows)} 条数据",
+            equipment_type=equipment_type,
+            total_rows=len(preview_rows),
+            valid_rows=valid_count,
+            invalid_rows=invalid_count,
+            preview_data=preview_data
+        )
+
+    except Exception as e:
+        logger.error(f"预览导入失败: {e}")
+        return ImportPreviewResponse(
+            success=False,
+            message=f"解析失败: {str(e)}",
+            equipment_type=equipment_type,
+            total_rows=0,
+            valid_rows=0,
+            invalid_rows=0,
+            preview_data=[]
+        )
+
+
+@router.post(
+    "/import/execute",
+    response_model=ImportResponse,
+    summary="执行导入",
+    description="上传 Excel 文件并执行导入到待审核队列",
+    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))]
+)
+async def execute_import(
+    file: UploadFile = File(...),
+    equipment_type: str = Query(..., description="装备类型: rod/reel/line/lure"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """执行导入"""
+    if equipment_type not in EQUIPMENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不支持的装备类型: {equipment_type}"
+        )
+
+    # 验证文件类型
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="只支持 .xlsx 或 .xls 格式的 Excel 文件"
+        )
+
+    from apps.api.services.excel_import_service import get_excel_import_service
+    service = get_excel_import_service()
+
+    try:
+        content = await file.read()
+        result = service.import_to_pending(
+            file_content=content,
+            equipment_type=equipment_type,
+            admin_user_id=current_user.user_id
+        )
+
+        # 转换错误格式
+        errors = []
+        for err in result.errors:
+            errors.append(ImportError(
+                row=err["row"],
+                errors=err["errors"],
+                data=err.get("data", {})
+            ))
+
+        logger.info(
+            f"管理员 {current_user.username} 导入 {EQUIPMENT_TYPES[equipment_type]}: "
+            f"成功 {result.imported_count} 条, 失败 {result.failed_count} 条"
+        )
+
+        return ImportResponse(
+            success=result.success,
+            message=result.message,
+            total_rows=result.total_rows,
+            imported_count=result.imported_count,
+            failed_count=result.failed_count,
+            pending_ids=result.pending_ids,
+            errors=errors
+        )
+
+    except Exception as e:
+        logger.error(f"执行导入失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"导入失败: {str(e)}"
+        )
