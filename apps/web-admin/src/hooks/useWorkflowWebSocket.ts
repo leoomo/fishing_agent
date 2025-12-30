@@ -209,6 +209,10 @@ export const useWorkflowWebSocket = (options: UseWorkflowWebSocketOptions = {}) 
             // 暂时不处理，需要时可以添加
             break
 
+          case 'pong':
+            // 心跳响应，忽略
+            break
+
           default:
             console.warn('未知的 WebSocket 事件类型:', event.type)
         }

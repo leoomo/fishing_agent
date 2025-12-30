@@ -5,8 +5,6 @@ import {
   DatabaseOutlined,
   UserOutlined,
   FileTextOutlined,
-  RobotOutlined,
-  BranchesOutlined,
   MonitorOutlined,
   BarChartOutlined,
   SettingOutlined,
@@ -48,19 +46,9 @@ const MainLayout = () => {
       ],
     },
     {
-      key: '/crawler',
-      icon: <RobotOutlined />,
-      label: '数据采集管理',
-    },
-    {
       key: '/data-workflow',
       icon: <NodeIndexOutlined />,
-      label: '数据处理工作流',
-    },
-    {
-      key: '/workflow',
-      icon: <BranchesOutlined />,
-      label: '工作流管理',
+      label: '数据工作流',
     },
     {
       key: '/monitor',

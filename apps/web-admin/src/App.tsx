@@ -17,9 +17,7 @@ const UserDetail = lazy(() => import('@/pages/Users/Detail'))
 const Analytics = lazy(() => import('@/pages/Analytics'))
 const Settings = lazy(() => import('@/pages/Settings'))
 const EquipmentOptions = lazy(() => import('@/pages/Settings/EquipmentOptions'))
-const Crawler = lazy(() => import('@/pages/Crawler'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
-const Workflow = lazy(() => import('@/pages/Workflow'))
 const DataWorkflow = lazy(() => import('@/pages/DataWorkflow'))
 
 // 加载中组件
@@ -86,14 +84,8 @@ const App = () => {
                 <Route path="content/rigs" element={<ContentPlaceholder title="Rig Management" />} />
                 <Route path="content/lures" element={<ContentPlaceholder title="Lure Management" />} />
 
-                {/* Crawler Management */}
-                <Route path="crawler" element={<Crawler />} />
-
-                {/* Data Workflow (combines OCR Worker + Pending Equipment) */}
+                {/* Data Workflow (Collection + OCR + Review + Worker Monitor) */}
                 <Route path="data-workflow" element={<DataWorkflow />} />
-
-                {/* Workflow Management */}
-                <Route path="workflow/*" element={<Workflow />} />
 
                 {/* System Monitor */}
                 <Route path="monitor" element={<Monitor />} />
