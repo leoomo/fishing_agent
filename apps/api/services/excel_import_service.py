@@ -361,6 +361,7 @@ class ExcelImportService:
                     pending = PendingEquipment(
                         status="pending",
                         ocr_status="completed",  # Excel 导入跳过 OCR
+                        ocr_text="[Excel 导入]",  # Excel 导入无 OCR 文本
                         source_type="excel_import",
                         extracted_data=json.dumps(extracted_data, ensure_ascii=False),
                         confidence=1.0,  # 手工导入默认满置信度

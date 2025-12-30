@@ -1289,12 +1289,15 @@ async def download_import_template(
     try:
         content = service.generate_template(equipment_type)
         filename = f"{EQUIPMENT_TYPES[equipment_type]}导入模板.xlsx"
+        # 使用 RFC 5987 编码中文文件名
+        from urllib.parse import quote
+        filename_encoded = quote(filename)
 
         return Response(
             content=content,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": f"attachment; filename*=UTF-8''{filename_encoded}"
             }
         )
     except Exception as e:
