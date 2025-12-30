@@ -198,7 +198,7 @@ export const WORKFLOW_STAGES: WorkflowStage[] = [
 
 // ========== Tab 配置 ==========
 
-export type WorkflowTab = 'collection' | 'ocr' | 'review' | 'worker'
+export type WorkflowTab = 'collection' | 'ocr' | 'import' | 'review' | 'worker'
 
 // ========== 状态映射 ==========
 
@@ -220,6 +220,7 @@ export const SOURCE_TYPE_CONFIG: Record<string, { icon: string; text: string }> 
   ecommerce: { icon: 'ShoppingOutlined', text: '电商平台' },
   official: { icon: 'GlobalOutlined', text: '官方网站' },
   forum: { icon: 'MessageOutlined', text: '论坛' },
+  excel_import: { icon: 'FileExcelOutlined', text: 'Excel导入' },
   unknown: { icon: 'FileTextOutlined', text: '未知' },
 }
 
@@ -442,3 +443,76 @@ export const WS_STATUS_CONFIG: Record<WSConnectionStatus, { color: string; text:
   disconnected: { color: 'default', text: '已断开' },
   error: { color: 'error', text: '连接错误' },
 }
+
+// ========== Excel 导入相关 ==========
+
+/**
+ * 导入模板信息
+ */
+export interface ImportTemplateInfo {
+  equipment_type: string
+  equipment_type_label: string
+  download_url: string
+}
+
+/**
+ * 模板列表响应
+ */
+export interface ImportTemplateListResponse {
+  templates: ImportTemplateInfo[]
+}
+
+/**
+ * 导入预览行
+ */
+export interface ImportPreviewRow {
+  row_number: number
+  data: Record<string, unknown>
+  is_valid: boolean
+  errors: string[]
+}
+
+/**
+ * 导入预览响应
+ */
+export interface ImportPreviewResponse {
+  success: boolean
+  message: string
+  equipment_type: string
+  total_rows: number
+  valid_rows: number
+  invalid_rows: number
+  preview_data: ImportPreviewRow[]
+}
+
+/**
+ * 导入错误
+ */
+export interface ImportError {
+  row: number
+  errors: string[]
+  data: Record<string, unknown>
+}
+
+/**
+ * 导入响应
+ */
+export interface ImportResponse {
+  success: boolean
+  message: string
+  total_rows: number
+  imported_count: number
+  failed_count: number
+  pending_ids: number[]
+  errors: ImportError[]
+}
+
+/**
+ * 导入装备类型选项
+ */
+export const IMPORT_EQUIPMENT_TYPES = [
+  { key: 'rod', label: '鱼竿' },
+  { key: 'reel', label: '渔轮' },
+  { key: 'line', label: '鱼线' },
+  { key: 'lure', label: '拟饵' },
+]

@@ -37,6 +37,7 @@ import {
   GlobalOutlined,
   MessageOutlined,
   FileTextOutlined,
+  FileExcelOutlined,
   ThunderboltOutlined,
   SaveOutlined,
   PictureOutlined,
@@ -81,6 +82,7 @@ const SOURCE_ICONS: Record<string, React.ReactNode> = {
   ecommerce: <ShoppingOutlined />,
   official: <GlobalOutlined />,
   forum: <MessageOutlined />,
+  excel_import: <FileExcelOutlined />,
   unknown: <FileTextOutlined />,
 }
 
@@ -88,6 +90,7 @@ const SOURCE_LABELS: Record<string, string> = {
   ecommerce: '电商平台',
   official: '官方网站',
   forum: '论坛',
+  excel_import: 'Excel导入',
   unknown: '未知',
 }
 

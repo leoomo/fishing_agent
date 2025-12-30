@@ -15,6 +15,9 @@ import type {
   ExtractResponse,
   ExtractedDataUpdate,
   TaskImagesResponse,
+  ImportTemplateListResponse,
+  ImportPreviewResponse,
+  ImportResponse,
 } from '../../types/dataWorkflow'
 
 const BASE_URL = '/admin/workflow'
@@ -139,6 +142,49 @@ export const dataWorkflowApi = {
   getImageUrl: (imagePath: string): string => {
     const token = localStorage.getItem('fishing_admin_token')
     return `/api/v1${BASE_URL}/images/${imagePath}?token=${token || ''}`
+  },
+
+  // ========== Excel 导入 ==========
+
+  /**
+   * 获取导入模板列表
+   */
+  getImportTemplates: (): Promise<ImportTemplateListResponse> => {
+    return client.get(`${BASE_URL}/import/templates`)
+  },
+
+  /**
+   * 获取模板下载 URL
+   */
+  getTemplateDownloadUrl: (equipmentType: string): string => {
+    const token = localStorage.getItem('fishing_admin_token')
+    return `/api/v1${BASE_URL}/import/template/${equipmentType}?token=${token || ''}`
+  },
+
+  /**
+   * 预览导入数据
+   */
+  previewImport: (file: File, equipmentType: string): Promise<ImportPreviewResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return client.post(`${BASE_URL}/import/preview?equipment_type=${equipmentType}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  },
+
+  /**
+   * 执行导入
+   */
+  executeImport: (file: File, equipmentType: string): Promise<ImportResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return client.post(`${BASE_URL}/import/execute?equipment_type=${equipmentType}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
   },
 }
 

@@ -229,3 +229,54 @@ class WorkflowWSEvent(BaseModel):
     data: Any = Field(None, description="事件数据")
     pending_id: Optional[int] = Field(None, description="关联的任务 ID")
     timestamp: str = Field(..., description="事件时间戳 (ISO 格式)")
+
+
+# ========== Excel 导入相关 ==========
+
+class ImportPreviewRow(BaseModel):
+    """导入预览行"""
+    row_number: int = Field(..., description="行号")
+    data: dict = Field(..., description="行数据")
+    is_valid: bool = Field(..., description="是否有效")
+    errors: List[str] = Field(default_factory=list, description="验证错误列表")
+
+
+class ImportPreviewResponse(BaseModel):
+    """导入预览响应"""
+    success: bool
+    message: str
+    equipment_type: str = Field(..., description="装备类型")
+    total_rows: int = Field(default=0, description="总行数")
+    valid_rows: int = Field(default=0, description="有效行数")
+    invalid_rows: int = Field(default=0, description="无效行数")
+    preview_data: List[ImportPreviewRow] = Field(default_factory=list)
+
+
+class ImportError(BaseModel):
+    """导入错误"""
+    row: int = Field(..., description="行号")
+    errors: List[str] = Field(default_factory=list, description="错误信息")
+    data: dict = Field(default_factory=dict, description="行数据")
+
+
+class ImportResponse(BaseModel):
+    """导入响应"""
+    success: bool
+    message: str
+    total_rows: int = Field(default=0, description="总行数")
+    imported_count: int = Field(default=0, description="成功导入数量")
+    failed_count: int = Field(default=0, description="失败数量")
+    pending_ids: List[int] = Field(default_factory=list, description="创建的待审核记录 ID")
+    errors: List[ImportError] = Field(default_factory=list, description="错误详情")
+
+
+class ImportTemplateInfo(BaseModel):
+    """导入模板信息"""
+    equipment_type: str = Field(..., description="装备类型 key")
+    equipment_type_label: str = Field(..., description="装备类型名称")
+    download_url: str = Field(..., description="模板下载 URL")
+
+
+class ImportTemplateListResponse(BaseModel):
+    """导入模板列表响应"""
+    templates: List[ImportTemplateInfo] = Field(default_factory=list)
