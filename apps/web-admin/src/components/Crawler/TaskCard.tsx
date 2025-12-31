@@ -1,3 +1,13 @@
+/**
+ * 采集任务卡片组件
+ *
+ * 美化版本 - 增强视觉效果：
+ * 1. 状态左边框颜色标识
+ * 2. 高优先级渐变背景
+ * 3. 运行中脉冲动画
+ * 4. 核心指标突出显示
+ */
+
 import React, { useState, useCallback } from 'react'
 import {
   Card,
@@ -6,12 +16,9 @@ import {
   Button,
   Space,
   Typography,
-  Row,
-  Col,
   Tooltip,
   Dropdown,
   Modal,
-  Badge,
 } from 'antd'
 import {
   PlayCircleOutlined,
@@ -26,6 +33,7 @@ import {
   LoadingOutlined,
   EditOutlined,
   HourglassOutlined,
+  FireOutlined,
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 import { useDispatch } from 'react-redux'
@@ -46,18 +54,16 @@ import {
 } from '../../store/slices/crawlerSlice'
 import LoginInteraction from './LoginInteraction'
 import TaskEdit from './TaskEdit'
+import './TaskCard.css'
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
 
 const { Text } = Typography
-const { Meta } = Card
 
 interface TaskCardProps {
   task: CrawlerTask
   isSelected?: boolean
-  // onSelectionChange?: (taskId: number, selected: boolean) => void // Removed: unused prop
-  // showLoginInteraction?: boolean // Removed: unused prop
 }
 
 // 状态配置
@@ -102,14 +108,33 @@ const statusConfig = {
 const TaskCard: React.FC<TaskCardProps> = ({
   task,
   isSelected = false,
-  // onSelectionChange, // Removed: unused prop
-  // showLoginInteraction, // Removed: unused prop
 }) => {
   const dispatch = useDispatch<AppDispatch>()
   const [loginModalVisible, setLoginModalVisible] = useState(false)
   const [editModalVisible, setEditModalVisible] = useState(false)
 
-  const statusConfigItem = statusConfig[task.status.toLowerCase() as keyof typeof statusConfig] || statusConfig.pending
+  const statusKey = task.status.toLowerCase() as keyof typeof statusConfig
+  const statusConfigItem = statusConfig[statusKey] || statusConfig.pending
+  const isHighPriority = task.priority === 'high'
+  const isRunning = ['queued', 'running'].includes(statusKey)
+
+  // 计算卡片类名
+  const getCardClassName = useCallback(() => {
+    const classes = ['task-card']
+    classes.push(`task-card-${statusKey}`)
+    if (isHighPriority) classes.push('task-card-high-priority')
+    if (isSelected) classes.push('selected')
+    return classes.join(' ')
+  }, [statusKey, isHighPriority, isSelected])
+
+  // 格式化执行时长
+  const formatDuration = useCallback((seconds?: number) => {
+    if (!seconds) return '-'
+    if (seconds < 60) return `${seconds}s`
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }, [])
 
   // 查看任务详情
   const handleViewDetail = useCallback(() => {
@@ -146,18 +171,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   // 删除任务
   const handleDelete = useCallback(() => {
-    console.log('handleDelete called for task:', task.task_name, task.task_id)
     const shouldDelete = window.confirm(`确定要删除任务 "${task.task_name}" 吗？此操作不可恢复。`)
     if (shouldDelete) {
-      console.log('User confirmed delete')
       try {
         dispatch(deleteTask(task.task_id)).unwrap()
         message.success('任务删除成功')
       } catch (error: unknown) {
         console.error('删除任务失败:', error)
       }
-    } else {
-      console.log('User cancelled delete')
     }
   }, [dispatch, task.task_id, task.task_name])
 
@@ -168,9 +189,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   // 编辑任务
   const handleEdit = useCallback(() => {
-    console.log('Edit task:', task.task_id, task.task_name)
     setEditModalVisible(true)
-  }, [task.task_id, task.task_name])
+  }, [])
 
   // 保存编辑的任务
   const handleSaveEdit = useCallback(async (taskData: Partial<CrawlerTask>) => {
@@ -178,7 +198,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       await dispatch(updateTask({ taskId: task.task_id, taskData })).unwrap()
     } catch (error) {
       console.error('更新任务失败:', error)
-      throw error // 重新抛出错误让TaskEdit组件处理
+      throw error
     }
   }, [dispatch, task.task_id])
 
@@ -189,34 +209,26 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   // 处理菜单项点击
   const handleMenuClick = useCallback((key: string) => {
-    console.log('Menu item clicked:', key)
     switch (key) {
       case 'detail':
-        console.log('Handling detail click')
         handleViewDetail()
         break
       case 'edit':
-        console.log('Handling edit click')
         handleEdit()
         break
       case 'start':
-        console.log('Handling start click')
         handleStart()
         break
       case 'stop':
-        console.log('Handling stop click')
         handleStop()
         break
       case 'rerun':
-        console.log('Handling rerun click')
         handleRerun()
         break
       case 'login':
-        console.log('Handling login click')
         handleShowLogin()
         break
       case 'delete':
-        console.log('Handling delete click')
         handleDelete()
         break
       default:
@@ -227,43 +239,16 @@ const TaskCard: React.FC<TaskCardProps> = ({
   // 更多操作菜单
   const moreMenuItems: MenuProps['items'] = [
     {
-      key: 'detail',
-      label: '查看详情',
-      icon: <EyeOutlined />,
-    },
-    {
       key: 'edit',
       label: '编辑任务',
       icon: <EditOutlined />,
-      disabled: task.status.toLowerCase() === 'running',
-    },
-    {
-      key: 'start',
-      label: '启动任务',
-      icon: <PlayCircleOutlined />,
-      disabled: !['pending', 'failed', 'cancelled'].includes(task.status.toLowerCase()),
-    },
-    {
-      key: 'stop',
-      label: '停止任务',
-      icon: <PauseCircleOutlined />,
-      disabled: !['queued', 'running'].includes(task.status.toLowerCase()),
-      danger: true,
-    },
-    {
-      key: 'rerun',
-      label: '重新运行',
-      icon: <ReloadOutlined />,
-      disabled: ['queued', 'running'].includes(task.status.toLowerCase()),
-    },
-    {
-      type: 'divider',
+      disabled: isRunning,
     },
     {
       key: 'login',
       label: '登录处理',
       icon: <PlayCircleOutlined />,
-      disabled: !['pending', 'failed'].includes(task.status.toLowerCase()),
+      disabled: !['pending', 'failed'].includes(statusKey),
     },
     {
       type: 'divider',
@@ -273,52 +258,38 @@ const TaskCard: React.FC<TaskCardProps> = ({
       label: '删除任务',
       icon: <DeleteOutlined />,
       danger: true,
-      disabled: ['queued', 'running'].includes(task.status.toLowerCase()),
+      disabled: isRunning,
     },
   ]
 
   // 计算进度百分比
-  const getProgressPercent = useCallback(() => {
-    if (!task.total_items) return 0
-    return Math.round((task.success_items / task.total_items) * 100)
-  }, [task.success_items, task.total_items])
-
-  // 格式化时间
-  const formatTime = useCallback((time: string) => {
-    return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
-  }, [])
+  const progressPercent = task.total_items
+    ? Math.round((task.success_items / task.total_items) * 100)
+    : 0
 
   // 获取相对时间
-  const getRelativeTime = useCallback((time: string) => {
-    return dayjs(time).fromNow()
-  }, [])
+  const relativeTime = dayjs(task.created_at).fromNow()
+  const fullTime = dayjs(task.created_at).format('YYYY-MM-DD HH:mm:ss')
 
   return (
     <>
       <Card
-        hoverable
-        className={`task-card ${isSelected ? 'selected' : ''}`}
+        className={getCardClassName()}
         size="small"
-        style={{
-          marginBottom: 16,
-          border: isSelected ? '2px solid #1890ff' : undefined,
-        }}
+        style={{ marginBottom: 16 }}
         actions={[
-          <Tooltip title="查看详情" key="detail">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              onClick={handleViewDetail}
-            />
-          </Tooltip>,
-          ['queued', 'running'].includes(task.status.toLowerCase()) ? (
+          // 启动/停止按钮
+          isRunning ? (
             <Tooltip title="停止任务" key="stop">
               <Button
                 type="text"
                 danger
                 icon={<PauseCircleOutlined />}
                 onClick={handleStop}
-              />
+                className="action-btn-danger"
+              >
+                停止
+              </Button>
             </Tooltip>
           ) : (
             <Tooltip title="启动任务" key="start">
@@ -326,18 +297,35 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 type="text"
                 icon={<PlayCircleOutlined />}
                 onClick={handleStart}
-                disabled={!['pending', 'failed', 'cancelled'].includes(task.status.toLowerCase())}
-              />
+                disabled={!['pending', 'failed', 'cancelled'].includes(statusKey)}
+                className="action-btn-primary"
+              >
+                启动
+              </Button>
             </Tooltip>
           ),
+          // 重新运行
           <Tooltip title="重新运行" key="rerun">
             <Button
               type="text"
               icon={<ReloadOutlined />}
               onClick={handleRerun}
-              disabled={['queued', 'running'].includes(task.status.toLowerCase())}
-            />
+              disabled={isRunning}
+            >
+              重运行
+            </Button>
           </Tooltip>,
+          // 查看详情
+          <Tooltip title="查看详情" key="detail">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={handleViewDetail}
+            >
+              详情
+            </Button>
+          </Tooltip>,
+          // 更多菜单
           <Dropdown
             menu={{
               items: moreMenuItems,
@@ -351,98 +339,81 @@ const TaskCard: React.FC<TaskCardProps> = ({
           </Dropdown>,
         ]}
       >
-        {/* 头部信息 */}
-        <div style={{ marginBottom: 12 }}>
-          <Row justify="space-between" align="middle">
-            <Col flex="auto">
-              <Meta
-                avatar={
-                  <Badge
-                    status={statusConfigItem.color as any}
-                    text={statusConfigItem.icon}
-                  />
-                }
-                title={
-                  <Text strong ellipsis={{ tooltip: task.task_name }}>
-                    {task.task_name}
-                  </Text>
-                }
-                description={
-                  <Space size="small">
-                    <Tag color="blue">{task.platform}</Tag>
-                    <Tag color="purple">{task.task_type}</Tag>
-                    {task.priority && (
-                      <Tag color={task.priority === 'high' ? 'red' : 'default'}>
-                        {task.priority === 'high' ? '高优先级' : task.priority}
-                      </Tag>
-                    )}
-                  </Space>
-                }
-              />
-            </Col>
-            <Col>
-              <Tag color={statusConfigItem.color} icon={statusConfigItem.icon}>
-                {statusConfigItem.text}
-              </Tag>
-            </Col>
-          </Row>
+        {/* 头部：标题 + 状态 */}
+        <div className="task-card-header">
+          <div className="task-card-title-section">
+            <div className="task-card-title">
+              {isHighPriority && (
+                <span className="priority-badge-high">
+                  <FireOutlined style={{ marginRight: 2 }} />
+                  高优
+                </span>
+              )}
+              <Tooltip title={task.task_name}>
+                <span className="task-card-title-text">
+                  {task.task_name}
+                </span>
+              </Tooltip>
+            </div>
+            <div className="task-card-subtitle">
+              {task.platform} · {task.task_type}
+            </div>
+          </div>
+          <Tag color={statusConfigItem.color} icon={statusConfigItem.icon}>
+            {statusConfigItem.text}
+          </Tag>
         </div>
 
-        {/* 进度信息 */}
-        <div style={{ marginBottom: 12 }}>
-          <Row justify="space-between" align="middle" style={{ marginBottom: 4 }}>
-            <Col>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                执行进度
-              </Text>
-            </Col>
-            <Col>
-              <Text style={{ fontSize: 12 }}>
-                {task.success_items} / {task.total_items || 0}
-              </Text>
-            </Col>
-          </Row>
+        {/* 核心指标行 */}
+        <div className="stats-row">
+          <div className="stat-item">
+            <div className="stat-value stat-value-success">
+              <CheckCircleOutlined />
+              {task.success_items || 0}
+            </div>
+            <div className="stat-label">成功</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-value stat-value-failed">
+              <CloseCircleOutlined />
+              {task.failed_items || 0}
+            </div>
+            <div className="stat-label">失败</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-value stat-value-default">
+              <ClockCircleOutlined />
+              {formatDuration(task.duration)}
+            </div>
+            <div className="stat-label">耗时</div>
+          </div>
+        </div>
+
+        {/* 进度条 */}
+        <div className="progress-section">
+          <div className="progress-header">
+            <span className="progress-label">执行进度</span>
+            <span className="progress-value">
+              {task.success_items || 0} / {task.total_items || 0}
+            </span>
+          </div>
           <Progress
-            percent={getProgressPercent()}
+            percent={progressPercent}
             status={task.status === 'failed' ? 'exception' : 'normal'}
             size="small"
+            showInfo={false}
           />
         </div>
 
-        {/* 详细信息 */}
-        <Row gutter={16}>
-          <Col span={8}>
+        {/* 底部信息 */}
+        <div className="task-card-footer">
+          <Tooltip title={fullTime}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              创建时间
+              创建于 {relativeTime}
             </Text>
-            <br />
-            <Tooltip title={formatTime(task.created_at)}>
-              <Text style={{ fontSize: 12 }}>
-                {getRelativeTime(task.created_at)}
-              </Text>
-            </Tooltip>
-          </Col>
-          <Col span={8}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              执行时长
-            </Text>
-            <br />
-            <Text style={{ fontSize: 12 }}>
-              {task.duration ? `${task.duration}s` : '-'}
-            </Text>
-          </Col>
-          <Col span={8}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              错误数
-            </Text>
-            <br />
-            <Text style={{ fontSize: 12 }}>
-              {task.failed_items || 0}
-            </Text>
-          </Col>
-        </Row>
-
-        </Card>
+          </Tooltip>
+        </div>
+      </Card>
 
       {/* 登录交互弹窗 */}
       <Modal
