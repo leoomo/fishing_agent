@@ -1,24 +1,32 @@
-# Fishing Agent - 智能钓鱼助手 v5.0.2
+# Fishing Agent - 智能钓鱼助手 v5.1.0
 
 基于 LangChain 1.0+ 的智能钓鱼助手，提供钓鱼时间推荐、天气分析和路亚装备管理功能。
 
-> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v5.0.2 + JWT认证系统 + React管理前端 + 7因子科学评分 + 智能图片合并 + 爬虫数据持久化 + 待审核装备管理 + 多提供商OCR支持**
+> 🎣 智能分析天气条件，推荐最佳钓鱼时间 - **模块化 Agent 架构 v5.1.0 + 鱼百科管理 + 内容管理系统 + Excel批量导入 + 向量搜索 + 数据分析优化 + JWT认证系统 + React管理前端 + 7因子科学评分**
 
 ## 🌟 核心特性
 
+### 🆕 新增功能 (v5.1.0)
+- **🐟 鱼百科管理** - 鱼种知识库、季节活动规律、装备推荐查询
+- **📚 内容管理系统** - 富文本编辑器、自动保存草稿、语义搜索、向量检索
+- **📊 Excel批量导入** - 批量导入装备数据到待审核队列、模板生成系统
+- **🔍 向量搜索** - 基于ChromaDB的语义搜索和相似文章推荐
+- **🎯 配件管理** - 钩子、铅坠、转环、前导线等配件完整管理
+- **🪝 拟饵类型** - 硬饵、软饵、金属饵、飞蝇分类体系
+- **🔧 钓组配置** - 德州钓组、卡罗莱纳钓组、倒吊钓组等模板
+
+### 核心功能
 - **🎣 智能钓鱼推荐** - 基于7因子科学评分体系，准确推荐最佳钓鱼时间和地点
-- **🎒 路亚装备管理** - 智能装备推荐、用户装备库、电商数据同步、装备UI优化
-- **📦 装备导入Agent** - 新增agent_equipment_import包，支持文本压缩中间件和批量装备信息提取
-- **✅ 待审核装备管理** - 新增装备审核工作流，支持管理员审核导入的装备数据
-- **🕷️ 爬虫数据持久化** - 完整的爬虫数据存储和状态管理，支持任务重试和断点续传
-- **🖼️ 智能图片合并** - 自动检测图片下方文字，智能批量合并相关图片，本地处理无需外部API
-- **🔍 多提供商OCR** - 支持Ollama本地OCR和SiliconFlow云端OCR，灵活配置
-- **📊 数据分析报表** - 装备统计、趋势分析、用户行为洞察
+- **🎒 路亚装备管理** - 路亚竿、渔轮、鱼线、拟饵四大类装备，智能推荐和对比
+- **✅ 待审核装备管理** - 装备审核工作流，Excel导入审核、OCR识别审核
+- **📊 数据分析报表** - 装备统计、趋势分析、品牌排行、价格分布、用户行为洞察（SQL性能优化）
 - **🔐 JWT认证系统** - 完整的用户认证和RBAC权限管理
 - **🖥️ 管理前端** - 基于React的现代化管理界面（http://localhost:5173）
-- **🕷️ 爬虫管理** - 多平台爬虫、任务调度、实时监控
+- **🕷️ 数据采集管理** - 多平台爬虫、任务调度、实时监控、数据持久化
 - **⚙️ 系统配置** - API密钥管理、系统参数配置
-- **🔄 工作流管理** - 可视化工作流编排、DAG依赖管理、任务调度系统
+- **🖼️ 智能图片合并** - 自动检测图片下方文字，智能批量合并相关图片，本地处理无需外部API
+- **🔍 多提供商OCR** - 支持Ollama本地OCR和SiliconFlow云端OCR，灵活配置
+- **📦 装备导入Agent** - 支持文本压缩中间件和批量装备信息提取
 
 ## 🚀 快速开始
 
@@ -74,7 +82,7 @@ agent = create_agent(model_provider="zhipu")
 response = agent.run("明天杭州钓鱼怎么样？")
 print(response)
 
-# 装备导入Agent (新增)
+# 装备导入Agent
 from packages.agents.equipment_import import EquipmentImportAgent
 
 agent = EquipmentImportAgent(model_provider="zhipu")
@@ -88,6 +96,12 @@ from packages.data_processing.image import BatchMergeProcessor
 
 processor = BatchMergeProcessor(source_dir="./images")
 result = processor.process()
+
+# 向量搜索 (新增)
+from apps.api.services.vector_store import ArticleVectorStore
+
+vector_store = ArticleVectorStore()
+results = vector_store.search("钓鱼技巧", top_k=5)
 
 # 爬虫功能
 from packages.scraper.spiders import TaobaoSpider
@@ -133,7 +147,7 @@ MIT License
 
 > 🎣 智能分析，精准钓鱼！
 >
-> 当前版本：v5.0.2 (Phase 6 智能图片合并 + 装备导入Agent + 文本压缩中间件 + Phase 5 数据分析和配置管理 + Phase 4 爬虫监控模块 + 爬虫数据持久化 + 待审核装备管理 + Phase 3 React管理前端 + Phase 2 JWT认证系统 + Phase 1 模块化Agent架构)
+> 当前版本：v5.1.0 (Phase 7 鱼百科管理 + 内容管理系统 + Excel批量导入 + 向量搜索 + 数据分析优化 + Phase 6 智能图片合并 + 装备导入Agent + 文本压缩中间件 + Phase 5 数据分析和配置管理 + Phase 4 爬虫监控模块 + 爬虫数据持久化 + 待审核装备管理 + Phase 3 React管理前端 + Phase 2 JWT认证系统 + Phase 1 模块化Agent架构)
 
 ## 🔧 工作流管理系统
 
@@ -342,12 +356,201 @@ if result["success"]:
 - **状态机** - 基于状态机的任务流程管理
 - **队列系统** - 支持任务队列和优先级调度
 
-## 🐛 最近修复 (v5.0.2)
+## 🐛 最近修复 (v5.1.0)
 
-- **监控页面代码规范** - 修复监控页面代码风格和Chat API默认模型配置问题
-- **Agent分析界面** - 修复监控界面Agent分析页面和ECharts组件显示问题
-- **LLM统计数据** - 修复LLM使用统计数据显示不正确的问题
-- **任务状态刷新** - 添加任务列表自动刷新功能，提升用户体验
-- **爬虫任务管理** - 完善任务编辑、状态管理和重新运行功能
-- **数据采集命名** - 将"爬虫"统一重命名为"数据采集"，提升界面专业性
-- **任务启动流程** - 实现任务启动后等待Worker领取的QUEUED状态机制
+- **数据分析优化** - SQL性能优化（CASE WHEN）、真实数据统计、前端增强（日期选择、CSV导出）
+- **工作流重构** - 五合一工作流系统（采集/OCR/导入/审核/监控）、移除废弃页面
+- **装备对比重构** - 模块化重构与差异分析增强
+- **数据库字段统一** - fish_species_id → species_id 字段重命名
+- **WebSocket优化** - 优化WebSocket连接处理和错误恢复
+
+## 🐟 鱼百科管理系统 (v5.1.0 新增)
+
+### 核心功能
+
+鱼百科管理系统提供完整的鱼种知识库、季节活动规律和装备推荐查询功能。
+
+### 主要特性
+
+- **鱼种管理** - 鱼种基本信息、分类（淡水/海水/广盐）、目标鱼种
+- **知识库** - 鱼种详细知识、生活习性、垂钓技巧
+- **季节活动** - 春夏秋冬四季活动规律、活动等级（活跃/一般/不活跃/休眠）
+- **装备推荐** - 针对不同鱼种的拟饵、钓组、装备推荐
+- **分类统计** - 按分类统计鱼种数量和分布
+
+### API端点
+
+```bash
+# 鱼种管理
+GET    /api/v1/fish-species              # 银种列表
+POST   /api/v1/fish-species              # 创建鱼种
+GET    /api/v1/fish-species/{id}         # 鱼种详情
+PUT    /api/v1/fish-species/{id}         # 更新鱼种
+DELETE /api/v1/fish-species/{id}         # 删除鱼种
+
+# 知识库管理
+GET    /api/v1/fish-knowledge            # 知识库列表
+POST   /api/v1/fish-knowledge            # 创建知识
+GET    /api/v1/fish-knowledge/{id}       # 知识详情
+PUT    /api/v1/fish-knowledge/{id}       # 更新知识
+DELETE /api/v1/fish-knowledge/{id}       # 删除知识
+
+# 季节活动管理
+GET    /api/v1/fish-seasons              # 季节活动列表
+POST   /api/v1/fish-seasons              # 创建季节活动
+GET    /api/v1/fish-seasons/{id}         # 季节活动详情
+PUT    /api/v1/fish-seasons/{id}         # 更新季节活动
+DELETE /api/v1/fish-seasons/{id}         # 删除季节活动
+
+# 装备推荐
+GET    /api/v1/fish-species/{id}/equipment  # 获取鱼种装备推荐
+
+# 统计数据
+GET    /api/v1/fish-species/stats/stats    # 分类统计
+GET    /api/v1/fish-species/init-data       # 初始化数据
+```
+
+## 📚 内容管理系统 (v5.1.0 新增)
+
+### 核心功能
+
+内容管理系统提供富文本编辑、自动保存、语义搜索和向量检索功能。
+
+### 主要特性
+
+- **富文本编辑器** - 支持Markdown、图片上传、代码高亮
+- **自动保存草稿** - 定时自动保存，防止数据丢失
+- **语义搜索** - 基于DashScope Embedding的向量搜索
+- **相似文章推荐** - 基于余弦相似度的文章推荐
+- **文章类型** - 技巧文章、装备评测、鱼种介绍、钓点分享
+- **发布流程** - 草稿 → 审核 → 发布/归档
+
+### API端点
+
+```bash
+# 文章管理
+POST   /api/v1/articles                  # 创建文章（草稿）
+GET    /api/v1/articles                  # 文章列表（支持过滤）
+GET    /api/v1/articles/{id}             # 文章详情
+PUT    /api/v1/articles/{id}             # 更新文章（自动保存）
+DELETE /api/v1/articles/{id}             # 删除文章
+POST   /api/v1/articles/{id}/publish     # 发布文章
+POST   /api/v1/articles/{id}/archive     # 归档文章
+
+# 搜索和推荐
+GET    /api/v1/articles/search           # 语义搜索
+GET    /api/v1/articles/{id}/similar     # 相似文章
+```
+
+### 向量存储
+
+- **ChromaDB** - 本地向量数据库，持久化存储
+- **DashScope Embedding** - 使用text-embedding-v2模型
+- **自动同步** - 文章发布时自动更新向量索引
+- **元数据过滤** - 支持按类型、标签、状态过滤
+
+## 📊 Excel批量导入系统 (v5.1.0 新增)
+
+### 核心功能
+
+Excel批量导入系统支持将装备数据批量导入到待审核队列，提供模板生成和预览功能。
+
+### 主要特性
+
+- **模板生成** - 自动生成Excel/CSV导入模板
+- **预览验证** - 导入前预览数据，验证格式和必填字段
+- **批量导入** - 支持批量导入装备数据到pending_equipment表
+- **类型映射** - 自动映射装备类型（rod/reel/line/lure）
+- **规格字段** - 支持各装备类型的特定规格字段
+- **错误处理** - 详细的错误信息和行号定位
+
+### API端点
+
+```bash
+# 导入管理
+POST   /api/v1/admin/workflow/import/templates  # 生成模板
+POST   /api/v1/admin/workflow/import/preview    # 预览导入
+POST   /api/v1/admin/workflow/import/execute    # 执行导入
+```
+
+### 支持的装备类型
+
+- **鱼竿** - 长度、调性、动作、节数、自重、饵重范围、线负荷
+- **渔轮** - 轮型、齿比、轴承数、自重、最大刹车力、线容量
+- **鱼线** - 线型、线径、强度、长度、颜色、编数
+- **拟饵** - 饵型、长度、重量、潜深范围、颜色、泳姿
+
+## 🎯 配件管理系统 (v5.1.0 新增)
+
+### 核心功能
+
+提供钓鱼配件的完整管理功能，包括钩子、铅坠、转环、前导线等。
+
+### 主要特性
+
+- **配件分类** - 钩子、铅坠、转环、前导线、浮漂、别针、其他
+- **规格管理** - 尺寸、材质、强度、适用场景
+- **装备关联** - 关联适用的钓组和目标鱼种
+- **用户等级** - 新手/进阶/高级推荐
+
+### API端点
+
+```bash
+GET    /api/v1/accessory          # 配件列表
+POST   /api/v1/accessory          # 创建配件
+GET    /api/v1/accessory/{id}     # 配件详情
+PUT    /api/v1/accessory/{id}     # 更新配件
+DELETE /api/v1/accessory/{id}     # 删除配件
+GET    /api/v1/accessory/options  # 配件选项数据
+GET    /api/v1/accessory/init-data  # 初始化数据
+```
+
+## 🪝 拟饵类型管理系统 (v5.1.0 新增)
+
+### 核心功能
+
+提供拟饵类型的分类和管理功能，支持品牌层级管理。
+
+### 主要特性
+
+- **拟饵分类** - 硬饵、软饵、金属饵、飞蝇、其他
+- **动作描述** - 泳姿、操作技巧
+- **规格范围** - 典型重量、长度范围
+- **目标鱼种** - 适用的目标鱼种
+- **品牌管理** - 拟饵品牌和系列关联
+
+### API端点
+
+```bash
+GET    /api/v1/lure-types          # 拟饵类型列表
+POST   /api/v1/lure-types          # 创建拟饵类型
+GET    /api/v1/lure-types/{id}     # 拟饵类型详情
+PUT    /api/v1/lure-types/{id}     # 更新拟饵类型
+DELETE /api/v1/lure-types/{id}     # 删除拟饵类型
+GET    /api/v1/lure-types/init-data  # 初始化数据
+```
+
+## 🔧 钓组配置管理系统 (v5.1.0 新增)
+
+### 核心功能
+
+提供钓组配置模板管理功能，支持组件编辑器。
+
+### 主要特性
+
+- **钓组分类** - 底钓、浮漂、路亚、飞蝇、海钓
+- **组件编辑器** - 可视化编辑钓组组件
+- **规格管理** - 钓组规格参数
+- **拟饵关联** - 关联适用的拟饵类型
+- **难度评级** - 简单/中等/困难
+
+### API端点
+
+```bash
+GET    /api/v1/rigs                # 钓组列表
+POST   /api/v1/rigs                # 创建钓组
+GET    /api/v1/rigs/{id}           # 钓组详情
+PUT    /api/v1/rigs/{id}           # 更新钓组
+DELETE /api/v1/rigs/{id}           # 删除钓组
+GET    /api/v1/rigs/options        # 钓组选项数据
+```

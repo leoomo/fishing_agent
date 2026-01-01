@@ -5,6 +5,90 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.1.0] - 2025-01-02
+
+### 新增
+- 🐟 **鱼百科管理系统** - 鱼种知识库、季节活动规律、装备推荐查询
+  - FishSpecies, FishKnowledge, FishSeasonActivity 三个核心模型
+  - 鱼种分类（淡水/海水/广盐鱼）
+  - 季节活动管理（春夏秋冬四季活动等级）
+  - 针对性装备推荐（拟饵/钓组/装备参数）
+- 📚 **内容管理系统 (CMS)** - 富文本编辑、自动保存草稿、语义搜索
+  - Article 模型，支持多种文章类型（技巧/评测/鱼种/钓点）
+  - 自动保存草稿功能（定时保存）
+  - 基于ChromaDB的向量搜索和DashScope Embedding
+  - 相似文章推荐（余弦相似度）
+  - 文章发布流程（草稿→审核→发布/归档）
+- 📊 **Excel批量导入系统** - 批量导入装备数据到待审核队列
+  - ExcelImportService 服务，支持模板生成
+  - 预览验证功能（导入前数据验证）
+  - 支持鱼竿/渔轮/鱼线/拟饵四种装备类型
+  - 详细的错误信息和行号定位
+- 🔍 **向量存储服务** - ArticleVectorStore 基于 ChromaDB
+  - DashScope Embedding 集成（text-embedding-v2）
+  - 本地向量数据库持久化
+  - 元数据过滤和语义搜索
+- 🎯 **钓鱼配件管理系统** - Accessory 模型
+  - 配件分类（钩子/铅坠/转环/前导线/浮漂/别针/其他）
+  - 规格管理（尺寸/材质/强度/适用场景）
+  - 装备关联（适用钓组/目标鱼种）
+  - 用户等级推荐（新手/进阶/高级）
+- 🪝 **拟饵类型管理系统** - LureType 模型
+  - 拟饵分类（硬饵/软饵/金属饵/飞蝇/其他）
+  - 动作描述（泳姿/操作技巧）
+  - 规格范围（典型重量/长度）
+  - 目标鱼种关联
+- 🔧 **钓组配置管理系统** - RigType, RigSpec, RigComponent 模型
+  - 钓组分类（底钓/浮漂/路亚/飞蝇/海钓）
+  - 组件编辑器（可视化编辑钓组组件）
+  - 规格管理（钓组规格参数）
+  - 拟饵关联（适用拟饵类型）
+  - 难度评级（简单/中等/困难）
+
+### 改进
+- 📊 **数据分析性能优化**
+  - SQL性能优化（使用CASE WHEN替代Python循环）
+  - 新增价格分布统计API
+  - 新增品牌统计API
+  - 新增用户活动统计API
+  - 真实数据统计（移除模拟数据）
+  - 前端增强（日期选择器、CSV导出）
+- 🔄 **数据工作流系统重构**
+  - 五合一工作流系统（采集/OCR/导入/审核/监控）
+  - WorkflowPipeline 组件改为标签切换模式
+  - 新增ImportTab组件（Excel导入界面）
+  - 移除废弃的CronEditor和WorkflowDAG组件
+- 🔧 **装备对比功能重构**
+  - 模块化重构（comparator.py → diff_analyzer.py + specs_extractor.py）
+  - 差异分析增强
+  - 新增equipment_searcher.py
+  - 统一常量定义（constants.py）
+  - 数据库迁移（migrations.py）
+- 🗃️ **数据库字段统一**
+  - fish_species_id → species_id 字段重命名
+  - 统一数据库外键命名规范
+- 🔌 **WebSocket连接优化**
+  - 优化WebSocket连接处理
+  - 改进错误恢复机制
+  - 添加useWorkflowSocket hook
+
+### 修复
+- 🐛 **修复Ant Design废弃警告** - 更新到兼容的API调用
+- 🐛 **修复TypeScript编译错误** - 类型定义和导入问题
+- 🐛 **修复TaskEdit状态引用** - 移除对已删除状态的引用
+- 🐛 **修复数据分析SQL错误** - CASE WHEN语法优化
+
+### 文档
+- 📚 **版本号统一** - README.md, CLAUDE.md, pyproject.toml 版本号更新为 v5.1.0
+- 📖 **API文档更新** - 添加新增的7个内容管理模块API文档
+- 🏗️ **架构文档更新** - 更新系统架构图和包依赖说明
+- 📝 **CHANGELOG更新** - 添加v5.1.0完整变更记录
+
+### 技术债务
+- 🔄 **工作流模块重构** - 移除独立的Workflow页面，整合到DataWorkflow
+- 🧹 **代码清理** - 删除废弃的CronEditor和WorkflowDAG组件
+- 📦 **依赖优化** - 更新依赖包版本
+
 ## [5.2.0] - 2024-12-29
 
 ### 新增
