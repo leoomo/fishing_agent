@@ -132,12 +132,12 @@ async def get_rig_options():
 
 
 @router.get(
-    "/lure-types",
+    "/lure-types/simple",
     response_model=List[LureTypeSimple],
-    summary="获取拟饵类型列表",
+    summary="获取拟饵类型简化列表（用于钓组关联）",
 )
-async def get_lure_types():
-    """获取所有拟饵类型用于关联选择"""
+async def get_lure_types_simple():
+    """获取所有拟饵类型用于关联选择（简化版）"""
     with get_db_session() as session:
         lure_types = session.query(LureType).order_by(LureType.name).all()
         return [
