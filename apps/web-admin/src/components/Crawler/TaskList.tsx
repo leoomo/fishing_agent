@@ -200,7 +200,7 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
           </Col>
           <Col>
             <Space>
-              <Button.Group>
+              <Space.Compact>
                 <Button
                   type={ui.viewMode === 'card' ? 'primary' : 'default'}
                   icon={<AppstoreOutlined />}
@@ -215,7 +215,7 @@ const TaskList: React.FC<TaskListProps> = ({ filters, onRefresh }) => {
                 >
                   表格视图
                 </Button>
-              </Button.Group>
+              </Space.Compact>
               <Button
                 icon={<ReloadOutlined />}
                 onClick={onRefresh}

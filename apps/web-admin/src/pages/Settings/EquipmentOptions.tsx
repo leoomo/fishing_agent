@@ -427,7 +427,7 @@ const EquipmentOptions = () => {
         }}
         okText="保存"
         cancelText="取消"
-        destroyOnClose
+        forceRender
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
