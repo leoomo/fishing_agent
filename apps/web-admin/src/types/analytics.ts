@@ -10,7 +10,9 @@ export interface EquipmentStats {
 
 export interface EquipmentTrend {
   month: string
+  date?: string
   count: number
+  total_count?: number
   category?: string
 }
 
@@ -41,6 +43,9 @@ export interface BusinessReport {
   content: string
   generated_at: string
   generated_by: string
+  start_date?: string
+  end_date?: string
+  report_data?: Record<string, unknown>
 }
 
 export interface ReportListResponse {

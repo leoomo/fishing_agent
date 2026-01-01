@@ -1,6 +1,9 @@
 import client from '../client'
 import type { Equipment, EquipmentListResponse, Brand } from '@/types/equipment'
 
+// 重新导出类型供其他模块使用
+export type { Brand }
+
 export interface EquipmentCreateRequest {
   name: string
   category: string

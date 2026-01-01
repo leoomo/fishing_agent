@@ -26,7 +26,6 @@ import {
   Card,
   Typography,
   Switch,
-  Spin,
 } from 'antd'
 import {
   PlusOutlined,
@@ -35,7 +34,7 @@ import {
 } from '@ant-design/icons'
 import type { Brand } from '@/api/services/equipment'
 import type { ColumnsType } from 'antd/es/table'
-import { useAllEquipmentOptions, DEFAULT_OPTIONS, EQUIPMENT_OPTION_KEYS } from '@/hooks/useEquipmentOptions'
+import { useAllEquipmentOptions } from '@/hooks/useEquipmentOptions'
 
 const { Option } = Select
 const { TextArea } = Input
@@ -654,7 +653,7 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
                 title: '节数',
                 dataIndex: 'sections',
                 width: 50,
-                render: (v: number | null, record: VariantRow) => {
+                render: (v: number | null) => {
                   const value = v || template.sections
                   const isOverride = v !== null && v !== undefined
                   return value ? <Text type={isOverride ? 'success' : undefined}>{value}</Text> : '-'
@@ -664,7 +663,7 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
                 title: '导环',
                 dataIndex: 'guide_type',
                 width: 80,
-                render: (v: string, record: VariantRow) => {
+                render: (v: string) => {
                   const value = v || template.guide_type
                   const isOverride = v && v.length > 0
                   return value ? <Text type={isOverride ? 'success' : undefined}>{value}</Text> : '-'
@@ -674,7 +673,7 @@ const ManualBatchForm: React.FC<ManualBatchFormProps> = ({
                 title: '握把',
                 dataIndex: 'handle_type',
                 width: 80,
-                render: (v: string, record: VariantRow) => {
+                render: (v: string) => {
                   const value = v || template.handle_type
                   const isOverride = v && v.length > 0
                   return value ? <Text type={isOverride ? 'success' : undefined}>{value}</Text> : '-'

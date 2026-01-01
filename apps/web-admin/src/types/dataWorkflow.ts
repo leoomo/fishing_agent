@@ -329,6 +329,7 @@ export type WorkflowEventType =
   | 'ocr_failed'
   | 'review_update'
   | 'worker_log'
+  | 'pong'
 
 /**
  * OCR 处理阶段

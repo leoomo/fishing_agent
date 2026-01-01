@@ -323,7 +323,6 @@ const Settings = () => {
   ]
 
   const apiConfigs = configs.filter(c => c.config_type === 'api')
-  const otherConfigs = configs.filter(c => c.config_type !== 'api')
 
   return (
     <div>
