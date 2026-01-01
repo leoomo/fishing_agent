@@ -230,6 +230,7 @@ from .routes.article import router as article_router
 from .routes.rig import router as rig_router
 from .routes.lure_type import router as lure_type_router
 from .routes.accessory import router as accessory_router
+from .routes.fish import router as fish_router
 from .middleware import install_api_logging_middleware
 
 # GZip 压缩中间件（响应大于 500 字节时压缩）
@@ -295,6 +296,9 @@ app.include_router(lure_type_router, prefix="/api/v1/admin/content", tags=["lure
 
 # 钓鱼配件管理 API 路由
 app.include_router(accessory_router, prefix="/api/v1/admin/content", tags=["accessories"])
+
+# 鱼百科管理 API 路由
+app.include_router(fish_router, prefix="/api/v1/admin/content", tags=["fish"])
 
 
 @app.get("/")
