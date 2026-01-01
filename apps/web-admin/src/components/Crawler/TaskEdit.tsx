@@ -98,7 +98,6 @@ const TaskEdit: React.FC<TaskEditProps> = ({
   useEffect(() => {
     if (visible && task) {
       const parsedConfig = parseTaskConfig(task)
-      setTaskType(task.task_type || 'taobao')
 
       form.setFieldsValue({
         task_name: task.task_name,
@@ -121,8 +120,8 @@ const TaskEdit: React.FC<TaskEditProps> = ({
   }, [visible, task, form])
 
   // 处理任务类型变化
-  const handleTaskTypeChange = (value: string) => {
-    setTaskType(value)
+  const handleTaskTypeChange = (_value: string) => {
+    // 任务类型变化时的处理（如果需要）
   }
 
   // 处理保存
