@@ -117,6 +117,11 @@ export const useWebSocket = (
 
   // 建立WebSocket连接
   const connect = useCallback(() => {
+    // 如果已手动关闭，不再尝试连接
+    if (manualCloseRef.current) {
+      return
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return
     }
@@ -198,6 +203,11 @@ export const useWebSocket = (
       }
 
       ws.onerror = (error) => {
+        // 如果是手动关闭，不记录错误（避免 StrictMode 双重渲染导致的警告）
+        if (manualCloseRef.current) {
+          return
+        }
+
         setState(prev => ({
           ...prev,
           isConnected: false,
@@ -270,11 +280,20 @@ export const useWebSocket = (
     }))
   }, [clearReconnectTimeout, clearHeartbeatInterval])
 
-  // 组件挂载时建立连接
+  // 组件挂载时建立连接（延迟一帧，避免 StrictMode 双重渲染导致的连接取消警告）
   useEffect(() => {
-    connect()
+    // 重置手动关闭标志
+    manualCloseRef.current = false
+
+    // 使用 requestAnimationFrame 延迟连接，让 StrictMode 的 cleanup 先执行
+    const rafId = requestAnimationFrame(() => {
+      if (!manualCloseRef.current) {
+        connect()
+      }
+    })
 
     return () => {
+      cancelAnimationFrame(rafId)
       disconnect()
     }
   }, [connect, disconnect])
