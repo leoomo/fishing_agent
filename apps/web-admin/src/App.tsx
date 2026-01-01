@@ -33,6 +33,9 @@ const LureTypeList = lazy(() => import('@/pages/Content/LureTypes'))
 // Content Management - Accessories
 const AccessoryList = lazy(() => import('@/pages/Content/Accessories'))
 
+// Content Management - Fish
+const FishList = lazy(() => import('@/pages/Content/Fish'))
+
 // 加载中组件
 const PageLoading = () => (
   <div style={{
@@ -182,8 +185,15 @@ const router = createBrowserRouter(
             </Suspense>
           ),
         },
-        // Content Management - Placeholders
-        { path: 'content/fish', element: <ContentPlaceholder title="鱼类百科" /> },
+        // Content Management - Fish
+        {
+          path: 'content/fish',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <FishList />
+            </Suspense>
+          ),
+        },
         // Data Workflow
         {
           path: 'data-workflow',
