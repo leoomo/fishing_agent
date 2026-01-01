@@ -159,7 +159,7 @@ const TaskEdit: React.FC<TaskEditProps> = ({
         </Button>,
       ]}
       width={700}
-      destroyOnClose
+      forceRender
     >
       <Form
         form={form}

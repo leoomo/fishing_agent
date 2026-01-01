@@ -215,7 +215,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ onRefresh }) => {
         onCancel={() => dispatch(hideTaskForm())}
         footer={null}
         width={600}
-        destroyOnClose
+        forceRender
       >
         <TaskForm
           form={form}

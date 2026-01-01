@@ -442,6 +442,7 @@ const ReviewTaskList: React.FC<ReviewTaskListProps> = ({
         okText={reviewAction === 'approve' ? '通过' : '拒绝'}
         okButtonProps={{ danger: reviewAction === 'reject' }}
         cancelText="取消"
+        forceRender
       >
         <Form form={form} layout="vertical">
           <Form.Item name="review_notes" label="审核备注">
@@ -475,7 +476,7 @@ const ReviewTaskList: React.FC<ReviewTaskListProps> = ({
         }
         open={detailModalVisible}
         onCancel={handleCloseDetail}
-        destroyOnClose
+        destroyOnHidden
         maskClosable={!hasChanges}
         keyboard={!hasChanges}
         footer={
