@@ -163,9 +163,9 @@ export const rigApi = {
   },
 
   /**
-   * Get all lure types for association
+   * Get all lure types for association (simple list)
    */
   getAllLureTypes: (): Promise<LureTypeSimple[]> => {
-    return client.get('/admin/content/lure-types')
+    return client.get('/admin/content/lure-types/simple')
   },
 }
