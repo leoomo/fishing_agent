@@ -229,6 +229,7 @@ from .routes.equipment_batch import router as equipment_batch_router
 from .routes.article import router as article_router
 from .routes.rig import router as rig_router
 from .routes.lure_type import router as lure_type_router
+from .routes.accessory import router as accessory_router
 from .middleware import install_api_logging_middleware
 
 # GZip 压缩中间件（响应大于 500 字节时压缩）
@@ -291,6 +292,9 @@ app.include_router(rig_router, prefix="/api/v1/admin/content", tags=["rigs"])
 
 # 拟饵类型管理 API 路由
 app.include_router(lure_type_router, prefix="/api/v1/admin/content", tags=["lure-types"])
+
+# 钓鱼配件管理 API 路由
+app.include_router(accessory_router, prefix="/api/v1/admin/content", tags=["accessories"])
 
 
 @app.get("/")

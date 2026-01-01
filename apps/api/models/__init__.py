@@ -11,6 +11,7 @@ from .user import User, UserEquipment, FishingLog
 from .fish import FishSpecies, FishKnowledge, FishSeasonActivity
 from .rig import RigType, RigSpec, RigComponent
 from .lure import LureType, RodLureFitness
+from .accessory import Accessory
 from .admin_user import AdminUser
 from .system import (
     CrawlerTask, CrawlerLog, APILog, LLMLog, SystemConfig, AnalyticsReport,
@@ -46,6 +47,7 @@ __all__ = [
     "RigComponent",
     "LureType",
     "RodLureFitness",
+    "Accessory",
 
     # Admin
     "AdminUser",

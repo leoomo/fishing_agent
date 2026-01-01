@@ -30,6 +30,9 @@ const RigList = lazy(() => import('@/pages/Content/Rigs'))
 // Content Management - Lure Types
 const LureTypeList = lazy(() => import('@/pages/Content/LureTypes'))
 
+// Content Management - Accessories
+const AccessoryList = lazy(() => import('@/pages/Content/Accessories'))
+
 // 加载中组件
 const PageLoading = () => (
   <div style={{
@@ -170,9 +173,17 @@ const router = createBrowserRouter(
             </Suspense>
           ),
         },
+        // Content Management - Accessories
+        {
+          path: 'content/accessories',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <AccessoryList />
+            </Suspense>
+          ),
+        },
         // Content Management - Placeholders
         { path: 'content/fish', element: <ContentPlaceholder title="鱼类百科" /> },
-        { path: 'content/accessories', element: <ContentPlaceholder title="钓鱼配件" /> },
         // Data Workflow
         {
           path: 'data-workflow',
