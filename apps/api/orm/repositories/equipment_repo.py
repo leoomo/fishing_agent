@@ -284,6 +284,88 @@ class EquipmentRepository(BaseRepository[Equipment]):
 
         return equipment
 
+    def update_with_specs(
+        self,
+        equipment_id: int,
+        equipment_data: Dict[str, Any],
+        spec_data: Optional[Dict[str, Any]] = None
+    ) -> Optional[Equipment]:
+        """
+        Update equipment and its specifications in one transaction
+
+        Args:
+            equipment_id: Equipment ID to update
+            equipment_data: Equipment fields to update
+            spec_data: Specification fields to update
+
+        Returns:
+            Updated Equipment instance or None if not found
+        """
+        equipment = self.get_with_details(equipment_id)
+        if not equipment:
+            return None
+
+        # Update equipment fields
+        for key, value in equipment_data.items():
+            if hasattr(equipment, key) and value is not None:
+                setattr(equipment, key, value)
+
+        # Update or create specs
+        if spec_data:
+            category = equipment.category
+
+            if category == '鱼竿':
+                valid_fields = {c.name for c in RodSpec.__table__.columns}
+                filtered_data = {k: v for k, v in spec_data.items() if k in valid_fields}
+                if equipment.rod_spec:
+                    for key, value in filtered_data.items():
+                        if key != 'equipment_id':
+                            setattr(equipment.rod_spec, key, value)
+                else:
+                    filtered_data['equipment_id'] = equipment_id
+                    filtered_data = {k: v for k, v in filtered_data.items() if v is not None}
+                    equipment.rod_spec = RodSpec(**filtered_data)
+
+            elif category == '渔轮':
+                valid_fields = {c.name for c in ReelSpec.__table__.columns}
+                filtered_data = {k: v for k, v in spec_data.items() if k in valid_fields}
+                if equipment.reel_spec:
+                    for key, value in filtered_data.items():
+                        if key != 'equipment_id':
+                            setattr(equipment.reel_spec, key, value)
+                else:
+                    filtered_data['equipment_id'] = equipment_id
+                    filtered_data = {k: v for k, v in filtered_data.items() if v is not None}
+                    equipment.reel_spec = ReelSpec(**filtered_data)
+
+            elif category == '鱼线':
+                valid_fields = {c.name for c in LineSpec.__table__.columns}
+                filtered_data = {k: v for k, v in spec_data.items() if k in valid_fields}
+                if equipment.line_spec:
+                    for key, value in filtered_data.items():
+                        if key != 'equipment_id':
+                            setattr(equipment.line_spec, key, value)
+                else:
+                    filtered_data['equipment_id'] = equipment_id
+                    filtered_data = {k: v for k, v in filtered_data.items() if v is not None}
+                    equipment.line_spec = LineSpec(**filtered_data)
+
+            elif category == '拟饵':
+                valid_fields = {c.name for c in LureSpec.__table__.columns}
+                filtered_data = {k: v for k, v in spec_data.items() if k in valid_fields}
+                if equipment.lure_spec:
+                    for key, value in filtered_data.items():
+                        if key != 'equipment_id':
+                            setattr(equipment.lure_spec, key, value)
+                else:
+                    filtered_data['equipment_id'] = equipment_id
+                    filtered_data = {k: v for k, v in filtered_data.items() if v is not None}
+                    equipment.lure_spec = LureSpec(**filtered_data)
+
+            self.session.flush()
+
+        return equipment
+
     def get_by_category(
         self,
         category: str,

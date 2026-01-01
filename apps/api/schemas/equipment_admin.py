@@ -11,42 +11,70 @@ from datetime import datetime
 
 class RodSpecsBase(BaseModel):
     """鱼竿规格"""
+    # 基本规格
     length: float = Field(..., ge=0.5, le=10.0, description="长度（米）")
     power: str = Field(..., pattern="^(UL|L|ML|M|MH|H|XH)$", description="调性")
-    action: str = Field(..., pattern="^(Fast|Medium|Slow)$", description="动作")
-    lure_weight_min: float = Field(..., ge=0, description="适用饵重最小值（克）")
-    lure_weight_max: float = Field(..., ge=0, description="适用饵重最大值（克）")
+    action: str = Field(..., pattern="^(Fast|Moderate|Slow)$", description="动作")
     sections: Optional[int] = Field(None, ge=1, le=10, description="节数")
-    closed_length: Optional[float] = Field(None, description="收缩长度（厘米）")
-    weight: Optional[float] = Field(None, description="自重（克）")
+    weight: Optional[float] = Field(None, ge=0, description="自重（克）")
+    closed_length: Optional[float] = Field(None, ge=0, description="收缩长度（厘米）")
+    # 重量范围
+    lure_weight_min: Optional[float] = Field(None, ge=0, description="适用饵重最小值（克）")
+    lure_weight_max: Optional[float] = Field(None, ge=0, description="适用饵重最大值（克）")
+    line_weight_min: Optional[float] = Field(None, ge=0, description="适用线重最小值（lb）")
+    line_weight_max: Optional[float] = Field(None, ge=0, description="适用线重最大值（lb）")
+    # 高级参数
+    guide_type: Optional[str] = Field(None, max_length=50, description="导环类型")
+    handle_type: Optional[str] = Field(None, max_length=50, description="握把类型")
+    tip_diameter: Optional[float] = Field(None, ge=0, description="竿稍直径（mm）")
+    butt_diameter: Optional[float] = Field(None, ge=0, description="竿柄直径（mm）")
+    handle_length: Optional[float] = Field(None, ge=0, description="握把长度（cm）")
+    craft_description: Optional[str] = Field(None, max_length=500, description="工艺描述")
 
 
 class ReelSpecsBase(BaseModel):
     """渔轮规格"""
+    # 基本规格
+    reel_type: Optional[str] = Field(None, pattern="^(spinning|baitcasting|fly)?$", description="轮类型")
     gear_ratio: Optional[str] = Field(None, description="速比（如 5.2:1）")
-    bearings: Optional[int] = Field(None, ge=0, description="轴承数")
-    max_drag: Optional[float] = Field(None, description="最大拽力（千克）")
+    bearings: Optional[str] = Field(None, description="轴承数")
+    weight: Optional[float] = Field(None, ge=0, description="自重（克）")
+    # 性能参数
     line_capacity: Optional[str] = Field(None, description="线容量（如 0.2mm/100m）")
-    weight: Optional[float] = Field(None, description="自重（克）")
-    spool_type: Optional[str] = Field(None, description="线杯类型")
+    max_drag: Optional[float] = Field(None, ge=0, description="最大拽力（kg）")
+    retrieve_per_turn: Optional[float] = Field(None, ge=0, description="每转收线（cm）")
+    # 尺寸参数
+    spool_width: Optional[float] = Field(None, ge=0, description="线杯宽度（mm）")
+    frame_height: Optional[float] = Field(None, ge=0, description="框架高度（mm）")
 
 
 class LineSpecsBase(BaseModel):
     """鱼线规格"""
+    # 基本规格
     line_type: str = Field(..., pattern="^(PE|尼龙|碳线|钢丝)$", description="线型")
-    diameter: Optional[float] = Field(None, description="线径（毫米）")
-    breaking_strength: Optional[float] = Field(None, description="拉力值（千克）")
-    length: Optional[float] = Field(None, description="长度（米）")
-    material: Optional[str] = Field(None, description="材质")
+    diameter: Optional[float] = Field(None, ge=0, description="线径（mm）")
+    length_m: Optional[float] = Field(None, ge=0, description="长度（米）")
+    # 强度参数
+    strength_lb: Optional[float] = Field(None, ge=0, description="拉力（lb）")
+    knot_strength: Optional[float] = Field(None, ge=0, description="节结拉力（lb）")
+    # 其他
+    color: Optional[str] = Field(None, max_length=50, description="颜色")
+    material: Optional[str] = Field(None, max_length=50, description="材质")
 
 
 class LureSpecsBase(BaseModel):
     """拟饵规格"""
+    # 基本规格
     lure_type: str = Field(..., description="拟饵类型")
-    weight: Optional[float] = Field(None, description="重量（克）")
-    length: Optional[float] = Field(None, description="长度（厘米）")
-    diving_depth: Optional[str] = Field(None, description="潜深（如 0.5-1.5米）")
-    action_type: Optional[str] = Field(None, description="动作类型")
+    lure_category: Optional[str] = Field(None, max_length=50, description="拟饵分类")
+    weight: Optional[float] = Field(None, ge=0, description="重量（克）")
+    length: Optional[float] = Field(None, ge=0, description="长度（cm）")
+    # 潜深范围
+    diving_depth_min: Optional[float] = Field(None, ge=0, description="最小潜深（米）")
+    diving_depth_max: Optional[float] = Field(None, ge=0, description="最大潜深（米）")
+    # 其他
+    color: Optional[str] = Field(None, max_length=100, description="颜色/花纹")
+    action_type: Optional[str] = Field(None, max_length=50, description="动作类型")
 
 
 # Union 类型（根据 category 动态选择）
