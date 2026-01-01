@@ -80,9 +80,10 @@ const App = () => {
                 <Route path="users/:id" element={<UserDetail />} />
 
                 {/* Content Management - Placeholders */}
-                <Route path="content/fish" element={<ContentPlaceholder title="Fish Management" />} />
-                <Route path="content/rigs" element={<ContentPlaceholder title="Rig Management" />} />
-                <Route path="content/lures" element={<ContentPlaceholder title="Lure Management" />} />
+                <Route path="content/fish" element={<ContentPlaceholder title="鱼类百科" />} />
+                <Route path="content/rigs" element={<ContentPlaceholder title="钓组配置" />} />
+                <Route path="content/lure-types" element={<ContentPlaceholder title="拟饵类型" />} />
+                <Route path="content/accessories" element={<ContentPlaceholder title="钓鱼配件" />} />
 
                 {/* Data Workflow (Collection + OCR + Review + Worker Monitor) */}
                 <Route path="data-workflow" element={<DataWorkflow />} />
