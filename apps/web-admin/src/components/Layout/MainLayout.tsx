@@ -40,6 +40,7 @@ const MainLayout = () => {
       icon: <FileTextOutlined />,
       label: '内容管理',
       children: [
+        { key: '/content/articles', label: '文章管理' },
         { key: '/content/fish', label: '鱼类百科' },
         { key: '/content/rigs', label: '钓组配置' },
         { key: '/content/lure-types', label: '拟饵类型' },

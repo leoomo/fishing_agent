@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { ConfigProvider, Spin } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -20,6 +20,10 @@ const EquipmentOptions = lazy(() => import('@/pages/Settings/EquipmentOptions'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
 const DataWorkflow = lazy(() => import('@/pages/DataWorkflow'))
 
+// Content Management - Articles
+const ArticleList = lazy(() => import('@/pages/Content/Articles/List'))
+const ArticleEditor = lazy(() => import('@/pages/Content/Articles/Editor'))
+
 // 加载中组件
 const PageLoading = () => (
   <div style={{
@@ -29,7 +33,7 @@ const PageLoading = () => (
     height: '100%',
     minHeight: '200px'
   }}>
-    <Spin size="large" tip="Loading..." />
+    <Spin size="large" />
   </div>
 )
 
@@ -47,63 +51,172 @@ const ContentPlaceholder = ({ title }: { title: string }) => (
   </div>
 )
 
+// 创建路由配置
+const router = createBrowserRouter(
+  [
+    {
+      path: '/login',
+      element: (
+        <Suspense fallback={<PageLoading />}>
+          <Login />
+        </Suspense>
+      ),
+    },
+    {
+      path: '/',
+      element: (
+        <PrivateRoute>
+          <MainLayout />
+        </PrivateRoute>
+      ),
+      children: [
+        { index: true, element: <Navigate to="/equipment" replace /> },
+        // Equipment Management
+        {
+          path: 'equipment',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <EquipmentList />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'equipment/create',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <EquipmentForm />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'equipment/batch-create',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <EquipmentBatchCreate />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'equipment/edit/:id',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <EquipmentForm />
+            </Suspense>
+          ),
+        },
+        // User Management
+        {
+          path: 'users',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <UserList />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'users/:id',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <UserDetail />
+            </Suspense>
+          ),
+        },
+        // Content Management - Articles
+        {
+          path: 'content/articles',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <ArticleList />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'content/articles/create',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <ArticleEditor />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'content/articles/edit/:id',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <ArticleEditor />
+            </Suspense>
+          ),
+        },
+        // Content Management - Placeholders
+        { path: 'content/fish', element: <ContentPlaceholder title="鱼类百科" /> },
+        { path: 'content/rigs', element: <ContentPlaceholder title="钓组配置" /> },
+        { path: 'content/lure-types', element: <ContentPlaceholder title="拟饵类型" /> },
+        { path: 'content/accessories', element: <ContentPlaceholder title="钓鱼配件" /> },
+        // Data Workflow
+        {
+          path: 'data-workflow',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <DataWorkflow />
+            </Suspense>
+          ),
+        },
+        // System Monitor
+        {
+          path: 'monitor',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <Monitor />
+            </Suspense>
+          ),
+        },
+        // Analytics
+        {
+          path: 'analytics',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <Analytics />
+            </Suspense>
+          ),
+        },
+        // Settings
+        {
+          path: 'settings',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <Settings />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'settings/equipment-options',
+          element: (
+            <Suspense fallback={<PageLoading />}>
+              <EquipmentOptions />
+            </Suspense>
+          ),
+        },
+      ],
+    },
+    // 404 redirect
+    { path: '*', element: <Navigate to="/equipment" replace /> },
+  ],
+  {
+    future: {
+      v7_relativeSplatPath: true,
+      v7_startTransition: true,
+      v7_fetcherPersist: true,
+      v7_normalizeFormMethod: true,
+      v7_partialHydration: true,
+      v7_skipActionErrorRevalidation: true,
+    },
+  }
+)
+
 const App = () => {
   return (
     <Provider store={store}>
       <ConfigProvider locale={zhCN}>
-        <BrowserRouter>
-          <Suspense fallback={<PageLoading />}>
-            <Routes>
-              {/* Login page */}
-              <Route path="/login" element={<Login />} />
-
-              {/* Protected routes */}
-              <Route
-                path="/"
-                element={
-                  <PrivateRoute>
-                    <MainLayout />
-                  </PrivateRoute>
-                }
-              >
-                {/* Default redirect to equipment */}
-                <Route index element={<Navigate to="/equipment" replace />} />
-
-                {/* Equipment Management */}
-                <Route path="equipment" element={<EquipmentList />} />
-                <Route path="equipment/create" element={<EquipmentForm />} />
-                <Route path="equipment/batch-create" element={<EquipmentBatchCreate />} />
-                <Route path="equipment/edit/:id" element={<EquipmentForm />} />
-
-                {/* User Management */}
-                <Route path="users" element={<UserList />} />
-                <Route path="users/:id" element={<UserDetail />} />
-
-                {/* Content Management - Placeholders */}
-                <Route path="content/fish" element={<ContentPlaceholder title="鱼类百科" />} />
-                <Route path="content/rigs" element={<ContentPlaceholder title="钓组配置" />} />
-                <Route path="content/lure-types" element={<ContentPlaceholder title="拟饵类型" />} />
-                <Route path="content/accessories" element={<ContentPlaceholder title="钓鱼配件" />} />
-
-                {/* Data Workflow (Collection + OCR + Review + Worker Monitor) */}
-                <Route path="data-workflow" element={<DataWorkflow />} />
-
-                {/* System Monitor */}
-                <Route path="monitor" element={<Monitor />} />
-
-                {/* Analytics */}
-                <Route path="analytics" element={<Analytics />} />
-
-                {/* Settings */}
-                <Route path="settings" element={<Settings />} />
-                <Route path="settings/equipment-options" element={<EquipmentOptions />} />
-              </Route>
-
-              {/* 404 redirect */}
-              <Route path="*" element={<Navigate to="/equipment" replace />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+        <RouterProvider router={router} future={{ v7_startTransition: true }} />
       </ConfigProvider>
     </Provider>
   )
