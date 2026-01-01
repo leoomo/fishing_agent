@@ -17,6 +17,7 @@ from .system import (
     AgentExecutionLog, ToolCallLog
 )
 from .chat import ChatSession, ChatMessage
+from .article import Article, ArticleType, ArticleStatus
 
 __all__ = [
     # Base
@@ -62,4 +63,9 @@ __all__ = [
     # Chat
     "ChatSession",
     "ChatMessage",
+
+    # Article
+    "Article",
+    "ArticleType",
+    "ArticleStatus",
 ]
