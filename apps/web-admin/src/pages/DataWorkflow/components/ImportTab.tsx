@@ -22,7 +22,6 @@ import {
   Spin,
 } from 'antd'
 import {
-  UploadOutlined,
   DownloadOutlined,
   InboxOutlined,
   CheckCircleOutlined,
@@ -42,7 +41,7 @@ import type {
 import { IMPORT_EQUIPMENT_TYPES } from '@/types/dataWorkflow'
 
 const { Dragger } = Upload
-const { Text, Title } = Typography
+const { Text } = Typography
 
 interface ImportTabProps {
   onSuccess?: () => void

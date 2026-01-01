@@ -72,7 +72,6 @@ const TaskEdit: React.FC<TaskEditProps> = ({
   loading = false,
 }) => {
   const [form] = Form.useForm()
-  const [taskType, setTaskType] = useState<string>('taobao')
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false)
 
   // 解析任务配置

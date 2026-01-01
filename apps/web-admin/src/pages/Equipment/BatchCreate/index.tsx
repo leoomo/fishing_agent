@@ -11,7 +11,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Card,
   Tabs,
-  Steps,
   Button,
   Space,
   Typography,
@@ -24,7 +23,6 @@ import {
   ArrowLeftOutlined,
   FormOutlined,
   FileTextOutlined,
-  CheckCircleOutlined,
 } from '@ant-design/icons'
 import { equipmentApi, type Brand } from '@/api/services/equipment'
 import type { BatchEquipmentCreateResponse } from '@/api/services/equipment'
