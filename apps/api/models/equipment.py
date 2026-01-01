@@ -128,6 +128,7 @@ class RodSpec(Base):
     action = Column(String(20), comment="Rod action (Fast/Moderate/Slow)")
     sections = Column(Integer, comment="Number of rod sections")
     weight = Column(Float, comment="Rod weight in grams")
+    closed_length = Column(Float, comment="Closed/collapsed length in cm")
     lure_weight_min = Column(Float, comment="Minimum lure weight in grams")
     lure_weight_max = Column(Float, comment="Maximum lure weight in grams")
     line_weight_min = Column(Float, comment="Minimum line weight (lb)")
@@ -151,18 +152,21 @@ class RodSpec(Base):
             'spec_id': self.spec_id,
             'equipment_id': self.equipment_id,
             'length': self.length,
-            'sections': self.sections,
-            'closed_length': self.closed_length,
-            'weight': self.weight,
             'power': self.power,
             'action': self.action,
+            'sections': self.sections,
+            'weight': self.weight,
+            'closed_length': self.closed_length,
             'lure_weight_min': self.lure_weight_min,
             'lure_weight_max': self.lure_weight_max,
             'line_weight_min': self.line_weight_min,
             'line_weight_max': self.line_weight_max,
-            'material': self.material,
+            'guide_type': self.guide_type,
+            'handle_type': self.handle_type,
+            'tip_diameter': self.tip_diameter,
+            'butt_diameter': self.butt_diameter,
             'handle_length': self.handle_length,
-            'grip_material': self.grip_material,
+            'craft_description': self.craft_description,
         }
 
 
@@ -182,6 +186,8 @@ class ReelSpec(Base):
     line_capacity = Column(String(100), comment="Line capacity (e.g., 0.2mm/200m)")
     max_drag = Column(Float, comment="Maximum drag in kg")
     retrieve_per_turn = Column(Float, comment="Retrieve per turn in cm")
+    spool_width = Column(Float, comment="Spool width in mm")
+    frame_height = Column(Float, comment="Frame height in mm")
 
     # Relationships
     equipment = relationship("Equipment", back_populates="reel_spec")
@@ -201,6 +207,8 @@ class ReelSpec(Base):
             'line_capacity': self.line_capacity,
             'max_drag': self.max_drag,
             'retrieve_per_turn': self.retrieve_per_turn,
+            'spool_width': self.spool_width,
+            'frame_height': self.frame_height,
         }
 
 
@@ -216,6 +224,7 @@ class LineSpec(Base):
     line_type = Column(String(20), index=True, comment="Line type (monofilament/braided/fluorocarbon)")
     diameter = Column(Float, comment="Line diameter in mm")
     strength_lb = Column(Float, comment="Breaking strength in lb")
+    knot_strength = Column(Float, comment="Knot strength in lb")
     length_m = Column(Float, comment="Line length in meters")
     color = Column(String(50), comment="Line color")
     material = Column(String(50), comment="Line material")
@@ -234,6 +243,7 @@ class LineSpec(Base):
             'line_type': self.line_type,
             'diameter': self.diameter,
             'strength_lb': self.strength_lb,
+            'knot_strength': self.knot_strength,
             'length_m': self.length_m,
             'color': self.color,
             'material': self.material,

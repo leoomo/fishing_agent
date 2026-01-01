@@ -283,49 +283,16 @@ async def get_equipment(equipment_id: int):
                     detail=f"装备不存在: equipment_id={equipment_id}"
                 )
 
-            # 提取规格
+            # 提取规格（返回完整字段）
             specs = None
             if equipment.category == "鱼竿" and equipment.rod_spec:
-                specs = {
-                    "length": equipment.rod_spec.length,
-                    "power": equipment.rod_spec.power,
-                    "action": equipment.rod_spec.action,
-                    "lure_weight_min": equipment.rod_spec.lure_weight_min,
-                    "lure_weight_max": equipment.rod_spec.lure_weight_max,
-                    "sections": equipment.rod_spec.sections,
-                    "weight": equipment.rod_spec.weight,
-                    "line_weight_min": equipment.rod_spec.line_weight_min,
-                    "line_weight_max": equipment.rod_spec.line_weight_max,
-                    "handle_length": equipment.rod_spec.handle_length,
-                }
+                specs = equipment.rod_spec.to_dict()
             elif equipment.category == "渔轮" and equipment.reel_spec:
-                specs = {
-                    "reel_type": equipment.reel_spec.reel_type,
-                    "gear_ratio": equipment.reel_spec.gear_ratio,
-                    "bearings": equipment.reel_spec.bearings,
-                    "max_drag": equipment.reel_spec.max_drag,
-                    "line_capacity": equipment.reel_spec.line_capacity,
-                    "weight": equipment.reel_spec.weight,
-                    "retrieve_per_turn": equipment.reel_spec.retrieve_per_turn,
-                }
+                specs = equipment.reel_spec.to_dict()
             elif equipment.category == "鱼线" and equipment.line_spec:
-                specs = {
-                    "line_type": equipment.line_spec.line_type,
-                    "diameter": equipment.line_spec.diameter,
-                    "strength_lb": equipment.line_spec.strength_lb,
-                    "length_m": equipment.line_spec.length_m,
-                    "color": equipment.line_spec.color,
-                    "material": equipment.line_spec.material,
-                }
+                specs = equipment.line_spec.to_dict()
             elif equipment.category == "拟饵" and equipment.lure_spec:
-                specs = {
-                    "lure_type": equipment.lure_spec.lure_type,
-                    "weight": equipment.lure_spec.weight,
-                    "length": equipment.lure_spec.length,
-                    "diving_depth_min": equipment.lure_spec.diving_depth_min,
-                    "diving_depth_max": equipment.lure_spec.diving_depth_max,
-                    "color": equipment.lure_spec.color,
-                }
+                specs = equipment.lure_spec.to_dict()
 
             return EquipmentResponse(
                 equipment_id=equipment.equipment_id,
@@ -370,11 +337,11 @@ async def update_equipment(
     current_user: CurrentUser = Depends(require_permission(PermissionEnum.EQUIPMENT_UPDATE))
 ):
     """
-    更新装备（支持部分更新）
+    更新装备（支持部分更新，包含规格）
 
     Args:
         equipment_id: 装备ID
-        equipment_data: 更新数据
+        equipment_data: 更新数据（包含 specs）
 
     Returns:
         EquipmentResponse: 更新后的装备信息
@@ -386,22 +353,24 @@ async def update_equipment(
         with get_db_session() as session:
             repo = EquipmentRepository(session)
 
-            # 检查装备是否存在
-            equipment = repo.get(equipment_id)
+            # 准备更新数据
+            update_dict = equipment_data.model_dump(exclude_none=True, exclude={'specs'})
+            spec_dict = equipment_data.specs.model_dump() if equipment_data.specs else None
+
+            # 使用 update_with_specs 同时更新装备和规格
+            equipment = repo.update_with_specs(
+                equipment_id=equipment_id,
+                equipment_data=update_dict,
+                spec_data=spec_dict
+            )
+
             if not equipment:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"装备不存在: equipment_id={equipment_id}"
                 )
 
-            # 更新装备（仅更新非 None 字段）
-            update_data = equipment_data.model_dump(exclude_none=True, exclude={'specs'})
-
-            for key, value in update_data.items():
-                setattr(equipment, key, value)
-
             session.commit()
-            session.refresh(equipment)
 
             logger.info(
                 f"装备更新成功: equipment_id={equipment_id}, "
