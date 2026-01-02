@@ -82,8 +82,8 @@ if os.getenv("LOG_TO_FILE", "true").lower() == "true":
         encoding='utf-8'
     )
     agent_fishing_handler.setFormatter(formatter)
-    logging.getLogger('packages.agent_fishing.core').addHandler(agent_fishing_handler)
-    logging.getLogger('packages.agent_fishing.utils').addHandler(agent_fishing_handler)
+    logging.getLogger('packages.agents.fishing.core').addHandler(agent_fishing_handler)
+    logging.getLogger('packages.agents.fishing.utils').addHandler(agent_fishing_handler)
 
     # 5. Agent工具日志
     agent_tools_handler = RotatingFileHandler(
@@ -93,9 +93,9 @@ if os.getenv("LOG_TO_FILE", "true").lower() == "true":
         encoding='utf-8'
     )
     agent_tools_handler.setFormatter(formatter)
-    logging.getLogger('packages.agent_fishing.tools').addHandler(agent_tools_handler)
+    logging.getLogger('packages.agents.fishing.tools').addHandler(agent_tools_handler)
 
-    # 6. 爬虫RPA日志
+    # 6. 数据采集RPA日志
     crawler_handler = RotatingFileHandler(
         'logs/crawler/rpa.log',
         maxBytes=10*1024*1024,
@@ -103,7 +103,7 @@ if os.getenv("LOG_TO_FILE", "true").lower() == "true":
         encoding='utf-8'
     )
     crawler_handler.setFormatter(formatter)
-    logging.getLogger('packages.agent_fishing.tools.crawler').addHandler(crawler_handler)
+    logging.getLogger('packages.agents.fishing.tools.crawler').addHandler(crawler_handler)
 
     # 7. 默认日志（其他未分类的日志）
     default_handler = RotatingFileHandler(
@@ -138,8 +138,27 @@ async def lifespan(app: FastAPI):
     # 初始化工作流调度器
     try:
         from packages.scraper.scheduler.workflow_scheduler import WorkflowScheduler
-        from packages.scraper.executor.task_queue import configure_database
-        from packages.agent_fishing.tools.lure.database import get_db
+        from packages.scraper.executor.task_queue import configure_database, initialize_task_queue
+        from apps.api.database import get_db
+        from apps.api.orm.session import init_db
+        from apps.api.models.base import Base
+        import threading
+
+        # Import PendingEquipment model BEFORE init_db so its table gets created
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+
+        # 初始化数据库并创建表
+        logger.info("初始化数据库...")
+        init_db(create_tables=True)
+        logger.info("数据库表创建完成")
+
+        # 初始化装备选项默认配置
+        try:
+            from apps.api.services.config_service import init_default_equipment_options
+            init_default_equipment_options()
+            logger.info("装备选项默认配置初始化完成")
+        except Exception as e:
+            logger.warning(f"装备选项配置初始化失败（可忽略）: {e}")
 
         # 配置 scraper 包的数据库连接（依赖注入）
         configure_database(get_db)
@@ -148,6 +167,21 @@ async def lifespan(app: FastAPI):
         workflow_scheduler = WorkflowScheduler(scheduler, get_db)
         workflow_scheduler.load_schedules_from_db()
         logger.info("工作流调度器初始化完成")
+
+        # 初始化爬虫任务队列
+        logger.info("初始化爬虫任务队列...")
+        max_workers = int(os.getenv("CRAWLER_WORKERS", "3"))
+        task_queue = initialize_task_queue(mode="thread", max_workers=max_workers)
+
+        # 启动任务队列工作线程
+        worker_thread = threading.Thread(
+            target=task_queue.start_worker_loop,
+            daemon=True,
+            name="crawler-worker"
+        )
+        worker_thread.start()
+        logger.info(f"爬虫任务队列已启动 (模式=thread, 工作器={max_workers})")
+
     except Exception as e:
         logger.error(f"工作流调度器初始化失败: {e}")
 
@@ -155,6 +189,15 @@ async def lifespan(app: FastAPI):
 
     # 关闭时清理
     logger.info("正在关闭应用...")
+
+    # 关闭任务队列
+    try:
+        from packages.scraper.executor.task_queue import shutdown_task_queue
+        logger.info("正在关闭爬虫任务队列...")
+        shutdown_task_queue(wait=True, timeout=30)
+        logger.info("爬虫任务队列已关闭")
+    except Exception as e:
+        logger.error(f"关闭爬虫任务队列失败: {e}")
 
     if scheduler:
         scheduler.shutdown(wait=False)
@@ -179,13 +222,16 @@ from .routes.monitor import router as monitor_router
 from .routes.analytics import router as analytics_router
 from .routes.config import router as config_router
 from .routes.ocr import router as ocr_router
+from .routes.worker import router as worker_router
+from .routes.ocr_worker import router as ocr_worker_router
+from .routes.data_workflow import router as data_workflow_router
+from .routes.equipment_batch import router as equipment_batch_router
+from .routes.article import router as article_router
+from .routes.rig import router as rig_router
+from .routes.lure_type import router as lure_type_router
+from .routes.accessory import router as accessory_router
+from .routes.fish import router as fish_router
 from .middleware import install_api_logging_middleware
-
-app = FastAPI(
-    title="智能钓鱼助手 API",
-    version="5.0.0",
-    description="基于 LangChain 的智能钓鱼助手 REST API - 支持数据分析和配置管理"
-)
 
 # GZip 压缩中间件（响应大于 500 字节时压缩）
 app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -216,7 +262,7 @@ app.include_router(equipment_admin_router, prefix="/api/v1/admin", tags=["equipm
 app.include_router(user_admin_router, prefix="/api/v1/admin", tags=["user-admin"])
 app.include_router(import_export_router, prefix="/api/v1/admin/import-export", tags=["import-export"])
 
-# Phase 4 爬虫和监控模块路由
+# Phase 4 数据采集和监控模块路由
 app.include_router(crawler_router, prefix="/api/v1/admin/crawler", tags=["crawler"])
 app.include_router(monitor_router, prefix="/api/v1/admin/monitor", tags=["monitor"])
 
@@ -226,6 +272,33 @@ app.include_router(config_router, prefix="/api/v1/admin/config", tags=["config"]
 
 # OCR 图片表格识别路由
 app.include_router(ocr_router, prefix="/api/v1/ocr", tags=["ocr"])
+
+# 分布式 Worker API 路由
+app.include_router(worker_router, prefix="/api/v1/worker", tags=["worker"])
+
+# OCR Worker API 路由
+app.include_router(ocr_worker_router, prefix="/api/v1/ocr-worker", tags=["ocr-worker"])
+
+# 数据处理工作流 API 路由
+app.include_router(data_workflow_router, prefix="/api/v1/admin/workflow", tags=["workflow"])
+
+# 装备批量添加 API 路由
+app.include_router(equipment_batch_router, prefix="/api/v1/admin/equipment", tags=["equipment-batch"])
+
+# 文章内容管理 API 路由
+app.include_router(article_router, prefix="/api/v1/admin", tags=["articles"])
+
+# 钓组配置管理 API 路由
+app.include_router(rig_router, prefix="/api/v1/admin/content", tags=["rigs"])
+
+# 拟饵类型管理 API 路由
+app.include_router(lure_type_router, prefix="/api/v1/admin/content", tags=["lure-types"])
+
+# 钓鱼配件管理 API 路由
+app.include_router(accessory_router, prefix="/api/v1/admin/content", tags=["accessories"])
+
+# 鱼百科管理 API 路由
+app.include_router(fish_router, prefix="/api/v1/admin/content", tags=["fish"])
 
 
 @app.get("/")

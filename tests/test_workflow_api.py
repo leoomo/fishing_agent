@@ -19,8 +19,8 @@ from datetime import datetime, timedelta
 
 # 导入API应用
 from apps.api.main import app
-from packages.agent_fishing.tools.lure.database import get_db
-from packages.agent_fishing.tools.lure.models.system import CrawlerWorkflowTemplate, CrawlerSchedule
+from apps.api.database import get_db
+from apps.api.models.system import CrawlerWorkflowTemplate, CrawlerSchedule
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)

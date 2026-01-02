@@ -1,0 +1,228 @@
+/**
+ * TaskCard 美化样式
+ *
+ * 设计原则：
+ * 1. 状态即颜色 - 左边框反映任务状态
+ * 2. 重点优先 - 高优先级、运行中任务视觉突出
+ * 3. 微动画 - 运行状态添加脉冲效果
+ */
+
+/* ========== 基础样式 ========== */
+.task-card {
+  border-left: 4px solid transparent;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ========== 状态边框颜色 ========== */
+.task-card-pending {
+  border-left-color: #d9d9d9;
+}
+
+.task-card-queued {
+  border-left-color: #faad14;
+}
+
+.task-card-running {
+  border-left-color: #1890ff;
+}
+
+.task-card-success {
+  border-left-color: #52c41a;
+}
+
+.task-card-failed {
+  border-left-color: #ff4d4f;
+}
+
+.task-card-cancelled {
+  border-left-color: #8c8c8c;
+}
+
+.task-card-paused {
+  border-left-color: #faad14;
+}
+
+/* ========== 高优先级强调 ========== */
+.task-card-high-priority {
+  background: linear-gradient(135deg, #fff1f0 0%, #ffffff 60%);
+}
+
+.task-card-high-priority .ant-card-body {
+  background: transparent;
+}
+
+/* ========== 运行中脉冲动画 ========== */
+@keyframes pulse-shadow {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(24, 144, 255, 0.35);
+  }
+}
+
+.task-card-running {
+  animation: pulse-shadow 2s ease-in-out infinite;
+}
+
+/* ========== Hover 效果 ========== */
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.task-card-running:hover {
+  animation: none;
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.35);
+}
+
+/* ========== 头部样式 ========== */
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.task-card-title-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.task-card-title-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-card-subtitle {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 优先级徽章 */
+.priority-badge-high {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* ========== 核心指标行 ========== */
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  margin: 8px 0;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+.stat-item {
+  text-align: center;
+  flex: 1;
+}
+
+.stat-item + .stat-item {
+  border-left: 1px solid #f0f0f0;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.stat-value-success {
+  color: #52c41a;
+}
+
+.stat-value-failed {
+  color: #ff4d4f;
+}
+
+.stat-value-default {
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-top: 4px;
+}
+
+/* ========== 进度条区域 ========== */
+.progress-section {
+  margin: 12px 0;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.progress-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.progress-value {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  font-weight: 500;
+}
+
+/* ========== 底部信息 ========== */
+.task-card-footer {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-top: 8px;
+}
+
+/* ========== 操作按钮 ========== */
+.task-card .ant-card-actions {
+  background: #fafafa;
+}
+
+.task-card .ant-card-actions > li {
+  margin: 8px 0;
+}
+
+/* 主要操作按钮 */
+.action-btn-primary {
+  color: #1890ff !important;
+  font-weight: 500;
+}
+
+.action-btn-danger {
+  color: #ff4d4f !important;
+}
+
+/* ========== 选中状态 ========== */
+.task-card.selected {
+  border: 2px solid #1890ff;
+  border-left-width: 4px;
+}

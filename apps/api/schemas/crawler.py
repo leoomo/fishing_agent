@@ -1,5 +1,5 @@
 """
-爬虫管理 Schema
+数据采集管理 Schema
 """
 
 from typing import Optional, List, Dict, Any
@@ -7,18 +7,18 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
 
 
-# ========== 爬虫任务 Schema ==========
+# ========== 数据采集任务 Schema ==========
 
 class CrawlerTaskCreate(BaseModel):
-    """创建爬虫任务请求"""
+    """创建数据采集任务请求"""
     task_type: str = Field(..., pattern="^(taobao|jd|forum)$", description="任务类型")
     task_name: str = Field(..., min_length=1, max_length=200, description="任务名称")
     config: Optional[Dict[str, Any]] = Field(None, description="任务配置（JSON）")
 
 
 class CrawlerTaskResponse(BaseModel):
-    """爬虫任务响应"""
-    id: int
+    """数据采集任务响应"""
+    task_id: int  # 前端期望 task_id 而不是 id
     task_type: str
     task_name: str
     status: str  # pending, running, success, failed
@@ -37,7 +37,7 @@ class CrawlerTaskResponse(BaseModel):
 
 
 class CrawlerTaskListResponse(BaseModel):
-    """爬虫任务列表响应（分页）"""
+    """数据采集任务列表响应（分页）"""
     total: int = Field(..., description="总数量")
     page: int = Field(..., description="当前页码")
     page_size: int = Field(..., description="每页数量")
@@ -45,7 +45,7 @@ class CrawlerTaskListResponse(BaseModel):
 
 
 class CrawlerLogResponse(BaseModel):
-    """爬虫日志响应"""
+    """数据采集日志响应"""
     id: int
     task_id: int
     level: str  # info, warning, error
@@ -57,9 +57,10 @@ class CrawlerLogResponse(BaseModel):
 
 
 class TriggerCrawlerRequest(BaseModel):
-    """触发爬虫任务请求"""
-    task_type: str = Field(..., pattern="^(taobao|jd|forum)$", description="任务类型")
+    """触发数据采集任务请求"""
+    task_type: str = Field(..., pattern="^(taobao|jd|pdd|forum)$", description="任务类型")
     keywords: Optional[List[str]] = Field(None, description="搜索关键词列表")
+    shop_url: Optional[str] = Field(None, description="店铺URL")
     max_pages: Optional[int] = Field(5, ge=1, le=50, description="最大爬取页数")
     proxy: Optional[str] = Field(None, description="代理服务器")
 
@@ -67,10 +68,18 @@ class TriggerCrawlerRequest(BaseModel):
 class SyncStatusResponse(BaseModel):
     """数据同步状态响应"""
     last_sync_time: Optional[str] = None
-    total_synced: int
-    pending_sync: int
-    duplicate_removed: int
-    sync_errors: int
+    total_synced: int = 0
+    pending_sync: int = 0
+    duplicate_removed: int = 0
+    sync_errors: int = 0
+    # 任务状态统计（前端概览使用）
+    total_tasks: int = 0
+    pending_tasks: int = 0
+    queued_tasks: int = 0
+    running_tasks: int = 0
+    success_tasks: int = 0
+    failed_tasks: int = 0
+    cancelled_tasks: int = 0
 
 
 # ========== 工作流 Schema ==========
@@ -340,3 +349,123 @@ class PaginatedResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+# ========== 待审核装备 Schema ==========
+
+class PendingEquipmentSubmit(BaseModel):
+    """Worker提交待审核装备数据"""
+    task_id: int = Field(..., description="关联的爬虫任务ID")
+    worker_id: str = Field(..., description="Worker ID")
+    ocr_text: str = Field(..., min_length=1, description="OCR识别的原始文本")
+    source_type: str = Field(
+        default="ecommerce",
+        pattern="^(ecommerce|official|forum|unknown)$",
+        description="来源类型"
+    )
+    source_url: Optional[str] = Field(None, description="来源URL")
+    image_data: Optional[str] = Field(None, description="Base64编码的原始图片(可选)")
+    equipment_type: Optional[str] = Field(None, description="装备类型(可选预填)")
+    brand_name: Optional[str] = Field(None, description="品牌名称(可选预填)")
+
+
+class PendingEquipmentSubmitResponse(BaseModel):
+    """Worker提交待审核装备响应"""
+    success: bool
+    pending_id: Optional[int] = Field(None, description="待审核记录ID")
+    message: str
+    extracted_data: Optional[Dict[str, Any]] = Field(None, description="LLM提取的结构化数据")
+
+
+class PendingEquipmentResponse(BaseModel):
+    """待审核装备响应"""
+    id: int
+    status: str  # pending/approved/rejected
+    ocr_text: str
+    source_type: str
+    source_url: Optional[str] = None
+    extracted_data: Optional[Dict[str, Any]] = None
+    confidence: float
+    equipment_type: Optional[str] = None
+    brand_name: Optional[str] = None
+    model_name: Optional[str] = None
+    product_name: Optional[str] = None
+    reviewed_by: Optional[int] = None
+    reviewed_at: Optional[str] = None
+    review_notes: Optional[str] = None
+    equipment_id: Optional[int] = None
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PendingEquipmentListResponse(BaseModel):
+    """待审核装备列表响应（分页）"""
+    total: int = Field(..., description="总数量")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    items: List[PendingEquipmentResponse] = Field(..., description="待审核列表")
+
+
+class PendingEquipmentReview(BaseModel):
+    """审核待审核装备请求"""
+    action: str = Field(..., pattern="^(approve|reject)$", description="审核动作")
+    review_notes: Optional[str] = Field(None, description="审核备注")
+    # 审核通过时，可以修正提取的数据
+    corrected_data: Optional[Dict[str, Any]] = Field(None, description="修正后的数据(可选)")
+
+
+class PendingEquipmentReviewResponse(BaseModel):
+    """审核响应"""
+    success: bool
+    message: str
+    equipment_id: Optional[int] = Field(None, description="审核通过后创建的装备ID")
+
+
+# ========== 爬虫图片上传 Schema ==========
+
+class CrawlerProductUpload(BaseModel):
+    """爬虫产品上传数据（JSON 元数据部分）"""
+    product_id: str = Field(..., description="产品标识：品牌_产品名")
+    brand_name: str = Field(..., min_length=1, description="品牌名称")
+    product_name: str = Field(..., min_length=1, description="产品名称")
+    source_url: Optional[str] = Field(None, description="来源URL")
+    image_count: int = Field(..., ge=1, description="该产品的图片数量")
+    equipment_type: Optional[str] = Field(None, description="装备类型")
+
+
+class CrawlerUploadRequest(BaseModel):
+    """爬虫批量上传请求（multipart/form-data 的 JSON 部分）"""
+    products: List[CrawlerProductUpload] = Field(..., min_length=1, description="产品列表")
+
+
+class CrawlerUploadResponse(BaseModel):
+    """爬虫上传响应"""
+    success: bool
+    task_id: int
+    uploaded_count: int = Field(..., description="成功上传数量")
+    skipped_count: int = Field(..., description="跳过数量（重复）")
+    failed_count: int = Field(default=0, description="失败数量")
+    pending_ids: List[int] = Field(default_factory=list, description="创建的待审核记录ID")
+    skipped_products: List[str] = Field(default_factory=list, description="跳过的产品标识")
+    errors: List[str] = Field(default_factory=list, description="错误信息")
+
+
+class DownloadedProductsResponse(BaseModel):
+    """已下载产品列表响应"""
+    task_id: int
+    products: List[str] = Field(..., description="品牌_产品名 标识列表")
+    count: int
+
+
+class CheckDuplicatesRequest(BaseModel):
+    """去重检查请求"""
+    task_id: Optional[int] = Field(None, description="任务ID（可选，指定则只在该任务内查重）")
+    product_ids: List[str] = Field(..., min_length=1, description="产品标识列表")
+
+
+class CheckDuplicatesResponse(BaseModel):
+    """去重检查响应"""
+    exists: List[str] = Field(default_factory=list, description="已存在的产品标识")
+    new: List[str] = Field(default_factory=list, description="新产品标识")

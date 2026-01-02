@@ -1,17 +1,19 @@
 """
-爬虫管理路由 - 任务管理和实时监控
+数据采集管理路由 - 任务管理和实时监控
 """
 
 from fastapi import APIRouter, HTTPException, Query, Depends, WebSocket, WebSocketDisconnect, status
 import asyncio
+import json
 import logging
 from typing import Optional, List
 from datetime import datetime, timedelta
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.crawler_repo import CrawlerRepository
+from packages.scraper.database import get_crawler_db
 from packages.scraper.models import CrawlerTask, TaskStatus
+from apps.api.orm.repositories.crawler_repo import CrawlerRepository
 
+from fastapi import UploadFile, File, Form
 from apps.api.schemas.crawler import (
     CrawlerTaskCreate,
     CrawlerTaskResponse,
@@ -37,14 +39,26 @@ from apps.api.schemas.crawler import (
     CronExpressionRequest,
     CronExpressionResponse,
     ApiResponse,
-    PaginatedResponse
+    PaginatedResponse,
+    # Pending equipment schemas
+    PendingEquipmentResponse,
+    PendingEquipmentListResponse,
+    PendingEquipmentReview,
+    PendingEquipmentReviewResponse,
+    # Upload schemas
+    CrawlerProductUpload,
+    CrawlerUploadRequest,
+    CrawlerUploadResponse,
+    DownloadedProductsResponse,
+    CheckDuplicatesRequest,
+    CheckDuplicatesResponse,
 )
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
 from apps.api.services.crawler_service import CrawlerService
 
 # Workflow imports
-from packages.agent_fishing.tools.lure.database import get_db
+from apps.api.database import get_db
 from packages.scraper.models import CrawlerWorkflowTemplate, CrawlerSchedule, CrawlerLog
 from packages.scraper.workflow.manager import WorkflowManager
 from packages.scraper.executor.task_queue import CrawlerTaskQueue, configure_database
@@ -60,13 +74,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ========== 爬虫任务管理 ==========
+# ========== 数据采集任务管理 ==========
 
 @router.get(
     "/tasks",
     response_model=CrawlerTaskListResponse,
-    summary="查询爬虫任务列表",
-    description="查询爬虫任务列表（支持分页和筛选）"
+    summary="查询数据采集任务列表",
+    description="查询数据采集任务列表（支持分页和筛选）"
 )
 async def list_tasks(
     page: int = Query(1, ge=1, description="页码"),
@@ -76,29 +90,25 @@ async def list_tasks(
     current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
 ):
     """
-    查询爬虫任务列表（分页 + 筛选）
+    查询数据采集任务列表（分页 + 筛选）
 
     Returns:
         CrawlerTaskListResponse: 任务列表
     """
     try:
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            query = session.query(CrawlerTask)
 
-            filters = {}
             if task_type:
-                filters['task_type'] = task_type
+                query = query.filter(CrawlerTask.task_type == task_type)
             if status:
-                filters['status'] = status
+                query = query.filter(CrawlerTask.status == status)
 
-            tasks = repo.get_all(
-                filters=filters,
-                limit=page_size,
-                offset=(page - 1) * page_size,
-                order_by='created_at DESC'
-            )
-
-            total = repo.count(filters=filters)
+            total = query.count()
+            tasks = query.order_by(CrawlerTask.created_at.desc()).offset(
+                (page - 1) * page_size
+            ).limit(page_size).all()
 
             return CrawlerTaskListResponse(
                 total=total,
@@ -108,22 +118,22 @@ async def list_tasks(
             )
 
     except Exception as e:
-        logger.error(f"查询爬虫任务失败: {e}", exc_info=True)
+        logger.error(f"查询数据采集任务失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
 
 
 @router.get(
     "/tasks/{task_id}",
     response_model=CrawlerTaskResponse,
-    summary="获取爬虫任务详情",
-    description="获取指定爬虫任务的详细信息"
+    summary="获取数据采集任务详情",
+    description="获取指定数据采集任务的详细信息"
 )
 async def get_task(
     task_id: int,
     current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
 ):
     """
-    获取爬虫任务详情
+    获取数据采集任务详情
 
     Args:
         task_id: 任务ID
@@ -135,9 +145,9 @@ async def get_task(
         HTTPException: 任务不存在
     """
     try:
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
-            task = repo.get(task_id)
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
 
             if not task:
                 raise HTTPException(
@@ -154,12 +164,109 @@ async def get_task(
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
 
 
+@router.put(
+    "/tasks/{task_id}",
+    response_model=CrawlerTaskResponse,
+    summary="更新数据采集任务",
+    description="更新指定数据采集任务的信息"
+)
+async def update_task(
+    task_id: int,
+    task_update: dict,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_UPDATE))
+):
+    """
+    更新数据采集任务
+
+    Args:
+        task_id: 任务ID
+        task_update: 更新数据
+
+    Returns:
+        CrawlerTaskResponse: 更新后的任务信息
+
+    Raises:
+        HTTPException: 任务不存在或更新失败
+    """
+    try:
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+
+            if not task:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"任务不存在: task_id={task_id}"
+                )
+
+            # 检查任务状态是否允许更新
+            if task.status == TaskStatus.RUNNING:
+                raise HTTPException(
+                    status_code=400,
+                    detail="运行中的任务不能更新"
+                )
+
+            # 更新允许的字段
+            allowed_fields = [
+                'task_name', 'task_type', 'priority', 'description', 'max_pages',
+                'delay_range', 'timeout', 'retry_count', 'extract_images',
+                'use_proxy', 'random_ua', 'config', 'shop_url', 'keywords'
+            ]
+
+            updated = False
+            for field, value in task_update.items():
+                if field in allowed_fields:
+                    if field == 'config' and value:
+                        # config字段需要JSON序列化
+                        task.config = json.dumps(value, ensure_ascii=False)
+                    elif field == 'keywords':
+                        # keywords需要存入config
+                        config = json.loads(task.config) if task.config else {}
+                        # 支持字符串或列表格式
+                        if isinstance(value, str):
+                            config['keywords'] = [kw.strip() for kw in value.split(',') if kw.strip()]
+                        else:
+                            config['keywords'] = value
+                        task.config = json.dumps(config, ensure_ascii=False)
+                        updated = True
+                        continue
+                    elif field == 'shop_url':
+                        # shop_url同时存入task字段和config
+                        task.shop_url = value
+                        config = json.loads(task.config) if task.config else {}
+                        config['shop_url'] = value
+                        task.config = json.dumps(config, ensure_ascii=False)
+                        updated = True
+                        continue
+                    elif hasattr(task, field):
+                        setattr(task, field, value)
+                    updated = True
+
+            if not updated:
+                raise HTTPException(
+                    status_code=400,
+                    detail="没有有效的更新字段"
+                )
+
+            task.updated_at = datetime.now()
+            session.commit()
+
+            logger.info(f"任务更新成功: task_id={task_id}")
+            return _build_task_response(task)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")
+
+
 @router.post(
     "/tasks/trigger",
     response_model=CrawlerTaskResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="手动触发爬虫任务",
-    description="手动触发爬虫任务（支持自定义关键词和配置）"
+    summary="手动触发数据采集任务",
+    description="手动触发数据采集任务（支持自定义关键词和配置）"
 )
 async def trigger_crawler(
     request: TriggerCrawlerRequest,
@@ -177,20 +284,21 @@ async def trigger_crawler(
     try:
         crawler_service = CrawlerService()
 
-        # 创建任务
-        task = crawler_service.trigger_crawler(
+        # 创建任务（返回dict）
+        task_dict = crawler_service.trigger_crawler(
             task_type=request.task_type,
             keywords=request.keywords,
+            shop_url=request.shop_url,
             max_pages=request.max_pages,
             proxy=request.proxy
         )
 
         logger.info(
-            f"爬虫任务已触发: task_id={task.id}, "
+            f"爬虫任务已触发: task_id={task_dict.get('id')}, "
             f"type={request.task_type}, user={current_user.user_id}"
         )
 
-        return _build_task_response(task)
+        return _build_task_response_from_dict(task_dict)
 
     except Exception as e:
         logger.error(f"触发爬虫任务失败: {e}", exc_info=True)
@@ -221,7 +329,7 @@ async def retry_task(
         HTTPException: 任务不存在或状态不是 failed
     """
     try:
-        with get_db_session() as session:
+        with get_crawler_db().get_session() as session:
             repo = CrawlerRepository(session)
             task = repo.get(task_id)
 
@@ -252,6 +360,222 @@ async def retry_task(
         raise HTTPException(status_code=500, detail=f"重试失败: {str(e)}")
 
 
+@router.post(
+    "/tasks/{task_id}/start",
+    response_model=CrawlerTaskResponse,
+    status_code=status.HTTP_200_OK,
+    summary="启动数据采集任务",
+    description="启动等待中的数据采集任务"
+)
+async def start_task(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    启动数据采集任务
+
+    Args:
+        task_id: 任务ID
+
+    Returns:
+        CrawlerTaskResponse: 更新后的任务信息
+
+    Raises:
+        HTTPException: 任务不存在或状态不允许启动
+    """
+    try:
+        with get_crawler_db().get_session() as session:
+            repo = CrawlerRepository(session)
+            task = repo.get(task_id)
+
+            if not task:
+                raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+
+            if task.status not in [TaskStatus.PENDING, TaskStatus.FAILED]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"只能启动等待或失败的任务，当前状态: {task.status}"
+                )
+
+            # 启动任务（返回 dict）
+            crawler_service = CrawlerService()
+            task_dict = crawler_service.start_task(task)
+
+            logger.info(
+                f"任务启动: task_id={task_id}, "
+                f"user={current_user.user_id}"
+            )
+
+            return CrawlerTaskResponse(**task_dict)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"启动任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"启动失败: {str(e)}")
+
+
+@router.post(
+    "/tasks/{task_id}/stop",
+    response_model=CrawlerTaskResponse,
+    status_code=status.HTTP_200_OK,
+    summary="停止数据采集任务",
+    description="停止正在运行或等待中的数据采集任务"
+)
+async def stop_task(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    停止数据采集任务
+
+    将任务状态设置为 CANCELLED，并通知 Worker 停止执行。
+
+    Args:
+        task_id: 任务ID
+
+    Returns:
+        CrawlerTaskResponse: 更新后的任务信息
+
+    Raises:
+        HTTPException: 任务不存在或状态不允许停止
+    """
+    try:
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+
+            if not task:
+                raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+
+            if task.status not in [TaskStatus.QUEUED, TaskStatus.RUNNING]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"只能停止等待中或运行中的任务，当前状态: {task.status}"
+                )
+
+            # 更新任务状态为已取消
+            task.status = TaskStatus.CANCELLED
+            task.end_time = datetime.now()
+            task.error_message = "用户手动停止"
+
+            # 在 config 中标记为已取消，Worker 心跳时会收到取消命令
+            config = json.loads(task.config) if task.config else {}
+            config["_cancelled"] = True
+            config["_cancelled_at"] = datetime.now().isoformat()
+            config["_cancelled_by"] = current_user.user_id
+            task.config = json.dumps(config, ensure_ascii=False)
+
+            session.commit()
+
+            logger.info(
+                f"任务已停止: task_id={task_id}, user={current_user.user_id}"
+            )
+
+            # 推送 WebSocket 更新
+            try:
+                from apps.api.services.websocket_manager import get_ws_manager
+                import asyncio
+
+                ws_manager = get_ws_manager()
+                asyncio.create_task(
+                    ws_manager.broadcast_progress(
+                        task_id=task_id,
+                        status="CANCELLED",
+                        progress=0,
+                        message="任务已被用户停止",
+                        items_processed=task.total_items or 0,
+                        items_success=task.success_items or 0,
+                        items_failed=task.failed_items or 0
+                    )
+                )
+            except Exception as ws_error:
+                logger.debug(f"WebSocket 推送失败: {ws_error}")
+
+            return _build_task_response(task)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"停止任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"停止失败: {str(e)}")
+
+
+@router.post(
+    "/tasks/{task_id}/rerun",
+    response_model=CrawlerTaskResponse,
+    status_code=status.HTTP_200_OK,
+    summary="重新运行任务",
+    description="重新运行已完成或失败的任务（重置状态后启动）"
+)
+async def rerun_task(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    重新运行任务
+
+    将任务状态重置为 PENDING，清空执行结果，然后重新启动。
+    支持对成功、失败状态的任务重新运行。
+
+    Args:
+        task_id: 任务ID
+
+    Returns:
+        CrawlerTaskResponse: 更新后的任务信息
+
+    Raises:
+        HTTPException: 任务不存在或正在运行中
+    """
+    try:
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+
+            if not task:
+                raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+
+            if task.status in [TaskStatus.QUEUED, TaskStatus.RUNNING]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"任务状态为{task.status.value}，无法重新运行"
+                )
+
+            # 重置任务状态
+            task.status = TaskStatus.PENDING
+            task.start_time = None
+            task.end_time = None
+            task.success_items = 0
+            task.failed_items = 0
+            task.total_items = 0
+            task.error_message = None
+            task.result_summary = None
+            task.retry_count = (task.retry_count or 0) + 1
+
+            session.commit()
+
+            logger.info(
+                f"任务已重置: task_id={task_id}, user={current_user.user_id}"
+            )
+
+            # 启动任务
+            crawler_service = CrawlerService()
+            updated_task = crawler_service.start_task(task)
+
+            logger.info(
+                f"任务重新运行: task_id={task_id}, user={current_user.user_id}"
+            )
+
+            # start_task 返回的是 dict，需要使用 _build_task_response_from_dict
+            return _build_task_response_from_dict(updated_task)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"重新运行任务失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"重新运行失败: {str(e)}")
+
+
 @router.get(
     "/tasks/{task_id}/logs",
     response_model=List[CrawlerLogResponse],
@@ -274,18 +598,22 @@ async def get_task_logs(
         List[CrawlerLogResponse]: 日志列表
     """
     try:
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
-
+        db = get_crawler_db()
+        with db.session_scope() as session:
             # 验证任务存在
-            task = repo.get(task_id)
+            task = session.query(CrawlerTask).get(task_id)
             if not task:
                 raise HTTPException(
                     status_code=404,
                     detail=f"任务不存在: task_id={task_id}"
                 )
 
-            logs = repo.get_task_logs(task_id, level=level)
+            # 查询日志
+            query = session.query(CrawlerLog).filter(CrawlerLog.task_id == task_id)
+            if level:
+                query = query.filter(CrawlerLog.level == level)
+
+            logs = query.order_by(CrawlerLog.created_at.desc()).limit(100).all()
 
             return [
                 CrawlerLogResponse(
@@ -326,9 +654,9 @@ async def delete_task(
         HTTPException: 任务不存在或正在运行
     """
     try:
-        with get_db_session() as session:
-            repo = CrawlerRepository(session)
-            task = repo.get(task_id)
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
 
             if not task:
                 raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
@@ -339,8 +667,7 @@ async def delete_task(
                     detail="无法删除正在运行的任务"
                 )
 
-            repo.delete(task_id)
-
+            session.delete(task)
             logger.info(f"任务记录已删除: task_id={task_id}, user={current_user.user_id}")
 
     except HTTPException:
@@ -383,52 +710,114 @@ async def websocket_crawler_progress(websocket: WebSocket, task_id: int):
     """
     WebSocket 实时推送爬虫任务进度
 
+    使用 WebSocketManager 管理连接，支持从执行器推送进度
+
     Args:
         websocket: WebSocket 连接
         task_id: 任务ID
     """
-    await websocket.accept()
+    from apps.api.services.websocket_manager import get_ws_manager
+
+    ws_manager = get_ws_manager()
 
     try:
+        await ws_manager.connect(websocket, task_id)
         logger.info(f"WebSocket 连接建立: task_id={task_id}")
 
-        while True:
-            # 查询任务状态
-            with get_db_session() as session:
-                repo = CrawlerRepository(session)
-                task = repo.get(task_id)
+        # 发送初始状态
+        with get_crawler_db().get_session() as session:
+            repo = CrawlerRepository(session)
+            task = repo.get(task_id)
 
-                if not task:
-                    await websocket.send_json({
-                        "error": f"任务不存在: {task_id}"
-                    })
-                    break
-
-                # 推送进度
+            if task:
                 await websocket.send_json({
+                    "type": "init",
                     "task_id": task_id,
-                    "status": task.status,
-                    "progress": f"{task.success_items}/{task.total_items}",
+                    "status": task.status.value if hasattr(task.status, 'value') else str(task.status),
+                    "progress": 0,
                     "success_items": task.success_items,
                     "failed_items": task.failed_items,
+                    "total_items": task.total_items,
                     "timestamp": datetime.utcnow().isoformat()
                 })
 
-                # 任务结束时断开连接
-                if task.status in [TaskStatus.SUCCESS, TaskStatus.FAILED]:
-                    logger.info(
-                        f"任务已完成，关闭 WebSocket: task_id={task_id}, "
-                        f"status={task.status}"
-                    )
-                    break
+        # 保持连接，等待客户端消息或断开
+        while True:
+            try:
+                # 等待客户端消息（ping/pong 保活）
+                data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=30.0
+                )
 
-            # 每秒推送一次
-            await asyncio.sleep(1)
+                # 处理 ping
+                if data == "ping":
+                    await websocket.send_text("pong")
+
+            except asyncio.TimeoutError:
+                # 发送 ping 保持连接
+                try:
+                    await websocket.send_text("ping")
+                except:
+                    break
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket 客户端断开连接: task_id={task_id}")
     except Exception as e:
         logger.error(f"WebSocket 错误: {e}", exc_info=True)
+    finally:
+        await ws_manager.disconnect(websocket, task_id)
+
+
+@router.websocket("/ws/crawler-status")
+async def websocket_crawler_status(websocket: WebSocket):
+    """
+    WebSocket 实时推送爬虫全局状态
+
+    推送数据:
+    - 任务列表更新
+    - 统计数据更新 (total_tasks, running_tasks, success_tasks, failed_tasks)
+
+    Note:
+        连接后每3秒推送一次最新状态，参考 monitor.py 中的 /ws/realtime-stats
+    """
+    await websocket.accept()
+
+    try:
+        logger.info("爬虫状态 WebSocket 连接建立")
+
+        crawler_service = CrawlerService()
+        db = get_crawler_db()
+
+        while True:
+            # 获取任务列表（最新的20条）
+            # 注意：必须在session内构建响应数据，否则会触发 DetachedInstanceError
+            with db.session_scope() as session:
+                query = session.query(CrawlerTask)
+                total = query.count()
+                tasks = query.order_by(CrawlerTask.created_at.desc()).limit(20).all()
+                # 在session关闭前构建响应数据，并转换为字典
+                tasks_data = [t.model_dump() for t in (_build_task_response(task) for task in tasks)]
+
+            # 获取统计数据
+            stats_data = crawler_service.get_sync_status()
+
+            # 推送数据
+            await websocket.send_json({
+                "type": "status_update",
+                "timestamp": datetime.utcnow().isoformat(),
+                "tasks": tasks_data,
+                "total": total,
+                "stats": stats_data
+            })
+
+            # 每3秒推送一次
+            await asyncio.sleep(3)
+
+    except WebSocketDisconnect:
+        logger.info("爬虫状态 WebSocket 客户端断开")
+    except Exception as e:
+        logger.error(f"爬虫状态 WebSocket 错误: {e}", exc_info=True)
         try:
             await websocket.send_json({"error": str(e)})
         except:
@@ -462,7 +851,7 @@ async def create_workflow_template(
         WorkflowTemplateResponse: 创建的模板
     """
     try:
-        with get_db_session() as session:
+        with get_crawler_db().get_session() as session:
             workflow_manager = WorkflowManager(session)
 
             # 转换为字典格式保存
@@ -513,7 +902,7 @@ async def list_workflow_templates(
         PaginatedResponse: 模板列表
     """
     try:
-        with get_db_session() as session:
+        with get_crawler_db().get_session() as session:
             query = session.query(CrawlerWorkflowTemplate)
 
             # 筛选条件
@@ -1387,25 +1776,531 @@ async def get_scheduler_status(
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
 
 
+# ========== 爬虫图片上传 ==========
+
+@router.post(
+    "/tasks/{task_id}/upload",
+    response_model=CrawlerUploadResponse,
+    summary="爬虫任务图片批量上传",
+    description="任务完成后批量上传产品图片并创建待审核记录"
+)
+async def upload_task_products(
+    task_id: int,
+    products: str = Form(..., description="产品列表JSON字符串"),
+    files: List[UploadFile] = File(..., description="图片文件列表"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    批量上传爬虫任务产品
+
+    - **products**: JSON 字符串，包含产品元数据列表
+    - **files**: 图片文件列表，文件名格式为 `{product_index}_{image_index}.{ext}`
+
+    产品 JSON 格式示例:
+    ```json
+    [
+        {
+            "product_id": "shimano_fx-2000",
+            "brand_name": "Shimano",
+            "product_name": "FX-2000",
+            "source_url": "https://...",
+            "image_count": 3,
+            "equipment_type": "渔轮"
+        }
+    ]
+    ```
+
+    Returns:
+        上传结果（成功/失败/跳过统计）
+    """
+    try:
+        from apps.api.services.crawler_upload_service import CrawlerUploadService
+
+        # 解析产品 JSON
+        try:
+            products_data = json.loads(products)
+            product_list = [CrawlerProductUpload(**p) for p in products_data]
+        except (json.JSONDecodeError, Exception) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"products JSON 解析失败: {str(e)}"
+            )
+
+        # 验证任务存在
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+            if not task:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"任务不存在: task_id={task_id}"
+                )
+
+        # 调用上传服务
+        service = CrawlerUploadService()
+        result = service.upload_products(
+            task_id=task_id,
+            products=product_list,
+            files=files
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"上传产品失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
+
+
+@router.get(
+    "/tasks/{task_id}/downloaded",
+    response_model=DownloadedProductsResponse,
+    summary="获取任务已下载产品列表",
+    description="查询爬虫任务已下载的产品标识，用于去重"
+)
+async def get_downloaded_products(
+    task_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取已下载产品标识列表
+
+    Returns:
+        品牌_产品名 标识数组
+    """
+    try:
+        from apps.api.services.crawler_upload_service import CrawlerUploadService
+
+        # 验证任务存在
+        db = get_crawler_db()
+        with db.session_scope() as session:
+            task = session.query(CrawlerTask).get(task_id)
+            if not task:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"任务不存在: task_id={task_id}"
+                )
+
+        service = CrawlerUploadService()
+        return service.get_downloaded_products(task_id)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取已下载产品失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.post(
+    "/check-duplicates",
+    response_model=CheckDuplicatesResponse,
+    summary="检查产品是否已下载",
+    description="批量检查产品标识是否已存在"
+)
+async def check_duplicates(
+    request: CheckDuplicatesRequest,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    检查产品是否已被爬取
+
+    Args:
+        task_id: 任务ID（可选，指定则只在该任务内查重）
+        product_ids: 品牌_产品名 标识列表
+
+    Returns:
+        {exists: ['id1', 'id2'], new: ['id3', 'id4']}
+    """
+    try:
+        from apps.api.services.crawler_upload_service import CrawlerUploadService
+
+        service = CrawlerUploadService()
+        return service.check_duplicates(
+            product_ids=request.product_ids,
+            task_id=request.task_id
+        )
+
+    except Exception as e:
+        logger.error(f"检查重复失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"检查失败: {str(e)}")
+
+
+# ========== 待审核装备管理 ==========
+
+@router.get(
+    "/pending-equipment",
+    response_model=PendingEquipmentListResponse,
+    summary="获取待审核装备列表",
+    description="获取待审核装备列表（支持分页和筛选）"
+)
+async def list_pending_equipment(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    status_filter: Optional[str] = Query(None, alias="status", description="状态筛选: pending/approved/rejected"),
+    equipment_type: Optional[str] = Query(None, description="装备类型筛选"),
+    brand_name: Optional[str] = Query(None, description="品牌名称筛选"),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取待审核装备列表
+
+    Returns:
+        PendingEquipmentListResponse: 待审核装备列表
+    """
+    try:
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
+
+        with get_db_session() as session:
+            query = session.query(PendingEquipment)
+
+            # 筛选条件
+            if status_filter:
+                query = query.filter(PendingEquipment.status == status_filter)
+            if equipment_type:
+                query = query.filter(PendingEquipment.equipment_type == equipment_type)
+            if brand_name:
+                query = query.filter(PendingEquipment.brand_name.contains(brand_name))
+
+            # 计算总数
+            total = query.count()
+
+            # 分页
+            items = query.order_by(PendingEquipment.created_at.desc()).offset(
+                (page - 1) * page_size
+            ).limit(page_size).all()
+
+            return PendingEquipmentListResponse(
+                total=total,
+                page=page,
+                page_size=page_size,
+                items=[_build_pending_equipment_response(item) for item in items]
+            )
+
+    except Exception as e:
+        logger.error(f"获取待审核装备列表失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/pending-equipment/stats",
+    summary="获取待审核装备统计",
+    description="获取待审核装备的统计数据"
+)
+async def get_pending_equipment_stats(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取待审核装备统计数据
+
+    Returns:
+        统计数据字典
+    """
+    try:
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
+        from sqlalchemy import func
+
+        with get_db_session() as session:
+            # 统计各状态数量
+            stats = session.query(
+                PendingEquipment.status,
+                func.count(PendingEquipment.id)
+            ).group_by(PendingEquipment.status).all()
+
+            stat_dict = {s[0]: s[1] for s in stats}
+            total = sum(stat_dict.values())
+
+            return {
+                "total": total,
+                "pending": stat_dict.get("pending", 0),
+                "approved": stat_dict.get("approved", 0),
+                "rejected": stat_dict.get("rejected", 0),
+            }
+
+    except Exception as e:
+        logger.error(f"获取待审核装备统计失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取统计失败: {str(e)}")
+
+
+@router.get(
+    "/pending-equipment/{pending_id}",
+    response_model=PendingEquipmentResponse,
+    summary="获取待审核装备详情",
+    description="获取指定待审核装备的详细信息"
+)
+async def get_pending_equipment(
+    pending_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+):
+    """
+    获取待审核装备详情
+
+    Args:
+        pending_id: 待审核记录ID
+
+    Returns:
+        PendingEquipmentResponse: 待审核装备详情
+    """
+    try:
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
+
+        with get_db_session() as session:
+            item = session.query(PendingEquipment).filter(
+                PendingEquipment.id == pending_id
+            ).first()
+
+            if not item:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"待审核记录不存在: id={pending_id}"
+                )
+
+            return _build_pending_equipment_response(item)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取待审核装备详情失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.post(
+    "/pending-equipment/{pending_id}/review",
+    response_model=PendingEquipmentReviewResponse,
+    summary="审核待审核装备",
+    description="审核通过或拒绝待审核装备"
+)
+async def review_pending_equipment(
+    pending_id: int,
+    review: PendingEquipmentReview,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_EXECUTE))
+):
+    """
+    审核待审核装备
+
+    Args:
+        pending_id: 待审核记录ID
+        review: 审核请求（包含action和notes）
+
+    Returns:
+        PendingEquipmentReviewResponse: 审核结果
+    """
+    try:
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
+
+        with get_db_session() as session:
+            item = session.query(PendingEquipment).filter(
+                PendingEquipment.id == pending_id
+            ).first()
+
+            if not item:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"待审核记录不存在: id={pending_id}"
+                )
+
+            if item.status != "pending":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"该记录已被审核: status={item.status}"
+                )
+
+            equipment_id = None
+
+            if review.action == "approve":
+                # 审核通过，创建正式装备记录
+                equipment_id = _create_equipment_from_pending(
+                    session, item, review.corrected_data
+                )
+
+                item.status = "approved"
+                item.equipment_id = equipment_id
+                logger.info(f"待审核装备通过: pending_id={pending_id}, equipment_id={equipment_id}")
+            else:
+                # 审核拒绝
+                item.status = "rejected"
+                logger.info(f"待审核装备拒绝: pending_id={pending_id}")
+
+            # 更新审核信息
+            item.reviewed_by = current_user.user_id
+            item.reviewed_at = datetime.utcnow()
+            item.review_notes = review.review_notes
+
+            session.commit()
+
+            return PendingEquipmentReviewResponse(
+                success=True,
+                message=f"审核{'通过' if review.action == 'approve' else '拒绝'}成功",
+                equipment_id=equipment_id
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"审核待审核装备失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"审核失败: {str(e)}")
+
+
+@router.delete(
+    "/pending-equipment/{pending_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除待审核记录",
+    description="删除指定的待审核装备记录"
+)
+async def delete_pending_equipment(
+    pending_id: int,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_DELETE))
+):
+    """
+    删除待审核记录
+
+    Args:
+        pending_id: 待审核记录ID
+    """
+    try:
+        from packages.agents.equipment_import.models.pending import PendingEquipment
+        from apps.api.orm.session import get_db_session
+
+        with get_db_session() as session:
+            item = session.query(PendingEquipment).filter(
+                PendingEquipment.id == pending_id
+            ).first()
+
+            if not item:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"待审核记录不存在: id={pending_id}"
+                )
+
+            session.delete(item)
+            logger.info(f"待审核记录已删除: pending_id={pending_id}, user={current_user.user_id}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除待审核记录失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+
+
+def _build_pending_equipment_response(item) -> PendingEquipmentResponse:
+    """构造待审核装备响应对象"""
+    return PendingEquipmentResponse(
+        id=item.id,
+        status=item.status,
+        ocr_text=item.ocr_text,
+        source_type=item.source_type,
+        source_url=item.source_url,
+        extracted_data=json.loads(item.extracted_data) if item.extracted_data else None,
+        confidence=item.confidence or 0.0,
+        equipment_type=item.equipment_type,
+        brand_name=item.brand_name,
+        model_name=item.model_name,
+        product_name=item.product_name,
+        reviewed_by=item.reviewed_by,
+        reviewed_at=item.reviewed_at.isoformat() if item.reviewed_at else None,
+        review_notes=item.review_notes,
+        equipment_id=item.equipment_id,
+        created_at=item.created_at.isoformat(),
+        updated_at=item.updated_at.isoformat()
+    )
+
+
+def _create_equipment_from_pending(session, pending_item, corrected_data: Optional[dict] = None) -> int:
+    """
+    从待审核记录创建正式装备
+
+    Args:
+        session: 数据库会话
+        pending_item: 待审核记录
+        corrected_data: 修正后的数据（可选）
+
+    Returns:
+        int: 创建的装备ID
+    """
+    from apps.api.models.equipment import Equipment
+    from apps.api.models.brand import Brand
+
+    # 获取提取的数据
+    extracted = json.loads(pending_item.extracted_data) if pending_item.extracted_data else {}
+
+    # 如果有修正数据，则使用修正数据
+    if corrected_data:
+        extracted.update(corrected_data)
+
+    # 查找或创建品牌
+    brand_name = extracted.get("brand_name") or pending_item.brand_name
+    brand = None
+    if brand_name:
+        brand = session.query(Brand).filter(
+            Brand.name_cn == brand_name
+        ).first()
+
+        if not brand:
+            # 创建新品牌
+            brand = Brand(name_cn=brand_name, country="未知")
+            session.add(brand)
+            session.flush()
+
+    # 创建装备记录
+    equipment = Equipment(
+        name=extracted.get("name") or pending_item.product_name or "未命名装备",
+        category=extracted.get("equipment_type") or pending_item.equipment_type or "其他",
+        brand_id=brand.brand_id if brand else None,
+        price_min=extracted.get("price_min"),
+        price_max=extracted.get("price_max"),
+        description=extracted.get("description"),
+        source_url=pending_item.source_url,
+        is_active=True
+    )
+    session.add(equipment)
+    session.flush()
+
+    return equipment.equipment_id
+
+
 # ========== 辅助函数 ==========
 
 def _build_task_response(task: CrawlerTask) -> CrawlerTaskResponse:
     """构造任务响应对象"""
     return CrawlerTaskResponse(
-        id=task.id,
+        task_id=task.id,  # 前端期望 task_id 而不是 id
         task_type=task.task_type,
         task_name=task.task_name,
         status=task.status,
         start_time=task.start_time.isoformat() if task.start_time else None,
         end_time=task.end_time.isoformat() if task.end_time else None,
-        total_items=task.total_items,
-        success_items=task.success_items,
-        failed_items=task.failed_items,
+        total_items=task.total_items or 0,
+        success_items=task.success_items or 0,
+        failed_items=task.failed_items or 0,
         error_message=task.error_message,
         config=task.config,
         result_summary=task.result_summary,
         created_at=task.created_at.isoformat(),
         updated_at=task.updated_at.isoformat()
+    )
+
+
+def _build_task_response_from_dict(task_dict: dict) -> CrawlerTaskResponse:
+    """从字典构造任务响应对象"""
+    return CrawlerTaskResponse(
+        task_id=task_dict.get('task_id'),  # 使用 task_id（来自 to_dict()）
+        task_type=task_dict.get('task_type'),
+        task_name=task_dict.get('task_name'),
+        status=task_dict.get('status'),
+        start_time=task_dict.get('start_time'),
+        end_time=task_dict.get('end_time'),
+        total_items=task_dict.get('total_items', 0),
+        success_items=task_dict.get('success_items', 0),
+        failed_items=task_dict.get('failed_items', 0),
+        error_message=task_dict.get('error_message'),
+        config=task_dict.get('config'),
+        result_summary=task_dict.get('result_summary'),
+        created_at=task_dict.get('created_at'),
+        updated_at=task_dict.get('updated_at')
     )
 
 

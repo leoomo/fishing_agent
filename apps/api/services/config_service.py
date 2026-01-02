@@ -2,11 +2,61 @@ import json
 import logging
 from typing import Dict, Optional, List
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.system import SystemConfig
+from apps.api.orm.session import get_db_session
+from apps.api.models.system import SystemConfig
 from apps.api.utils.encryption import encrypt_value, decrypt_value
 
 logger = logging.getLogger(__name__)
+
+# 装备选项默认配置（带备注）
+EQUIPMENT_OPTION_DEFAULTS = {
+    'equipment.rod.power_options': {
+        'value': [
+            {'value': 'UL', 'note': '超轻调，适合微物钓法'},
+            {'value': 'L', 'note': '轻调，适合小型鱼类'},
+            {'value': 'ML', 'note': '中轻调，通用型'},
+            {'value': 'M', 'note': '中调，平衡性好'},
+            {'value': 'MH', 'note': '中硬调，适合中大型鱼'},
+            {'value': 'H', 'note': '硬调，适合大型鱼'},
+            {'value': 'XH', 'note': '超硬调，适合巨物'},
+        ],
+        'description': '鱼竿调性选项（从超软到超硬）',
+    },
+    'equipment.rod.action_options': {
+        'value': [
+            {'value': 'Fast', 'note': '快调，恢复迅速'},
+            {'value': 'Medium', 'note': '中调，平衡性好'},
+            {'value': 'Slow', 'note': '慢调，弯曲幅度大'},
+        ],
+        'description': '鱼竿动作选项（弯曲恢复速度）',
+    },
+    'equipment.rod.action_options_cn': {
+        'value': [
+            {'value': '慢调', 'note': '弯曲幅度大，适合溜鱼'},
+            {'value': '中调', 'note': '平衡型，适用范围广'},
+            {'value': '快调', 'note': '恢复快，灵敏度高'},
+            {'value': '超快调', 'note': '极速恢复，精准度高'},
+        ],
+        'description': '鱼竿动作选项（中文表述）',
+    },
+    'equipment.user_level_options': {
+        'value': [
+            {'value': '新手', 'note': '入门级用户'},
+            {'value': '进阶', 'note': '有一定经验的用户'},
+            {'value': '高手', 'note': '经验丰富的专业用户'},
+        ],
+        'description': '装备适合的用户水平',
+    },
+    'equipment.category_options': {
+        'value': [
+            {'value': '鱼竿', 'note': '钓鱼主要工具'},
+            {'value': '渔轮', 'note': '收放线装置'},
+            {'value': '鱼线', 'note': '连接鱼竿和鱼钩'},
+            {'value': '拟饵', 'note': '模拟饵料吸引鱼类'},
+        ],
+        'description': '装备分类选项',
+    },
+}
 
 
 class ConfigService:
@@ -241,3 +291,62 @@ class ConfigService:
                 "valid": False,
                 "message": f"测试失败: {str(e)}"
             }
+
+    def init_equipment_options(self) -> Dict[str, bool]:
+        """
+        初始化装备选项默认配置
+
+        只创建不存在的配置，不覆盖已存在的配置。
+
+        Returns:
+            dict: 配置键 -> 是否创建 (True=新建, False=已存在)
+        """
+        results = {}
+
+        with get_db_session() as session:
+            for config_key, config_data in EQUIPMENT_OPTION_DEFAULTS.items():
+                # 检查是否已存在
+                existing = session.query(SystemConfig).filter_by(
+                    config_key=config_key
+                ).first()
+
+                if existing:
+                    results[config_key] = False
+                    logger.debug(f"配置已存在，跳过: {config_key}")
+                    continue
+
+                # 创建新配置
+                config = SystemConfig(
+                    config_key=config_key,
+                    config_value=json.dumps(config_data['value'], ensure_ascii=False),
+                    config_type='system',
+                    description=config_data['description'],
+                    is_encrypted=False
+                )
+                session.add(config)
+                results[config_key] = True
+                logger.info(f"创建装备选项配置: {config_key}")
+
+            session.commit()
+
+        return results
+
+
+def init_default_equipment_options():
+    """
+    初始化装备选项默认配置的便捷函数
+
+    可在应用启动时调用，确保默认配置存在。
+    """
+    service = ConfigService()
+    results = service.init_equipment_options()
+
+    created = [k for k, v in results.items() if v]
+    skipped = [k for k, v in results.items() if not v]
+
+    if created:
+        logger.info(f"创建了 {len(created)} 个装备选项配置")
+    if skipped:
+        logger.debug(f"跳过了 {len(skipped)} 个已存在的配置")
+
+    return results

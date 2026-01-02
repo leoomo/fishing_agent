@@ -12,14 +12,14 @@
 import pytest
 from datetime import datetime
 from unittest.mock import Mock, patch, MagicMock
-from packages.agent_fishing.tools.crawler import (
+from packages.agents.fishing.tools.crawler import (
     EquipmentData,
     EquipmentDeduplicator,
     DataPersister,
     UserAgentRotator,
     RequestThrottler,
 )
-from packages.agent_fishing.tools.lure.database import get_db
+from apps.api.database import get_db
 
 
 class TestEquipmentData:
@@ -171,7 +171,7 @@ class TestDataPersister:
     @pytest.fixture
     def persister(self, real_db):
         """创建持久化器实例"""
-        from packages.agent_fishing.tools.lure.image_manager import ImageManager, LocalImageStorage
+        from packages.agents.fishing.tools.lure.image_manager import ImageManager, LocalImageStorage
         import tempfile
         # 使用临时目录存储测试图片
         temp_dir = tempfile.mkdtemp()

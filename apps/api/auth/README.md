@@ -179,7 +179,7 @@ CONTENT_READ = "content:read"
 CONTENT_UPDATE = "content:update"
 CONTENT_DELETE = "content:delete"
 
-# 爬虫管理
+# 数据采集管理
 CRAWLER_READ = "crawler:read"
 CRAWLER_EXECUTE = "crawler:execute"
 CRAWLER_DELETE = "crawler:delete"

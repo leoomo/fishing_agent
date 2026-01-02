@@ -230,7 +230,10 @@ tmp/
 *.hdf5
 *.bin
 *.safetensors
-models/
+# ML models directory (but not Python package models/)
+/models/
+!packages/**/models/
+!apps/**/models/
 data/raw/
 data/processed/
 
@@ -277,3 +280,4 @@ node_modules/
 /playwright/.cache/
 /playwright/.auth/
 .playwright-mcp/
+node_modules

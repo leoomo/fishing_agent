@@ -23,10 +23,10 @@ def test_imports():
     logger.info("=== 测试模块导入 ===")
 
     try:
-        from packages.agent_fishing.tools.crawler.platform.registry import platform_registry
-        from packages.agent_fishing.tools.crawler.platform.base_platform import TaskConfig, TaskType
-        from packages.agent_fishing.tools.crawler.platform.taobao_platform import TaobaoPlatform
-        from packages.agent_fishing.tools.crawler.platform.jd_platform import JDPlatform
+        from packages.agents.fishing.tools.crawler.platform.registry import platform_registry
+        from packages.agents.fishing.tools.crawler.platform.base_platform import TaskConfig, TaskType
+        from packages.agents.fishing.tools.crawler.platform.taobao_platform import TaobaoPlatform
+        from packages.agents.fishing.tools.crawler.platform.jd_platform import JDPlatform
 
         logger.info("✅ 所有模块导入成功")
         return True
@@ -40,7 +40,7 @@ def test_registry():
     logger.info("\n=== 测试平台注册表 ===")
 
     try:
-        from packages.agent_fishing.tools.crawler.platform.registry import platform_registry
+        from packages.agents.fishing.tools.crawler.platform.registry import platform_registry
 
         # 获取支持的平台
         platforms = platform_registry.get_supported_platforms()
@@ -76,7 +76,7 @@ def test_task_config():
     logger.info("\n=== 测试任务配置 ===")
 
     try:
-        from packages.agent_fishing.tools.crawler.platform.base_platform import TaskConfig, TaskType
+        from packages.agents.fishing.tools.crawler.platform.base_platform import TaskConfig, TaskType
 
         # 创建关键词搜索配置
         keyword_config = TaskConfig(
@@ -110,8 +110,8 @@ async def test_platform_crawl():
     logger.info("\n=== 测试平台爬虫 ===")
 
     try:
-        from packages.agent_fishing.tools.crawler.platform.registry import platform_registry
-        from packages.agent_fishing.tools.crawler.platform.base_platform import TaskConfig, TaskType
+        from packages.agents.fishing.tools.crawler.platform.registry import platform_registry
+        from packages.agents.fishing.tools.crawler.platform.base_platform import TaskConfig, TaskType
 
         # 获取淘宝平台实例
         taobao = platform_registry.get_platform("taobao")

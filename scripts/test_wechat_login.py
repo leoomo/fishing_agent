@@ -152,8 +152,8 @@ def run_database_migration():
 
     try:
         import sqlite3
-        from packages.agent_fishing.tools.lure.migrations_wechat import run_wechat_migrations
-        from packages.agent_fishing.tools.lure.database import get_db
+        from packages.agents.fishing.tools.lure.migrations_wechat import run_wechat_migrations
+        from packages.agents.fishing.tools.lure.database import get_db
 
         # 获取数据库连接
         db_path = get_db().get_database_path()

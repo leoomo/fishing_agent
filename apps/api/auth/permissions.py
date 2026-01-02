@@ -44,6 +44,7 @@ class PermissionEnum(str, Enum):
     # Crawler management
     CRAWLER_READ = "crawler:read"
     CRAWLER_EXECUTE = "crawler:execute"  # Trigger tasks
+    CRAWLER_UPDATE = "crawler:update"    # Update task configuration
     CRAWLER_DELETE = "crawler:delete"
 
     # System monitoring

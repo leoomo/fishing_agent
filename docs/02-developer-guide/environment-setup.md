@@ -139,7 +139,7 @@ cd ../..
 
 ```bash
 # 小程序目录已创建，使用微信开发者工具打开
-miniprogram/
+fishing_agent_app/
 ```
 
 ## ⚙️ 配置说明
@@ -193,7 +193,7 @@ miniprogram/
 ### 数据库配置
 
 项目使用 SQLite 数据库，自动创建：
-- 装备数据：`packages/agent_fishing/tools/lure/data/equipment.db`
+- 装备数据：`shared/data/equipment.db`
 - 待审核装备：`shared/data/pending_equipment.db`
 - 系统配置：`shared/data/system.db`
 
@@ -234,9 +234,9 @@ npm run dev
 ### 方式四：微信小程序
 
 ```bash
-# 1. 使用微信开发者工具打开 miniprogram/ 目录
+# 1. 使用微信开发者工具打开 fishing_agent_app/ 目录
 # 2. 在本地设置中勾选"不校验合法域名"
-# 3. 修改 miniprogram/utils/api.js 中的 baseURL 为本地地址
+# 3. 修改 fishing_agent_app/utils/api.js 中的 baseURL 为本地地址
 ```
 
 ### 方式五：Docker 部署
@@ -259,8 +259,8 @@ docker-compose up -d
 ```bash
 # 测试所有核心包
 uv run python -c "
-from packages.agent_fishing import create_agent
-from packages.agent_equipment_import import EquipmentImportAgent
+from packages.agents.fishing import create_agent
+from packages.agents.equipment_import import EquipmentImportAgent
 from packages.data_processing.image import BatchMergeProcessor
 from packages.scraper import BaseSpider
 print('✅ 所有核心包导入成功')
@@ -421,7 +421,7 @@ ls -la shared/data/
 ### 1. 使用 Python API
 
 ```python
-from packages.agent_equipment_import import EquipmentImportAgent
+from packages.agents.equipment_import import EquipmentImportAgent
 
 # 创建导入 Agent
 agent = EquipmentImportAgent(

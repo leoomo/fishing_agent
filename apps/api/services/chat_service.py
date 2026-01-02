@@ -5,9 +5,10 @@ import logging
 from typing import Dict, Optional, List, Generator
 from datetime import datetime
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.chat import ChatSession, ChatMessage
-from packages.agent_fishing import create_agent
+from apps.api.orm.session import get_db_session
+from apps.api.models.chat import ChatSession, ChatMessage
+from packages.agents.fishing import create_agent
+from packages.agents.agent_component.monitoring import MonitoringCallback
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +27,23 @@ DEFAULT_SUGGESTIONS = [
 class ChatService:
     """Chat service for managing sessions and messages"""
 
-    def __init__(self, model_provider: str = "qwen"):
+    def __init__(self, model_provider: str = "qwen", user_id: Optional[int] = None, session_id: Optional[int] = None):
         self.model_provider = model_provider
+        self.user_id = user_id
+        self.session_id = session_id
         self._agent = None
 
     @property
     def agent(self):
         """Lazy load agent"""
         if self._agent is None:
-            self._agent = create_agent(model_provider=self.model_provider)
+            self._agent = create_agent(
+                model_provider=self.model_provider,
+                enable_monitoring=True,
+                user_id=self.user_id,
+                session_id=self.session_id,
+                verbose_callbacks=False
+            )
         return self._agent
 
     # ============ Session Operations ============
@@ -251,7 +260,9 @@ class ChatService:
                 if role == "user" and chat_session.title == "新对话":
                     chat_session.title = self._generate_title(content)
 
-            return message.to_dict()
+            # Convert to dict before the session closes
+            result = message.to_dict()
+            return result
 
     def get_messages(self, session_id: int, limit: int = 100, offset: int = 0) -> Dict:
         """

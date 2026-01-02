@@ -12,8 +12,8 @@ from datetime import datetime
 from ..auth.jwt import create_access_token, verify_password
 from ..auth.dependencies import get_current_user, CurrentUser
 from ..auth.permissions import get_role_permissions
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.admin_user_repo import AdminUserRepository
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.admin_user_repo import AdminUserRepository
 from ..services.wechat_service import wechat_service
 
 import logging

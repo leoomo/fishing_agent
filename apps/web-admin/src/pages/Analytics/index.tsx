@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Card,
   Row,
@@ -10,15 +10,19 @@ import {
   Spin,
   message,
   Tabs,
-  DatePicker,
   Modal,
   Typography,
+  DatePicker,
+  Space,
+  Descriptions,
 } from 'antd'
 import {
   BarChartOutlined,
   LineChartOutlined,
   PieChartOutlined,
   FileTextOutlined,
+  DownloadOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { analyticsApi } from '@/api/services/analytics'
@@ -30,10 +34,43 @@ import type {
   BusinessReport,
 } from '@/types/analytics'
 import type { ColumnsType } from 'antd/es/table'
-import dayjs from 'dayjs'
+import dayjs, { Dayjs } from 'dayjs'
 
+const { Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
-const { Paragraph } = Typography
+
+// CSV 导出工具函数
+const exportToCSV = (data: Record<string, unknown>[], filename: string) => {
+  if (!data || data.length === 0) {
+    message.warning('没有数据可导出')
+    return
+  }
+
+  const headers = Object.keys(data[0])
+  const csvRows = [
+    headers.join(','),
+    ...data.map((row) =>
+      headers.map((h) => {
+        const val = row[h]
+        // 处理包含逗号或引号的值
+        if (typeof val === 'string' && (val.includes(',') || val.includes('"'))) {
+          return `"${val.replace(/"/g, '""')}"`
+        }
+        return val
+      }).join(',')
+    ),
+  ]
+
+  const csvContent = '\uFEFF' + csvRows.join('\n') // BOM for Excel UTF-8
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${filename}_${dayjs().format('YYYYMMDD_HHmmss')}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+  message.success('导出成功')
+}
 
 const Analytics = () => {
   const [loading, setLoading] = useState(true)
@@ -46,16 +83,22 @@ const Analytics = () => {
   const [reportVisible, setReportVisible] = useState(false)
   const [currentReport, setCurrentReport] = useState<BusinessReport | null>(null)
 
-  useEffect(() => {
-    fetchAllData()
-  }, [])
+  // 日期范围状态
+  const [trendDateRange, setTrendDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().subtract(12, 'month'),
+    dayjs(),
+  ])
+  const [reportDateRange, setReportDateRange] = useState<[Dayjs, Dayjs] | null>(null)
 
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     setLoading(true)
     try {
+      // 计算月数
+      const months = Math.ceil(trendDateRange[1].diff(trendDateRange[0], 'month', true)) || 12
+
       const [statsData, trendsData, priceData, brandData] = await Promise.all([
         analyticsApi.getEquipmentStats(),
-        analyticsApi.getEquipmentTrends(12),
+        analyticsApi.getEquipmentTrends(months),
         analyticsApi.getPriceDistribution(),
         analyticsApi.getBrandStats(10),
       ])
@@ -68,7 +111,11 @@ const Analytics = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [trendDateRange])
+
+  useEffect(() => {
+    fetchAllData()
+  }, [fetchAllData])
 
   const handleCategoryChange = async (category?: string) => {
     setSelectedCategory(category)
@@ -80,14 +127,27 @@ const Analytics = () => {
     }
   }
 
+  const handleTrendDateChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
+    if (dates && dates[0] && dates[1]) {
+      setTrendDateRange([dates[0], dates[1]])
+    }
+  }
+
   const handleGenerateReport = async (reportType: string) => {
     setReportLoading(true)
     try {
-      // 计算日期范围
-      const endDate = dayjs()
-      const startDate = reportType === 'weekly'
-        ? endDate.subtract(7, 'day')
-        : endDate.subtract(30, 'day')
+      let startDate: Dayjs
+      let endDate: Dayjs
+
+      if (reportDateRange) {
+        startDate = reportDateRange[0]
+        endDate = reportDateRange[1]
+      } else {
+        endDate = dayjs()
+        startDate = reportType === 'weekly'
+          ? endDate.subtract(7, 'day')
+          : endDate.subtract(30, 'day')
+      }
 
       const report = await analyticsApi.generateReport({
         report_type: reportType,
@@ -104,20 +164,52 @@ const Analytics = () => {
     }
   }
 
+  // 导出趋势数据
+  const handleExportTrends = () => {
+    const data = trends.map((t) => ({
+      日期: t.date,
+      总数量: t.total_count,
+      ...t.by_category,
+    }))
+    exportToCSV(data, '装备趋势')
+  }
+
+  // 导出品牌数据
+  const handleExportBrands = () => {
+    const data = brandStats.map((b, index) => ({
+      排名: index + 1,
+      品牌: b.brand_name,
+      装备数量: b.equipment_count,
+      平均价格: b.avg_price,
+      占比: `${b.percentage}%`,
+    }))
+    exportToCSV(data, '品牌排行')
+  }
+
+  // 导出价格分布
+  const handleExportPriceDistribution = () => {
+    const data = priceDistribution.map((p) => ({
+      价格区间: p.price_range,
+      数量: p.count,
+      占比: `${p.percentage}%`,
+    }))
+    exportToCSV(data, '价格分布')
+  }
+
   // 趋势图配置
   const trendChartOption = {
     title: { text: '装备数量趋势', left: 'center' },
     tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
-      data: trends.map((t) => t.month),
+      data: trends.map((t) => t.date),
     },
     yAxis: { type: 'value' },
     series: [
       {
         name: '装备数量',
         type: 'line',
-        data: trends.map((t) => t.count),
+        data: trends.map((t) => t.total_count),
         smooth: true,
         areaStyle: { opacity: 0.3 },
       },
@@ -133,7 +225,7 @@ const Analytics = () => {
         type: 'pie',
         radius: ['40%', '70%'],
         data: priceDistribution.map((p) => ({
-          name: p.range,
+          name: p.price_range,
           value: p.count,
         })),
         emphasis: {
@@ -229,22 +321,32 @@ const Analytics = () => {
             />
           </Col>
           <Col span={6}>
-            <Button
-              type="primary"
-              icon={<FileTextOutlined />}
-              loading={reportLoading}
-              onClick={() => handleGenerateReport('weekly')}
-            >
-              生成周报
-            </Button>
-            <Button
-              style={{ marginLeft: 8 }}
-              icon={<FileTextOutlined />}
-              loading={reportLoading}
-              onClick={() => handleGenerateReport('monthly')}
-            >
-              生成月报
-            </Button>
+            <Space direction="vertical" size="small">
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<FileTextOutlined />}
+                  loading={reportLoading}
+                  onClick={() => handleGenerateReport('weekly')}
+                >
+                  周报
+                </Button>
+                <Button
+                  icon={<FileTextOutlined />}
+                  loading={reportLoading}
+                  onClick={() => handleGenerateReport('monthly')}
+                >
+                  月报
+                </Button>
+              </Space>
+              <RangePicker
+                size="small"
+                value={reportDateRange}
+                onChange={(dates) => setReportDateRange(dates as [Dayjs, Dayjs] | null)}
+                placeholder={['自定义开始', '自定义结束']}
+                style={{ width: '100%' }}
+              />
+            </Space>
           </Col>
         </Row>
       </Card>
@@ -259,7 +361,23 @@ const Analytics = () => {
           }
           key="trends"
         >
-          <Card>
+          <Card
+            extra={
+              <Space>
+                <RangePicker
+                  picker="month"
+                  value={trendDateRange}
+                  onChange={handleTrendDateChange}
+                />
+                <Button icon={<ReloadOutlined />} onClick={fetchAllData}>
+                  刷新
+                </Button>
+                <Button icon={<DownloadOutlined />} onClick={handleExportTrends}>
+                  导出 CSV
+                </Button>
+              </Space>
+            }
+          >
             <ReactECharts option={trendChartOption} style={{ height: 400 }} />
           </Card>
         </Tabs.TabPane>
@@ -273,7 +391,13 @@ const Analytics = () => {
           }
           key="price"
         >
-          <Card>
+          <Card
+            extra={
+              <Button icon={<DownloadOutlined />} onClick={handleExportPriceDistribution}>
+                导出 CSV
+              </Button>
+            }
+          >
             <div style={{ marginBottom: 16 }}>
               <Select
                 placeholder="选择类别"
@@ -303,7 +427,13 @@ const Analytics = () => {
         >
           <Row gutter={16}>
             <Col span={12}>
-              <Card>
+              <Card
+                extra={
+                  <Button icon={<DownloadOutlined />} onClick={handleExportBrands}>
+                    导出 CSV
+                  </Button>
+                }
+              >
                 <ReactECharts option={brandChartOption} style={{ height: 400 }} />
               </Card>
             </Col>
@@ -362,7 +492,7 @@ const Analytics = () => {
         title={`${currentReport?.report_type === 'weekly' ? '周报' : '月报'} - ${currentReport?.start_date} 至 ${currentReport?.end_date}`}
         open={reportVisible}
         onCancel={() => setReportVisible(false)}
-        width={800}
+        width={900}
         footer={[
           <Button key="close" onClick={() => setReportVisible(false)}>
             关闭
@@ -371,16 +501,86 @@ const Analytics = () => {
       >
         {currentReport && (
           <div>
-            <p style={{ color: '#999' }}>
+            <p style={{ color: '#999', marginBottom: 16 }}>
               生成时间: {new Date(currentReport.generated_at).toLocaleString('zh-CN')}
               &nbsp;&nbsp;|&nbsp;&nbsp;
               生成人: {currentReport.generated_by}
             </p>
-            <Paragraph>
-              <pre style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: 16 }}>
-                {JSON.stringify(currentReport.report_data, null, 2)}
-              </pre>
-            </Paragraph>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Card size="small" title="装备统计" style={{ marginBottom: 16 }}>
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label="新增装备">
+                      <Text strong>{currentReport.report_data?.equipment?.new_count || 0}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="总装备数">
+                      {currentReport.report_data?.equipment?.total_count || 0}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="平均价格">
+                      ¥{(currentReport.report_data?.equipment?.avg_price || 0).toFixed(0)}
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card size="small" title="用户统计" style={{ marginBottom: 16 }}>
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label="新增用户">
+                      <Text strong>{currentReport.report_data?.users?.new_count || 0}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="活跃用户">
+                      {currentReport.report_data?.users?.active_count || 0}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="总用户数">
+                      {currentReport.report_data?.users?.total_count || 0}
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Card size="small" title="API 统计">
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label="总调用量">
+                      <Text strong>{currentReport.report_data?.api?.total_requests || 0}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="平均响应时间">
+                      {(currentReport.report_data?.api?.avg_response_time || 0).toFixed(1)} ms
+                    </Descriptions.Item>
+                    <Descriptions.Item label="成功率">
+                      {((currentReport.report_data?.api?.success_rate || 0) * 100).toFixed(1)}%
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card size="small" title="LLM 统计">
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label="总调用量">
+                      <Text strong>{currentReport.report_data?.llm?.total_calls || 0}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="总 Token 数">
+                      {(currentReport.report_data?.llm?.total_tokens || 0).toLocaleString()}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="平均延迟">
+                      {(currentReport.report_data?.llm?.avg_latency || 0).toFixed(0)} ms
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              </Col>
+            </Row>
+
+            <div style={{ marginTop: 16 }}>
+              <Paragraph>
+                <Text type="secondary">原始数据：</Text>
+                <pre style={{ whiteSpace: 'pre-wrap', background: '#f5f5f5', padding: 12, fontSize: 12 }}>
+                  {JSON.stringify(currentReport.report_data, null, 2)}
+                </pre>
+              </Paragraph>
+            </div>
           </div>
         )}
       </Modal>

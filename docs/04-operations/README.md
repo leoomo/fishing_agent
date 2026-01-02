@@ -52,8 +52,16 @@
 ┌─────────────────────────────────────────────────────────┐
 │                    应用服务层                              │
 ├─────────────┬─────────────┬─────────────┬─────────────────┤
-│   API服务   │  Web前端    │  微信小程序  │    CLI工具       │
-│  (多实例)    │  (静态资源)  │ (第三方托管) │   (部署包)       │
+│   API服务   │  Web前端    │  小程序前端  │    CLI工具       │
+│  (多实例)    │  (静态资源)  │(第三方托管)  │   (部署包)       │
+└─────────────┴─────────────┴─────────────┴─────────────────┘
+                           │
+┌─────────────────────────────────────────────────────────┐
+│                  业务处理层                               │
+├─────────────┬─────────────┬─────────────┬─────────────────┤
+│钓鱼Agent    │装备导入Agent │ OCR工作流    │   分布式爬虫      │
+│(fishing/)   │(equipment_) │ (多提供商)   │(Master-Worker)  │
+│             │  import/)   │             │                 │
 └─────────────┴─────────────┴─────────────┴─────────────────┘
                            │
 ┌─────────────────────────────────────────────────────────┐
@@ -76,6 +84,191 @@
 - **缓存**: Redis存储会话和临时数据
 - **OCR服务**: Ollama本地OCR或SiliconFlow云端OCR
 - **监控系统**: Prometheus + Grafana监控方案
+- **分布式爬虫**: Master-Worker架构的数据采集系统
+- **OCR工作流**: 多阶段图片处理和文字识别管道
+
+## 🕷️ 分布式爬虫部署
+
+### Master节点部署
+```yaml
+# docker-compose.crawler-master.yml
+version: '3.8'
+services:
+  crawler-master:
+    image: fishing-agent/crawler-master:latest
+    container_name: crawler-master
+    environment:
+      - NODE_TYPE=master
+      - REDIS_URL=redis://redis:6379/0
+      - DB_URL=postgresql://user:pass@postgres:5432/fishing
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./crawler/config:/app/config
+      - ./crawler/logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: crawler-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: crawler-postgres
+    environment:
+      - POSTGRES_DB=fishing
+      - POSTGRES_USER=fishing
+      - POSTGRES_PASSWORD=your_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+```
+
+### Worker节点部署
+```yaml
+# docker-compose.crawler-worker.yml
+version: '3.8'
+services:
+  crawler-worker:
+    image: fishing-agent/crawler-worker:latest
+    environment:
+      - NODE_TYPE=worker
+      - WORKER_ID=worker-1
+      - MASTER_URL=http://crawler-master:8001
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./crawler/logs:/app/logs
+    deploy:
+      replicas: 5  # Worker节点数量
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+```
+
+### 监控和扩展
+```bash
+# 启动Master节点
+docker-compose -f docker-compose.crawler-master.yml up -d
+
+# 扩展Worker节点 (Kubernetes)
+kubectl scale deployment crawler-worker --replicas=10 -n fishing-agent
+
+# 监控爬虫状态
+kubectl logs -f deployment/crawler-master -n fishing-agent
+kubectl get pods -n fishing-agent -l app=crawler-worker
+```
+
+## 🖼️ OCR工作流部署
+
+### OCR服务部署
+```yaml
+# docker-compose.ocr.yml
+version: '3.8'
+services:
+  ollama-ocr:
+    image: ollama/ollama:latest
+    container_name: ollama-ocr
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_MODELS=llava
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  ocr-workflow:
+    image: fishing-agent/ocr-workflow:latest
+    container_name: ocr-workflow
+    environment:
+      - OCR_PROVIDER=ollama
+      - OLLAMA_URL=http://ollama-ocr:11434
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      - REDIS_URL=redis://redis:6379/1
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./ocr/temp:/app/temp
+      - ./ocr/logs:/app/logs
+    depends_on:
+      - ollama-ocr
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ocr-redis
+    ports:
+      - "6380:6379"
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+```
+
+### 多提供商配置
+```python
+# OCR配置示例
+OCR_CONFIG = {
+    "default": "siliconflow",  # 默认使用云端OCR
+    "providers": {
+        "ollama": {
+            "url": "http://ollama-ocr:11434",
+            "model": "llava",
+            "timeout": 30,
+            "max_retries": 3
+        },
+        "siliconflow": {
+            "api_key": "${SILICONFLOW_API_KEY}",
+            "model": "Qwen/Qwen2-VL-7B-Instruct",
+            "timeout": 60,
+            "max_retries": 2
+        }
+    },
+    "fallback": ["ollama"],  # 降级策略
+    "batch_size": 10,         # 批处理大小
+    "max_concurrent": 5       # 最大并发数
+}
+```
+
+### 性能优化
+```bash
+# GPU加速 (NVIDIA)
+docker run --gpus all ollama/ollama:latest
+
+# 批量处理配置
+export OCR_BATCH_SIZE=20
+export OCR_MAX_CONCURRENT=10
+
+# 缓存配置
+export OCR_CACHE_TTL=3600
+export OCR_CACHE_SIZE=1000
+```
 
 ## 🔧 部署要求
 
@@ -170,6 +363,10 @@ kubectl get services -n fishing-agent
 - **API调用量**: 接口使用统计
 - **OCR识别量**: 图片处理统计
 - **钓鱼推荐成功率**: 业务效果指标
+- **爬虫任务完成率**: 任务执行统计
+- **数据采集量**: 每日数据采集量
+- **OCR准确率**: 文字识别准确度
+- **工作流处理时间**: 端到端处理耗时
 
 ## 🔒 安全配置
 

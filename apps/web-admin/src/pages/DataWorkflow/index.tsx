@@ -1,0 +1,574 @@
+/**
+ * 数据工作流页面
+ *
+ * 统一入口，整合：
+ * - Tab 1: 采集任务 (原 /crawler)
+ * - Tab 2: OCR处理
+ * - Tab 3: 人工审核
+ * - Tab 4: Worker监控
+ */
+
+import React, { useEffect, useCallback } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Typography, Button, Card, Tabs, Space, Select, message, Tag, Tooltip } from 'antd'
+import {
+  ReloadOutlined,
+  WifiOutlined,
+  DisconnectOutlined,
+  RobotOutlined,
+  ScanOutlined,
+  AuditOutlined,
+  TeamOutlined,
+  ImportOutlined,
+} from '@ant-design/icons'
+import type { AppDispatch } from '../../store/store'
+import type { WorkflowTab, OCRStatus, ReviewStatus } from '../../types/dataWorkflow'
+import { WS_STATUS_CONFIG } from '../../types/dataWorkflow'
+
+// 组件
+import WorkflowPipeline from './components/WorkflowPipeline'
+import WorkerMonitorPanel from './components/WorkerMonitorPanel'
+import OCRTaskList from './components/OCRTaskList'
+import ReviewTaskList from './components/ReviewTaskList'
+import WorkerLogPanel from './components/WorkerLogPanel'
+import CollectionTab from './components/CollectionTab'
+import ImportTab from './components/ImportTab'
+
+// WebSocket Hook
+import { useWorkflowWebSocket } from '../../hooks/useWorkflowWebSocket'
+
+// Redux - DataWorkflow
+import {
+  fetchWorkflowStats,
+  fetchWorkers,
+  fetchOCRTasks,
+  fetchReviewTasks,
+  retryOCRTask,
+  batchRetryOCRTasks,
+  skipOCRTask,
+  setOCRTaskPriority,
+  deleteOCRTask,
+  reviewTask,
+  deleteReviewTask,
+  setActiveTab,
+  setOCRFilters,
+  setOCRSelectedKeys,
+  setReviewFilters,
+  showReviewModal,
+  hideReviewModal,
+  // Selectors
+  selectWorkflowStats,
+  selectStatsLoading,
+  selectWorkers,
+  selectWorkersLoading,
+  selectOCRTasks,
+  selectOCRTasksTotal,
+  selectOCRTasksLoading,
+  selectOCRFilters,
+  selectOCRSelectedKeys,
+  selectReviewTasks,
+  selectReviewTasksTotal,
+  selectReviewTasksLoading,
+  selectReviewFilters,
+  selectCurrentReviewTask,
+  selectReviewModalVisible,
+  selectReviewAction,
+  selectActiveTab,
+  // WebSocket 相关
+  selectWsConnected,
+  selectTaskProgress,
+  selectWorkerLogs,
+  selectLogsPanelCollapsed,
+  clearWorkerLogs,
+  toggleLogsPanelCollapsed,
+} from '../../store/slices/dataWorkflowSlice'
+
+// Redux - Crawler
+import {
+  selectStats as selectCrawlerStats,
+} from '../../store/slices/crawlerSlice'
+
+const { Title } = Typography
+
+const DataWorkflowPage: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>()
+
+  // Stats
+  const stats = useSelector(selectWorkflowStats)
+  const statsLoading = useSelector(selectStatsLoading)
+
+  // Crawler Stats
+  const crawlerStats = useSelector(selectCrawlerStats)
+
+  // Workers
+  const workers = useSelector(selectWorkers)
+  const workersLoading = useSelector(selectWorkersLoading)
+
+  // OCR Tasks
+  const ocrTasks = useSelector(selectOCRTasks)
+  const ocrTasksTotal = useSelector(selectOCRTasksTotal)
+  const ocrTasksLoading = useSelector(selectOCRTasksLoading)
+  const ocrFilters = useSelector(selectOCRFilters)
+  const ocrSelectedKeys = useSelector(selectOCRSelectedKeys)
+
+  // Review Tasks
+  const reviewTasks = useSelector(selectReviewTasks)
+  const reviewTasksTotal = useSelector(selectReviewTasksTotal)
+  const reviewTasksLoading = useSelector(selectReviewTasksLoading)
+  const reviewFilters = useSelector(selectReviewFilters)
+  const currentReviewTask = useSelector(selectCurrentReviewTask)
+  const reviewModalVisible = useSelector(selectReviewModalVisible)
+  const reviewAction = useSelector(selectReviewAction)
+
+  // Active Tab
+  const activeTab = useSelector(selectActiveTab)
+
+  // WebSocket 相关
+  const wsConnected = useSelector(selectWsConnected)
+  const taskProgress = useSelector(selectTaskProgress)
+  const workerLogs = useSelector(selectWorkerLogs)
+  const logsPanelCollapsed = useSelector(selectLogsPanelCollapsed)
+
+  // 使用 WebSocket Hook
+  useWorkflowWebSocket({
+    autoConnect: true,
+    onConnected: () => {
+      console.log('工作流 WebSocket 已连接')
+    },
+    onDisconnected: () => {
+      console.log('工作流 WebSocket 已断开')
+    },
+  })
+
+  // 初始化数据
+  useEffect(() => {
+    dispatch(fetchWorkflowStats())
+    dispatch(fetchWorkers())
+    dispatch(fetchOCRTasks(ocrFilters))
+    dispatch(fetchReviewTasks(reviewFilters))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 刷新所有数据
+  const handleRefresh = useCallback(() => {
+    dispatch(fetchWorkflowStats())
+    dispatch(fetchWorkers())
+    if (activeTab === 'ocr') {
+      dispatch(fetchOCRTasks(ocrFilters))
+    } else if (activeTab === 'review') {
+      dispatch(fetchReviewTasks(reviewFilters))
+    }
+    message.success('已刷新')
+  }, [dispatch, activeTab, ocrFilters, reviewFilters])
+
+  // Tab 切换
+  const handleTabChange = (key: string) => {
+    dispatch(setActiveTab(key as WorkflowTab))
+    if (key === 'ocr') {
+      dispatch(fetchOCRTasks(ocrFilters))
+    } else if (key === 'review') {
+      dispatch(fetchReviewTasks(reviewFilters))
+    }
+  }
+
+  // 从 Pipeline 点击跳转
+  const handlePipelineStageClick = (tab: WorkflowTab) => {
+    dispatch(setActiveTab(tab))
+    if (tab === 'ocr') {
+      dispatch(fetchOCRTasks(ocrFilters))
+    } else if (tab === 'review') {
+      dispatch(fetchReviewTasks(reviewFilters))
+    }
+  }
+
+  // ========== OCR 操作 ==========
+
+  const handleOCRStatusFilterChange = (value: OCRStatus | undefined) => {
+    const newFilters = { ...ocrFilters, ocr_status: value, page: 1 }
+    dispatch(setOCRFilters(newFilters))
+    dispatch(fetchOCRTasks(newFilters))
+  }
+
+  const handleOCRPageChange = (page: number, pageSize: number) => {
+    const newFilters = { ...ocrFilters, page, page_size: pageSize }
+    dispatch(setOCRFilters(newFilters))
+    dispatch(fetchOCRTasks(newFilters))
+  }
+
+  const handleOCRRetry = async (pendingId: number) => {
+    const result = await dispatch(retryOCRTask(pendingId))
+    if (retryOCRTask.fulfilled.match(result)) {
+      message.success('任务已重新加入队列')
+      dispatch(fetchWorkflowStats())
+    } else {
+      message.error('重试失败')
+    }
+  }
+
+  const handleOCRBatchRetry = async (pendingIds: number[]) => {
+    if (pendingIds.length === 0) {
+      message.warning('请先选择要重试的任务')
+      return
+    }
+    const result = await dispatch(batchRetryOCRTasks(pendingIds))
+    if (batchRetryOCRTasks.fulfilled.match(result)) {
+      message.success(`成功重试 ${result.payload.affectedCount} 个任务`)
+      dispatch(fetchWorkflowStats())
+    } else {
+      message.error('批量重试失败')
+    }
+  }
+
+  const handleOCRSkip = async (pendingId: number) => {
+    const result = await dispatch(skipOCRTask(pendingId))
+    if (skipOCRTask.fulfilled.match(result)) {
+      message.success('任务已跳过')
+      dispatch(fetchWorkflowStats())
+    } else {
+      message.error('跳过失败')
+    }
+  }
+
+  const handleOCRSetPriority = async (pendingId: number, priority: number) => {
+    const result = await dispatch(setOCRTaskPriority({ pendingId, priority }))
+    if (setOCRTaskPriority.fulfilled.match(result)) {
+      message.success('优先级已更新')
+    } else {
+      message.error('设置优先级失败')
+    }
+  }
+
+  const handleOCRDelete = async (pendingId: number) => {
+    const result = await dispatch(deleteOCRTask(pendingId))
+    if (deleteOCRTask.fulfilled.match(result)) {
+      message.success('任务已删除')
+      dispatch(fetchWorkflowStats())
+    } else {
+      message.error('删除失败')
+    }
+  }
+
+  // ========== 审核操作 ==========
+
+  const handleReviewStatusFilterChange = (value: ReviewStatus | undefined) => {
+    const newFilters = { ...reviewFilters, status: value, page: 1 }
+    dispatch(setReviewFilters(newFilters))
+    dispatch(fetchReviewTasks(newFilters))
+  }
+
+  const handleReviewSourceTypeFilterChange = (value: string | undefined) => {
+    const newFilters = { ...reviewFilters, source_type: value, page: 1 }
+    dispatch(setReviewFilters(newFilters))
+    dispatch(fetchReviewTasks(newFilters))
+  }
+
+  const handleReviewPageChange = (page: number, pageSize: number) => {
+    const newFilters = { ...reviewFilters, page, page_size: pageSize }
+    dispatch(setReviewFilters(newFilters))
+    dispatch(fetchReviewTasks(newFilters))
+  }
+
+  const handleReview = async (
+    taskId: number,
+    action: { action: 'approve' | 'reject'; review_notes?: string }
+  ) => {
+    const result = await dispatch(reviewTask({ taskId, action }))
+    if (reviewTask.fulfilled.match(result)) {
+      message.success(`任务已${action.action === 'approve' ? '通过' : '拒绝'}`)
+      dispatch(fetchWorkflowStats())
+      dispatch(fetchReviewTasks(reviewFilters))
+    } else {
+      message.error('操作失败')
+    }
+  }
+
+  const handleReviewDelete = async (taskId: number) => {
+    const result = await dispatch(deleteReviewTask(taskId))
+    if (deleteReviewTask.fulfilled.match(result)) {
+      message.success('任务已删除')
+      dispatch(fetchWorkflowStats())
+    } else {
+      message.error('删除失败')
+    }
+  }
+
+  // 计算 Tab 数字
+  const getCollectionCount = () => {
+    return crawlerStats?.running_tasks || 0
+  }
+
+  const getOCRCount = () => {
+    if (!stats) return 0
+    return stats.ocr_pending + stats.ocr_processing
+  }
+
+  const getReviewCount = () => {
+    return stats?.review_pending || 0
+  }
+
+  const getActiveWorkerCount = () => {
+    return workers.filter(w => w.status === 'active').length
+  }
+
+  // Tab items
+  const tabItems = [
+    {
+      key: 'collection',
+      label: (
+        <span>
+          <RobotOutlined style={{ marginRight: 4 }} />
+          采集任务
+          {getCollectionCount() > 0 && (
+            <span style={{ marginLeft: 4, color: '#999' }}>
+              ({getCollectionCount()})
+            </span>
+          )}
+        </span>
+      ),
+      children: (
+        <CollectionTab onRefresh={() => dispatch(fetchWorkflowStats())} />
+      ),
+    },
+    {
+      key: 'ocr',
+      label: (
+        <span>
+          <ScanOutlined style={{ marginRight: 4 }} />
+          OCR处理
+          {getOCRCount() > 0 && (
+            <span style={{ marginLeft: 4, color: '#999' }}>
+              ({getOCRCount()})
+            </span>
+          )}
+        </span>
+      ),
+      children: (
+        <>
+          {/* OCR 筛选器 */}
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <Space>
+              <span>状态筛选:</span>
+              <Select
+                style={{ width: 150 }}
+                placeholder="全部状态"
+                allowClear
+                value={ocrFilters.ocr_status}
+                onChange={handleOCRStatusFilterChange}
+                options={[
+                  { value: 'pending', label: '待处理' },
+                  { value: 'processing', label: '处理中' },
+                  { value: 'completed', label: '已完成' },
+                  { value: 'failed', label: '失败' },
+                  { value: 'skipped', label: '跳过' },
+                ]}
+              />
+            </Space>
+          </Card>
+
+          {/* OCR 任务列表 */}
+          <Card>
+            <OCRTaskList
+              tasks={ocrTasks}
+              total={ocrTasksTotal}
+              loading={ocrTasksLoading}
+              page={ocrFilters.page || 1}
+              pageSize={ocrFilters.page_size || 20}
+              selectedKeys={ocrSelectedKeys}
+              taskProgress={taskProgress}
+              onPageChange={handleOCRPageChange}
+              onSelectChange={(keys) => dispatch(setOCRSelectedKeys(keys))}
+              onRetry={handleOCRRetry}
+              onBatchRetry={handleOCRBatchRetry}
+              onSkip={handleOCRSkip}
+              onSetPriority={handleOCRSetPriority}
+              onDelete={handleOCRDelete}
+            />
+          </Card>
+
+          {/* Worker 日志面板 - 仅在 OCR 处理中显示 */}
+          <div style={{ marginTop: 16 }}>
+            <WorkerLogPanel
+              logs={workerLogs}
+              collapsed={logsPanelCollapsed}
+              onToggleCollapse={() => dispatch(toggleLogsPanelCollapsed())}
+              onClear={() => dispatch(clearWorkerLogs())}
+              maxHeight={250}
+            />
+          </div>
+        </>
+      ),
+    },
+    {
+      key: 'import',
+      label: (
+        <span>
+          <ImportOutlined style={{ marginRight: 4 }} />
+          数据导入
+        </span>
+      ),
+      children: (
+        <ImportTab
+          onSuccess={() => {
+            dispatch(setActiveTab('review'))
+            dispatch(fetchReviewTasks(reviewFilters))
+            dispatch(fetchWorkflowStats())
+          }}
+        />
+      ),
+    },
+    {
+      key: 'review',
+      label: (
+        <span>
+          <AuditOutlined style={{ marginRight: 4 }} />
+          人工审核
+          {getReviewCount() > 0 && (
+            <span style={{ marginLeft: 4, color: '#999' }}>({getReviewCount()})</span>
+          )}
+        </span>
+      ),
+      children: (
+        <>
+          {/* 审核筛选器 */}
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <Space wrap>
+              <span>状态筛选:</span>
+              <Select
+                style={{ width: 150 }}
+                placeholder="全部状态"
+                allowClear
+                value={reviewFilters.status}
+                onChange={handleReviewStatusFilterChange}
+                options={[
+                  { value: 'pending', label: '待审核' },
+                  { value: 'approved', label: '已通过' },
+                  { value: 'rejected', label: '已拒绝' },
+                ]}
+              />
+              <span style={{ marginLeft: 16 }}>数据来源:</span>
+              <Select
+                style={{ width: 150 }}
+                placeholder="全部来源"
+                allowClear
+                value={reviewFilters.source_type}
+                onChange={handleReviewSourceTypeFilterChange}
+                options={[
+                  { value: 'ecommerce', label: '电商平台' },
+                  { value: 'official', label: '官方网站' },
+                  { value: 'forum', label: '论坛' },
+                  { value: 'excel_import', label: 'Excel导入' },
+                ]}
+              />
+            </Space>
+          </Card>
+
+          {/* 审核任务列表 */}
+          <Card>
+            <ReviewTaskList
+              tasks={reviewTasks}
+              total={reviewTasksTotal}
+              loading={reviewTasksLoading}
+              page={reviewFilters.page || 1}
+              pageSize={reviewFilters.page_size || 20}
+              onPageChange={handleReviewPageChange}
+              onReview={handleReview}
+              onDelete={handleReviewDelete}
+              currentTask={currentReviewTask}
+              modalVisible={reviewModalVisible}
+              reviewAction={reviewAction}
+              onShowReviewModal={(task, action) =>
+                dispatch(showReviewModal({ task, action }))
+              }
+              onHideReviewModal={() => dispatch(hideReviewModal())}
+              onRefresh={() => dispatch(fetchReviewTasks(reviewFilters))}
+            />
+          </Card>
+        </>
+      ),
+    },
+    {
+      key: 'worker',
+      label: (
+        <span>
+          <TeamOutlined style={{ marginRight: 4 }} />
+          Worker监控
+          {getActiveWorkerCount() > 0 && (
+            <span style={{ marginLeft: 4, color: '#52c41a' }}>({getActiveWorkerCount()})</span>
+          )}
+        </span>
+      ),
+      children: (
+        <>
+          {/* Worker 监控面板 */}
+          <WorkerMonitorPanel
+            workers={workers}
+            stats={stats}
+            loading={workersLoading}
+            collapsed={false}
+            onToggleCollapse={() => {}}
+          />
+
+          {/* Worker 日志面板 */}
+          <div style={{ marginTop: 16 }}>
+            <WorkerLogPanel
+              logs={workerLogs}
+              collapsed={logsPanelCollapsed}
+              onToggleCollapse={() => dispatch(toggleLogsPanelCollapsed())}
+              onClear={() => dispatch(clearWorkerLogs())}
+              maxHeight={400}
+            />
+          </div>
+        </>
+      ),
+    },
+  ]
+
+  return (
+    <div style={{ padding: 24 }}>
+      {/* 页面标题 */}
+      <div
+        style={{
+          marginBottom: 24,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <Space>
+          <Title level={4} style={{ margin: 0 }}>
+            数据工作流
+          </Title>
+          {/* WebSocket 连接状态 */}
+          <Tooltip title={`实时更新: ${WS_STATUS_CONFIG[wsConnected].text}`}>
+            <Tag
+              color={WS_STATUS_CONFIG[wsConnected].color}
+              icon={wsConnected === 'connected' ? <WifiOutlined /> : <DisconnectOutlined />}
+            >
+              {WS_STATUS_CONFIG[wsConnected].text}
+            </Tag>
+          </Tooltip>
+        </Space>
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={handleRefresh}
+          loading={statsLoading}
+        >
+          刷新
+        </Button>
+      </div>
+
+      {/* 工作流管道 */}
+      <div style={{ marginBottom: 16 }}>
+        <WorkflowPipeline
+          stats={stats}
+          loading={statsLoading}
+          onStageClick={handlePipelineStageClick}
+        />
+      </div>
+
+      {/* 任务列表 Tabs */}
+      <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems} />
+    </div>
+  )
+}
+
+export default DataWorkflowPage

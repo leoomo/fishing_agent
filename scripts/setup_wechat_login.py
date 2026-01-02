@@ -120,9 +120,9 @@ def run_database_migration():
 
     try:
         import sqlite3
-        from packages.agent_fishing.tools.lure.database import get_db
-        from packages.agent_fishing.tools.lure.migrations import DatabaseMigrations
-        from packages.agent_fishing.tools.lure.migrations_wechat import run_wechat_migrations
+        from packages.agents.fishing.tools.lure.database import get_db
+        from packages.agents.fishing.tools.lure.migrations import DatabaseMigrations
+        from packages.agents.fishing.tools.lure.migrations_wechat import run_wechat_migrations
 
         # 获取数据库路径
         db_path = get_db().get_database_path()

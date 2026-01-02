@@ -65,9 +65,8 @@ def check_environment():
 def test_agent_creation(model_provider: str = "qwen") -> bool:
     """测试Agent创建"""
     print(f"\n🤖 测试 {model_provider} Agent 创建...")
-
     try:
-        from packages.agent_fishing import create_agent, ModelFactory
+        from packages.agents.fishing import create_agent, ModelFactory
 
         # 检查模型提供商可用性
         available_providers = ModelFactory.list_providers()
@@ -121,8 +120,8 @@ def debug_weather_api_calls():
     print("="*60)
 
     try:
-        from packages.agent_fishing.tools.fishing.weather_api import get_weather_data as _get_weather_data
-        from packages.agent_fishing.utils.coordinate import get_coordinates
+        from packages.agents.fishing.tools.fishing.weather_api import get_weather_data as _get_weather_data
+        from packages.agents.fishing.utils.coordinate import get_coordinates
 
         # 1. 测试地理编码
         print("📍 测试地理编码...")
@@ -357,7 +356,7 @@ def create_crawler_task(task_type: str = "taobao", keywords: list = None, max_pa
 
     try:
         from packages.scraper.models import CrawlerTask
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
         from datetime import datetime
 
         # 默认关键词
@@ -419,7 +418,7 @@ def execute_crawler_task(task_id: int):
 
     try:
         from packages.scraper.executor.task_queue import CrawlerTaskQueue
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
         from packages.scraper.models import CrawlerTask, TaskStatus
 
         # 获取任务
@@ -454,7 +453,7 @@ def monitor_crawler_task(task_id: int, timeout: int = 60):
     """监控爬虫任务状态"""
     print(f"\n👀 监控爬虫任务 {task_id} (超时: {timeout}秒)...")
 
-    from packages.agent_fishing.tools.lure.orm.session import get_db_session
+    from apps.api.orm.session import get_db_session
     from packages.scraper.models import CrawlerTask, TaskStatus
     import time
 
@@ -500,7 +499,7 @@ def list_crawler_tasks(limit: int = 10):
     print("-"*80)
 
     try:
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
         from packages.scraper.models import CrawlerTask
 
         with get_db_session() as session:
@@ -530,7 +529,7 @@ def clean_crawler_tasks(status: str = None, days: int = 7):
     print(f"\n🧹 清理爬虫任务...")
 
     try:
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
         from packages.scraper.models import CrawlerTask, TaskStatus
         from datetime import datetime, timedelta
 
@@ -637,7 +636,7 @@ def execute_rpa_crawler(task_id: int):
     print(f"\n🤖 执行RPA爬虫任务 {task_id}...")
 
     try:
-        from packages.agent_fishing.tools.lure.orm.session import get_db_session
+        from apps.api.orm.session import get_db_session
         from packages.scraper.models import CrawlerTask, TaskStatus
         from datetime import datetime
 
@@ -966,7 +965,7 @@ def main():
     # 测试Agent创建
     agent = None
     try:
-        from packages.agent_fishing import create_agent
+        from packages.agents.fishing import create_agent
         agent = create_agent(
             model_provider=model_provider,
             enable_logging=True,

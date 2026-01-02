@@ -16,11 +16,11 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from packages.agent_fishing.tools.user_equipment import (
+from packages.agents.fishing.tools.user_equipment import (
     UserEquipmentManager,
     UserBasedRecommender,
 )
-from packages.agent_fishing.tools.lure.database import get_db
+from packages.agents.fishing.tools.lure.database import get_db
 
 
 def main():

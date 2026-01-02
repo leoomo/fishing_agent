@@ -8,8 +8,8 @@ import json
 from typing import Dict, List, Optional
 import logging
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.orm.repositories.equipment_repo import EquipmentRepository
+from apps.api.orm.session import get_db_session
+from apps.api.orm.repositories.equipment_repo import EquipmentRepository
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import ReactECharts from 'echarts-for-react'
 import {
   Card,
   Row,
@@ -23,14 +24,43 @@ import {
   ThunderboltOutlined,
   ToolOutlined,
   DollarOutlined,
+  BugOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
-import ReactECharts from 'echarts-for-react'
 import { monitorApi } from '@/api/services/monitor'
 import type { APIStats, LLMStats, DBPerformance, SystemHealth, RealtimeStats } from '@/types/monitor'
 import type { ColumnsType } from 'antd/es/table'
 import AgentAnalytics from './AgentAnalytics'
 import ToolAnalytics from './ToolAnalytics'
 import CostReport from './CostReport'
+import FailurePatterns from '../../components/Monitor/FailurePatterns'
+import RootCauseAnalysis from '../../components/Monitor/RootCauseAnalysis'
+
+// Safe ECharts wrapper to prevent undefined errors
+const SafeReactECharts = ({ option, style, ...props }: any) => {
+  if (!option || typeof option !== 'object') {
+    return (
+      <div style={{
+        ...style,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#999',
+        fontSize: 16
+      }}>
+        暂无数据
+      </div>
+    )
+  }
+
+  return (
+    <ReactECharts
+      option={option}
+      style={style}
+      {...props}
+    />
+  )
+}
 
 const Monitor = () => {
   const [loading, setLoading] = useState(true)
@@ -49,8 +79,9 @@ const Monitor = () => {
     connectWebSocket()
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close()
+      const ws = wsRef.current
+      if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+        ws.close()
       }
       if (uptimeTimerRef.current) {
         clearInterval(uptimeTimerRef.current)
@@ -97,7 +128,22 @@ const Monitor = () => {
   }
 
   const connectWebSocket = () => {
-    const ws = new WebSocket(`ws://${window.location.host}/api/v1/admin/monitor/ws/realtime-stats`)
+    // 在开发环境中直接连接到后端，WebSocket不走Vite代理
+    const wsUrl = import.meta.env.DEV
+      ? 'ws://localhost:8000/api/v1/admin/monitor/ws/realtime-stats'
+      : `ws://${window.location.host}/api/v1/admin/monitor/ws/realtime-stats`
+
+    // Avoid duplicate connections
+    if (wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING) {
+      return
+    }
+
+    const ws = new WebSocket(wsUrl)
+
+    ws.onopen = () => {
+      wsRef.current = ws
+    }
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
@@ -110,7 +156,12 @@ const Monitor = () => {
       // WebSocket 连接失败时静默处理
     }
 
-    wsRef.current = ws
+    ws.onclose = () => {
+      // 清理引用，避免内存泄漏
+      if (wsRef.current === ws) {
+        wsRef.current = null
+      }
+    }
   }
 
   const getHealthStatusIcon = (status: string) => {
@@ -169,8 +220,24 @@ const Monitor = () => {
   }
 
   // API 请求趋势图
-  const apiTrendOption = apiStats
-    ? {
+  const apiTrendOption = useMemo(() => {
+    if (!apiStats || !Array.isArray(apiStats.requests_by_day)) {
+      return {
+        title: { text: 'API 请求趋势', left: 'center' },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: [] },
+        yAxis: { type: 'value' },
+        series: [],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: { text: '暂无数据', fontSize: 16, fill: '#999' }
+        }
+      }
+    }
+
+    return {
         title: { text: 'API 请求趋势', left: 'center' },
         tooltip: { trigger: 'axis' },
         xAxis: {
@@ -188,11 +255,31 @@ const Monitor = () => {
           },
         ],
       }
-    : {}
+  }, [apiStats])
 
   // LLM Token 趋势图
-  const llmTrendOption = llmStats
-    ? {
+  const llmTrendOption = useMemo(() => {
+    if (!llmStats || !Array.isArray(llmStats.by_day)) {
+      return {
+        title: { text: 'LLM Token 消耗趋势', left: 'center' },
+        tooltip: { trigger: 'axis' },
+        legend: { top: 30 },
+        xAxis: { type: 'category', data: [] },
+        yAxis: [
+          { type: 'value', name: '调用次数' },
+          { type: 'value', name: 'Token 数' },
+        ],
+        series: [],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: { text: '暂无数据', fontSize: 16, fill: '#999' }
+        }
+      }
+    }
+
+    return {
         title: { text: 'LLM Token 消耗趋势', left: 'center' },
         tooltip: { trigger: 'axis' },
         legend: { top: 30 },
@@ -219,11 +306,29 @@ const Monitor = () => {
           },
         ],
       }
-    : {}
+  }, [llmStats])
 
   // 状态码分布图
-  const statusCodeOption = apiStats
-    ? {
+  const statusCodeOption = useMemo(() => {
+    if (!apiStats || !apiStats.requests_by_status) {
+      return {
+        title: { text: '状态码分布', left: 'center' },
+        tooltip: { trigger: 'item' },
+        series: [{
+          type: 'pie',
+          radius: '60%',
+          data: [],
+        }],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: { text: '暂无数据', fontSize: 16, fill: '#999' }
+        }
+      }
+    }
+
+    return {
         title: { text: '状态码分布', left: 'center' },
         tooltip: { trigger: 'item' },
         series: [
@@ -240,7 +345,7 @@ const Monitor = () => {
           },
         ],
       }
-    : {}
+  }, [apiStats])
 
   // LLM 提供商统计表格列
   const llmProviderColumns: ColumnsType<{
@@ -335,16 +440,16 @@ const Monitor = () => {
           description={
             <Row gutter={24}>
               <Col span={6}>
-                <span>API 请求/分钟: <strong>{realtimeStats.api_requests_per_minute}</strong></span>
+                <span>API 请求/分钟: <strong>{realtimeStats.api_requests_per_minute ?? 0}</strong></span>
               </Col>
               <Col span={6}>
-                <span>LLM Token/分钟: <strong>{realtimeStats.llm_tokens_per_minute}</strong></span>
+                <span>LLM Token/分钟: <strong>{realtimeStats.llm_tokens_per_minute ?? 0}</strong></span>
               </Col>
               <Col span={6}>
-                <span>错误率: <strong>{(realtimeStats.error_rate * 100).toFixed(2)}%</strong></span>
+                <span>错误率: <strong>{((realtimeStats.error_rate ?? 0) * 100).toFixed(2)}%</strong></span>
               </Col>
               <Col span={6}>
-                <span>在线用户: <strong>{realtimeStats.active_users}</strong></span>
+                <span>在线用户: <strong>{realtimeStats.active_users ?? 0}</strong></span>
               </Col>
             </Row>
           }
@@ -405,12 +510,22 @@ const Monitor = () => {
           <Row gutter={16} style={{ marginTop: 16 }}>
             <Col span={16}>
               <Card>
-                <ReactECharts option={apiTrendOption} style={{ height: 350 }} />
+                <SafeReactECharts
+                  option={apiTrendOption}
+                  style={{ height: 350, width: '100%' }}
+                  lazyUpdate={true}
+                  notMerge={true}
+                />
               </Card>
             </Col>
             <Col span={8}>
               <Card>
-                <ReactECharts option={statusCodeOption} style={{ height: 350 }} />
+                <SafeReactECharts
+                  option={statusCodeOption}
+                  style={{ height: 350, width: '100%' }}
+                  lazyUpdate={true}
+                  notMerge={true}
+                />
               </Card>
             </Col>
           </Row>
@@ -477,7 +592,12 @@ const Monitor = () => {
           </Row>
 
           <Card style={{ marginTop: 16 }}>
-            <ReactECharts option={llmTrendOption} style={{ height: 350 }} />
+            <SafeReactECharts
+              option={llmTrendOption}
+              style={{ height: 350, width: '100%' }}
+              lazyUpdate={true}
+              notMerge={true}
+            />
           </Card>
 
           <Card title="提供商统计" style={{ marginTop: 16 }}>
@@ -597,6 +717,32 @@ const Monitor = () => {
           key="cost"
         >
           <CostReport />
+        </Tabs.TabPane>
+
+        {/* 失败模式检测 */}
+        <Tabs.TabPane
+          tab={
+            <span>
+              <BugOutlined />
+              失败模式
+            </span>
+          }
+          key="failure-patterns"
+        >
+          <FailurePatterns />
+        </Tabs.TabPane>
+
+        {/* 根因分析 */}
+        <Tabs.TabPane
+          tab={
+            <span>
+              <SearchOutlined />
+              根因分析
+            </span>
+          }
+          key="root-cause"
+        >
+          <RootCauseAnalysis />
         </Tabs.TabPane>
       </Tabs>
     </div>

@@ -2,7 +2,7 @@
 钓鱼 Agent API 路由
 """
 from fastapi import APIRouter, HTTPException
-from packages.agent_fishing import create_agent
+from packages.agents.fishing import create_agent
 from ..schemas.chat import ChatRequest, ChatResponse
 
 router = APIRouter()
@@ -41,7 +41,7 @@ async def list_tools():
     Returns:
         工具列表
     """
-    from packages.agent_fishing import get_all_tools
+    from packages.agents.fishing import get_all_tools
 
     tools = get_all_tools()
     return {

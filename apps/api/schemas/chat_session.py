@@ -13,7 +13,7 @@ class MessageRequest(BaseModel):
     message: str = Field(..., description="Message content")
     session_id: Optional[int] = Field(None, description="Session ID (creates new if not provided)")
     user_id: Optional[int] = Field(None, description="User ID")
-    model_provider: str = Field(default="zhipu", description="LLM provider")
+    model_provider: str = Field(default="qwen", description="LLM provider")
 
 
 class MessageResponse(BaseModel):

@@ -10,10 +10,12 @@ import time
 import tempfile
 import logging
 from typing import List, Optional, Tuple, Dict, Any
+from pathlib import Path
 
 from .base import BaseOCRProvider
 from .exceptions import OllamaError, OCRModelNotFoundError, OCRConfigurationError
 from packages.data_processing.image import ImageMerger
+from packages.data_processing.ocr import OCRMergeProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -154,24 +156,79 @@ class OllamaProvider(BaseOCRProvider):
             )
         return file_size
 
-    def _merge_images(self, image_paths: List[str]) -> Tuple[str, int]:
+    def _merge_images(self, image_paths: List[str]) -> Tuple[List[str], int]:
         """
-        合并多张图片
+        使用 OCRMergeProcessor 智能合并多张图片
+
+        流程：
+        1. 裁剪每张图片的空白区域（crop_single_image）
+        2. 跳过文字稀疏区域（skip_sparse_regions）
+        3. 智能分组合并（generate_smart_merge_groups）
+        4. 如果只有一个输出文件且超过限制，分割处理
 
         Args:
             image_paths: 图片路径列表
 
         Returns:
-            Tuple[str, int]: (合并后的图片路径, 合并数量)
+            Tuple[List[str], int]: (输出文件路径列表, 合并数量)
         """
         if len(image_paths) == 1:
-            return image_paths[0], 1
+            return [image_paths[0]], 1
 
-        # 创建临时文件
+        # 创建临时目录
+        temp_dir = tempfile.mkdtemp(prefix="ocr_merge_")
+        output_dir = tempfile.mkdtemp(prefix="ocr_output_")
+
+        try:
+            # 将所有图片复制到源目录（OCRMergeProcessor 需要源目录）
+            import shutil
+            source_dir = Path(temp_dir)
+            for i, path in enumerate(image_paths):
+                shutil.copy2(path, source_dir / f"{i+1}.jpg")
+
+            # 使用 OCRMergeProcessor 处理
+            # 注意：使用默认参数即可，已在 OCRMergeProcessor 中优化
+            processor = OCRMergeProcessor(
+                source_dir=str(source_dir),
+                output_dir=output_dir,
+                verbose=False
+            )
+
+            result = processor.process()
+
+            if not result.success:
+                raise OllamaError(f"图片处理失败: {result.error}", "OCR_MERGE_ERROR")
+
+            output_files = result.output_files
+
+            logger.info(f"智能合并完成: {len(image_paths)} 张图片 -> {len(output_files)} 个文件")
+            logger.info(f"统计: {result.statistics}")
+
+            return output_files, len(image_paths)
+
+        except OllamaError:
+            raise
+        except Exception as e:
+            logger.error(f"OCRMergeProcessor 处理失败: {e}")
+            # 回退到简单合并
+            logger.info("回退到简单合并模式...")
+            return self._simple_merge_images(image_paths)
+        finally:
+            # 清理临时目录
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            # 注意：output_dir 需要保留，因为 merged_path 在里面
+
+    def _simple_merge_images(self, image_paths: List[str]) -> Tuple[List[str], int]:
+        """
+        简单合并模式（回退方案）
+
+        直接垂直合并所有图片，不进行裁剪和智能分组
+        """
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
             output_path = f.name
 
-        logger.info(f"合并 {len(image_paths)} 张图片...")
+        logger.info(f"简单合并 {len(image_paths)} 张图片...")
 
         success = self.image_merger.merge_vertically(image_paths, output_path)
 
@@ -179,7 +236,7 @@ class OllamaProvider(BaseOCRProvider):
             raise OllamaError("图片合并失败", "OCR_MERGE_ERROR")
 
         logger.info(f"图片合并成功: {output_path}")
-        return output_path, len(image_paths)
+        return [output_path], len(image_paths)
 
     def recognize_table(
         self,
@@ -214,7 +271,7 @@ class OllamaProvider(BaseOCRProvider):
             dict: 识别结果
         """
         start_time = time.time()
-        merged_path = None
+        merged_paths = []
         images_merged = 1
 
         try:
@@ -233,50 +290,62 @@ class OllamaProvider(BaseOCRProvider):
 
             # 合并图片（如果多张）
             if len(image_paths) > 1:
-                merged_path, images_merged = self._merge_images(image_paths)
-                target_path = merged_path
+                merged_paths, images_merged = self._merge_images(image_paths)
             else:
-                target_path = image_paths[0]
+                merged_paths = [image_paths[0]]
 
-            # 编码图片为base64
-            img_data = self._encode_image_to_base64(target_path)
-            file_size = os.path.getsize(target_path)
-
-            if verbose:
-                logger.info(f"图片大小: {file_size/1024:.1f}KB, 模型: {self._model}")
-
-            # 调用Ollama API
+            # 对所有输出文件进行 OCR，然后合并结果
+            all_markdown = []
+            total_file_size = 0
             client = self._get_client()
 
-            if verbose:
-                logger.info("正在调用Ollama API...")
+            total_files = len(merged_paths)
+            for i, target_path in enumerate(merged_paths):
+                # 始终显示 OCR 进度
+                file_size = os.path.getsize(target_path)
+                total_file_size += file_size
+                logger.info(
+                    f"  OCR 进度: [{i+1}/{total_files}] "
+                    f"{os.path.basename(target_path)} ({file_size/1024:.1f}KB)"
+                )
 
-            response = client.generate(
-                model=self._model,
-                prompt="Extract all text from this image and return it in a structured markdown format.",
-                images=[img_data],
-                options={
-                    'temperature': 0.1,  # 较低的温度以获得更一致的结果
-                }
-            )
+                # 编码图片为base64
+                img_data = self._encode_image_to_base64(target_path)
 
-            # 获取识别结果
-            markdown = response['response'].strip()
+                if verbose:
+                    logger.info(f"  正在调用Ollama API (模型: {self._model})...")
+
+                response = client.generate(
+                    model=self._model,
+                    prompt="Extract all text from this image and return it in a structured markdown format.",
+                    images=[img_data],
+                    options={
+                        'temperature': 0.1,  # 较低的温度以获得更一致的结果
+                    }
+                )
+
+                # 获取识别结果
+                markdown = response['response'].strip()
+                all_markdown.append(markdown)
+
+            # 合并所有 markdown 结果
+            final_markdown = "\n\n".join(all_markdown)
 
             # 计算处理时间
             processing_time_ms = int((time.time() - start_time) * 1000)
 
             if verbose:
-                logger.info(f"识别完成，耗时: {processing_time_ms}ms")
+                logger.info(f"识别完成，处理了 {len(merged_paths)} 个文件，耗时: {processing_time_ms}ms")
 
             return self._format_response(
                 success=True,
-                markdown=markdown,
+                markdown=final_markdown,
                 metadata={
                     "model": self._model,
                     "processing_time_ms": processing_time_ms,
                     "images_merged": images_merged,
-                    "image_size_bytes": file_size
+                    "output_files_count": len(merged_paths),
+                    "total_file_size_bytes": total_file_size
                 }
             )
 
@@ -336,12 +405,13 @@ class OllamaProvider(BaseOCRProvider):
 
         finally:
             # 清理临时合并文件
-            if merged_path and os.path.exists(merged_path):
-                try:
-                    os.unlink(merged_path)
-                    logger.debug(f"已清理临时文件: {merged_path}")
-                except Exception as e:
-                    logger.warning(f"清理临时文件失败: {e}")
+            for path in merged_paths:
+                if os.path.exists(path):
+                    try:
+                        os.unlink(path)
+                        logger.debug(f"已清理临时文件: {path}")
+                    except Exception as e:
+                        logger.warning(f"清理临时文件失败: {e}")
 
     def recognize_table_from_bytes(
         self,
@@ -389,22 +459,49 @@ class OllamaProvider(BaseOCRProvider):
             "base_url": self.base_url
         }
 
-    def is_available(self) -> bool:
-        """检查服务是否可用"""
+    def check_availability(self) -> Tuple[bool, Optional[str]]:
+        """
+        检查服务是否可用，返回详细信息
+
+        Returns:
+            Tuple[bool, Optional[str]]: (是否可用, 错误原因)
+        """
+        # 1. 检查 ollama 包是否安装
         try:
-            # 尝试连接Ollama服务
+            import ollama  # noqa: F401
+        except ImportError:
+            return (False, "未安装 ollama 包，请运行: pip install ollama")
+
+        # 2. 尝试连接 Ollama 服务
+        try:
             client = self._get_client()
-
-            # 检查服务状态
-            client.list()
-
-            # 确保模型可用
-            self._ensure_model_available()
-
-            return True
+        except OCRConfigurationError as e:
+            return (False, f"无法连接到 Ollama 服务 ({self.base_url}): {e.message}")
         except Exception as e:
-            logger.debug(f"Ollama服务不可用: {e}")
-            return False
+            return (False, f"无法连接到 Ollama 服务 ({self.base_url}): {e}")
+
+        # 3. 检查服务状态
+        try:
+            client.list()
+        except Exception as e:
+            return (False, f"Ollama 服务响应异常: {e}")
+
+        # 4. 确保模型可用
+        try:
+            self._ensure_model_available()
+        except OCRModelNotFoundError as e:
+            return (False, f"模型 '{self._model}' 不可用: {e.message}")
+        except Exception as e:
+            return (False, f"模型 '{self._model}' 不可用: {e}")
+
+        return (True, None)
+
+    def is_available(self) -> bool:
+        """检查服务是否可用（兼容旧接口）"""
+        available, error_reason = self.check_availability()
+        if not available:
+            logger.debug(f"Ollama服务不可用: {error_reason}")
+        return available
 
     def list_available_models(self) -> List[str]:
         """列出可用的模型"""

@@ -142,6 +142,11 @@ def test_get_sync_status(admin_token):
     assert "total_synced" in data
     assert "pending_sync" in data
     assert "sync_errors" in data
+    assert "total_tasks" in data
+    assert "pending_tasks" in data
+    assert "running_tasks" in data
+    assert "success_tasks" in data
+    assert "failed_tasks" in data
 
 
 def test_retry_task_invalid_status(admin_token):

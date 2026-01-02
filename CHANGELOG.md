@@ -5,19 +5,126 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [5.0.2] - 2024-12-18
+## [5.1.0] - 2025-01-02
+
+### 新增
+- 🐟 **鱼百科管理系统** - 鱼种知识库、季节活动规律、装备推荐查询
+  - FishSpecies, FishKnowledge, FishSeasonActivity 三个核心模型
+  - 鱼种分类（淡水/海水/广盐鱼）
+  - 季节活动管理（春夏秋冬四季活动等级）
+  - 针对性装备推荐（拟饵/钓组/装备参数）
+- 📚 **内容管理系统 (CMS)** - 富文本编辑、自动保存草稿、语义搜索
+  - Article 模型，支持多种文章类型（技巧/评测/鱼种/钓点）
+  - 自动保存草稿功能（定时保存）
+  - 基于ChromaDB的向量搜索和DashScope Embedding
+  - 相似文章推荐（余弦相似度）
+  - 文章发布流程（草稿→审核→发布/归档）
+- 📊 **Excel批量导入系统** - 批量导入装备数据到待审核队列
+  - ExcelImportService 服务，支持模板生成
+  - 预览验证功能（导入前数据验证）
+  - 支持鱼竿/渔轮/鱼线/拟饵四种装备类型
+  - 详细的错误信息和行号定位
+- 🔍 **向量存储服务** - ArticleVectorStore 基于 ChromaDB
+  - DashScope Embedding 集成（text-embedding-v2）
+  - 本地向量数据库持久化
+  - 元数据过滤和语义搜索
+- 🎯 **钓鱼配件管理系统** - Accessory 模型
+  - 配件分类（钩子/铅坠/转环/前导线/浮漂/别针/其他）
+  - 规格管理（尺寸/材质/强度/适用场景）
+  - 装备关联（适用钓组/目标鱼种）
+  - 用户等级推荐（新手/进阶/高级）
+- 🪝 **拟饵类型管理系统** - LureType 模型
+  - 拟饵分类（硬饵/软饵/金属饵/飞蝇/其他）
+  - 动作描述（泳姿/操作技巧）
+  - 规格范围（典型重量/长度）
+  - 目标鱼种关联
+- 🔧 **钓组配置管理系统** - RigType, RigSpec, RigComponent 模型
+  - 钓组分类（底钓/浮漂/路亚/飞蝇/海钓）
+  - 组件编辑器（可视化编辑钓组组件）
+  - 规格管理（钓组规格参数）
+  - 拟饵关联（适用拟饵类型）
+  - 难度评级（简单/中等/困难）
+
+### 改进
+- 📊 **数据分析性能优化**
+  - SQL性能优化（使用CASE WHEN替代Python循环）
+  - 新增价格分布统计API
+  - 新增品牌统计API
+  - 新增用户活动统计API
+  - 真实数据统计（移除模拟数据）
+  - 前端增强（日期选择器、CSV导出）
+- 🔄 **数据工作流系统重构**
+  - 五合一工作流系统（采集/OCR/导入/审核/监控）
+  - WorkflowPipeline 组件改为标签切换模式
+  - 新增ImportTab组件（Excel导入界面）
+  - 移除废弃的CronEditor和WorkflowDAG组件
+- 🔧 **装备对比功能重构**
+  - 模块化重构（comparator.py → diff_analyzer.py + specs_extractor.py）
+  - 差异分析增强
+  - 新增equipment_searcher.py
+  - 统一常量定义（constants.py）
+  - 数据库迁移（migrations.py）
+- 🗃️ **数据库字段统一**
+  - fish_species_id → species_id 字段重命名
+  - 统一数据库外键命名规范
+- 🔌 **WebSocket连接优化**
+  - 优化WebSocket连接处理
+  - 改进错误恢复机制
+  - 添加useWorkflowSocket hook
+
+### 修复
+- 🐛 **修复Ant Design废弃警告** - 更新到兼容的API调用
+- 🐛 **修复TypeScript编译错误** - 类型定义和导入问题
+- 🐛 **修复TaskEdit状态引用** - 移除对已删除状态的引用
+- 🐛 **修复数据分析SQL错误** - CASE WHEN语法优化
+
+### 文档
+- 📚 **版本号统一** - README.md, CLAUDE.md, pyproject.toml 版本号更新为 v5.1.0
+- 📖 **API文档更新** - 添加新增的7个内容管理模块API文档
+- 🏗️ **架构文档更新** - 更新系统架构图和包依赖说明
+- 📝 **CHANGELOG更新** - 添加v5.1.0完整变更记录
+
+### 技术债务
+- 🔄 **工作流模块重构** - 移除独立的Workflow页面，整合到DataWorkflow
+- 🧹 **代码清理** - 删除废弃的CronEditor和WorkflowDAG组件
+- 📦 **依赖优化** - 更新依赖包版本
+
+## [5.2.0] - 2024-12-29
+
+### 新增
+- 🤖 **用户装备管理系统** - UserEquipmentManager和EquipmentRecommender
+- 📊 **统一监控组件** - MonitoringCallback适用于所有Agent
+- 🕷️ **分布式爬虫架构** - Master-Worker模式，支持多种Worker类型
+- 🔧 **OCR工作流** - 完整的OCR图片处理工作流
+- 📦 **装备批量操作** - 支持批量添加和管理装备
+- 🎯 **OCR Worker** - 专用的OCR处理Worker节点
+
+### 改进
+- 🏗️ **Agent包路径重构** - 统一为packages/agents/ (复数形式)
+- 📂 **小程序目录重命名** - fishing_agent_app/
+- 🔌 **API路由扩展** - 新增7个路由模块，总计17个
+- 📊 **数据库模型完善** - 30个模型，覆盖所有业务
+
+### 文档
+- 📚 **文档全面更新** - 同步更新所有30+个文档
+
+## [5.0.2] - 2024-12-22
 
 ### 新增
 - 📦 **装备导入Agent (agent_equipment_import)** - 全新独立的装备导入Agent包，支持从文本中提取装备信息
 - 🗜️ **文本压缩中间件** - 新增TextCompressorMiddleware，自动压缩长文本删除冗余内容，压缩率可达50%+
 - 📋 **批量装备提取** - 支持从单个长文本中批量提取多个装备型号，提高处理效率
 - 🤖 **对话式交互支持** - EquipmentImportAgent支持自然语言对话和直接API调用两种模式
+- ✅ **待审核装备管理系统** - 完整的装备数据审核工作流，支持管理员审核、批准或拒绝导入的装备数据
+- 🕷️ **爬虫数据持久化系统** - 完整的爬虫任务生命周期管理和数据存储，支持任务重试和断点续传
 - 🔍 **OCR多提供商支持** - 重构OCR服务架构，支持Ollama本地和SiliconFlow云端双提供商
 - 🏗️ **OCR模块化设计** - 新增BaseOCRProvider抽象基类和Factory模式，便于扩展新提供商
 - 🦙 **Ollama本地OCR集成** - 支持deepseek-ocr模型，完全本地处理，保护数据隐私
 - 🔄 **OCR提供商自动切换** - 根据配置自动选择最适合的OCR服务
 - 📊 **OCR服务状态检测** - 实时检测所有提供商的可用性，智能选择可用服务
 - 🛠️ **OCR调试工具增强** - 更新debug_ocr.py，支持多提供商状态查看和智能合并批处理
+- 📚 **完整API文档** - 新增fishing-api.md和admin-api.md，提供完整的API接口文档
+- 📖 **爬虫开发指南** - 创建crawler-development.md，详细的爬虫开发和使用指南
 
 ### 改进
 - 🏗️ **基础设施模块分离** - 将scraper和data_processing从agent_fishing中独立出来，形成清晰的三层架构
@@ -27,11 +134,20 @@
 - 🔧 **依赖管理优化** - 将ollama依赖设为必需，添加ocr-ollama可选依赖组
 - 📚 **文档结构优化** - 更新README添加OCR多提供商说明，完善配置示例
 - 🚀 **批处理性能提升** - 优化智能图片合并流程，支持更灵活的检测策略
+- 📊 **任务状态管理** - 基于状态机的任务流程管理，支持QUEUED/RUNNING/SUCCESS/FAILED状态转换
+- 🔄 **实时状态推送** - WebSocket实时推送任务执行状态和进度，提升用户体验
+- 🎯 **界面专业性提升** - 将"爬虫"统一重命名为"数据采集"，提升界面专业性
 
 ### 修复
 - 🔧 **ExtractedEquipment空值处理** - 修复from_dict方法对空值的处理逻辑
 - 🔗 **导入路径修复** - 修复TaobaoShopCategoryRPA的抽象方法实现和导入路径
 - 📂 **模块导入优化** - 修复data_processing包内部的导入路径问题
+- 🐛 **监控页面代码规范** - 修复监控页面代码风格和Chat API默认模型配置问题
+- 🐛 **Agent分析界面** - 修复监控界面Agent分析页面和ECharts组件显示问题
+- 🐛 **LLM统计数据** - 修复LLM使用统计数据显示不正确的问题
+- 🐛 **任务状态刷新** - 添加任务列表自动刷新功能，提升用户体验
+- 🐛 **爬虫任务管理** - 完善任务编辑、状态管理和重新运行功能
+- 🐛 **任务启动流程** - 实现任务启动后等待Worker领取的QUEUED状态机制
 
 ## [5.0.1] - 2024-12-14
 

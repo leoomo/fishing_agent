@@ -6,11 +6,13 @@ OCR 提供商工厂
 
 import os
 import logging
-from typing import Dict, Any
+from typing import List, Dict, Any, Optional
 
 from .base import BaseOCRProvider
 from .siliconflow_provider import SiliconFlowProvider
 from .ollama_provider import OllamaProvider
+from .baidu_provider import BaiduProvider
+from .fallback_provider import FallbackProvider
 from .exceptions import OCRConfigurationError, OCRProviderNotAvailableError
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,8 @@ class OCRProviderFactory:
     SUPPORTED_PROVIDERS = {
         "siliconflow": SiliconFlowProvider,
         "ollama": OllamaProvider,
+        "baidu": BaiduProvider,
+        "fallback": FallbackProvider,
     }
 
     @staticmethod
@@ -58,10 +62,11 @@ class OCRProviderFactory:
         try:
             provider = provider_class()
 
-            # 检查提供商是否可用
-            if not provider.is_available():
+            # 检查提供商是否可用（使用详细检查方法）
+            available, error_reason = provider.check_availability()
+            if not available:
                 raise OCRProviderNotAvailableError(
-                    f"OCR提供商 '{provider_type}' 不可用",
+                    f"OCR提供商 '{provider_type}' 不可用: {error_reason}",
                     "OCR_PROVIDER_NOT_AVAILABLE"
                 )
 
@@ -130,3 +135,23 @@ class OCRProviderFactory:
                 "error": str(e),
                 "type": "unknown"
             }
+
+    @staticmethod
+    def create_fallback_provider(
+        provider_types: Optional[List[str]] = None
+    ) -> FallbackProvider:
+        """
+        创建带回退机制的 OCR 提供商
+
+        Args:
+            provider_types: 提供商列表，按优先级排序
+                           如 ["ollama", "siliconflow", "baidu"]
+                           默认从环境变量 OCR_FALLBACK_PROVIDERS 读取
+
+        Returns:
+            FallbackProvider: 回退提供商实例
+
+        Raises:
+            ValueError: 无法初始化任何提供商
+        """
+        return FallbackProvider(provider_types)

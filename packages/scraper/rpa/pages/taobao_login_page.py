@@ -37,12 +37,58 @@ class TaobaoLoginPage(TaobaoBasePage):
             if success:
                 # Wait for login form to be ready
                 time.sleep(3)
+
+                # 检查是否有"快速进入"按钮（用户之前已登录过）
+                if self._try_quick_enter():
+                    self.logger.info("Quick enter successful, skipping QR login")
+                    return True
+
                 self.logger.info("Login page loaded successfully")
 
             return success
         except Exception as e:
             self.logger.error(f"Failed to load login page: {e}")
             return False
+
+    def _try_quick_enter(self) -> bool:
+        """
+        尝试点击"快速进入"按钮
+
+        淘宝登录页面在用户之前已登录过时，可能显示"快速进入"按钮，
+        点击后可直接进入而无需重新扫码登录。
+
+        Returns:
+            True if quick enter button found and clicked successfully, False otherwise
+        """
+        quick_enter_selectors = [
+            # 精确匹配提供的 HTML 结构
+            'button.fm-button.fm-submit:has-text("快速进入")',
+            'button[type="submit"].fm-button.fm-submit:has-text("快速进入")',
+            # 备用选择器
+            'button:has-text("快速进入")',
+            '.fm-submit:has-text("快速进入")',
+            'text=快速进入',
+        ]
+
+        for selector in quick_enter_selectors:
+            try:
+                element = self.page.locator(selector).first
+                if element.is_visible(timeout=2000):
+                    self.logger.info(f"Found '快速进入' button, clicking...")
+                    element.click()
+                    time.sleep(3)  # 等待页面跳转
+
+                    # 验证是否成功进入
+                    if self.is_logged_in():
+                        self.logger.info("Quick enter login successful")
+                        return True
+                    else:
+                        self.logger.warning("Quick enter clicked but login not verified")
+            except Exception as e:
+                self.logger.debug(f"Quick enter selector '{selector}' failed: {e}")
+                continue
+
+        return False
 
     def switch_to_qr_login(self) -> bool:
         """
@@ -264,6 +310,11 @@ class TaobaoLoginPage(TaobaoBasePage):
                     return True
                 else:
                     self.logger.warning("URL changed but login not verified")
+
+            # 检查是否出现"快速进入"按钮
+            if self._try_quick_enter():
+                self.logger.info("Quick enter successful during wait")
+                return True
 
             # Check for login success indicators
             if self._check_login_success_indicators():

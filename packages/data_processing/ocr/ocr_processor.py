@@ -68,17 +68,18 @@ class OCRMergeProcessor:
         min_text_area: int = 100,
         # 合并参数
         quality: int = 95,
-        spacing: int = 0,  # 默认间距 0 像素，通过 padding 避免重叠
-        # 分割参数
-        enable_split: bool = False,
-        min_segment_height: int = 300,
-        max_segment_height: int = 4000,
+        spacing: int = 0,
+        # 分割参数（优化后的默认值，支持纯色区域检测）
+        enable_split: bool = True,
+        min_segment_height: int = 800,
+        max_segment_height: int = 2200,
+        min_blank_rows: int = 15,
         # 其他参数
         keep_empty_images: bool = False,
-        skip_pure_images: bool = True,  # 跳过纯图片（无文字）
-        skip_sparse_regions: bool = True,  # 跳过文字稀疏区域
-        min_chars_per_region: int = 5,  # 区域最小文字数量
-        verbose: bool = False
+        skip_pure_images: bool = True,
+        skip_sparse_regions: bool = True,
+        min_chars_per_region: int = 2,
+        verbose: bool = True
     ):
         """
         初始化处理器
@@ -89,15 +90,16 @@ class OCRMergeProcessor:
             padding: 裁剪边距
             min_text_area: 最小文字区域面积
             quality: 输出图片质量
-            spacing: 合并时的间距（默认0像素，通过padding避免重叠）
-            enable_split: 是否启用分割
+            spacing: 合并时的间距（默认0，纯色区域检测不依赖间隙）
+            enable_split: 是否启用分割（默认启用，支持纯色区域检测）
             min_segment_height: 最小片段高度
             max_segment_height: 最大片段高度
-            keep_empty_images: 是否保留无文字的图片（即使没有文字也合并）
+            min_blank_rows: 最小空白行数（用于高亮度空白检测）
+            keep_empty_images: 是否保留无文字的图片
             skip_pure_images: 跳过纯图片（无文字的图片不参与合并）
-            skip_sparse_regions: 跳过文字稀疏区域（文字数少于阈值的横向区域）
+            skip_sparse_regions: 跳过文字稀疏区域
             min_chars_per_region: 区域最小文字数量阈值
-            verbose: 详细日志
+            verbose: 详细日志（默认启用）
         """
         self.source_dir = Path(source_dir).resolve()
         if not self.source_dir.exists():
@@ -105,6 +107,12 @@ class OCRMergeProcessor:
 
         self.output_dir = Path(output_dir) if output_dir else self.source_dir / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # 创建专门的临时目录（在系统临时目录中，避免污染输出目录）
+        import uuid
+        temp_dir_name = f"ocr_merge_{uuid.uuid4().hex[:8]}"
+        self.temp_dir = Path(tempfile.gettempdir()) / temp_dir_name
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
 
         # 参数
         self.padding = padding
@@ -114,6 +122,7 @@ class OCRMergeProcessor:
         self.enable_split = enable_split
         self.min_segment_height = min_segment_height
         self.max_segment_height = max_segment_height
+        self.min_blank_rows = min_blank_rows  # 新增参数
         self.keep_empty_images = keep_empty_images
         self.skip_pure_images = skip_pure_images
         self.skip_sparse_regions = skip_sparse_regions
@@ -160,7 +169,7 @@ class OCRMergeProcessor:
     def merger(self):
         """延迟加载图片合并器"""
         if self._merger is None:
-            from .image_merger import ImageMerger
+            from packages.data_processing.image import ImageMerger
             self._merger = ImageMerger(
                 quality=self.quality,
                 spacing=self.spacing
@@ -171,8 +180,10 @@ class OCRMergeProcessor:
     def splitter(self):
         """延迟加载图片分割器"""
         if self._splitter is None:
-            from .merge_split_processor import BlankRowDetector, ImageSplitter
-            self._blank_detector = BlankRowDetector()
+            from packages.data_processing.image.splitter import BlankRowDetector, ImageSplitter
+            self._blank_detector = BlankRowDetector(
+                min_blank_rows=self.min_blank_rows  # 使用配置的参数
+            )
             self._splitter = ImageSplitter(
                 min_segment_height=self.min_segment_height,
                 max_segment_height=self.max_segment_height
@@ -282,19 +293,30 @@ class OCRMergeProcessor:
                 y_max = max(box.y_max for box in text_boxes)
 
             # 应用 padding 并防止越界
-            y1 = max(0, y_min - self.padding)
-            y2 = min(h, y_max + self.padding)
+            # 顶部：如果文字离顶部很近（<50px），不裁剪顶部
+            # 底部：如果文字离底部很近（<50px），不裁剪底部
+            edge_threshold = 50
+
+            if y_min < edge_threshold:
+                y1 = 0  # 顶部有文字，保留完整顶部
+            else:
+                y1 = max(0, y_min - self.padding)
+
+            if h - y_max < edge_threshold:
+                y2 = h  # 底部有文字，保留完整底部
+            else:
+                y2 = min(h, y_max + self.padding)
 
             # 裁剪图片（只裁剪上下，保留完整宽度）
             cropped = img[y1:y2, 0:w]
             crop_height = y2 - y1
             result.cropped_size = (w, crop_height)
 
-            # 保存到临时文件
+            # 保存到临时文件（使用专门的临时目录）
             with tempfile.NamedTemporaryFile(
                 suffix='.jpg',
                 delete=False,
-                dir=str(self.output_dir)
+                dir=str(self.temp_dir)  # 使用临时目录而不是输出目录
             ) as f:
                 temp_path = f.name
 
@@ -325,13 +347,23 @@ class OCRMergeProcessor:
         Returns:
             List[ProcessedImage]: 处理结果列表
         """
+        import time
+
         results = []
+        total = len(image_files)
+        step_start = time.time()
+        cumulative_time = 0
 
         for i, image_path in enumerate(image_files):
-            if self.verbose:
-                logger.info(f"处理 {i+1}/{len(image_files)}: {Path(image_path).name}")
+            # 先输出开始处理的信息（第一张会触发 PaddleOCR 初始化，比较慢）
+            if i == 0:
+                logger.info(f"  处理第1张图片（首次会初始化 OCR 模型，请稍候）...")
 
+            img_start = time.time()
             result = self.crop_single_image(image_path)
+            img_elapsed = time.time() - img_start
+            cumulative_time += img_elapsed
+
             results.append(result)
 
             # 更新统计
@@ -342,6 +374,20 @@ class OCRMergeProcessor:
                 self.stats["cropped_total_height"] += result.cropped_size[1]
             else:
                 self.stats["images_without_text"] += 1
+
+            # 显示进度（每5张或首尾）
+            if (i + 1) % 5 == 0 or i == 0 or i == total - 1:
+                avg_time = cumulative_time / (i + 1)
+                remaining = avg_time * (total - i - 1)
+                status = "有文字" if result.has_text else "无文字"
+                logger.info(
+                    f"  文字检测: [{i+1}/{total}] {Path(image_path).name} "
+                    f"({img_elapsed:.1f}s, {status}) "
+                    f"[预计剩余: {remaining:.0f}s]"
+                )
+
+        total_elapsed = time.time() - step_start
+        logger.info(f"  文字检测完成: {total}张, 总耗时: {total_elapsed:.1f}s, 平均: {total_elapsed/total:.2f}s/张")
 
         return results
 
@@ -374,6 +420,19 @@ class OCRMergeProcessor:
         # 必须两张图片都有文字才考虑合并
         if not (current.has_text and next_img.has_text):
             return False
+
+        # 检查宽度差异：如果宽度差异超过20%，不合并
+        current_width = current.original_size[0]
+        next_width = next_img.original_size[0]
+        if current_width > 0 and next_width > 0:
+            width_ratio = min(current_width, next_width) / max(current_width, next_width)
+            if width_ratio < 0.8:  # 宽度差异超过20%
+                if self.verbose:
+                    logger.info(
+                        f"图片 {index + 1}({current_width}px) 与图片 {index + 2}({next_width}px) "
+                        f"宽度差异过大 ({width_ratio:.1%})，不合并"
+                    )
+                return False
 
         # 检测当前图片底部是否有文字
         current_has_bottom_text = self._detect_text_at_edge(
@@ -631,7 +690,7 @@ class OCRMergeProcessor:
 
     def split_merged_image(self, merged_path: str) -> List[str]:
         """
-        分割合并后的图片
+        分割合并后的图片 - 自适应背景检测 + 安全距离验证
 
         Args:
             merged_path: 合并后的图片路径
@@ -646,22 +705,66 @@ class OCRMergeProcessor:
             logger.warning("PIL 未安装，跳过分割")
             return [merged_path]
 
-        from .merge_split_processor import BlankRowDetector, ImageSplitter
+        from packages.data_processing.image.splitter import BlankRowDetector, ImageSplitter
+        import numpy as np
 
         try:
             with Image.open(merged_path) as img:
-                # 检测空白区域
-                blank_detector = BlankRowDetector()
-                blank_regions = blank_detector.find_blank_regions(img)
+                # 检测背景类型
+                pixels = np.array(img)
+                avg_brightness = np.mean(pixels)
+                is_dark_background = avg_brightness < 100
 
-                # 选择切割点
+                if is_dark_background:
+                    logger.info(
+                        f"检测到暗色背景 (亮度={avg_brightness:.0f})，"
+                        "启用纯色检测模式"
+                    )
+
+                # 根据背景类型选择检测模式
+                blank_detector = BlankRowDetector(
+                    min_blank_rows=self.min_blank_rows,
+                    detect_solid_color=is_dark_background,
+                    solid_color_variance=80.0 if is_dark_background else 100.0
+                )
+                # 关闭自动检测，因为我们已经手动检测过了
+                blank_regions = blank_detector.find_blank_regions(
+                    img, auto_detect_background=False
+                )
+
+                # 如果暗色背景没找到纯色区域，回退到高亮度检测
+                if not blank_regions and is_dark_background:
+                    logger.info("纯色检测未找到区域，回退到高亮度检测...")
+                    blank_detector = BlankRowDetector(
+                        min_blank_rows=self.min_blank_rows,
+                        detect_solid_color=False
+                    )
+                    blank_regions = blank_detector.find_blank_regions(
+                        img, auto_detect_background=False
+                    )
+
+                # 如果亮色背景没找到高亮度空白，尝试纯色检测
+                if not blank_regions and not is_dark_background:
+                    logger.info("未找到高亮度空白区域，尝试纯色区域检测...")
+                    blank_detector = BlankRowDetector(
+                        min_blank_rows=min(10, self.min_blank_rows),
+                        detect_solid_color=True,
+                        solid_color_variance=100.0
+                    )
+                    blank_regions = blank_detector.find_blank_regions(
+                        img, auto_detect_background=False
+                    )
+
+                # 选择切割点（带安全距离验证）
                 splitter = ImageSplitter(
                     min_segment_height=self.min_segment_height,
                     max_segment_height=self.max_segment_height
                 )
                 split_points = splitter.select_split_points(
                     blank_regions,
-                    img.height
+                    img.height,
+                    image=img,              # 传入图片用于安全检查
+                    min_content_distance=30  # 最小30px安全距离
                 )
 
                 if not split_points:
@@ -671,10 +774,13 @@ class OCRMergeProcessor:
                 # 执行切割
                 segments = splitter.split_image(img, split_points)
 
+                # 获取原文件名（不含扩展名）
+                base_name = Path(merged_path).stem
+
                 # 保存分割后的图片
                 output_files = []
                 for i, segment in enumerate(segments):
-                    output_name = f"segment_{i+1:03d}.jpg"
+                    output_name = f"{base_name}_seg{i+1:02d}.jpg"
                     output_path = self.output_dir / output_name
                     segment.save(str(output_path), 'JPEG', quality=self.quality)
                     output_files.append(str(output_path))
@@ -698,13 +804,19 @@ class OCRMergeProcessor:
         for result in processed_images:
             if result.cropped_path and os.path.exists(result.cropped_path):
                 try:
-                    # 检查是否是临时文件（在 output_dir 中）
-                    if Path(result.cropped_path).parent == self.output_dir:
-                        # 检查文件名是否是临时格式
-                        if 'tmp' in result.cropped_path:
-                            os.unlink(result.cropped_path)
+                    # 删除所有临时文件（现在都在 self.temp_dir 中）
+                    os.unlink(result.cropped_path)
                 except Exception:
                     pass
+
+        # 清理整个临时目录
+        try:
+            import shutil
+            if self.temp_dir.exists():
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+                logger.info(f"已清理临时目录: {self.temp_dir}")
+        except Exception as e:
+            logger.warning(f"清理临时目录失败: {e}")
 
     def generate_metadata(
         self,
@@ -725,6 +837,9 @@ class OCRMergeProcessor:
                 "quality": self.quality,
                 "spacing": self.spacing,
                 "enable_split": self.enable_split,
+                "min_segment_height": self.min_segment_height,
+                "max_segment_height": self.max_segment_height,
+                "min_blank_rows": self.min_blank_rows,
                 "keep_empty_images": self.keep_empty_images,
                 "skip_pure_images": self.skip_pure_images,
                 "skip_sparse_regions": self.skip_sparse_regions,
@@ -765,11 +880,14 @@ class OCRMergeProcessor:
         """
         import time
         start_time = time.time()
+        step_times = {}
 
         try:
             # 1. 扫描图片
+            step_start = time.time()
             logger.info("Step 1: 扫描图片...")
             image_files = self.scan_images()
+            step_times["scan"] = time.time() - step_start
             if not image_files:
                 return ProcessingResult(
                     success=False,
@@ -777,8 +895,10 @@ class OCRMergeProcessor:
                 )
 
             # 2. 裁剪所有图片
+            step_start = time.time()
             logger.info("Step 2: 检测文字区域并裁剪...")
             processed_images = self.crop_all_images(image_files)
+            step_times["crop"] = time.time() - step_start
 
             # 检查是否有成功处理的图片
             successful_crops = [r for r in processed_images if r.cropped_path]
@@ -790,8 +910,10 @@ class OCRMergeProcessor:
                 )
 
             # 3. 智能合并图片
+            step_start = time.time()
             logger.info("Step 3: 智能合并图片...")
             output_files = self.merge_cropped_images(processed_images)
+            step_times["merge"] = time.time() - step_start
             if not output_files:
                 return ProcessingResult(
                     success=False,
@@ -799,24 +921,51 @@ class OCRMergeProcessor:
                     statistics=self.stats
                 )
 
-            # 4. 可选：分割图片（如果只输出一个文件且启用了分割）
-            if self.enable_split and len(output_files) == 1:
-                logger.info("Step 4: 分割图片...")
-                output_files = self.split_merged_image(output_files[0])
+            # 4. 可选：分割超过阈值的文件
+            if self.enable_split:
+                step_start = time.time()
+                logger.info("Step 4: 检查并分割超大文件...")
+                final_output_files = []
+
+                for output_file in output_files:
+                    # 检查所有超过阈值的文件（不再只检查 merged 文件）
+                    try:
+                        with Image.open(output_file) as img:
+                            if img.height > self.max_segment_height:
+                                logger.info(f"  分割 {Path(output_file).name} ({img.height}px > {self.max_segment_height}px)")
+                                split_files = self.split_merged_image(output_file)
+                                final_output_files.extend(split_files)
+                            else:
+                                final_output_files.append(output_file)
+                    except Exception as e:
+                        logger.error(f"检查文件失败 {output_file}: {e}")
+                        final_output_files.append(output_file)
+
+                output_files = final_output_files
+                step_times["split"] = time.time() - step_start
 
             # 5. 清理临时文件
+            step_start = time.time()
             logger.info("Step 5: 清理临时文件...")
             self.cleanup_temp_files(processed_images)
+            step_times["cleanup"] = time.time() - step_start
 
             # 6. 更新统计
+            total_time = time.time() - start_time
             self.stats["output_count"] = len(output_files)
-            self.stats["processing_time_ms"] = int((time.time() - start_time) * 1000)
+            self.stats["processing_time_ms"] = int(total_time * 1000)
 
             # 7. 生成元数据
             metadata = self.generate_metadata(image_files, processed_images, output_files)
             metadata_path = self.save_metadata(metadata)
 
+            # 输出耗时统计
             logger.info("处理完成!")
+            logger.info(f"耗时统计: 扫描={step_times.get('scan', 0):.1f}s, "
+                       f"裁剪={step_times.get('crop', 0):.1f}s, "
+                       f"合并={step_times.get('merge', 0):.1f}s, "
+                       f"分割={step_times.get('split', 0):.1f}s, "
+                       f"总计={total_time:.1f}s")
             logger.info(f"统计: {self.stats}")
 
             return ProcessingResult(

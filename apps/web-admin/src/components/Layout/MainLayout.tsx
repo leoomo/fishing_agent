@@ -5,12 +5,11 @@ import {
   DatabaseOutlined,
   UserOutlined,
   FileTextOutlined,
-  RobotOutlined,
-  BranchesOutlined,
   MonitorOutlined,
   BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
+  NodeIndexOutlined,
 } from '@ant-design/icons'
 import { useDispatch } from 'react-redux'
 import { logout } from '@/store/slices/authSlice'
@@ -41,20 +40,17 @@ const MainLayout = () => {
       icon: <FileTextOutlined />,
       label: '内容管理',
       children: [
-        { key: '/content/fish', label: '鱼类管理' },
-        { key: '/content/rigs', label: '钓组管理' },
-        { key: '/content/lures', label: '拟饵管理' },
+        { key: '/content/articles', label: '文章管理' },
+        { key: '/content/fish', label: '鱼类百科' },
+        { key: '/content/rigs', label: '钓组配置' },
+        { key: '/content/lure-types', label: '拟饵类型' },
+        { key: '/content/accessories', label: '钓鱼配件' },
       ],
     },
     {
-      key: '/crawler',
-      icon: <RobotOutlined />,
-      label: '爬虫管理',
-    },
-    {
-      key: '/workflow',
-      icon: <BranchesOutlined />,
-      label: '工作流管理',
+      key: '/data-workflow',
+      icon: <NodeIndexOutlined />,
+      label: '数据工作流',
     },
     {
       key: '/monitor',
@@ -67,9 +63,13 @@ const MainLayout = () => {
       label: '数据分析',
     },
     {
-      key: '/settings',
+      key: 'settings-menu',
       icon: <SettingOutlined />,
       label: '配置管理',
+      children: [
+        { key: '/settings', label: 'API 配置' },
+        { key: '/settings/equipment-options', label: '装备属性选项' },
+      ],
     },
   ]
 

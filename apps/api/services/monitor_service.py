@@ -7,10 +7,10 @@ import time
 import os
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import func, case, text
+from sqlalchemy import func, case, text, Float
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.system import APILog, LLMLog, AgentExecutionLog, ToolCallLog, SystemConfig
+from apps.api.orm.session import get_db_session
+from apps.api.models.system import APILog, LLMLog, AgentExecutionLog, ToolCallLog, SystemConfig
 
 logger = logging.getLogger(__name__)
 
@@ -475,8 +475,11 @@ class MonitorService:
                 AgentExecutionLog.agent_type,
                 func.count(AgentExecutionLog.id).label('total_executions'),
                 func.avg(AgentExecutionLog.latency_ms).label('avg_latency'),
-                func.sum(AgentExecutionLog.total_tokens).label('total_tokens'),
-                func.sum(AgentExecutionLog.estimated_cost).label('total_cost'),
+                func.sum(
+                    func.coalesce(AgentExecutionLog.input_tokens, 0) +
+                    func.coalesce(AgentExecutionLog.output_tokens, 0)
+                ).label('total_tokens'),
+                func.cast(0.0, Float).label('total_cost'),  # 暂时设为0，因为表中没有cost字段
                 func.sum(case((AgentExecutionLog.success == True, 1), else_=0)).label('success_count'),
             ).filter(
                 AgentExecutionLog.timestamp >= start_date
@@ -689,11 +692,13 @@ class MonitorService:
                         "executions": 0
                     }
 
-                daily_stats[key]["total_cost"] += record.estimated_cost or 0
-                daily_stats[key]["total_tokens"] += record.total_tokens or 0
+                daily_stats[key]["total_cost"] += 0  # 暂时设为0，因为表中没有cost字段
+                daily_stats[key]["total_tokens"] += (
+                    (record.input_tokens or 0) + (record.output_tokens or 0)
+                )
                 daily_stats[key]["executions"] += 1
 
-                by_agent[agent] = by_agent.get(agent, 0) + (record.estimated_cost or 0)
+                by_agent[agent] = by_agent.get(agent, 0) + 0  # 暂时设为0，因为表中没有cost字段
 
             items = list(daily_stats.values())
             items.sort(key=lambda x: (x["date"], x["agent_type"]))
@@ -724,7 +729,19 @@ class MonitorService:
         with get_db_session() as session:
             start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
 
-            query = session.query(AgentExecutionLog).filter(
+            query = session.query(
+                AgentExecutionLog.id,
+                AgentExecutionLog.timestamp,
+                AgentExecutionLog.agent_type,
+                AgentExecutionLog.agent_version,
+                AgentExecutionLog.session_id,
+                AgentExecutionLog.user_id,
+                AgentExecutionLog.input_tokens,
+                AgentExecutionLog.output_tokens,
+                AgentExecutionLog.latency_ms,
+                AgentExecutionLog.success,
+                AgentExecutionLog.error_message
+            ).filter(
                 AgentExecutionLog.timestamp >= start_date
             )
 
@@ -749,8 +766,10 @@ class MonitorService:
                     }
 
                 daily_stats[date_str]["executions"] += 1
-                daily_stats[date_str]["tokens"] += record.total_tokens or 0
-                daily_stats[date_str]["cost"] += record.estimated_cost or 0
+                daily_stats[date_str]["tokens"] += (
+                    (record.input_tokens or 0) + (record.output_tokens or 0)
+                )
+                daily_stats[date_str]["cost"] += 0  # 暂时设为0，因为表中没有cost字段
                 if record.success:
                     daily_stats[date_str]["success_count"] += 1
 

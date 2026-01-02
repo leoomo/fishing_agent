@@ -5,8 +5,8 @@ Tests for BrandRepository
 import pytest
 from sqlalchemy.orm import Session
 
-from packages.agent_fishing.tools.lure.orm.repositories import BrandRepository
-from packages.agent_fishing.tools.lure.models import Brand, Equipment
+from apps.api.orm.repositories import BrandRepository
+from apps.api.models import Brand, Equipment
 
 
 class TestBrandRepository:

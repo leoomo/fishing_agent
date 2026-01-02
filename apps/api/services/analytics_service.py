@@ -2,14 +2,14 @@ import logging
 import json
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import func
+from sqlalchemy import func, case, and_
 
-from packages.agent_fishing.tools.lure.orm.session import get_db_session
-from packages.agent_fishing.tools.lure.models.equipment import Equipment
-from packages.agent_fishing.tools.lure.models.brand import Brand
-from packages.agent_fishing.tools.lure.models.user import User, UserEquipment
-from packages.agent_fishing.tools.lure.models.system import AnalyticsReport, APILog
-from packages.agent_fishing.tools.lure.models.admin_user import AdminUser
+from apps.api.orm.session import get_db_session
+from apps.api.models.equipment import Equipment
+from apps.api.models.brand import Brand
+from apps.api.models.user import User, UserEquipment
+from apps.api.models.system import AnalyticsReport, APILog, AgentExecutionLog
+from apps.api.models.admin_user import AdminUser
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ class AnalyticsService:
 
     def get_price_distribution(self, category: Optional[str] = None) -> List[Dict]:
         """
-        获取价格分布统计
+        获取价格分布统计（使用 SQL CASE WHEN 优化性能）
 
         Args:
             category: 装备类别（可选）
@@ -127,7 +127,25 @@ class AnalyticsService:
             list: 价格分布数据
         """
         with get_db_session() as session:
-            query = session.query(Equipment).filter(
+            # 计算平均价格表达式
+            avg_price_expr = (Equipment.price_min + Equipment.price_max) / 2
+
+            # 使用 SQL CASE WHEN 进行分组统计
+            price_range_expr = case(
+                (avg_price_expr < 100, '0-100'),
+                (and_(avg_price_expr >= 100, avg_price_expr < 300), '100-300'),
+                (and_(avg_price_expr >= 300, avg_price_expr < 500), '300-500'),
+                (and_(avg_price_expr >= 500, avg_price_expr < 1000), '500-1000'),
+                (and_(avg_price_expr >= 1000, avg_price_expr < 2000), '1000-2000'),
+                (and_(avg_price_expr >= 2000, avg_price_expr < 5000), '2000-5000'),
+                else_='5000+'
+            ).label('price_range')
+
+            # 构建查询
+            query = session.query(
+                price_range_expr,
+                func.count(Equipment.equipment_id).label('count')
+            ).filter(
                 Equipment.is_active == True,
                 Equipment.price_min.isnot(None),
                 Equipment.price_max.isnot(None)
@@ -136,31 +154,21 @@ class AnalyticsService:
             if category:
                 query = query.filter(Equipment.category == category)
 
-            equipment_list = query.all()
+            # 执行分组统计
+            results = query.group_by('price_range').all()
 
-            # 定义价格区间
-            price_ranges = [
-                (0, 100),
-                (100, 300),
-                (300, 500),
-                (500, 1000),
-                (1000, 2000),
-                (2000, 5000),
-                (5000, float('inf'))
-            ]
+            # 计算总数
+            total_count = sum(r.count for r in results)
 
+            # 定义价格区间顺序
+            range_order = ['0-100', '100-300', '300-500', '500-1000', '1000-2000', '2000-5000', '5000+']
+            result_dict = {r.price_range: r.count for r in results}
+
+            # 按顺序返回结果
             distribution = []
-            total_count = len(equipment_list)
-
-            for min_price, max_price in price_ranges:
-                count = sum(
-                    1 for eq in equipment_list
-                    if min_price <= ((eq.price_min + eq.price_max) / 2) < max_price
-                )
-
+            for range_label in range_order:
+                count = result_dict.get(range_label, 0)
                 if count > 0:
-                    range_label = f"{min_price}-{max_price}" if max_price != float('inf') else f"{min_price}+"
-
                     distribution.append({
                         "price_range": range_label,
                         "count": count,
@@ -219,7 +227,7 @@ class AnalyticsService:
 
     def get_user_activity(self, days: int = 30) -> List[Dict]:
         """
-        获取用户活跃度统计
+        获取用户活跃度统计（基于 API 日志）
 
         Args:
             days: 统计天数
@@ -228,18 +236,51 @@ class AnalyticsService:
             list: 活跃度数据
         """
         with get_db_session() as session:
-            # TODO: 实现基于 API 日志的活跃度统计
-            # 需要从 api_logs 表中提取用户活跃数据
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
 
-            # 占位符实现
+            # 获取总用户数（用于计算活跃率）
+            total_users = session.query(func.count(User.user_id)).scalar() or 1
+
+            # 按日期统计活跃用户数（基于 API 日志）
+            dau_query = session.query(
+                func.date(APILog.timestamp).label('date'),
+                func.count(func.distinct(APILog.user_id)).label('dau')
+            ).filter(
+                APILog.timestamp >= start_date,
+                APILog.user_id.isnot(None)
+            ).group_by(
+                func.date(APILog.timestamp)
+            ).all()
+
+            dau_dict = {str(r.date): r.dau for r in dau_query}
+
+            # 按日期统计新增用户数
+            new_users_query = session.query(
+                func.date(User.created_at).label('date'),
+                func.count(User.user_id).label('new_count')
+            ).filter(
+                User.created_at >= start_date
+            ).group_by(
+                func.date(User.created_at)
+            ).all()
+
+            new_users_dict = {str(r.date): r.new_count for r in new_users_query}
+
+            # 构建结果
             result = []
             for i in range(days):
                 date = (datetime.now() - timedelta(days=days-i-1)).date()
+                date_str = date.isoformat()
+                dau = dau_dict.get(date_str, 0)
+                new_users = new_users_dict.get(date_str, 0)
+                active_rate = round(dau / total_users * 100, 2) if total_users > 0 else 0.0
+
                 result.append({
-                    "date": date.isoformat(),
-                    "dau": 0,  # 日活跃用户数
-                    "new_users": 0,  # 新增用户数
-                    "active_rate": 0.0  # 活跃率
+                    "date": date_str,
+                    "dau": dau,
+                    "new_users": new_users,
+                    "active_rate": active_rate
                 })
 
             return result
@@ -283,7 +324,7 @@ class AnalyticsService:
         generated_by: str
     ) -> Dict:
         """
-        生成业务报表
+        生成业务报表（收集真实数据）
 
         Args:
             report_type: 报表类型（weekly/monthly/custom）
@@ -302,27 +343,112 @@ class AnalyticsService:
 
             admin_user_id = admin_user.id if admin_user else None
 
+            # 解析日期范围
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)  # 包含结束日期
+
+            # ========== 装备统计 ==========
+            # 新增装备数
+            new_equipment_count = session.query(func.count(Equipment.equipment_id)).filter(
+                Equipment.created_at >= start_dt,
+                Equipment.created_at < end_dt,
+                Equipment.is_active == True
+            ).scalar() or 0
+
+            # 总装备数
+            total_equipment_count = session.query(func.count(Equipment.equipment_id)).filter(
+                Equipment.is_active == True
+            ).scalar() or 0
+
+            # 平均价格
+            avg_price = session.query(
+                func.avg((Equipment.price_min + Equipment.price_max) / 2)
+            ).filter(
+                Equipment.is_active == True,
+                Equipment.price_min.isnot(None),
+                Equipment.price_max.isnot(None)
+            ).scalar() or 0.0
+
+            # ========== 用户统计 ==========
+            # 新增用户数
+            new_users_count = session.query(func.count(User.user_id)).filter(
+                User.created_at >= start_dt,
+                User.created_at < end_dt
+            ).scalar() or 0
+
+            # 活跃用户数（基于 API 日志）
+            active_users_count = session.query(
+                func.count(func.distinct(APILog.user_id))
+            ).filter(
+                APILog.timestamp >= start_dt,
+                APILog.timestamp < end_dt,
+                APILog.user_id.isnot(None)
+            ).scalar() or 0
+
+            # 总用户数（用于计算留存率）
+            total_users = session.query(func.count(User.user_id)).scalar() or 1
+            retention_rate = round(active_users_count / total_users * 100, 2) if total_users > 0 else 0.0
+
+            # ========== API 统计 ==========
+            # 总调用量
+            api_total_calls = session.query(func.count(APILog.id)).filter(
+                APILog.timestamp >= start_dt,
+                APILog.timestamp < end_dt
+            ).scalar() or 0
+
+            # 平均响应时间
+            api_avg_response_time = session.query(
+                func.avg(APILog.response_time)
+            ).filter(
+                APILog.timestamp >= start_dt,
+                APILog.timestamp < end_dt,
+                APILog.response_time.isnot(None)
+            ).scalar() or 0.0
+
+            # 错误率
+            api_error_count = session.query(func.count(APILog.id)).filter(
+                APILog.timestamp >= start_dt,
+                APILog.timestamp < end_dt,
+                APILog.status_code >= 400
+            ).scalar() or 0
+            api_error_rate = round(api_error_count / api_total_calls * 100, 2) if api_total_calls > 0 else 0.0
+
+            # ========== LLM/Agent 统计 ==========
+            # 总调用量
+            llm_total_calls = session.query(func.count(AgentExecutionLog.id)).filter(
+                AgentExecutionLog.timestamp >= start_dt,
+                AgentExecutionLog.timestamp < end_dt
+            ).scalar() or 0
+
+            # 总 Token 数
+            llm_total_tokens = session.query(
+                func.sum(AgentExecutionLog.total_tokens)
+            ).filter(
+                AgentExecutionLog.timestamp >= start_dt,
+                AgentExecutionLog.timestamp < end_dt
+            ).scalar() or 0
+
             # 收集报表数据
             report_data = {
                 "equipment": {
-                    "new_count": 0,  # 新增装备数
-                    "total_count": 0,  # 总装备数
-                    "avg_price": 0.0  # 平均价格
+                    "new_count": new_equipment_count,
+                    "total_count": total_equipment_count,
+                    "avg_price": round(avg_price, 2)
                 },
                 "users": {
-                    "new_count": 0,  # 新增用户数
-                    "active_count": 0,  # 活跃用户数
-                    "retention_rate": 0.0  # 留存率
+                    "new_count": new_users_count,
+                    "active_count": active_users_count,
+                    "retention_rate": retention_rate
                 },
                 "api": {
-                    "total_calls": 0,  # 总调用量
-                    "avg_response_time": 0.0,  # 平均响应时间
-                    "error_rate": 0.0  # 错误率
+                    "total_calls": api_total_calls,
+                    "avg_response_time": round(api_avg_response_time, 2),
+                    "error_rate": api_error_rate
                 },
                 "llm": {
-                    "total_calls": 0,  # 总调用量
-                    "total_tokens": 0,  # 总 Token 数
-                    "total_cost": 0.0  # 总成本
+                    "total_calls": llm_total_calls,
+                    "total_tokens": llm_total_tokens,
+                    "total_cost": 0.0  # 成本需要根据具体定价计算
                 }
             }
 
@@ -331,8 +457,8 @@ class AnalyticsService:
                 report_type=report_type,
                 start_date=datetime.fromisoformat(start_date).date(),
                 end_date=datetime.fromisoformat(end_date).date(),
-                report_data=json.dumps(report_data, ensure_ascii=False),  # JSON 字符串
-                generated_by=admin_user_id,  # 关联 admin_user_id
+                report_data=json.dumps(report_data, ensure_ascii=False),
+                generated_by=admin_user_id,
                 is_published=True
             )
 

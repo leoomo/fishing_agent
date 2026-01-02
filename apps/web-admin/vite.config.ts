@@ -12,9 +12,20 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // API 请求代理
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        ws: true,
+        // WebSocket 需要配置超时
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('proxy error', err);
+          });
+          proxy.on('proxyReqWs', (proxyReq, req, socket, options, head) => {
+            // WebSocket 代理启动
+          });
+        },
       },
     },
   },
