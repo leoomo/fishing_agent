@@ -11,12 +11,15 @@ import {
   Select,
   DatePicker,
   Space,
+  Tooltip,
 } from 'antd'
 import {
   RocketOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   DollarOutlined,
+  DownloadOutlined,
+  EyeOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { monitorApi } from '@/api/services/monitor'
@@ -28,16 +31,26 @@ import type {
 } from '@/types/monitor'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
+import { Button } from 'antd'
+import { exportToCSV, getExportFilename } from '@/utils/export'
+import { useMonitorContext } from '@/contexts/MonitorContext'
 
 const { RangePicker } = DatePicker
 
 const AgentAnalytics = () => {
+  const { setAgentTypeFilter, setActiveTab } = useMonitorContext()
   const [loading, setLoading] = useState(true)
   const [agentStats, setAgentStats] = useState<AgentStatsResponse | null>(null)
   const [latencyPercentiles, setLatencyPercentiles] = useState<LatencyPercentiles | null>(null)
   const [agentTrends, setAgentTrends] = useState<AgentTrendsResponse | null>(null)
   const [selectedAgent, setSelectedAgent] = useState<string | undefined>(undefined)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
+
+  // 钻取到工具分析页面
+  const handleDrillToTools = (agentType: string) => {
+    setAgentTypeFilter(agentType)
+    setActiveTab('tool')
+  }
 
   useEffect(() => {
     fetchData()
@@ -136,6 +149,23 @@ const AgentAnalytics = () => {
       width: 100,
       render: (cost: number) => `¥${cost.toFixed(2)}`,
       sorter: (a, b) => a.total_cost - b.total_cost,
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      render: (_: unknown, record: AgentStats) => (
+        <Tooltip title="查看该 Agent 使用的工具">
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => handleDrillToTools(record.agent_type)}
+            size="small"
+          >
+            工具
+          </Button>
+        </Tooltip>
+      ),
     },
   ]
 
@@ -244,61 +274,46 @@ const AgentAnalytics = () => {
       }
     : {}
 
-  // 成功率仪表盘
-  const successRateOption = agentStats
-    ? {
-        series: agentStats.agents.slice(0, 2).map((agent, idx) => ({
-          type: 'gauge',
-          center: [idx === 0 ? '25%' : '75%', '55%'],
-          radius: '70%',
-          startAngle: 200,
-          endAngle: -20,
-          min: 0,
-          max: 100,
-          splitNumber: 10,
-          itemStyle: {
-            color: agent.success_rate >= 95 ? '#52c41a' : agent.success_rate >= 80 ? '#faad14' : '#ff4d4f',
-          },
-          progress: {
-            show: true,
-            width: 20,
-          },
-          pointer: {
-            show: false,
-          },
-          axisLine: {
-            lineStyle: {
-              width: 20,
-            },
-          },
-          axisTick: {
-            show: false,
-          },
-          splitLine: {
-            show: false,
-          },
-          axisLabel: {
-            show: false,
-          },
-          title: {
-            offsetCenter: [0, '30%'],
-            fontSize: 14,
-          },
-          detail: {
-            valueAnimation: true,
-            offsetCenter: [0, '-10%'],
-            fontSize: 24,
-            formatter: '{value}%',
-          },
-          data: [
-            {
-              value: agent.success_rate.toFixed(1),
-              name: agent.agent_type,
-            },
-          ],
-        })),
-      }
-    : {}
+  // 成功率迷你趋势图（替代仪表盘）
+  const getSuccessRateTrendOption = (agentType: string) => {
+    if (!agentTrends?.trends) return null
+    const trendData = agentTrends.trends.slice(-7) // 最近7天
+    if (trendData.length === 0) return null
+
+    return {
+      grid: { top: 5, right: 5, bottom: 5, left: 5 },
+      xAxis: { type: 'category', show: false, data: trendData.map(t => t.date) },
+      yAxis: { type: 'value', show: false, min: 0, max: 100 },
+      series: [{
+        type: 'line',
+        data: trendData.map(t => t.success_rate),
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { width: 2, color: '#52c41a' },
+        areaStyle: { color: 'rgba(82,196,26,0.1)' },
+      }],
+    }
+  }
+
+  // 导出 CSV
+  const handleExport = () => {
+    if (!agentStats?.agents || agentStats.agents.length === 0) {
+      message.warning('没有数据可以导出')
+      return
+    }
+
+    const exportColumns = [
+      { title: 'Agent 类型', dataIndex: 'agent_type' },
+      { title: '执行次数', dataIndex: 'total_executions' },
+      { title: '成功率 (%)', dataIndex: 'success_rate', render: (v: unknown) => Number(v).toFixed(1) },
+      { title: '平均延时 (ms)', dataIndex: 'avg_latency_ms', render: (v: unknown) => Number(v).toFixed(0) },
+      { title: 'Token 数', dataIndex: 'total_tokens' },
+      { title: '成本 (CNY)', dataIndex: 'total_cost', render: (v: unknown) => Number(v).toFixed(4) },
+    ]
+
+    exportToCSV(agentStats.agents as Record<string, unknown>[], exportColumns, getExportFilename('agent_stats'))
+    message.success('导出成功')
+  }
 
   if (loading && !agentStats) {
     return (
@@ -376,10 +391,41 @@ const AgentAnalytics = () => {
         </Col>
       </Row>
 
-      {/* 成功率仪表盘 */}
+      {/* Agent 成功率卡片 */}
       {agentStats && agentStats.agents.length > 0 && (
         <Card title="Agent 成功率" style={{ marginBottom: 16 }}>
-          <ReactECharts option={successRateOption} style={{ height: 250 }} />
+          <Row gutter={16}>
+            {agentStats.agents.map((agent) => {
+              const successRateTrendOption = getSuccessRateTrendOption(agent.agent_type)
+              const rateColor = agent.success_rate >= 95 ? '#52c41a' : agent.success_rate >= 80 ? '#faad14' : '#ff4d4f'
+
+              return (
+                <Col span={12} key={agent.agent_type}>
+                  <Card size="small" style={{ textAlign: 'center' }}>
+                    <Tag color={agent.agent_type === 'fishing' ? 'blue' : 'green'} style={{ marginBottom: 8 }}>
+                      {agent.agent_type}
+                    </Tag>
+                    <div style={{ fontSize: 36, fontWeight: 'bold', color: rateColor }}>
+                      {agent.success_rate.toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+                      成功率 ({agent.total_executions} 次执行)
+                    </div>
+                    {successRateTrendOption && (
+                      <ReactECharts
+                        option={successRateTrendOption}
+                        style={{ height: 40 }}
+                        opts={{ renderer: 'svg' }}
+                      />
+                    )}
+                    <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+                      最近7天趋势
+                    </div>
+                  </Card>
+                </Col>
+              )
+            })}
+          </Row>
         </Card>
       )}
 
@@ -405,7 +451,20 @@ const AgentAnalytics = () => {
           </Card>
         </Col>
         <Col span={12}>
-          <Card title="Agent 执行统计详情">
+          <Card
+            title="Agent 执行统计详情"
+            extra={
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                onClick={handleExport}
+                size="small"
+                disabled={!agentStats?.agents || agentStats.agents.length === 0}
+              >
+                导出 CSV
+              </Button>
+            }
+          >
             <Table
               columns={agentColumns}
               dataSource={agentStats?.agents || []}

@@ -17,12 +17,15 @@ import {
   RiseOutlined,
   PieChartOutlined,
   BarChartOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { monitorApi } from '@/api/services/monitor'
 import type { CostReportResponse, CostReportItem } from '@/types/monitor'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
+import { Button } from 'antd'
+import { exportToCSV, getExportFilename } from '@/utils/export'
 
 const { RangePicker } = DatePicker
 
@@ -193,32 +196,59 @@ const CostReport = () => {
       }
     : {}
 
-  // Token vs 成本相关性图
+  // Token vs 成本双轴折线图（替代散点图）
   const tokenCostOption = costReport
     ? {
-        title: { text: 'Token 与成本关系', left: 'center' },
+        title: { text: 'Token 与成本趋势', left: 'center' },
         tooltip: {
-          trigger: 'item',
-          formatter: (params: { data: [number, number, string] }) => {
-            const [tokens, cost, agent] = params.data
-            return `${agent}<br/>Token: ${tokens.toLocaleString()}<br/>成本: ¥${cost.toFixed(4)}`
+          trigger: 'axis',
+          axisPointer: { type: 'cross' },
+          formatter: (params: Array<{ name: string; seriesName: string; value: number; marker: string }>) => {
+            let result = params[0].name + '<br/>'
+            params.forEach((param) => {
+              if (param.seriesName === 'Token 数') {
+                result += `${param.marker} ${param.seriesName}: ${param.value.toLocaleString()}<br/>`
+              } else {
+                result += `${param.marker} ${param.seriesName}: ¥${param.value.toFixed(4)}<br/>`
+              }
+            })
+            return result
           },
         },
-        xAxis: { type: 'value', name: 'Token 数', scale: true },
-        yAxis: { type: 'value', name: '成本 (CNY)', scale: true },
+        legend: { top: 30, data: ['Token 数', '成本'] },
+        xAxis: {
+          type: 'category',
+          data: [...new Set(costReport.items.map((item) => item.date))],
+        },
+        yAxis: [
+          { type: 'value', name: 'Token 数', position: 'left' },
+          { type: 'value', name: '成本 (CNY)', position: 'right' },
+        ],
         series: [
           {
-            type: 'scatter',
-            symbolSize: (data: [number, number]) => Math.min(Math.sqrt(data[0]) / 5, 50),
-            data: costReport.items.map((item) => [
-              item.total_tokens,
-              item.total_cost,
-              item.agent_type,
-            ]),
-            itemStyle: {
-              color: (params: { data: [number, number, string] }) =>
-                agentColors[params.data[2]] || agentColors.other,
-            },
+            name: 'Token 数',
+            type: 'line',
+            data: [...new Set(costReport.items.map((item) => item.date))].map((date) => {
+              return costReport.items
+                .filter((i) => i.date === date)
+                .reduce((sum, i) => sum + i.total_tokens, 0)
+            }),
+            smooth: true,
+            itemStyle: { color: '#1890ff' },
+            areaStyle: { color: 'rgba(24,144,255,0.1)' },
+          },
+          {
+            name: '成本',
+            type: 'line',
+            yAxisIndex: 1,
+            data: [...new Set(costReport.items.map((item) => item.date))].map((date) => {
+              return costReport.items
+                .filter((i) => i.date === date)
+                .reduce((sum, i) => sum + i.total_cost, 0)
+            }),
+            smooth: true,
+            itemStyle: { color: '#52c41a' },
+            areaStyle: { color: 'rgba(82,196,26,0.1)' },
           },
         ],
       }
@@ -230,6 +260,34 @@ const CostReport = () => {
   const dailyAvgCost = uniqueDays > 0 ? totalCost / uniqueDays : 0
   const totalTokens = costReport?.items.reduce((sum, i) => sum + i.total_tokens, 0) || 0
   const avgCostPerToken = totalTokens > 0 && totalCost > 0 ? totalCost / totalTokens : 0
+
+  // 导出 CSV
+  const handleExport = () => {
+    if (!costReport?.items || costReport.items.length === 0) {
+      message.warning('没有数据可以导出')
+      return
+    }
+
+    const exportColumns = [
+      { title: '日期', dataIndex: 'date' },
+      { title: 'Agent 类型', dataIndex: 'agent_type' },
+      { title: '执行次数', dataIndex: 'executions' },
+      { title: 'Token 数', dataIndex: 'total_tokens' },
+      { title: '成本 (CNY)', dataIndex: 'total_cost', render: (v: unknown) => Number(v).toFixed(4) },
+      {
+        title: '单次成本 (CNY)',
+        dataIndex: 'avg_cost',
+        render: (_: unknown, record: Record<string, unknown>) => {
+          const executions = Number(record.executions) || 0
+          const cost = Number(record.total_cost) || 0
+          return executions > 0 ? (cost / executions).toFixed(4) : '0'
+        },
+      },
+    ]
+
+    exportToCSV(costReport.items as Record<string, unknown>[], exportColumns, getExportFilename('cost_report'))
+    message.success('导出成功')
+  }
 
   if (loading && !costReport) {
     return (
@@ -336,7 +394,19 @@ const CostReport = () => {
       </Row>
 
       {/* 成本详情表格 */}
-      <Card title="成本明细">
+      <Card
+        title="成本明细"
+        extra={
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={handleExport}
+            disabled={!costReport?.items || costReport.items.length === 0}
+          >
+            导出 CSV
+          </Button>
+        }
+      >
         <Table
           columns={costColumns}
           dataSource={costReport?.items || []}
