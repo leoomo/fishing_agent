@@ -20,7 +20,6 @@ import {
   EditOutlined,
   DeleteOutlined,
   ApiOutlined,
-  ControlOutlined,
   DatabaseOutlined,
 } from '@ant-design/icons'
 import { configApi } from '@/api/services/config'
@@ -150,7 +149,9 @@ const Settings = () => {
         if (record.is_encrypted) {
           return <Text type="secondary">******** (已加密)</Text>
         }
-        return value.length > 50 ? `${value.substring(0, 50)}...` : value
+        // 处理对象或数组类型的值
+        const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+        return displayValue.length > 50 ? `${displayValue.substring(0, 50)}...` : displayValue
       },
     },
     {
@@ -228,31 +229,6 @@ const Settings = () => {
         </span>
       ),
       children: <AgentConfigManager />,
-    },
-    {
-      key: 'algorithm',
-      label: (
-        <span>
-          <ControlOutlined />
-          算法参数
-        </span>
-      ),
-      children: (
-        <div>
-          <div style={{ marginBottom: 16 }}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              新增配置
-            </Button>
-          </div>
-          <Table
-            columns={columns}
-            dataSource={configs.filter((c) => c.config_type === 'algorithm')}
-            loading={loading}
-            rowKey="config_key"
-            pagination={false}
-          />
-        </div>
-      ),
     },
     {
       key: 'all',
