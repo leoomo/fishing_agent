@@ -19,14 +19,16 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  KeyOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  LoadingOutlined,
+  ApiOutlined,
+  ControlOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons'
 import { configApi } from '@/api/services/config'
 import type { Config, ConfigCreate } from '@/types/config'
 import type { ColumnsType } from 'antd/es/table'
+import APIKeyManager from './components/APIKeyManager'
+import AgentConfigManager from './components/AgentConfigManager'
+import { RobotOutlined } from '@ant-design/icons'
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -38,14 +40,14 @@ const Settings = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingConfig, setEditingConfig] = useState<Config | null>(null)
   const [form] = Form.useForm()
-
-  // API 密钥测试状态
-  const [testingKey, setTestingKey] = useState<string | null>(null)
-  const [testResults, setTestResults] = useState<Record<string, { valid: boolean; message: string }>>({})
+  const [activeTab, setActiveTab] = useState('api')
 
   useEffect(() => {
-    fetchConfigs()
-  }, [selectedType])
+    // 只在非 api 标签页时加载配置
+    if (activeTab !== 'api') {
+      fetchConfigs()
+    }
+  }, [selectedType, activeTab])
 
   const fetchConfigs = async () => {
     setLoading(true)
@@ -62,6 +64,10 @@ const Settings = () => {
   const handleCreate = () => {
     setEditingConfig(null)
     form.resetFields()
+    // 根据当前标签页设置默认类型
+    if (activeTab !== 'all') {
+      form.setFieldsValue({ config_type: activeTab })
+    }
     setModalVisible(true)
   }
 
@@ -106,35 +112,6 @@ const Settings = () => {
       fetchConfigs()
     } catch {
       message.error('操作失败')
-    }
-  }
-
-  const handleTestApiKey = async (configKey: string, provider: string) => {
-    setTestingKey(configKey)
-    try {
-      // 获取实际的 key 值
-      const config = configs.find(c => c.config_key === configKey)
-      if (!config) return
-
-      const result = await configApi.testApiKey(provider, config.config_value)
-      setTestResults(prev => ({
-        ...prev,
-        [configKey]: result,
-      }))
-
-      if (result.valid) {
-        message.success('API 密钥有效')
-      } else {
-        message.warning(result.message || 'API 密钥无效')
-      }
-    } catch {
-      setTestResults(prev => ({
-        ...prev,
-        [configKey]: { valid: false, message: '测试失败' },
-      }))
-      message.error('测试失败')
-    } finally {
-      setTestingKey(null)
     }
   }
 
@@ -203,7 +180,7 @@ const Settings = () => {
     },
     {
       title: '操作',
-      width: 200,
+      width: 150,
       fixed: 'right',
       render: (_, record) => (
         <Space>
@@ -215,22 +192,6 @@ const Settings = () => {
           >
             编辑
           </Button>
-
-          {record.config_type === 'api' && (
-            <Button
-              type="link"
-              size="small"
-              icon={testingKey === record.config_key ? <LoadingOutlined /> : <KeyOutlined />}
-              onClick={() => {
-                // 从 config_key 中提取 provider
-                const provider = record.config_key.replace('_API_KEY', '').toLowerCase()
-                handleTestApiKey(record.config_key, provider)
-              }}
-              disabled={testingKey !== null}
-            >
-              测试
-            </Button>
-          )}
 
           <Popconfirm
             title="确定删除此配置？"
@@ -247,185 +208,101 @@ const Settings = () => {
     },
   ]
 
-  // API 密钥专用列
-  const apiKeyColumns: ColumnsType<Config> = [
+  const tabItems = [
     {
-      title: 'API 服务',
-      dataIndex: 'config_key',
-      width: 180,
-      render: (key) => {
-        const name = key.replace('_API_KEY', '')
-        return <Text strong>{name}</Text>
-      },
+      key: 'api',
+      label: (
+        <span>
+          <ApiOutlined />
+          API 密钥
+        </span>
+      ),
+      children: <APIKeyManager />,
     },
     {
-      title: '密钥',
-      dataIndex: 'config_value',
-      width: 300,
-      render: (value, record) => {
-        if (record.is_encrypted) {
-          return <Text type="secondary">••••••••••••••••</Text>
-        }
-        // 部分显示
-        if (value.length > 8) {
-          return <Text code>{value.substring(0, 4)}...{value.substring(value.length - 4)}</Text>
-        }
-        return <Text code>{value}</Text>
-      },
+      key: 'agent',
+      label: (
+        <span>
+          <RobotOutlined />
+          Agent 配置
+        </span>
+      ),
+      children: <AgentConfigManager />,
     },
     {
-      title: '状态',
-      width: 120,
-      render: (_, record) => {
-        const result = testResults[record.config_key]
-        if (!result) return <Tag>未测试</Tag>
-        return result.valid ? (
-          <Tag icon={<CheckCircleOutlined />} color="success">有效</Tag>
-        ) : (
-          <Tag icon={<CloseCircleOutlined />} color="error">无效</Tag>
-        )
-      },
+      key: 'algorithm',
+      label: (
+        <span>
+          <ControlOutlined />
+          算法参数
+        </span>
+      ),
+      children: (
+        <div>
+          <div style={{ marginBottom: 16 }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              新增配置
+            </Button>
+          </div>
+          <Table
+            columns={columns}
+            dataSource={configs.filter((c) => c.config_type === 'algorithm')}
+            loading={loading}
+            rowKey="config_key"
+            pagination={false}
+          />
+        </div>
+      ),
     },
     {
-      title: '描述',
-      dataIndex: 'description',
-      width: 200,
-      render: (desc) => desc || '-',
-    },
-    {
-      title: '操作',
-      width: 180,
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={testingKey === record.config_key ? <LoadingOutlined /> : <KeyOutlined />}
-            onClick={() => {
-              const provider = record.config_key.replace('_API_KEY', '').toLowerCase()
-              handleTestApiKey(record.config_key, provider)
-            }}
-            disabled={testingKey !== null}
-          >
-            测试
-          </Button>
-        </Space>
+      key: 'all',
+      label: (
+        <span>
+          <DatabaseOutlined />
+          全部配置
+        </span>
+      ),
+      children: (
+        <div>
+          <div style={{ marginBottom: 16 }}>
+            <Space>
+              <Select
+                placeholder="筛选类型"
+                style={{ width: 150 }}
+                allowClear
+                value={selectedType}
+                onChange={setSelectedType}
+              >
+                <Select.Option value="agent">Agent 配置</Select.Option>
+                <Select.Option value="algorithm">算法参数</Select.Option>
+                <Select.Option value="api">API 密钥</Select.Option>
+                <Select.Option value="system">系统配置</Select.Option>
+              </Select>
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                新增配置
+              </Button>
+            </Space>
+          </div>
+          <Table
+            columns={columns}
+            dataSource={configs}
+            loading={loading}
+            rowKey="config_key"
+            scroll={{ x: 1200 }}
+            pagination={{ pageSize: 20 }}
+          />
+        </div>
       ),
     },
   ]
-
-  const apiConfigs = configs.filter(c => c.config_type === 'api')
 
   return (
     <div>
       <Card title="配置管理">
         <Tabs
-          defaultActiveKey="api"
-          items={[
-            {
-              key: 'api',
-              label: 'API 密钥',
-              children: (
-                <div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                      新增配置
-                    </Button>
-                  </div>
-                  <Table
-                    columns={apiKeyColumns}
-                    dataSource={apiConfigs}
-                    loading={loading}
-                    rowKey="config_key"
-                    pagination={false}
-                  />
-                </div>
-              ),
-            },
-            {
-              key: 'agent',
-              label: 'Agent 配置',
-              children: (
-                <div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                      新增配置
-                    </Button>
-                  </div>
-                  <Table
-                    columns={columns}
-                    dataSource={configs.filter(c => c.config_type === 'agent')}
-                    loading={loading}
-                    rowKey="config_key"
-                    pagination={false}
-                  />
-                </div>
-              ),
-            },
-            {
-              key: 'algorithm',
-              label: '算法参数',
-              children: (
-                <div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                      新增配置
-                    </Button>
-                  </div>
-                  <Table
-                    columns={columns}
-                    dataSource={configs.filter(c => c.config_type === 'algorithm')}
-                    loading={loading}
-                    rowKey="config_key"
-                    pagination={false}
-                  />
-                </div>
-              ),
-            },
-            {
-              key: 'all',
-              label: '全部配置',
-              children: (
-                <div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Space>
-                      <Select
-                        placeholder="筛选类型"
-                        style={{ width: 150 }}
-                        allowClear
-                        value={selectedType}
-                        onChange={setSelectedType}
-                      >
-                        <Select.Option value="agent">Agent 配置</Select.Option>
-                        <Select.Option value="algorithm">算法参数</Select.Option>
-                        <Select.Option value="api">API 密钥</Select.Option>
-                        <Select.Option value="system">系统配置</Select.Option>
-                      </Select>
-                      <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                        新增配置
-                      </Button>
-                    </Space>
-                  </div>
-                  <Table
-                    columns={columns}
-                    dataSource={configs}
-                    loading={loading}
-                    rowKey="config_key"
-                    scroll={{ x: 1200 }}
-                    pagination={{ pageSize: 20 }}
-                  />
-                </div>
-              ),
-            },
-          ]}
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={tabItems}
         />
       </Card>
 
@@ -442,10 +319,7 @@ const Settings = () => {
             label="配置键"
             rules={[{ required: true, message: '请输入配置键' }]}
           >
-            <Input
-              placeholder="如: DASHSCOPE_API_KEY"
-              disabled={!!editingConfig}
-            />
+            <Input placeholder="如: AGENT_MODEL" disabled={!!editingConfig} />
           </Form.Item>
 
           <Form.Item
