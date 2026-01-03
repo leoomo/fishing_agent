@@ -10,18 +10,24 @@ import {
   message,
   DatePicker,
   Space,
+  Button,
+  Alert,
 } from 'antd'
 import {
   ToolOutlined,
   ThunderboltOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  CloseOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { monitorApi } from '@/api/services/monitor'
 import type { ToolStatsResponse, ToolStats } from '@/types/monitor'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
+import { useMonitorContext } from '@/contexts/MonitorContext'
+import { exportToCSV, getExportFilename } from '@/utils/export'
 
 const { RangePicker } = DatePicker
 
@@ -36,13 +42,14 @@ const categoryColors: Record<string, string> = {
 }
 
 const ToolAnalytics = () => {
+  const { agentTypeFilter, setAgentTypeFilter } = useMonitorContext()
   const [loading, setLoading] = useState(true)
   const [toolStats, setToolStats] = useState<ToolStatsResponse | null>(null)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
 
   useEffect(() => {
     fetchData()
-  }, [dateRange])
+  }, [dateRange, agentTypeFilter])
 
   const fetchData = async () => {
     setLoading(true)
@@ -50,11 +57,17 @@ const ToolAnalytics = () => {
       const params: {
         start_date?: string
         end_date?: string
+        agent_type?: string
       } = {}
 
       if (dateRange) {
         params.start_date = dateRange[0].format('YYYY-MM-DD')
         params.end_date = dateRange[1].format('YYYY-MM-DD')
+      }
+
+      // 应用 Agent 类型过滤（从钻取功能传入）
+      if (agentTypeFilter) {
+        params.agent_type = agentTypeFilter
       }
 
       const stats = await monitorApi.getToolStats(params)
@@ -64,6 +77,34 @@ const ToolAnalytics = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 清除 Agent 过滤器
+  const handleClearFilter = () => {
+    setAgentTypeFilter(null)
+  }
+
+  // 导出 CSV
+  const handleExport = () => {
+    if (!toolStats?.tools || toolStats.tools.length === 0) {
+      message.warning('没有数据可以导出')
+      return
+    }
+
+    const exportColumns = [
+      { title: '工具名称', dataIndex: 'tool_name' },
+      { title: '类别', dataIndex: 'category' },
+      { title: '调用次数', dataIndex: 'call_count' },
+      { title: '成功率 (%)', dataIndex: 'success_rate', render: (v: unknown) => Number(v).toFixed(1) },
+      { title: '平均延时 (ms)', dataIndex: 'avg_latency_ms', render: (v: unknown) => Number(v).toFixed(0) },
+    ]
+
+    const filename = agentTypeFilter
+      ? getExportFilename(`tool_stats_${agentTypeFilter}`)
+      : getExportFilename('tool_stats')
+
+    exportToCSV(toolStats.tools as Record<string, unknown>[], exportColumns, filename)
+    message.success('导出成功')
   }
 
   // 工具统计表格列
@@ -280,18 +321,56 @@ const ToolAnalytics = () => {
 
   return (
     <div>
+      {/* Agent 过滤器提示（钻取功能） */}
+      {agentTypeFilter && (
+        <Alert
+          message={
+            <Space>
+              <span>
+                当前筛选: <Tag color="blue">{agentTypeFilter}</Tag> Agent 使用的工具
+              </span>
+              <Button
+                type="link"
+                size="small"
+                icon={<CloseOutlined />}
+                onClick={handleClearFilter}
+              >
+                清除筛选
+              </Button>
+            </Space>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       {/* 筛选器 */}
       <Card style={{ marginBottom: 16 }}>
-        <Space size="large">
-          <span>
-            日期范围：
-            <RangePicker
-              style={{ marginLeft: 8 }}
-              value={dateRange}
-              onChange={(dates) => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | null)}
-            />
-          </span>
-        </Space>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Space size="large">
+              <span>
+                日期范围：
+                <RangePicker
+                  style={{ marginLeft: 8 }}
+                  value={dateRange}
+                  onChange={(dates) => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | null)}
+                />
+              </span>
+            </Space>
+          </Col>
+          <Col>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              disabled={!toolStats?.tools || toolStats.tools.length === 0}
+            >
+              导出 CSV
+            </Button>
+          </Col>
+        </Row>
       </Card>
 
       {/* 总体统计 */}
