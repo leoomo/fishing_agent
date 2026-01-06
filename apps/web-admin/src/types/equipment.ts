@@ -177,3 +177,19 @@ export type ReelType = (typeof REEL_TYPES)[number]
 // 鱼线类型选项
 export const LINE_TYPES = ['PE', '尼龙', '碳线', '钢丝'] as const
 export type LineType = (typeof LINE_TYPES)[number]
+
+// 装备搜索筛选接口
+export interface EquipmentSearchFilters {
+  category?: string
+  brand_id?: number
+  keyword?: string
+  price_min?: number
+  price_max?: number
+  user_level?: string
+  is_active?: boolean
+  // 鱼竿专属
+  power?: string
+  action?: string
+  length_min?: number
+  length_max?: number
+}

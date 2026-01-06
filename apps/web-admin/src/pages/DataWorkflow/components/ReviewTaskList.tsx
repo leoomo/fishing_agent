@@ -26,7 +26,7 @@ import {
   Row,
   Col,
   Spin,
-  message,
+  App,
   Timeline,
   Image,
 } from 'antd'
@@ -110,6 +110,7 @@ const ReviewTaskList: React.FC<ReviewTaskListProps> = ({
   onHideReviewModal,
   onRefresh,
 }) => {
+  const { modal, message } = App.useApp()
   const [form] = Form.useForm()
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [detailTask, setDetailTask] = useState<ReviewTaskItem | null>(null)
@@ -202,7 +203,7 @@ const ReviewTaskList: React.FC<ReviewTaskListProps> = ({
   // 关闭详情弹窗
   const handleCloseDetail = () => {
     if (hasChanges) {
-      Modal.confirm({
+      modal.confirm({
         title: '确定要关闭吗？',
         content: '您有未保存的修改，关闭后将丢失这些更改。',
         okText: '确定关闭',
