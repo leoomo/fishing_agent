@@ -92,8 +92,22 @@ export const equipmentApi = {
     category?: string
     brand_id?: number
     keyword?: string
+    // 通用高级筛选
+    price_min?: number
+    price_max?: number
+    user_level?: string
+    is_active?: boolean
+    // 鱼竿专属筛选
+    power?: string
+    action?: string
+    length_min?: number
+    length_max?: number
   }): Promise<EquipmentListResponse> => {
-    return client.get('/admin/equipment', { params })
+    // 过滤掉 undefined 值
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== '')
+    )
+    return client.get('/admin/equipment', { params: cleanParams })
   },
 
   // 获取装备详情

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Row, Col, message, Modal, Spin } from 'antd'
+import { Row, Col, App, Spin } from 'antd'
 import { ExclamationCircleOutlined } from '@ant-design/icons'
 import { configApi } from '@/api/services/config'
 import type { Config } from '@/types/config'
@@ -17,6 +17,7 @@ interface APIKeyState {
 }
 
 const APIKeyManager: React.FC = () => {
+  const { modal, message } = App.useApp()
   const [loading, setLoading] = useState(true)
   const [apiKeyStates, setApiKeyStates] = useState<Record<string, APIKeyState>>({})
   const [testingKeys, setTestingKeys] = useState<Set<string>>(new Set())
@@ -192,7 +193,7 @@ const APIKeyManager: React.FC = () => {
     const state = apiKeyStates[provider.key]
     if (state?.status === 'unconfigured') return
 
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       icon: <ExclamationCircleOutlined />,
       content: `确定要删除 ${provider.name} 的 API 密钥配置吗？`,

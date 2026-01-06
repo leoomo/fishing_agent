@@ -1,31 +1,47 @@
-import { useEffect, useState } from 'react'
-import { Table, Button, Input, Select, Space, Modal, message, Tag } from 'antd'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Table, Button, Space, App, Tag } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, ExportOutlined, AppstoreAddOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { equipmentApi } from '@/api/services/equipment'
-import type { Equipment } from '@/types/equipment'
-
-const { Search } = Input
+import type { Equipment, Brand } from '@/types/equipment'
+import { useEquipmentSearch } from './hooks/useEquipmentSearch'
+import AdvancedSearch from './components/AdvancedSearch'
 
 const EquipmentList = () => {
   const navigate = useNavigate()
+  const { modal, message } = App.useApp()
   const [data, setData] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(false)
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [category, setCategory] = useState<string>()
-  const [keyword, setKeyword] = useState<string>()
+  const [brands, setBrands] = useState<Brand[]>([])
 
-  const fetchData = async () => {
+  // 使用搜索 Hook
+  const {
+    filters,
+    page,
+    pageSize,
+    setFilters,
+    setPage,
+    setPageSize,
+    resetFilters,
+    searchParams,
+  } = useEquipmentSearch({ defaultPageSize: 20 })
+
+  // 加载品牌列表
+  const loadBrands = useCallback(async () => {
+    try {
+      const response = await equipmentApi.listBrands()
+      setBrands(response)
+    } catch {
+      // 品牌加载失败不影响主功能
+    }
+  }, [])
+
+  // 加载装备数据
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await equipmentApi.list({
-        page,
-        page_size: pageSize,
-        category,
-        keyword,
-      })
+      const response = await equipmentApi.list(searchParams)
       setData(response.items)
       setTotal(response.total)
     } catch {
@@ -33,16 +49,31 @@ const EquipmentList = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchParams, message])
 
+  // 初始化加载
   useEffect(() => {
-    fetchData()
-  }, [page, pageSize, category])
+    loadBrands()
+  }, [loadBrands])
+
+  // 使用 ref 跟踪上一次的参数，避免不必要的重新请求
+  const prevParamsRef = useRef<string>('')
+
+  // 筛选条件变化时重新加载
+  useEffect(() => {
+    const paramsStr = JSON.stringify(searchParams)
+    if (paramsStr !== prevParamsRef.current) {
+      prevParamsRef.current = paramsStr
+      fetchData()
+    }
+  }, [searchParams, fetchData])
 
   const handleDelete = (id: number) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: '确定要删除这个装备吗？',
+      okText: '确认',
+      cancelText: '取消',
       onOk: async () => {
         try {
           await equipmentApi.delete(id)
@@ -57,7 +88,7 @@ const EquipmentList = () => {
 
   const handleExport = async () => {
     try {
-      const blob = await equipmentApi.exportCSV({ category })
+      const blob = await equipmentApi.exportCSV({ category: filters.category })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -68,12 +99,6 @@ const EquipmentList = () => {
     } catch {
       message.error('导出失败')
     }
-  }
-
-  const handleSearch = (value: string) => {
-    setKeyword(value)
-    setPage(1)
-    fetchData()
   }
 
   const columns = [
@@ -124,7 +149,7 @@ const EquipmentList = () => {
       title: '规格信息',
       width: 250,
       render: (_: unknown, record: Equipment) => {
-        const specs = record.specs as any
+        const specs = record.specs as Record<string, unknown> | undefined
         if (!specs) return '-'
 
         switch (record.category) {
@@ -217,27 +242,18 @@ const EquipmentList = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <Space>
-          <Select
-            placeholder="选择类别"
-            style={{ width: 120 }}
-            allowClear
-            onChange={setCategory}
-          >
-            <Select.Option value="鱼竿">鱼竿</Select.Option>
-            <Select.Option value="渔轮">渔轮</Select.Option>
-            <Select.Option value="鱼线">鱼线</Select.Option>
-            <Select.Option value="拟饵">拟饵</Select.Option>
-          </Select>
+      {/* 高级搜索组件 */}
+      <AdvancedSearch
+        filters={filters}
+        brands={brands}
+        loading={loading}
+        onChange={setFilters}
+        onSearch={fetchData}
+        onReset={resetFilters}
+      />
 
-          <Search
-            placeholder="搜索装备名称"
-            style={{ width: 200 }}
-            onSearch={handleSearch}
-          />
-        </Space>
-
+      {/* 操作按钮 */}
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
         <Space>
           <Button icon={<ExportOutlined />} onClick={handleExport}>
             导出
@@ -269,9 +285,12 @@ const EquipmentList = () => {
           total,
           showSizeChanger: true,
           showTotal: (total) => `共 ${total} 条`,
-          onChange: (page, pageSize) => {
-            setPage(page)
-            setPageSize(pageSize)
+          onChange: (newPage, newPageSize) => {
+            if (newPageSize !== pageSize) {
+              setPageSize(newPageSize)
+            } else {
+              setPage(newPage)
+            }
           },
         }}
         scroll={{ x: 1200 }}

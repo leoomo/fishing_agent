@@ -1,6 +1,6 @@
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom'
 import { Provider } from 'react-redux'
-import { ConfigProvider, Spin } from 'antd'
+import { ConfigProvider, Spin, App as AntdApp } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { Suspense, lazy } from 'react'
 import { store } from '@/store/store'
@@ -259,7 +259,9 @@ const App = () => {
   return (
     <Provider store={store}>
       <ConfigProvider locale={zhCN}>
-        <RouterProvider router={router} future={{ v7_startTransition: true }} />
+        <AntdApp>
+          <RouterProvider router={router} future={{ v7_startTransition: true }} />
+        </AntdApp>
       </ConfigProvider>
     </Provider>
   )

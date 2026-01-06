@@ -143,7 +143,12 @@ async def list_equipment(
     price_min: Optional[float] = Query(None, description="最低价格过滤"),
     price_max: Optional[float] = Query(None, description="最高价格过滤"),
     is_active: Optional[bool] = Query(None, description="是否启用过滤"),
-    keyword: Optional[str] = Query(None, description="关键词搜索（名称、描述）")
+    keyword: Optional[str] = Query(None, description="关键词搜索（名称、描述）"),
+    # 鱼竿专属筛选参数
+    power: Optional[str] = Query(None, description="调性过滤（鱼竿专属）"),
+    action: Optional[str] = Query(None, description="动作过滤（鱼竿专属）"),
+    length_min: Optional[float] = Query(None, description="最小长度过滤（鱼竿专属）"),
+    length_max: Optional[float] = Query(None, description="最大长度过滤（鱼竿专属）")
 ):
     """
     查询装备列表（分页 + 多条件筛选）
@@ -155,30 +160,64 @@ async def list_equipment(
         with get_db_session() as session:
             repo = EquipmentRepository(session)
 
-            # 查询装备（预加载品牌）
-            equipment_list = repo.search(
-                category=category,
-                brand_id=brand_id,
-                price_min=price_min,
-                price_max=price_max,
-                user_level=user_level,
-                is_active=is_active if is_active is not None else True,
-                keyword=keyword,
-                limit=page_size,
-                offset=(page - 1) * page_size,
-                preload=True
-            )
+            # 检查是否有鱼竿专属筛选参数
+            has_rod_filters = any([power, action, length_min, length_max])
+
+            # 如果有鱼竿专属筛选，使用 search_rods 方法
+            if has_rod_filters and (category == '鱼竿' or category is None):
+                equipment_list = repo.search_rods(
+                    power=power,
+                    action=action,
+                    length_min=length_min,
+                    length_max=length_max,
+                    brand_id=brand_id,
+                    price_min=price_min,
+                    price_max=price_max,
+                    user_level=user_level,
+                    is_active=is_active if is_active is not None else True,
+                    keyword=keyword,
+                    limit=page_size,
+                    offset=(page - 1) * page_size,
+                    preload=True
+                )
+            else:
+                # 通用查询
+                equipment_list = repo.search(
+                    category=category,
+                    brand_id=brand_id,
+                    price_min=price_min,
+                    price_max=price_max,
+                    user_level=user_level,
+                    is_active=is_active if is_active is not None else True,
+                    keyword=keyword,
+                    limit=page_size,
+                    offset=(page - 1) * page_size,
+                    preload=True
+                )
 
             # 统计总数（使用相同的过滤条件）
-            total_query = session.query(repo.model)
-
-            # 应用相同的过滤条件
             from sqlalchemy import and_, or_
-            from apps.api.models.equipment import Equipment
+            from apps.api.models.equipment import Equipment, RodSpec
 
+            # 如果有鱼竿专属筛选，需要 join RodSpec 表
+            if has_rod_filters and (category == '鱼竿' or category is None):
+                total_query = session.query(Equipment).join(RodSpec)
+                # 应用鱼竿专属过滤条件
+                if power:
+                    total_query = total_query.filter(RodSpec.power == power)
+                if action:
+                    total_query = total_query.filter(RodSpec.action == action)
+                if length_min:
+                    total_query = total_query.filter(RodSpec.length >= length_min)
+                if length_max:
+                    total_query = total_query.filter(RodSpec.length <= length_max)
+            else:
+                total_query = session.query(repo.model)
+                if category:
+                    total_query = total_query.filter(Equipment.category == category)
+
+            # 应用通用过滤条件
             filters = []
-            if category:
-                filters.append(Equipment.category == category)
             if brand_id:
                 filters.append(Equipment.brand_id == brand_id)
             if user_level:
