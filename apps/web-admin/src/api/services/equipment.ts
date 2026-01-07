@@ -97,11 +97,37 @@ export const equipmentApi = {
     price_max?: number
     user_level?: string
     is_active?: boolean
+    // 通用扩展筛选
+    source?: string
+    model?: string
+    created_after?: string
+    created_before?: string
     // 鱼竿专属筛选
     power?: string
     action?: string
     length_min?: number
     length_max?: number
+    rod_lure_weight_min?: number
+    rod_lure_weight_max?: number
+    sections?: number
+    // 渔轮专属筛选
+    reel_type?: string
+    max_drag_min?: number
+    max_drag_max?: number
+    reel_weight_min?: number
+    reel_weight_max?: number
+    // 鱼线专属筛选
+    line_type?: string
+    diameter_min?: number
+    diameter_max?: number
+    strength_min?: number
+    strength_max?: number
+    // 拟饵专属筛选
+    lure_category?: string
+    lure_weight_min?: number
+    lure_weight_max?: number
+    diving_depth_min?: number
+    diving_depth_max?: number
   }): Promise<EquipmentListResponse> => {
     // 过滤掉 undefined 值
     const cleanParams = Object.fromEntries(

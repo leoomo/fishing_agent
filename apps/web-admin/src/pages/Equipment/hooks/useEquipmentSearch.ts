@@ -28,10 +28,37 @@ const URL_PARAM_KEYS: (keyof EquipmentSearchFilters)[] = [
   'price_max',
   'user_level',
   'is_active',
+  // 通用扩展
+  'source',
+  'model',
+  'created_after',
+  'created_before',
+  // 鱼竿专属
   'power',
   'action',
   'length_min',
   'length_max',
+  'rod_lure_weight_min',
+  'rod_lure_weight_max',
+  'sections',
+  // 渔轮专属
+  'reel_type',
+  'max_drag_min',
+  'max_drag_max',
+  'reel_weight_min',
+  'reel_weight_max',
+  // 鱼线专属
+  'line_type',
+  'diameter_min',
+  'diameter_max',
+  'strength_min',
+  'strength_max',
+  // 拟饵专属
+  'lure_category',
+  'lure_weight_min',
+  'lure_weight_max',
+  'diving_depth_min',
+  'diving_depth_max',
 ]
 
 export function useEquipmentSearch(
@@ -41,6 +68,16 @@ export function useEquipmentSearch(
   const [searchParams, setSearchParams] = useSearchParams()
   const debounceTimerRef = useRef<number | null>(null)
 
+  // 数值类型参数列表
+  const FLOAT_PARAMS: (keyof EquipmentSearchFilters)[] = [
+    'price_min', 'price_max', 'length_min', 'length_max',
+    'rod_lure_weight_min', 'rod_lure_weight_max',
+    'max_drag_min', 'max_drag_max', 'reel_weight_min', 'reel_weight_max',
+    'diameter_min', 'diameter_max', 'strength_min', 'strength_max',
+    'lure_weight_min', 'lure_weight_max', 'diving_depth_min', 'diving_depth_max',
+  ]
+  const INT_PARAMS: (keyof EquipmentSearchFilters)[] = ['brand_id', 'sections']
+
   // 从 URL 解析初始筛选条件
   const parseFiltersFromURL = useCallback((): EquipmentSearchFilters => {
     const filters: EquipmentSearchFilters = {}
@@ -48,14 +85,14 @@ export function useEquipmentSearch(
     URL_PARAM_KEYS.forEach((key) => {
       const value = searchParams.get(key)
       if (value !== null && value !== '') {
-        if (key === 'brand_id') {
-          filters[key] = parseInt(value, 10)
-        } else if (key === 'price_min' || key === 'price_max' || key === 'length_min' || key === 'length_max') {
-          filters[key] = parseFloat(value)
+        if (INT_PARAMS.includes(key)) {
+          filters[key] = parseInt(value, 10) as never
+        } else if (FLOAT_PARAMS.includes(key)) {
+          filters[key] = parseFloat(value) as never
         } else if (key === 'is_active') {
           filters[key] = value === 'true'
         } else {
-          filters[key] = value
+          filters[key] = value as never
         }
       }
     })

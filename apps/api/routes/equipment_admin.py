@@ -144,11 +144,37 @@ async def list_equipment(
     price_max: Optional[float] = Query(None, description="最高价格过滤"),
     is_active: Optional[bool] = Query(None, description="是否启用过滤"),
     keyword: Optional[str] = Query(None, description="关键词搜索（名称、描述）"),
+    # 通用扩展参数
+    source: Optional[str] = Query(None, description="数据来源过滤"),
+    model: Optional[str] = Query(None, description="型号搜索"),
+    created_after: Optional[str] = Query(None, description="创建时间起始（ISO格式）"),
+    created_before: Optional[str] = Query(None, description="创建时间截止（ISO格式）"),
     # 鱼竿专属筛选参数
     power: Optional[str] = Query(None, description="调性过滤（鱼竿专属）"),
     action: Optional[str] = Query(None, description="动作过滤（鱼竿专属）"),
     length_min: Optional[float] = Query(None, description="最小长度过滤（鱼竿专属）"),
-    length_max: Optional[float] = Query(None, description="最大长度过滤（鱼竿专属）")
+    length_max: Optional[float] = Query(None, description="最大长度过滤（鱼竿专属）"),
+    rod_lure_weight_min: Optional[float] = Query(None, description="适用饵重最小值（鱼竿专属）"),
+    rod_lure_weight_max: Optional[float] = Query(None, description="适用饵重最大值（鱼竿专属）"),
+    sections: Optional[int] = Query(None, description="节数过滤（鱼竿专属）"),
+    # 渔轮专属筛选参数
+    reel_type: Optional[str] = Query(None, description="轮类型过滤（渔轮专属）"),
+    max_drag_min: Optional[float] = Query(None, description="最大拽力最小值（渔轮专属）"),
+    max_drag_max: Optional[float] = Query(None, description="最大拽力最大值（渔轮专属）"),
+    reel_weight_min: Optional[float] = Query(None, description="轮自重最小值（渔轮专属）"),
+    reel_weight_max: Optional[float] = Query(None, description="轮自重最大值（渔轮专属）"),
+    # 鱼线专属筛选参数
+    line_type: Optional[str] = Query(None, description="线型过滤（鱼线专属）"),
+    diameter_min: Optional[float] = Query(None, description="线径最小值（鱼线专属）"),
+    diameter_max: Optional[float] = Query(None, description="线径最大值（鱼线专属）"),
+    strength_min: Optional[float] = Query(None, description="拉力最小值（鱼线专属）"),
+    strength_max: Optional[float] = Query(None, description="拉力最大值（鱼线专属）"),
+    # 拟饵专属筛选参数
+    lure_category: Optional[str] = Query(None, description="拟饵分类过滤（拟饵专属）"),
+    lure_weight_min: Optional[float] = Query(None, description="拟饵重量最小值（拟饵专属）"),
+    lure_weight_max: Optional[float] = Query(None, description="拟饵重量最大值（拟饵专属）"),
+    diving_depth_min: Optional[float] = Query(None, description="潜深最小值（拟饵专属）"),
+    diving_depth_max: Optional[float] = Query(None, description="潜深最大值（拟饵专属）"),
 ):
     """
     查询装备列表（分页 + 多条件筛选）
@@ -157,52 +183,86 @@ async def list_equipment(
         EquipmentListResponse: 分页装备列表
     """
     try:
+        from datetime import datetime
         with get_db_session() as session:
             repo = EquipmentRepository(session)
 
-            # 检查是否有鱼竿专属筛选参数
-            has_rod_filters = any([power, action, length_min, length_max])
+            # 检查是否有各类别专属筛选参数
+            has_rod_filters = any([power, action, length_min, length_max, rod_lure_weight_min, rod_lure_weight_max, sections])
+            has_reel_filters = any([reel_type, max_drag_min, max_drag_max, reel_weight_min, reel_weight_max])
+            has_line_filters = any([line_type, diameter_min, diameter_max, strength_min, strength_max])
+            has_lure_filters = any([lure_category, lure_weight_min, lure_weight_max, diving_depth_min, diving_depth_max])
 
-            # 如果有鱼竿专属筛选，使用 search_rods 方法
+            # 通用查询参数
+            common_kwargs = {
+                'brand_id': brand_id,
+                'price_min': price_min,
+                'price_max': price_max,
+                'user_level': user_level,
+                'is_active': is_active if is_active is not None else True,
+                'keyword': keyword,
+                'source': source,
+                'model': model,
+                'created_after': created_after,
+                'created_before': created_before,
+                'limit': page_size,
+                'offset': (page - 1) * page_size,
+                'preload': True
+            }
+
+            # 根据类别专属筛选选择查询方法
             if has_rod_filters and (category == '鱼竿' or category is None):
                 equipment_list = repo.search_rods(
                     power=power,
                     action=action,
                     length_min=length_min,
                     length_max=length_max,
-                    brand_id=brand_id,
-                    price_min=price_min,
-                    price_max=price_max,
-                    user_level=user_level,
-                    is_active=is_active if is_active is not None else True,
-                    keyword=keyword,
-                    limit=page_size,
-                    offset=(page - 1) * page_size,
-                    preload=True
+                    lure_weight_min=rod_lure_weight_min,
+                    lure_weight_max=rod_lure_weight_max,
+                    sections=sections,
+                    **common_kwargs
+                )
+            elif has_reel_filters and (category == '渔轮' or category is None):
+                equipment_list = repo.search_reels(
+                    reel_type=reel_type,
+                    max_drag_min=max_drag_min,
+                    max_drag_max=max_drag_max,
+                    weight_min=reel_weight_min,
+                    weight_max=reel_weight_max,
+                    **common_kwargs
+                )
+            elif has_line_filters and (category == '鱼线' or category is None):
+                equipment_list = repo.search_lines(
+                    line_type=line_type,
+                    diameter_min=diameter_min,
+                    diameter_max=diameter_max,
+                    strength_min=strength_min,
+                    strength_max=strength_max,
+                    **common_kwargs
+                )
+            elif has_lure_filters and (category == '拟饵' or category is None):
+                equipment_list = repo.search_lures(
+                    lure_category=lure_category,
+                    weight_min=lure_weight_min,
+                    weight_max=lure_weight_max,
+                    diving_depth_min=diving_depth_min,
+                    diving_depth_max=diving_depth_max,
+                    **common_kwargs
                 )
             else:
                 # 通用查询
                 equipment_list = repo.search(
                     category=category,
-                    brand_id=brand_id,
-                    price_min=price_min,
-                    price_max=price_max,
-                    user_level=user_level,
-                    is_active=is_active if is_active is not None else True,
-                    keyword=keyword,
-                    limit=page_size,
-                    offset=(page - 1) * page_size,
-                    preload=True
+                    **common_kwargs
                 )
 
             # 统计总数（使用相同的过滤条件）
             from sqlalchemy import and_, or_
-            from apps.api.models.equipment import Equipment, RodSpec
+            from apps.api.models.equipment import Equipment, RodSpec, ReelSpec, LineSpec, LureSpec
 
-            # 如果有鱼竿专属筛选，需要 join RodSpec 表
+            # 根据类别专属筛选构建总数查询
             if has_rod_filters and (category == '鱼竿' or category is None):
                 total_query = session.query(Equipment).join(RodSpec)
-                # 应用鱼竿专属过滤条件
                 if power:
                     total_query = total_query.filter(RodSpec.power == power)
                 if action:
@@ -211,6 +271,56 @@ async def list_equipment(
                     total_query = total_query.filter(RodSpec.length >= length_min)
                 if length_max:
                     total_query = total_query.filter(RodSpec.length <= length_max)
+                if rod_lure_weight_min:
+                    total_query = total_query.filter(
+                        or_(RodSpec.lure_weight_min >= rod_lure_weight_min, RodSpec.lure_weight_max >= rod_lure_weight_min)
+                    )
+                if rod_lure_weight_max:
+                    total_query = total_query.filter(
+                        or_(RodSpec.lure_weight_min <= rod_lure_weight_max, RodSpec.lure_weight_max <= rod_lure_weight_max)
+                    )
+                if sections:
+                    total_query = total_query.filter(RodSpec.sections == sections)
+            elif has_reel_filters and (category == '渔轮' or category is None):
+                total_query = session.query(Equipment).join(ReelSpec)
+                if reel_type:
+                    total_query = total_query.filter(ReelSpec.reel_type == reel_type)
+                if max_drag_min:
+                    total_query = total_query.filter(ReelSpec.max_drag >= max_drag_min)
+                if max_drag_max:
+                    total_query = total_query.filter(ReelSpec.max_drag <= max_drag_max)
+                if reel_weight_min:
+                    total_query = total_query.filter(ReelSpec.weight >= reel_weight_min)
+                if reel_weight_max:
+                    total_query = total_query.filter(ReelSpec.weight <= reel_weight_max)
+            elif has_line_filters and (category == '鱼线' or category is None):
+                total_query = session.query(Equipment).join(LineSpec)
+                if line_type:
+                    total_query = total_query.filter(LineSpec.line_type == line_type)
+                if diameter_min:
+                    total_query = total_query.filter(LineSpec.diameter >= diameter_min)
+                if diameter_max:
+                    total_query = total_query.filter(LineSpec.diameter <= diameter_max)
+                if strength_min:
+                    total_query = total_query.filter(LineSpec.strength_lb >= strength_min)
+                if strength_max:
+                    total_query = total_query.filter(LineSpec.strength_lb <= strength_max)
+            elif has_lure_filters and (category == '拟饵' or category is None):
+                total_query = session.query(Equipment).join(LureSpec)
+                if lure_category:
+                    total_query = total_query.filter(LureSpec.lure_category == lure_category)
+                if lure_weight_min:
+                    total_query = total_query.filter(LureSpec.weight >= lure_weight_min)
+                if lure_weight_max:
+                    total_query = total_query.filter(LureSpec.weight <= lure_weight_max)
+                if diving_depth_min:
+                    total_query = total_query.filter(
+                        or_(LureSpec.diving_depth_min >= diving_depth_min, LureSpec.diving_depth_max >= diving_depth_min)
+                    )
+                if diving_depth_max:
+                    total_query = total_query.filter(
+                        or_(LureSpec.diving_depth_min <= diving_depth_max, LureSpec.diving_depth_max <= diving_depth_max)
+                    )
             else:
                 total_query = session.query(repo.model)
                 if category:
@@ -245,6 +355,23 @@ async def list_equipment(
                     Equipment.features.like(f"%{keyword}%")
                 )
                 filters.append(keyword_filter)
+            # 通用扩展筛选
+            if source:
+                filters.append(Equipment.source == source)
+            if model:
+                filters.append(Equipment.model.like(f"%{model}%"))
+            if created_after:
+                try:
+                    dt = datetime.fromisoformat(created_after.replace('Z', '+00:00'))
+                    filters.append(Equipment.created_at >= dt)
+                except ValueError:
+                    pass
+            if created_before:
+                try:
+                    dt = datetime.fromisoformat(created_before.replace('Z', '+00:00'))
+                    filters.append(Equipment.created_at <= dt)
+                except ValueError:
+                    pass
 
             if filters:
                 total_query = total_query.filter(and_(*filters))
