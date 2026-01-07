@@ -16,6 +16,71 @@ class EquipmentRepository(BaseRepository[Equipment]):
     def __init__(self, session: Session):
         super().__init__(session, Equipment)
 
+    def _apply_common_filters(self, query, kwargs: Dict[str, Any]):
+        """
+        Apply common filters to a query from kwargs
+
+        Args:
+            query: SQLAlchemy query object
+            kwargs: Dictionary of filter parameters
+
+        Returns:
+            Query with filters applied
+        """
+        from datetime import datetime
+
+        if kwargs.get('brand_id'):
+            query = query.filter(Equipment.brand_id == kwargs['brand_id'])
+
+        if kwargs.get('is_active', True):
+            query = query.filter(Equipment.is_active == True)
+
+        if kwargs.get('user_level'):
+            query = query.filter(Equipment.user_level == kwargs['user_level'])
+
+        if kwargs.get('keyword'):
+            keyword = kwargs['keyword']
+            query = query.filter(or_(
+                Equipment.name.like(f"%{keyword}%"),
+                Equipment.description.like(f"%{keyword}%"),
+                Equipment.features.like(f"%{keyword}%"),
+            ))
+
+        if kwargs.get('price_min') is not None:
+            query = query.filter(or_(
+                Equipment.price_min >= kwargs['price_min'],
+                Equipment.price_max >= kwargs['price_min']
+            ))
+
+        if kwargs.get('price_max') is not None:
+            query = query.filter(or_(
+                Equipment.price_min <= kwargs['price_max'],
+                Equipment.price_max <= kwargs['price_max']
+            ))
+
+        # 通用扩展筛选
+        if kwargs.get('source'):
+            query = query.filter(Equipment.source == kwargs['source'])
+
+        if kwargs.get('model'):
+            query = query.filter(Equipment.model.like(f"%{kwargs['model']}%"))
+
+        if kwargs.get('created_after'):
+            try:
+                dt = datetime.fromisoformat(kwargs['created_after'].replace('Z', '+00:00'))
+                query = query.filter(Equipment.created_at >= dt)
+            except ValueError:
+                pass
+
+        if kwargs.get('created_before'):
+            try:
+                dt = datetime.fromisoformat(kwargs['created_before'].replace('Z', '+00:00'))
+                query = query.filter(Equipment.created_at <= dt)
+            except ValueError:
+                pass
+
+        return query
+
     def get_with_details(self, equipment_id: int) -> Optional[Equipment]:
         """
         Get equipment with all related data preloaded (brand and specs)
@@ -49,6 +114,11 @@ class EquipmentRepository(BaseRepository[Equipment]):
         user_level: Optional[str] = None,
         is_active: bool = True,
         keyword: Optional[str] = None,
+        # 通用扩展筛选参数
+        source: Optional[str] = None,
+        model: Optional[str] = None,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
         order_by: str = "equipment_id",
@@ -66,6 +136,10 @@ class EquipmentRepository(BaseRepository[Equipment]):
             user_level: User level filter (新手/进阶/高手)
             is_active: Only return active equipment
             keyword: Keyword search in name/description/features
+            source: Data source filter (manual/crawler/import)
+            model: Model name filter (partial match)
+            created_after: Created after date (ISO format)
+            created_before: Created before date (ISO format)
             limit: Maximum number of results
             offset: Pagination offset
             order_by: Field to order by (prefix with '-' for descending)
@@ -74,6 +148,8 @@ class EquipmentRepository(BaseRepository[Equipment]):
         Returns:
             List of matching equipment
         """
+        from datetime import datetime
+
         query = self.session.query(Equipment)
 
         # Apply filters
@@ -122,6 +198,27 @@ class EquipmentRepository(BaseRepository[Equipment]):
             )
             filters.append(keyword_filter)
 
+        # 通用扩展筛选
+        if source:
+            filters.append(Equipment.source == source)
+
+        if model:
+            filters.append(Equipment.model.like(f"%{model}%"))
+
+        if created_after:
+            try:
+                dt = datetime.fromisoformat(created_after.replace('Z', '+00:00'))
+                filters.append(Equipment.created_at >= dt)
+            except ValueError:
+                pass
+
+        if created_before:
+            try:
+                dt = datetime.fromisoformat(created_before.replace('Z', '+00:00'))
+                filters.append(Equipment.created_at <= dt)
+            except ValueError:
+                pass
+
         # Combine all filters
         if filters:
             query = query.filter(and_(*filters))
@@ -158,6 +255,7 @@ class EquipmentRepository(BaseRepository[Equipment]):
         length_max: Optional[float] = None,
         lure_weight_min: Optional[float] = None,
         lure_weight_max: Optional[float] = None,
+        sections: Optional[int] = None,
         **kwargs
     ) -> List[Equipment]:
         """
@@ -170,6 +268,7 @@ class EquipmentRepository(BaseRepository[Equipment]):
             length_max: Maximum rod length in meters
             lure_weight_min: Minimum lure weight range
             lure_weight_max: Maximum lure weight range
+            sections: Number of rod sections
             **kwargs: Additional filters passed to search()
 
         Returns:
@@ -211,20 +310,224 @@ class EquipmentRepository(BaseRepository[Equipment]):
                 )
             )
 
+        if sections is not None:
+            rod_filters.append(RodSpec.sections == sections)
+
         if rod_filters:
             query = query.filter(and_(*rod_filters))
 
         # Apply common filters from kwargs
-        if kwargs.get('brand_id'):
-            query = query.filter(Equipment.brand_id == kwargs['brand_id'])
-
-        if kwargs.get('is_active', True):
-            query = query.filter(Equipment.is_active == True)
+        query = self._apply_common_filters(query, kwargs)
 
         # Preload relationships
         query = query.options(
             joinedload(Equipment.brand),
             joinedload(Equipment.rod_spec),
+        )
+
+        # Apply pagination
+        limit = kwargs.get('limit', 50)
+        offset = kwargs.get('offset', 0)
+        query = query.offset(offset).limit(limit)
+
+        return query.all()
+
+    def search_reels(
+        self,
+        reel_type: Optional[str] = None,
+        max_drag_min: Optional[float] = None,
+        max_drag_max: Optional[float] = None,
+        weight_min: Optional[float] = None,
+        weight_max: Optional[float] = None,
+        **kwargs
+    ) -> List[Equipment]:
+        """
+        Search for fishing reels with reel-specific filters
+
+        Args:
+            reel_type: Reel type (spinning/baitcasting/fly)
+            max_drag_min: Minimum max drag (kg)
+            max_drag_max: Maximum max drag (kg)
+            weight_min: Minimum weight (g)
+            weight_max: Maximum weight (g)
+            **kwargs: Additional filters passed to search()
+
+        Returns:
+            List of matching reel equipment
+        """
+        query = self.session.query(Equipment).join(ReelSpec)
+
+        # Force category to be reel
+        kwargs['category'] = '渔轮'
+
+        # Build reel-specific filters
+        reel_filters = []
+
+        if reel_type:
+            reel_filters.append(ReelSpec.reel_type == reel_type)
+
+        if max_drag_min is not None:
+            reel_filters.append(ReelSpec.max_drag >= max_drag_min)
+
+        if max_drag_max is not None:
+            reel_filters.append(ReelSpec.max_drag <= max_drag_max)
+
+        if weight_min is not None:
+            reel_filters.append(ReelSpec.weight >= weight_min)
+
+        if weight_max is not None:
+            reel_filters.append(ReelSpec.weight <= weight_max)
+
+        if reel_filters:
+            query = query.filter(and_(*reel_filters))
+
+        # Apply common filters from kwargs
+        query = self._apply_common_filters(query, kwargs)
+
+        # Preload relationships
+        query = query.options(
+            joinedload(Equipment.brand),
+            joinedload(Equipment.reel_spec),
+        )
+
+        # Apply pagination
+        limit = kwargs.get('limit', 50)
+        offset = kwargs.get('offset', 0)
+        query = query.offset(offset).limit(limit)
+
+        return query.all()
+
+    def search_lines(
+        self,
+        line_type: Optional[str] = None,
+        diameter_min: Optional[float] = None,
+        diameter_max: Optional[float] = None,
+        strength_min: Optional[float] = None,
+        strength_max: Optional[float] = None,
+        **kwargs
+    ) -> List[Equipment]:
+        """
+        Search for fishing lines with line-specific filters
+
+        Args:
+            line_type: Line type (PE/尼龙/碳线/钢丝)
+            diameter_min: Minimum diameter (mm)
+            diameter_max: Maximum diameter (mm)
+            strength_min: Minimum strength (lb)
+            strength_max: Maximum strength (lb)
+            **kwargs: Additional filters passed to search()
+
+        Returns:
+            List of matching line equipment
+        """
+        query = self.session.query(Equipment).join(LineSpec)
+
+        # Force category to be line
+        kwargs['category'] = '鱼线'
+
+        # Build line-specific filters
+        line_filters = []
+
+        if line_type:
+            line_filters.append(LineSpec.line_type == line_type)
+
+        if diameter_min is not None:
+            line_filters.append(LineSpec.diameter >= diameter_min)
+
+        if diameter_max is not None:
+            line_filters.append(LineSpec.diameter <= diameter_max)
+
+        if strength_min is not None:
+            line_filters.append(LineSpec.strength_lb >= strength_min)
+
+        if strength_max is not None:
+            line_filters.append(LineSpec.strength_lb <= strength_max)
+
+        if line_filters:
+            query = query.filter(and_(*line_filters))
+
+        # Apply common filters from kwargs
+        query = self._apply_common_filters(query, kwargs)
+
+        # Preload relationships
+        query = query.options(
+            joinedload(Equipment.brand),
+            joinedload(Equipment.line_spec),
+        )
+
+        # Apply pagination
+        limit = kwargs.get('limit', 50)
+        offset = kwargs.get('offset', 0)
+        query = query.offset(offset).limit(limit)
+
+        return query.all()
+
+    def search_lures(
+        self,
+        lure_category: Optional[str] = None,
+        weight_min: Optional[float] = None,
+        weight_max: Optional[float] = None,
+        diving_depth_min: Optional[float] = None,
+        diving_depth_max: Optional[float] = None,
+        **kwargs
+    ) -> List[Equipment]:
+        """
+        Search for lures with lure-specific filters
+
+        Args:
+            lure_category: Lure category (硬饵/软饵/金属饵/飞蝇)
+            weight_min: Minimum weight (g)
+            weight_max: Maximum weight (g)
+            diving_depth_min: Minimum diving depth (m)
+            diving_depth_max: Maximum diving depth (m)
+            **kwargs: Additional filters passed to search()
+
+        Returns:
+            List of matching lure equipment
+        """
+        query = self.session.query(Equipment).join(LureSpec)
+
+        # Force category to be lure
+        kwargs['category'] = '拟饵'
+
+        # Build lure-specific filters
+        lure_filters = []
+
+        if lure_category:
+            lure_filters.append(LureSpec.lure_category == lure_category)
+
+        if weight_min is not None:
+            lure_filters.append(LureSpec.weight >= weight_min)
+
+        if weight_max is not None:
+            lure_filters.append(LureSpec.weight <= weight_max)
+
+        if diving_depth_min is not None:
+            lure_filters.append(
+                or_(
+                    LureSpec.diving_depth_min >= diving_depth_min,
+                    LureSpec.diving_depth_max >= diving_depth_min
+                )
+            )
+
+        if diving_depth_max is not None:
+            lure_filters.append(
+                or_(
+                    LureSpec.diving_depth_min <= diving_depth_max,
+                    LureSpec.diving_depth_max <= diving_depth_max
+                )
+            )
+
+        if lure_filters:
+            query = query.filter(and_(*lure_filters))
+
+        # Apply common filters from kwargs
+        query = self._apply_common_filters(query, kwargs)
+
+        # Preload relationships
+        query = query.options(
+            joinedload(Equipment.brand),
+            joinedload(Equipment.lure_spec),
         )
 
         # Apply pagination

@@ -178,6 +178,32 @@ export type ReelType = (typeof REEL_TYPES)[number]
 export const LINE_TYPES = ['PE', '尼龙', '碳线', '钢丝'] as const
 export type LineType = (typeof LINE_TYPES)[number]
 
+// 数据来源选项
+export const DATA_SOURCES = ['manual', 'crawler', 'import'] as const
+export type DataSource = (typeof DATA_SOURCES)[number]
+
+// 数据来源中文映射
+export const DATA_SOURCE_LABELS: Record<DataSource, string> = {
+  manual: '手动录入',
+  crawler: '爬虫采集',
+  import: '批量导入',
+}
+
+// 拟饵分类选项
+export const LURE_CATEGORIES = ['硬饵', '软饵', '金属饵', '飞蝇'] as const
+export type LureCategory = (typeof LURE_CATEGORIES)[number]
+
+// 鱼竿节数选项
+export const ROD_SECTIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const
+export type RodSection = (typeof ROD_SECTIONS)[number]
+
+// 渔轮类型中文映射
+export const REEL_TYPE_LABELS: Record<string, string> = {
+  spinning: '纺车轮',
+  baitcasting: '水滴轮',
+  fly: '飞钓轮',
+}
+
 // 装备搜索筛选接口
 export interface EquipmentSearchFilters {
   category?: string
@@ -187,9 +213,35 @@ export interface EquipmentSearchFilters {
   price_max?: number
   user_level?: string
   is_active?: boolean
+  // 通用扩展
+  source?: string
+  model?: string
+  created_after?: string
+  created_before?: string
   // 鱼竿专属
   power?: string
   action?: string
   length_min?: number
   length_max?: number
+  rod_lure_weight_min?: number
+  rod_lure_weight_max?: number
+  sections?: number
+  // 渔轮专属
+  reel_type?: string
+  max_drag_min?: number
+  max_drag_max?: number
+  reel_weight_min?: number
+  reel_weight_max?: number
+  // 鱼线专属
+  line_type?: string
+  diameter_min?: number
+  diameter_max?: number
+  strength_min?: number
+  strength_max?: number
+  // 拟饵专属
+  lure_category?: string
+  lure_weight_min?: number
+  lure_weight_max?: number
+  diving_depth_min?: number
+  diving_depth_max?: number
 }
