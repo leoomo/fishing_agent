@@ -98,6 +98,29 @@ const OPTION_GROUPS = [
     ] as OptionItem[],
     color: 'orange',
   },
+  {
+    key: 'equipment.reel.type_options',
+    name: '渔轮类型',
+    description: '渔轮的类型分类',
+    defaultValue: [
+      { value: 'spinning', note: '纺车轮，适合新手' },
+      { value: 'baitcasting', note: '水滴轮，精准抛投' },
+      { value: 'fly', note: '飞蝇轮，飞蝇钓专用' },
+    ] as OptionItem[],
+    color: 'geekblue',
+  },
+  {
+    key: 'equipment.line.type_options',
+    name: '鱼线类型',
+    description: '鱼线的材质分类',
+    defaultValue: [
+      { value: 'PE', note: '编织线，强度高' },
+      { value: '尼龙', note: '尼龙线，延展性好' },
+      { value: '碳线', note: '碳素线，隐蔽性强' },
+      { value: '钢丝', note: '钢丝线，防咬断' },
+    ] as OptionItem[],
+    color: 'magenta',
+  },
 ]
 
 /**
