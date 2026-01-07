@@ -50,8 +50,9 @@ export const LURE_CATEGORY_CONFIG: Record<LureCategory, LureCategoryConfig> = {
 export const LURE_CATEGORY_OPTIONS = Object.entries(LURE_CATEGORY_CONFIG).map(
   ([value, config]) => ({
     value: value as LureCategory,
+    icon: config.icon,
+    color: config.color,
     label: `${config.icon} ${config.label}`,
-    ...config,
   })
 )
 

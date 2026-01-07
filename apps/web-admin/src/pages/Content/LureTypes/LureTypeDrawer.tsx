@@ -23,7 +23,6 @@ import { SaveOutlined, CloseOutlined } from '@ant-design/icons'
 import { lureTypeApi } from '@/api/services/lureType'
 import {
   LURE_CATEGORY_OPTIONS,
-  type LureType,
   type LureTypeCreateRequest,
   type LureTypeUpdateRequest,
 } from '@/types/lureType'

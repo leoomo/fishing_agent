@@ -22,7 +22,7 @@ export default defineConfig({
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
           });
-          proxy.on('proxyReqWs', (proxyReq, req, socket, options, head) => {
+          proxy.on('proxyReqWs', (_proxyReq, _req, _socket, _options, _head) => {
             // WebSocket 代理启动
           });
         },

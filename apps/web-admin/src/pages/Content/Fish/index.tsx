@@ -426,7 +426,7 @@ const FishList: React.FC = () => {
           style={{ width: 140 }}
           options={categoryOptions}
           value={filters.category || ''}
-          onChange={(v) => handleCategoryChange(v || undefined)}
+          onChange={(v) => handleCategoryChange((v || undefined) as FishCategory | undefined)}
           allowClear
         />
         <Select

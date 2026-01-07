@@ -20,26 +20,31 @@ import {
   StarOutlined,
   StarFilled,
   EnvironmentOutlined,
+  EditOutlined,
 } from '@ant-design/icons'
 import { usersApi } from '@/api/services/users'
-import type { User, UserEquipment, FishingLog } from '@/types/user'
+import type { User, UserEquipment, FishingLog, UserStats } from '@/types/user'
 import type { ColumnsType } from 'antd/es/table'
+import UserEditDrawer from './components/UserEditDrawer'
 
 const UserDetail = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
+  const [stats, setStats] = useState<UserStats | null>(null)
   const [equipment, setEquipment] = useState<UserEquipment[]>([])
   const [fishingLogs, setFishingLogs] = useState<FishingLog[]>([])
   const [equipmentLoading, setEquipmentLoading] = useState(false)
   const [logsLoading, setLogsLoading] = useState(false)
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false)
 
   const userId = parseInt(id || '0', 10)
 
   useEffect(() => {
     if (userId) {
       fetchUserDetail()
+      fetchUserStats()
     }
   }, [userId])
 
@@ -52,6 +57,15 @@ const UserDetail = () => {
       message.error('加载用户信息失败')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchUserStats = async () => {
+    try {
+      const statsData = await usersApi.getStats(userId)
+      setStats(statsData)
+    } catch {
+      // 静默处理统计加载失败
     }
   }
 
@@ -85,6 +99,11 @@ const UserDetail = () => {
     } else if (key === 'logs' && fishingLogs.length === 0) {
       fetchFishingLogs()
     }
+  }
+
+  const handleEditSuccess = () => {
+    fetchUserDetail()
+    fetchUserStats()
   }
 
   const equipmentColumns: ColumnsType<UserEquipment> = [
@@ -130,7 +149,8 @@ const UserDetail = () => {
       title: '购买日期',
       dataIndex: 'purchase_date',
       width: 120,
-      render: (date) => (date ? new Date(date).toLocaleDateString('zh-CN') : '-'),
+      render: (date) =>
+        date ? new Date(date).toLocaleDateString('zh-CN') : '-',
     },
   ]
 
@@ -218,22 +238,95 @@ const UserDetail = () => {
 
   const getLevelColor = (level: string) => {
     const colors: Record<string, string> = {
-      '新手': 'green',
-      '进阶': 'blue',
-      '高手': 'gold',
+      新手: 'green',
+      进阶: 'blue',
+      高手: 'gold',
     }
     return colors[level] || 'default'
   }
 
+  // Tabs items 配置（使用新 API 避免废弃警告）
+  const tabItems = [
+    {
+      key: 'stats',
+      label: '统计概览',
+      children: (
+        <Row gutter={24}>
+          <Col span={6}>
+            <Statistic
+              title="装备总数"
+              value={stats?.equipment_count ?? '-'}
+            />
+          </Col>
+          <Col span={6}>
+            <Statistic
+              title="钓鱼记录"
+              value={stats?.fishing_logs_count ?? '-'}
+            />
+          </Col>
+          <Col span={6}>
+            <Statistic
+              title="收藏装备"
+              value={stats?.favorite_count ?? '-'}
+            />
+          </Col>
+          <Col span={6}>
+            <Statistic
+              title="装备总花费"
+              prefix="¥"
+              value={stats?.equipment_total_cost ?? '-'}
+            />
+          </Col>
+        </Row>
+      ),
+    },
+    {
+      key: 'equipment',
+      label: '装备库',
+      children: (
+        <Table
+          columns={equipmentColumns}
+          dataSource={equipment}
+          loading={equipmentLoading}
+          rowKey="user_equipment_id"
+          scroll={{ x: 1000 }}
+          pagination={{ pageSize: 10 }}
+        />
+      ),
+    },
+    {
+      key: 'logs',
+      label: '钓鱼记录',
+      children: (
+        <Table
+          columns={logsColumns}
+          dataSource={fishingLogs}
+          loading={logsLoading}
+          rowKey="log_id"
+          scroll={{ x: 1200 }}
+          pagination={{ pageSize: 10 }}
+        />
+      ),
+    },
+  ]
+
   return (
     <div>
-      <Button
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/users')}
-        style={{ marginBottom: 16 }}
-      >
-        返回列表
-      </Button>
+      <Space style={{ marginBottom: 16 }}>
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate('/users')}
+        >
+          返回列表
+        </Button>
+        <Button
+          type="primary"
+          icon={<EditOutlined />}
+          onClick={() => setEditDrawerOpen(true)}
+        >
+          编辑用户
+        </Button>
+      </Space>
 
       <Card title={`用户详情 - ${user.username}`}>
         <Descriptions bordered column={2}>
@@ -245,7 +338,8 @@ const UserDetail = () => {
             <Tag color={getLevelColor(user.user_level)}>{user.user_level}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="钓龄">
-            {user.fishing_experience_years !== null && user.fishing_experience_years !== undefined
+            {user.fishing_experience_years !== null &&
+            user.fishing_experience_years !== undefined
               ? `${user.fishing_experience_years} 年`
               : '-'}
           </Descriptions.Item>
@@ -268,56 +362,20 @@ const UserDetail = () => {
       </Card>
 
       <Card style={{ marginTop: 16 }}>
-        <Tabs defaultActiveKey="stats" onChange={handleTabChange}>
-          <Tabs.TabPane tab="统计概览" key="stats">
-            <Row gutter={24}>
-              <Col span={6}>
-                <Statistic title="装备总数" value={equipment.length || '-'} />
-              </Col>
-              <Col span={6}>
-                <Statistic title="钓鱼记录" value={fishingLogs.length || '-'} />
-              </Col>
-              <Col span={6}>
-                <Statistic
-                  title="收藏装备"
-                  value={equipment.filter((e) => e.is_favorite).length || '-'}
-                />
-              </Col>
-              <Col span={6}>
-                <Statistic
-                  title="装备总花费"
-                  prefix="¥"
-                  value={
-                    equipment.reduce((sum, e) => sum + (e.purchase_price || 0), 0) || '-'
-                  }
-                />
-              </Col>
-            </Row>
-          </Tabs.TabPane>
-
-          <Tabs.TabPane tab="装备库" key="equipment">
-            <Table
-              columns={equipmentColumns}
-              dataSource={equipment}
-              loading={equipmentLoading}
-              rowKey="user_equipment_id"
-              scroll={{ x: 1000 }}
-              pagination={{ pageSize: 10 }}
-            />
-          </Tabs.TabPane>
-
-          <Tabs.TabPane tab="钓鱼记录" key="logs">
-            <Table
-              columns={logsColumns}
-              dataSource={fishingLogs}
-              loading={logsLoading}
-              rowKey="log_id"
-              scroll={{ x: 1200 }}
-              pagination={{ pageSize: 10 }}
-            />
-          </Tabs.TabPane>
-        </Tabs>
+        <Tabs
+          defaultActiveKey="stats"
+          items={tabItems}
+          onChange={handleTabChange}
+        />
       </Card>
+
+      {/* 用户编辑抽屉 */}
+      <UserEditDrawer
+        open={editDrawerOpen}
+        user={user}
+        onClose={() => setEditDrawerOpen(false)}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   )
 }

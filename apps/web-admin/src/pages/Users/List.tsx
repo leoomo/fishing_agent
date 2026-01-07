@@ -1,32 +1,49 @@
-import { useState, useEffect } from 'react'
-import { Table, Card, Input, Select, Space, Tag, Button, message } from 'antd'
-import { EyeOutlined, SearchOutlined } from '@ant-design/icons'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Table, Card, Tag, Button, Space, App } from 'antd'
+import {
+  EyeOutlined,
+  EditOutlined,
+  ExportOutlined,
+} from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { usersApi } from '@/api/services/users'
 import type { User } from '@/types/user'
-import type { ColumnsType } from 'antd/es/table'
-
-const { Search } = Input
+import type { ColumnsType, TableRowSelection } from 'antd/es/table/interface'
+import { useUserSearch } from './hooks/useUserSearch'
+import AdvancedSearch from './components/AdvancedSearch'
+import UserEditDrawer from './components/UserEditDrawer'
+import BatchOperationBar from './components/BatchOperationBar'
 
 const UserList = () => {
   const navigate = useNavigate()
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<User[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [userLevel, setUserLevel] = useState<string>()
-  const [location, setLocation] = useState<string>()
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
 
-  const fetchData = async () => {
+  // 使用搜索 Hook
+  const {
+    filters,
+    page,
+    pageSize,
+    setFilters,
+    setPage,
+    setPageSize,
+    resetFilters,
+    searchParams,
+  } = useUserSearch({ defaultPageSize: 20 })
+
+  // 使用 ref 跟踪上一次的参数，避免不必要的重新请求
+  const prevParamsRef = useRef<string>('')
+
+  // 加载用户数据
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await usersApi.list({
-        page,
-        page_size: pageSize,
-        user_level: userLevel,
-        location,
-      })
+      const response = await usersApi.list(searchParams)
       setData(response.users)
       setTotal(response.total)
     } catch {
@@ -34,23 +51,53 @@ const UserList = () => {
     } finally {
       setLoading(false)
     }
+  }, [searchParams, message])
+
+  // 筛选条件变化时重新加载
+  useEffect(() => {
+    const paramsStr = JSON.stringify(searchParams)
+    if (paramsStr !== prevParamsRef.current) {
+      prevParamsRef.current = paramsStr
+      fetchData()
+    }
+  }, [searchParams, fetchData])
+
+  // 处理编辑
+  const handleEdit = (user: User) => {
+    setEditingUser(user)
+    setEditDrawerOpen(true)
   }
 
-  useEffect(() => {
-    fetchData()
-  }, [page, pageSize, userLevel])
+  // 处理导出全部
+  const handleExportAll = async () => {
+    try {
+      const blob = await usersApi.exportCSV({
+        user_level: filters.user_level,
+      })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'users_export.csv'
+      a.click()
+      window.URL.revokeObjectURL(url)
+      message.success('导出成功')
+    } catch {
+      message.error('导出失败')
+    }
+  }
 
-  const handleSearch = (value: string) => {
-    setLocation(value || undefined)
-    setPage(1)
-    fetchData()
+  // 行选择配置
+  const rowSelection: TableRowSelection<User> = {
+    selectedRowKeys,
+    onChange: (keys) => setSelectedRowKeys(keys as number[]),
+    preserveSelectedRowKeys: true,
   }
 
   const getLevelColor = (level: string) => {
     const colors: Record<string, string> = {
-      '新手': 'green',
-      '进阶': 'blue',
-      '高手': 'gold',
+      新手: 'green',
+      进阶: 'blue',
+      高手: 'gold',
     }
     return colors[level] || 'default'
   }
@@ -88,19 +135,14 @@ const UserList = () => {
       title: '钓龄(年)',
       dataIndex: 'fishing_experience_years',
       width: 90,
-      render: (years) => (years !== null && years !== undefined ? years : '-'),
+      render: (years) =>
+        years !== null && years !== undefined ? years : '-',
     },
     {
       title: '偏好钓法',
       dataIndex: 'preferred_fishing_method',
       width: 100,
       render: (method) => method || '-',
-    },
-    {
-      title: '地区',
-      dataIndex: 'location',
-      width: 120,
-      render: (loc) => loc || '-',
     },
     {
       title: '注册时间',
@@ -110,52 +152,68 @@ const UserList = () => {
     },
     {
       title: '操作',
-      width: 100,
+      width: 150,
       fixed: 'right',
       render: (_, record) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          onClick={() => navigate(`/users/${record.user_id}`)}
-        >
-          详情
-        </Button>
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => navigate(`/users/${record.user_id}`)}
+          >
+            详情
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
+            编辑
+          </Button>
+        </Space>
       ),
     },
   ]
 
   return (
     <Card title="用户管理">
-      <Space style={{ marginBottom: 16 }}>
-        <Select
-          placeholder="用户水平"
-          style={{ width: 120 }}
-          allowClear
-          value={userLevel}
-          onChange={(value) => {
-            setUserLevel(value)
-            setPage(1)
-          }}
-        >
-          <Select.Option value="新手">新手</Select.Option>
-          <Select.Option value="进阶">进阶</Select.Option>
-          <Select.Option value="高手">高手</Select.Option>
-        </Select>
+      {/* 高级搜索组件 */}
+      <AdvancedSearch
+        filters={filters}
+        loading={loading}
+        onChange={setFilters}
+        onSearch={fetchData}
+        onReset={resetFilters}
+      />
 
-        <Search
-          placeholder="搜索地区"
-          style={{ width: 200 }}
-          allowClear
-          enterButton={<SearchOutlined />}
-          onSearch={handleSearch}
-        />
-      </Space>
+      {/* 批量操作工具栏 */}
+      <BatchOperationBar
+        selectedIds={selectedRowKeys}
+        onClear={() => setSelectedRowKeys([])}
+        onSuccess={fetchData}
+      />
+
+      {/* 操作按钮 */}
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <Button icon={<ExportOutlined />} onClick={handleExportAll}>
+          导出全部
+        </Button>
+      </div>
 
       <Table
         columns={columns}
         dataSource={data}
         loading={loading}
         rowKey="user_id"
+        rowSelection={rowSelection}
         scroll={{ x: 1200 }}
         pagination={{
           current: page,
@@ -165,10 +223,24 @@ const UserList = () => {
           showQuickJumper: true,
           showTotal: (t) => `共 ${t} 条`,
           onChange: (p, ps) => {
-            setPage(p)
-            setPageSize(ps)
+            if (ps !== pageSize) {
+              setPageSize(ps)
+            } else {
+              setPage(p)
+            }
           },
         }}
+      />
+
+      {/* 用户编辑抽屉 */}
+      <UserEditDrawer
+        open={editDrawerOpen}
+        user={editingUser}
+        onClose={() => {
+          setEditDrawerOpen(false)
+          setEditingUser(null)
+        }}
+        onSuccess={fetchData}
       />
     </Card>
   )

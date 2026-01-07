@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { ConfigProvider, Spin, App as AntdApp } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -55,13 +55,6 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return token ? <>{children}</> : <Navigate to="/login" replace />
 }
 
-// 内容管理占位页面（Phase 6-8 后续扩展）
-const ContentPlaceholder = ({ title }: { title: string }) => (
-  <div style={{ textAlign: 'center', padding: '50px' }}>
-    <h2>{title}</h2>
-    <p style={{ color: '#999' }}>Developing...</p>
-  </div>
-)
 
 // 创建路由配置
 const router = createBrowserRouter(
@@ -246,7 +239,6 @@ const router = createBrowserRouter(
   {
     future: {
       v7_relativeSplatPath: true,
-      v7_startTransition: true,
       v7_fetcherPersist: true,
       v7_normalizeFormMethod: true,
       v7_partialHydration: true,

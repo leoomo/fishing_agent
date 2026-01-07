@@ -7,7 +7,33 @@ from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 
-# ========== 用户 Schema ==========
+# ========== 用户水平常量 ==========
+USER_LEVELS = ["新手", "进阶", "高手"]
+
+# ========== 钓法常量 ==========
+FISHING_METHODS = ["路亚", "台钓", "矶钓", "筏钓", "海钓", "飞蝇"]
+
+
+# ========== 用户请求 Schema ==========
+
+class UserUpdateRequest(BaseModel):
+    """用户更新请求"""
+    email: Optional[str] = Field(None, description="邮箱")
+    phone: Optional[str] = Field(None, description="手机")
+    user_level: Optional[str] = Field(None, description="用户水平")
+    fishing_experience_years: Optional[int] = Field(None, ge=0, le=100, description="钓龄（年）")
+    preferred_fish: Optional[str] = Field(None, description="喜欢鱼种")
+    preferred_scenarios: Optional[str] = Field(None, description="偏好钓法")
+    nickname: Optional[str] = Field(None, description="昵称")
+
+
+class BatchUpdateRequest(BaseModel):
+    """批量更新请求"""
+    user_ids: List[int] = Field(..., min_length=1, description="用户ID列表")
+    user_level: Optional[str] = Field(None, description="批量修改用户水平")
+
+
+# ========== 用户响应 Schema ==========
 
 class UserResponse(BaseModel):
     """用户响应"""
@@ -68,3 +94,20 @@ class FishingLogResponse(BaseModel):
     created_at: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserStatsResponse(BaseModel):
+    """用户统计响应"""
+    equipment_count: int = Field(0, description="装备总数")
+    favorite_count: int = Field(0, description="收藏装备数")
+    equipment_total_cost: float = Field(0, description="装备总花费")
+    fishing_logs_count: int = Field(0, description="钓鱼记录数")
+    total_fish_caught: int = Field(0, description="总钓鱼数量")
+    total_weight: float = Field(0, description="总钓获重量(kg)")
+
+
+class BatchUpdateResponse(BaseModel):
+    """批量更新响应"""
+    success: bool = Field(..., description="是否成功")
+    updated_count: int = Field(..., description="更新的用户数量")
+    message: str = Field(..., description="结果消息")

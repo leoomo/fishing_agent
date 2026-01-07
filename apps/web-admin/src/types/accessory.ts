@@ -64,8 +64,9 @@ export const ACCESSORY_CATEGORY_CONFIG: Record<AccessoryCategory, AccessoryCateg
 export const ACCESSORY_CATEGORY_OPTIONS = Object.entries(ACCESSORY_CATEGORY_CONFIG).map(
   ([value, config]) => ({
     value: value as AccessoryCategory,
+    icon: config.icon,
+    color: config.color,
     label: `${config.icon} ${config.label}`,
-    ...config,
   })
 )
 
@@ -78,8 +79,8 @@ export const USER_LEVEL_CONFIG: Record<UserLevel, { label: string; color: string
 
 export const USER_LEVEL_OPTIONS = Object.entries(USER_LEVEL_CONFIG).map(([value, config]) => ({
   value: value as UserLevel,
+  color: config.color,
   label: config.label,
-  ...config,
 }))
 
 // ========== 配件接口 ==========
