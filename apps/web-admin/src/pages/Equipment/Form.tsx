@@ -9,11 +9,11 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Form, Input, Select, InputNumber, Button, Card, message, Row, Col } from 'antd'
+import { Form, Input, Select, InputNumber, Button, Card, message, Row, Col, Spin } from 'antd'
 import { useNavigate, useParams } from 'react-router-dom'
 import { equipmentApi } from '@/api/services/equipment'
 import type { Brand, Equipment } from '@/types/equipment'
-import { EQUIPMENT_CATEGORIES, USER_LEVELS } from '@/types/equipment'
+import { useAllEquipmentOptions } from '@/hooks/useEquipmentOptions'
 import SpecFormFields from './SpecFormFields'
 
 const { TextArea } = Input
@@ -25,6 +25,17 @@ const EquipmentForm = () => {
   const [loading, setLoading] = useState(false)
   const [brands, setBrands] = useState<Brand[]>([])
   const [category, setCategory] = useState<string>('')
+
+  // 从配置表加载选项
+  const {
+    categoryOptions,
+    userLevelOptions,
+    powerOptions,
+    actionOptions,
+    reelTypeOptions,
+    lineTypeOptions,
+    loading: optionsLoading,
+  } = useAllEquipmentOptions()
 
   useEffect(() => {
     // 加载品牌列表
@@ -74,142 +85,156 @@ const EquipmentForm = () => {
   }
 
   return (
-    <Card
-      title={id ? '编辑装备' : '新增装备'}
-      bordered={false}
-      style={{ maxWidth: 900, margin: '0 auto' }}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={onFinish}
-        initialValues={{ user_level: '新手', is_active: true }}
-        requiredMark={false}
+    <Spin spinning={optionsLoading} tip="加载配置选项...">
+      <Card
+        title={id ? '编辑装备' : '新增装备'}
+        bordered={false}
+        style={{ maxWidth: 900, margin: '0 auto' }}
       >
-        {/* 第一行：名称、类别、品牌 */}
-        <Row gutter={16}>
-          <Col span={10}>
-            <Form.Item
-              label="装备名称"
-              name="name"
-              rules={[{ required: true, message: '请输入装备名称' }]}
-            >
-              <Input placeholder="装备名称" />
-            </Form.Item>
-          </Col>
-          <Col span={7}>
-            <Form.Item
-              label="类别"
-              name="category"
-              rules={[{ required: true, message: '请选择类别' }]}
-            >
-              <Select
-                placeholder="选择类别"
-                onChange={handleCategoryChange}
-                options={EQUIPMENT_CATEGORIES.filter((c) => c !== '套装').map((c) => ({
-                  label: c,
-                  value: c,
-                }))}
-              />
-            </Form.Item>
-          </Col>
-          <Col span={7}>
-            <Form.Item
-              label="品牌"
-              name="brand_id"
-              rules={[{ required: true, message: '请选择品牌' }]}
-            >
-              <Select
-                placeholder="选择品牌"
-                showSearch
-                optionFilterProp="label"
-                options={brands.map((brand) => ({
-                  label: brand.name_cn,
-                  value: brand.brand_id,
-                }))}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* 第二行：型号、价格范围、适用水平 */}
-        <Row gutter={16}>
-          <Col span={8}>
-            <Form.Item label="型号" name="model">
-              <Input placeholder="型号" />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label="价格范围">
-              <Input.Group compact>
-                <Form.Item name="price_min" noStyle>
-                  <InputNumber
-                    placeholder="最低"
-                    min={0}
-                    style={{ width: '45%' }}
-                    addonBefore="¥"
-                  />
-                </Form.Item>
-                <Input
-                  style={{
-                    width: '10%',
-                    textAlign: 'center',
-                    borderLeft: 0,
-                    borderRight: 0,
-                    pointerEvents: 'none',
-                    backgroundColor: '#fafafa',
-                  }}
-                  placeholder="~"
-                  disabled
-                />
-                <Form.Item name="price_max" noStyle>
-                  <InputNumber placeholder="最高" min={0} style={{ width: '45%' }} />
-                </Form.Item>
-              </Input.Group>
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label="适用水平" name="user_level">
-              <Select
-                options={USER_LEVELS.map((level) => ({
-                  label: level,
-                  value: level,
-                }))}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* 规格参数（根据类别动态显示） */}
-        {category && <SpecFormFields category={category} />}
-
-        {/* 描述信息 */}
-        <div style={{ marginTop: 24 }}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={onFinish}
+          initialValues={{ user_level: '新手', is_active: true }}
+          requiredMark={false}
+        >
+          {/* 第一行：名称、类别、品牌 */}
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="描述" name="description">
-                <TextArea rows={3} placeholder="装备描述..." />
+            <Col span={10}>
+              <Form.Item
+                label="装备名称"
+                name="name"
+                rules={[{ required: true, message: '请输入装备名称' }]}
+              >
+                <Input placeholder="装备名称" />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item label="特点" name="features">
-                <TextArea rows={3} placeholder="装备特点（每行一条）..." />
+            <Col span={7}>
+              <Form.Item
+                label="类别"
+                name="category"
+                rules={[{ required: true, message: '请选择类别' }]}
+              >
+                <Select
+                  placeholder="选择类别"
+                  onChange={handleCategoryChange}
+                  options={categoryOptions
+                    .filter((opt) => opt.value !== '套装')
+                    .map((opt) => ({
+                      label: opt.note ? `${opt.value}(${opt.note})` : opt.value,
+                      value: opt.value,
+                    }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={7}>
+              <Form.Item
+                label="品牌"
+                name="brand_id"
+                rules={[{ required: true, message: '请选择品牌' }]}
+              >
+                <Select
+                  placeholder="选择品牌"
+                  showSearch
+                  optionFilterProp="label"
+                  options={brands.map((brand) => ({
+                    label: brand.name_cn,
+                    value: brand.brand_id,
+                  }))}
+                />
               </Form.Item>
             </Col>
           </Row>
-        </div>
 
-        {/* 操作按钮 */}
-        <div style={{ marginTop: 32, textAlign: 'right' }}>
-          <Button onClick={() => navigate('/equipment')} style={{ marginRight: 12 }}>
-            取消
-          </Button>
-          <Button type="primary" htmlType="submit" loading={loading}>
-            保存
-          </Button>
-        </div>
-      </Form>
-    </Card>
+          {/* 第二行：型号、价格范围、适用水平 */}
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item label="型号" name="model">
+                <Input placeholder="型号" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="价格范围">
+                <Input.Group compact>
+                  <Form.Item name="price_min" noStyle>
+                    <InputNumber
+                      placeholder="最低"
+                      min={0}
+                      style={{ width: '45%' }}
+                      addonBefore="¥"
+                    />
+                  </Form.Item>
+                  <Input
+                    style={{
+                      width: '10%',
+                      textAlign: 'center',
+                      borderLeft: 0,
+                      borderRight: 0,
+                      pointerEvents: 'none',
+                      backgroundColor: '#fafafa',
+                    }}
+                    placeholder="~"
+                    disabled
+                  />
+                  <Form.Item name="price_max" noStyle>
+                    <InputNumber placeholder="最高" min={0} style={{ width: '45%' }} />
+                  </Form.Item>
+                </Input.Group>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="适用水平" name="user_level">
+                <Select
+                  options={userLevelOptions.map((opt) => ({
+                    label: opt.note ? `${opt.value}(${opt.note})` : opt.value,
+                    value: opt.value,
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* 规格参数（根据类别动态显示） */}
+          {category && (
+            <SpecFormFields
+              category={category}
+              dynamicOptions={{
+                power: powerOptions,
+                action: actionOptions,
+                reel_type: reelTypeOptions,
+                line_type: lineTypeOptions,
+              }}
+            />
+          )}
+
+          {/* 描述信息 */}
+          <div style={{ marginTop: 24 }}>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="描述" name="description">
+                  <TextArea rows={3} placeholder="装备描述..." />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="特点" name="features">
+                  <TextArea rows={3} placeholder="装备特点（每行一条）..." />
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
+
+          {/* 操作按钮 */}
+          <div style={{ marginTop: 32, textAlign: 'right' }}>
+            <Button onClick={() => navigate('/equipment')} style={{ marginRight: 12 }}>
+              取消
+            </Button>
+            <Button type="primary" htmlType="submit" loading={loading}>
+              保存
+            </Button>
+          </div>
+        </Form>
+      </Card>
+    </Spin>
   )
 }
 

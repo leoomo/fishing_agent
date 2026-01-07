@@ -1,9 +1,12 @@
 /**
  * 装备规格字段配置
  * 定义每种类别的字段配置（名称、类型、验证规则、分组）
+ *
+ * 注意：select 类型字段使用 dynamicOptionKey 指定动态加载的选项，
+ * options 作为静态 fallback。
  */
 
-import { ROD_POWERS, ROD_ACTIONS, REEL_TYPES, LINE_TYPES } from '@/types/equipment'
+import type { DynamicOptionsMap } from './SpecFormFields'
 
 // 字段定义接口
 export interface SpecFieldDef {
@@ -12,6 +15,7 @@ export interface SpecFieldDef {
   type: 'input' | 'number' | 'select' | 'textarea'
   required?: boolean
   options?: { label: string; value: string }[]
+  dynamicOptionKey?: keyof DynamicOptionsMap // 动态选项键
   min?: number
   max?: number
   step?: number
@@ -39,7 +43,16 @@ export const ROD_SPEC_FIELDS: SpecFieldDef[] = [
     label: '调性',
     type: 'select',
     required: true,
-    options: ROD_POWERS.map((p) => ({ label: p, value: p })),
+    dynamicOptionKey: 'power',
+    options: [
+      { label: 'UL', value: 'UL' },
+      { label: 'L', value: 'L' },
+      { label: 'ML', value: 'ML' },
+      { label: 'M', value: 'M' },
+      { label: 'MH', value: 'MH' },
+      { label: 'H', value: 'H' },
+      { label: 'XH', value: 'XH' },
+    ],
     group: 'basic',
   },
   {
@@ -47,7 +60,12 @@ export const ROD_SPEC_FIELDS: SpecFieldDef[] = [
     label: '动作',
     type: 'select',
     required: true,
-    options: ROD_ACTIONS.map((a) => ({ label: a === 'Fast' ? '快调' : a === 'Moderate' ? '中调' : '慢调', value: a })),
+    dynamicOptionKey: 'action',
+    options: [
+      { label: 'Fast(快调)', value: 'Fast' },
+      { label: 'Medium(中调)', value: 'Medium' },
+      { label: 'Slow(慢调)', value: 'Slow' },
+    ],
     group: 'basic',
   },
   {
@@ -173,10 +191,12 @@ export const REEL_SPEC_FIELDS: SpecFieldDef[] = [
     name: 'reel_type',
     label: '轮类型',
     type: 'select',
-    options: REEL_TYPES.map((t) => ({
-      label: t === 'spinning' ? '纺车轮' : t === 'baitcasting' ? '水滴轮' : '飞蝇轮',
-      value: t,
-    })),
+    dynamicOptionKey: 'reel_type',
+    options: [
+      { label: 'spinning(纺车轮)', value: 'spinning' },
+      { label: 'baitcasting(水滴轮)', value: 'baitcasting' },
+      { label: 'fly(飞蝇轮)', value: 'fly' },
+    ],
     group: 'basic',
   },
   {
@@ -257,7 +277,13 @@ export const LINE_SPEC_FIELDS: SpecFieldDef[] = [
     label: '线型',
     type: 'select',
     required: true,
-    options: LINE_TYPES.map((t) => ({ label: t, value: t })),
+    dynamicOptionKey: 'line_type',
+    options: [
+      { label: 'PE(编织线)', value: 'PE' },
+      { label: '尼龙(尼龙线)', value: '尼龙' },
+      { label: '碳线(碳素线)', value: '碳线' },
+      { label: '钢丝(钢丝线)', value: '钢丝' },
+    ],
     group: 'basic',
   },
   {

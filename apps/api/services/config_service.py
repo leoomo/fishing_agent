@@ -56,6 +56,23 @@ EQUIPMENT_OPTION_DEFAULTS = {
         ],
         'description': '装备分类选项',
     },
+    'equipment.reel.type_options': {
+        'value': [
+            {'value': 'spinning', 'note': '纺车轮，适合新手'},
+            {'value': 'baitcasting', 'note': '水滴轮，精准抛投'},
+            {'value': 'fly', 'note': '飞蝇轮，飞蝇钓专用'},
+        ],
+        'description': '渔轮类型选项',
+    },
+    'equipment.line.type_options': {
+        'value': [
+            {'value': 'PE', 'note': '编织线，强度高'},
+            {'value': '尼龙', 'note': '尼龙线，延展性好'},
+            {'value': '碳线', 'note': '碳素线，隐蔽性强'},
+            {'value': '钢丝', 'note': '钢丝线，防咬断'},
+        ],
+        'description': '鱼线类型选项',
+    },
 }
 
 

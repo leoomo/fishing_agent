@@ -18,6 +18,8 @@ export const EQUIPMENT_OPTION_KEYS = {
   ACTION_CN: 'equipment.rod.action_options_cn',
   USER_LEVEL: 'equipment.user_level_options',
   CATEGORY: 'equipment.category_options',
+  REEL_TYPE: 'equipment.reel.type_options',
+  LINE_TYPE: 'equipment.line.type_options',
 } as const
 
 /**
@@ -54,6 +56,17 @@ export const DEFAULT_OPTIONS: Record<string, OptionItem[]> = {
     { value: '渔轮', note: '收放线装置' },
     { value: '鱼线', note: '连接鱼竿和鱼钩' },
     { value: '拟饵', note: '模拟饵料吸引鱼类' },
+  ],
+  [EQUIPMENT_OPTION_KEYS.REEL_TYPE]: [
+    { value: 'spinning', note: '纺车轮，适合新手' },
+    { value: 'baitcasting', note: '水滴轮，精准抛投' },
+    { value: 'fly', note: '飞蝇轮，飞蝇钓专用' },
+  ],
+  [EQUIPMENT_OPTION_KEYS.LINE_TYPE]: [
+    { value: 'PE', note: '编织线，强度高' },
+    { value: '尼龙', note: '尼龙线，延展性好' },
+    { value: '碳线', note: '碳素线，隐蔽性强' },
+    { value: '钢丝', note: '钢丝线，防咬断' },
   ],
 }
 
@@ -184,6 +197,8 @@ export function useAllEquipmentOptions() {
   const actionCn = useEquipmentOptions(EQUIPMENT_OPTION_KEYS.ACTION_CN)
   const userLevel = useEquipmentOptions(EQUIPMENT_OPTION_KEYS.USER_LEVEL)
   const category = useEquipmentOptions(EQUIPMENT_OPTION_KEYS.CATEGORY)
+  const reelType = useEquipmentOptions(EQUIPMENT_OPTION_KEYS.REEL_TYPE)
+  const lineType = useEquipmentOptions(EQUIPMENT_OPTION_KEYS.LINE_TYPE)
 
   return {
     // 完整选项（带备注）
@@ -192,13 +207,17 @@ export function useAllEquipmentOptions() {
     actionOptionsCn: actionCn.options,
     userLevelOptions: userLevel.options,
     categoryOptions: category.options,
+    reelTypeOptions: reelType.options,
+    lineTypeOptions: lineType.options,
     // 纯值列表（用于 Select 等组件）
     powerValues: power.values,
     actionValues: action.values,
     actionValuesCn: actionCn.values,
     userLevelValues: userLevel.values,
     categoryValues: category.values,
-    loading: power.loading || action.loading || actionCn.loading || userLevel.loading || category.loading,
+    reelTypeValues: reelType.values,
+    lineTypeValues: lineType.values,
+    loading: power.loading || action.loading || actionCn.loading || userLevel.loading || category.loading || reelType.loading || lineType.loading,
     refresh: async () => {
       await Promise.all([
         power.refresh(),
@@ -206,6 +225,8 @@ export function useAllEquipmentOptions() {
         actionCn.refresh(),
         userLevel.refresh(),
         category.refresh(),
+        reelType.refresh(),
+        lineType.refresh(),
       ])
     },
   }

@@ -13,22 +13,52 @@ import { Form, Input, InputNumber, Select, Row, Col, Typography } from 'antd'
 import { DownOutlined, RightOutlined } from '@ant-design/icons'
 import { getSpecFields, GROUP_LABELS } from './specFieldConfig'
 import type { SpecFieldDef } from './specFieldConfig'
+import type { OptionItem } from '@/hooks/useEquipmentOptions'
 
 const { TextArea } = Input
 const { Text } = Typography
 
+// 动态选项映射类型
+export interface DynamicOptionsMap {
+  power?: OptionItem[]
+  action?: OptionItem[]
+  reel_type?: OptionItem[]
+  line_type?: OptionItem[]
+}
+
 interface SpecFormFieldsProps {
   category: string
   formItemPrefix?: string // Form.Item name 前缀，如 ['specs']
+  dynamicOptions?: DynamicOptionsMap // 动态选项
 }
 
 /**
  * 渲染单个字段
  */
-const SpecField: React.FC<{ field: SpecFieldDef; prefix?: string[] }> = ({ field, prefix = [] }) => {
+const SpecField: React.FC<{
+  field: SpecFieldDef
+  prefix?: string[]
+  dynamicOptions?: DynamicOptionsMap
+}> = ({ field, prefix = [], dynamicOptions }) => {
   const name = prefix.length > 0 ? [...prefix, field.name] : field.name
 
   const rules = field.required ? [{ required: true, message: `请输入${field.label}` }] : []
+
+  // 获取动态选项（如果可用）
+  const getFieldOptions = (): { label: string; value: string }[] => {
+    // 检查是否有对应的动态选项
+    if (dynamicOptions) {
+      const optionKey = field.dynamicOptionKey
+      if (optionKey && dynamicOptions[optionKey]) {
+        return dynamicOptions[optionKey]!.map((opt) => ({
+          label: opt.note ? `${opt.value}(${opt.note})` : opt.value,
+          value: opt.value,
+        }))
+      }
+    }
+    // 回退到静态选项
+    return field.options || []
+  }
 
   // 根据类型渲染不同的输入控件
   const renderInput = () => {
@@ -48,7 +78,7 @@ const SpecField: React.FC<{ field: SpecFieldDef; prefix?: string[] }> = ({ field
         return (
           <Select
             placeholder={`选择${field.label}`}
-            options={field.options}
+            options={getFieldOptions()}
             allowClear
           />
         )
@@ -86,6 +116,7 @@ const SpecField: React.FC<{ field: SpecFieldDef; prefix?: string[] }> = ({ field
 const SpecFormFields: React.FC<SpecFormFieldsProps> = ({
   category,
   formItemPrefix = 'specs',
+  dynamicOptions,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -121,7 +152,7 @@ const SpecFormFields: React.FC<SpecFormFieldsProps> = ({
         <Row gutter={16}>
           {groupedFields.basic.map((field) => (
             <Col span={8} key={field.name}>
-              <SpecField field={field} prefix={prefix} />
+              <SpecField field={field} prefix={prefix} dynamicOptions={dynamicOptions} />
             </Col>
           ))}
         </Row>
@@ -132,7 +163,7 @@ const SpecFormFields: React.FC<SpecFormFieldsProps> = ({
         <Row gutter={16} style={{ marginTop: 8 }}>
           {groupedFields.range.map((field) => (
             <Col span={8} key={field.name}>
-              <SpecField field={field} prefix={prefix} />
+              <SpecField field={field} prefix={prefix} dynamicOptions={dynamicOptions} />
             </Col>
           ))}
         </Row>
@@ -162,7 +193,7 @@ const SpecFormFields: React.FC<SpecFormFieldsProps> = ({
             <Row gutter={16}>
               {groupedFields.advanced.map((field) => (
                 <Col span={field.type === 'textarea' ? 24 : 8} key={field.name}>
-                  <SpecField field={field} prefix={prefix} />
+                  <SpecField field={field} prefix={prefix} dynamicOptions={dynamicOptions} />
                 </Col>
               ))}
             </Row>
