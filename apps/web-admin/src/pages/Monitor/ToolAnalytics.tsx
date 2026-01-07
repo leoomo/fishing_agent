@@ -103,7 +103,7 @@ const ToolAnalytics = () => {
       ? getExportFilename(`tool_stats_${agentTypeFilter}`)
       : getExportFilename('tool_stats')
 
-    exportToCSV(toolStats.tools as Record<string, unknown>[], exportColumns, filename)
+    exportToCSV(toolStats.tools as unknown as Record<string, unknown>[], exportColumns, filename)
     message.success('导出成功')
   }
 

@@ -356,7 +356,7 @@ const RigList: React.FC = () => {
           style={{ width: 140 }}
           options={categoryOptions}
           value={filters.category || ''}
-          onChange={(v) => handleCategoryChange(v || undefined)}
+          onChange={(v) => handleCategoryChange((v || undefined) as RigCategory | undefined)}
           allowClear
         />
         <Select
@@ -364,7 +364,7 @@ const RigList: React.FC = () => {
           style={{ width: 120 }}
           options={difficultyOptions}
           value={filters.difficulty || ''}
-          onChange={(v) => handleDifficultyChange(v || undefined)}
+          onChange={(v) => handleDifficultyChange((v || undefined) as RigDifficulty | undefined)}
           allowClear
         />
       </div>

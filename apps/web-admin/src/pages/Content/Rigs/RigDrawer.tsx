@@ -30,8 +30,6 @@ import type {
 import {
   RIG_CATEGORY_CONFIG,
   RIG_DIFFICULTY_CONFIG,
-  type RigCategory,
-  type RigDifficulty,
 } from '@/types/rig'
 import ComponentEditor from './ComponentEditor'
 import SpecEditor from './SpecEditor'

@@ -439,7 +439,7 @@ const AccessoryList: React.FC = () => {
           style={{ width: 140 }}
           options={categoryOptions}
           value={filters.category || ''}
-          onChange={(v) => handleCategoryChange(v || undefined)}
+          onChange={(v) => handleCategoryChange((v || undefined) as AccessoryCategory | undefined)}
           allowClear
         />
         <Select
@@ -447,7 +447,7 @@ const AccessoryList: React.FC = () => {
           style={{ width: 120 }}
           options={userLevelOptions}
           value={filters.user_level || ''}
-          onChange={(v) => handleUserLevelChange(v || undefined)}
+          onChange={(v) => handleUserLevelChange((v || undefined) as UserLevel | undefined)}
           allowClear
         />
       </div>

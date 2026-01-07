@@ -285,7 +285,7 @@ const CostReport = () => {
       },
     ]
 
-    exportToCSV(costReport.items as Record<string, unknown>[], exportColumns, getExportFilename('cost_report'))
+    exportToCSV(costReport.items as unknown as Record<string, unknown>[], exportColumns, getExportFilename('cost_report'))
     message.success('导出成功')
   }
 

@@ -1,5 +1,24 @@
 // 用户类型定义
 
+// ========== 常量 ==========
+export const USER_LEVELS = ['新手', '进阶', '高手'] as const
+export type UserLevel = (typeof USER_LEVELS)[number]
+
+export const FISHING_METHODS = ['路亚', '台钓', '矶钓', '筏钓', '海钓', '飞蝇'] as const
+export type FishingMethod = (typeof FISHING_METHODS)[number]
+
+// ========== 搜索筛选 ==========
+export interface UserSearchFilters {
+  keyword?: string
+  user_level?: string
+  fishing_experience_min?: number
+  fishing_experience_max?: number
+  preferred_fishing_method?: string
+  created_after?: string
+  created_before?: string
+}
+
+// ========== 用户数据 ==========
 export interface User {
   user_id: number
   username: string
@@ -21,6 +40,39 @@ export interface UserListResponse {
   page_size: number
 }
 
+// ========== 更新数据 ==========
+export interface UserUpdateData {
+  email?: string
+  phone?: string
+  user_level?: string
+  fishing_experience_years?: number
+  preferred_fish?: string
+  preferred_scenarios?: string
+  nickname?: string
+}
+
+export interface BatchUpdateData {
+  user_ids: number[]
+  user_level?: string
+}
+
+export interface BatchUpdateResponse {
+  success: boolean
+  updated_count: number
+  message: string
+}
+
+// ========== 统计数据 ==========
+export interface UserStats {
+  equipment_count: number
+  favorite_count: number
+  equipment_total_cost: number
+  fishing_logs_count: number
+  total_fish_caught: number
+  total_weight: number
+}
+
+// ========== 用户装备 ==========
 export interface UserEquipment {
   user_equipment_id: number
   user_id: number

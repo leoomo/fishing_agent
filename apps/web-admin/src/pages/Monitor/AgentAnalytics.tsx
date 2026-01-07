@@ -275,7 +275,7 @@ const AgentAnalytics = () => {
     : {}
 
   // 成功率迷你趋势图（替代仪表盘）
-  const getSuccessRateTrendOption = (agentType: string) => {
+  const getSuccessRateTrendOption = (_agentType: string) => {
     if (!agentTrends?.trends) return null
     const trendData = agentTrends.trends.slice(-7) // 最近7天
     if (trendData.length === 0) return null
@@ -311,7 +311,7 @@ const AgentAnalytics = () => {
       { title: '成本 (CNY)', dataIndex: 'total_cost', render: (v: unknown) => Number(v).toFixed(4) },
     ]
 
-    exportToCSV(agentStats.agents as Record<string, unknown>[], exportColumns, getExportFilename('agent_stats'))
+    exportToCSV(agentStats.agents as unknown as Record<string, unknown>[], exportColumns, getExportFilename('agent_stats'))
     message.success('导出成功')
   }
 

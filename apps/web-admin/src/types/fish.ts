@@ -42,8 +42,9 @@ export const FISH_CATEGORY_CONFIG: Record<FishCategory, FishCategoryConfig> = {
 export const FISH_CATEGORY_OPTIONS = Object.entries(FISH_CATEGORY_CONFIG).map(
   ([value, config]) => ({
     value: value as FishCategory,
+    icon: config.icon,
+    color: config.color,
     label: `${config.icon} ${config.label}`,
-    ...config,
   })
 )
 
@@ -63,8 +64,9 @@ export const SEASON_CONFIG: Record<Season, SeasonConfig> = {
 
 export const SEASON_OPTIONS = Object.entries(SEASON_CONFIG).map(([value, config]) => ({
   value: value as Season,
+  icon: config.icon,
+  color: config.color,
   label: `${config.icon} ${config.label}`,
-  ...config,
 }))
 
 // 活跃度配置
@@ -77,8 +79,8 @@ export const ACTIVITY_LEVEL_CONFIG: Record<ActivityLevel, { label: string; color
 export const ACTIVITY_LEVEL_OPTIONS = Object.entries(ACTIVITY_LEVEL_CONFIG).map(
   ([value, config]) => ({
     value: value as ActivityLevel,
+    color: config.color,
     label: config.label,
-    ...config,
   })
 )
 

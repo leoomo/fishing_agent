@@ -26,7 +26,6 @@ import { accessoryApi } from '@/api/services/accessory'
 import {
   ACCESSORY_CATEGORY_OPTIONS,
   USER_LEVEL_OPTIONS,
-  type Accessory,
   type AccessoryCreateRequest,
   type AccessoryUpdateRequest,
 } from '@/types/accessory'
