@@ -133,8 +133,7 @@ def sample_rod_spec(db_session: Session, sample_equipment: Equipment):
         lure_weight_min=5.0,
         lure_weight_max=20.0,
         line_weight_min=4.0,
-        line_weight_max=12.0,
-        material="碳素"
+        line_weight_max=12.0
     )
     db_session.add(rod_spec)
     db_session.commit()

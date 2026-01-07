@@ -282,7 +282,7 @@ class APILog(Base):
     error_message = Column(Text, comment="Error message if any")
 
     # Enhanced error tracking fields
-    correlation_id = Column(String(100), index=True, comment="Correlation ID for cross-service tracing")
+    correlation_id = Column(String(100), comment="Correlation ID for cross-service tracing")
     error_category = Column(SQLEnum(ErrorCategory, native_enum=False), index=True, comment="Error category for pattern detection")
     error_severity = Column(SQLEnum(ErrorSeverity, native_enum=False), comment="Error severity level")
     error_context = Column(Text, comment="Additional error context (JSON)")
@@ -339,7 +339,7 @@ class AgentExecutionLog(Base):
     user_id = Column(Integer, index=True, comment="User ID")
 
     # Enhanced error tracking
-    correlation_id = Column(String(100), index=True, comment="Correlation ID for cross-service tracing")
+    correlation_id = Column(String(100), comment="Correlation ID for cross-service tracing")
     failure_stage = Column(String(50), comment="Stage where failure occurred (INIT/PROCESSING/TOOL_CALL/FINAL_RESPONSE)")
     error_category = Column(SQLEnum(ErrorCategory, native_enum=False), index=True, comment="Error category for pattern detection")
     error_pattern_id = Column(String(100), index=True, comment="Link to detected failure patterns")
@@ -489,7 +489,7 @@ class LLMLog(Base):
     cost = Column(Float, comment="Estimated cost in CNY")
 
     # New fields for agent monitoring
-    agent_type = Column(String(50), index=True, comment="Agent type that made the call")
+    agent_type = Column(String(50), comment="Agent type that made the call")
     session_id = Column(Integer, index=True, comment="Session ID if applicable")
     user_id = Column(Integer, index=True, comment="User ID if applicable")
     execution_id = Column(Integer, ForeignKey('agent_execution_logs.id', ondelete='SET NULL'),
