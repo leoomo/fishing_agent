@@ -716,3 +716,196 @@ class EquipmentRepository(BaseRepository[Equipment]):
             offset=offset,
             preload=True
         )
+
+    # === Agent Tools 专用方法 ===
+
+    def search_by_name_exact(
+        self,
+        name: str,
+        category: Optional[str] = None
+    ) -> Optional[Equipment]:
+        """
+        精确匹配搜索 (name 或 model 完��匹配)
+
+        Args:
+            name: 搜索名称
+            category: 装备类别（可选）
+
+        Returns:
+            匹配的装备或 None
+        """
+        query = self.session.query(Equipment).options(
+            joinedload(Equipment.brand),
+            joinedload(Equipment.rod_spec),
+            joinedload(Equipment.reel_spec),
+            joinedload(Equipment.line_spec),
+            joinedload(Equipment.lure_spec),
+        )
+
+        # 精确匹配 name 或 model
+        query = query.filter(
+            or_(
+                Equipment.name == name,
+                Equipment.model == name
+            )
+        )
+
+        if category:
+            query = query.filter(Equipment.category == category)
+
+        return query.first()
+
+    def search_by_name_fuzzy(
+        self,
+        name: str,
+        category: Optional[str] = None,
+        limit: int = 10
+    ) -> List[Equipment]:
+        """
+        模糊匹配搜索 (name/model/brand_name 包含)
+
+        Args:
+            name: 搜索名称
+            category: 装备类别（可选）
+            limit: 返回数量限制
+
+        Returns:
+            匹配的装备列表
+        """
+        from ...models.brand import Brand
+
+        query = self.session.query(Equipment).outerjoin(
+            Brand, Equipment.brand_id == Brand.brand_id
+        ).options(
+            joinedload(Equipment.brand),
+            joinedload(Equipment.rod_spec),
+            joinedload(Equipment.reel_spec),
+            joinedload(Equipment.line_spec),
+            joinedload(Equipment.lure_spec),
+        )
+
+        # 模糊匹配 name, model 或 brand_name
+        pattern = f"%{name}%"
+        query = query.filter(
+            or_(
+                Equipment.name.like(pattern),
+                Equipment.model.like(pattern),
+                Brand.name_cn.like(pattern)
+            )
+        )
+
+        if category:
+            query = query.filter(Equipment.category == category)
+
+        return query.limit(limit).all()
+
+    def get_by_ids(
+        self,
+        equipment_ids: List[int],
+        preload: bool = True
+    ) -> List[Equipment]:
+        """
+        批量按ID查询 (保持输入顺序)
+
+        Args:
+            equipment_ids: 装备ID列表
+            preload: 是否预加载关联数据
+
+        Returns:
+            装备列表（保持输入顺序）
+        """
+        if not equipment_ids:
+            return []
+
+        query = self.session.query(Equipment).filter(
+            Equipment.equipment_id.in_(equipment_ids)
+        )
+
+        if preload:
+            query = query.options(
+                joinedload(Equipment.brand),
+                joinedload(Equipment.rod_spec),
+                joinedload(Equipment.reel_spec),
+                joinedload(Equipment.line_spec),
+                joinedload(Equipment.lure_spec),
+            )
+
+        results = query.all()
+
+        # 按输入顺序排序
+        id_to_equipment = {e.equipment_id: e for e in results}
+        return [id_to_equipment[eid] for eid in equipment_ids if eid in id_to_equipment]
+
+    def to_dict(self, equipment: Equipment) -> Dict[str, Any]:
+        """
+        将 Equipment 实例转为字典 (兼容原有格式)
+
+        Args:
+            equipment: Equipment 实例
+
+        Returns:
+            字典格式的装备数据
+        """
+        result = {
+            'id': equipment.equipment_id,
+            'equipment_id': equipment.equipment_id,
+            'name': equipment.name,
+            'category': equipment.category,
+            'brand_id': equipment.brand_id,
+            'brand_name': equipment.brand.name_cn if equipment.brand else None,
+            'model': equipment.model,
+            'price_min': equipment.price_min,
+            'price_max': equipment.price_max,
+            'description': equipment.description,
+            'features': equipment.features,
+            'user_level': equipment.user_level,
+            'source': equipment.source,
+            'is_active': equipment.is_active,
+            'created_at': equipment.created_at.isoformat() if equipment.created_at else None,
+            'updated_at': equipment.updated_at.isoformat() if equipment.updated_at else None,
+        }
+
+        # 添加规格数据
+        if equipment.rod_spec:
+            result['specs'] = {
+                'length': equipment.rod_spec.length,
+                'power': equipment.rod_spec.power,
+                'action': equipment.rod_spec.action,
+                'sections': equipment.rod_spec.sections,
+                'weight': equipment.rod_spec.weight,
+                'lure_weight_min': equipment.rod_spec.lure_weight_min,
+                'lure_weight_max': equipment.rod_spec.lure_weight_max,
+                'line_weight_min': equipment.rod_spec.line_weight_min,
+                'line_weight_max': equipment.rod_spec.line_weight_max,
+            }
+        elif equipment.reel_spec:
+            result['specs'] = {
+                'reel_type': equipment.reel_spec.reel_type,
+                'gear_ratio': equipment.reel_spec.gear_ratio,
+                'max_drag': equipment.reel_spec.max_drag,
+                'weight': equipment.reel_spec.weight,
+                'line_capacity': equipment.reel_spec.line_capacity,
+                'bearings': equipment.reel_spec.bearings,
+            }
+        elif equipment.line_spec:
+            result['specs'] = {
+                'line_type': equipment.line_spec.line_type,
+                'diameter': equipment.line_spec.diameter,
+                'strength_lb': equipment.line_spec.strength_lb,
+                'length_m': equipment.line_spec.length_m,
+                'color': equipment.line_spec.color,
+            }
+        elif equipment.lure_spec:
+            result['specs'] = {
+                'lure_category': equipment.lure_spec.lure_category,
+                'lure_type': equipment.lure_spec.lure_type,
+                'weight': equipment.lure_spec.weight,
+                'length': equipment.lure_spec.length,
+                'diving_depth_min': equipment.lure_spec.diving_depth_min,
+                'diving_depth_max': equipment.lure_spec.diving_depth_max,
+                'color': equipment.lure_spec.color,
+            }
+        else:
+            result['specs'] = {}
+
+        return result
