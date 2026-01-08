@@ -381,6 +381,17 @@ async def list_equipment(
             # 转换为响应模型
             items = []
             for eq in equipment_list:
+                # 提取规格数据
+                specs = None
+                if eq.category == "鱼竿" and eq.rod_spec:
+                    specs = eq.rod_spec.to_dict()
+                elif eq.category == "渔轮" and eq.reel_spec:
+                    specs = eq.reel_spec.to_dict()
+                elif eq.category == "鱼线" and eq.line_spec:
+                    specs = eq.line_spec.to_dict()
+                elif eq.category == "拟饵" and eq.lure_spec:
+                    specs = eq.lure_spec.to_dict()
+
                 items.append(EquipmentResponse(
                     equipment_id=eq.equipment_id,
                     name=eq.name,
@@ -399,7 +410,7 @@ async def list_equipment(
                     source_url=eq.source_url,
                     created_at=eq.created_at.isoformat(),
                     updated_at=eq.updated_at.isoformat(),
-                    specs=None  # 列表不返回详细规格，减少数据量
+                    specs=specs
                 ))
 
             return EquipmentListResponse(
