@@ -1269,14 +1269,34 @@ async def get_import_templates():
 @router.get(
     "/import/template/{equipment_type}",
     summary="下载导入模板",
-    description="下载指定装备类型的 Excel 导入模板",
-    dependencies=[Depends(require_permission(PermissionEnum.CRAWLER_READ))]
+    description="下载指定装备类型的 Excel 导入模板（支持通过 token 查询参数认证）",
 )
 async def download_import_template(
     equipment_type: str,
-    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CRAWLER_READ))
+    token: str = Query(None, description="JWT token（用于浏览器下载认证）")
 ):
-    """下载导入模板"""
+    """
+    下载导入模板
+
+    由于浏览器直接打开 URL 无法携带 Authorization header，
+    支持通过 query parameter 传递 token 进行认证。
+    """
+    # 验证 token
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="需要提供 token 参数"
+        )
+
+    from ..auth.dependencies import verify_token
+    try:
+        verify_token(token)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Token 验证失败: {str(e)}"
+        )
+
     if equipment_type not in EQUIPMENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
