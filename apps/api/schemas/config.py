@@ -8,7 +8,7 @@ class ConfigCreate(BaseModel):
     config_value: str = Field(..., description="配置值（JSON字符串）")
     config_type: str = Field(
         ...,
-        pattern="^(agent|algorithm|api|system)$",
+        pattern="^(agent|algorithm|api|system|user)$",
         description="配置类型"
     )
     description: Optional[str] = Field(None, description="描述")

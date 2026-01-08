@@ -55,6 +55,7 @@ class ConfigType(str, enum.Enum):
     ALGORITHM = "algorithm"
     API = "api"
     SYSTEM = "system"
+    USER = "user"
 
 
 class ReportType(str, enum.Enum):
