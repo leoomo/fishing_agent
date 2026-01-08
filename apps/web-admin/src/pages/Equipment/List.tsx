@@ -103,11 +103,6 @@ const EquipmentList = () => {
 
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'equipment_id',
-      width: 80,
-    },
-    {
       title: '名称',
       dataIndex: 'name',
       width: 200,
