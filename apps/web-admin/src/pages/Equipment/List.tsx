@@ -164,6 +164,36 @@ const EquipmentList = () => {
             : '-',
       },
       {
+        key: 'action',
+        title: '动作',
+        width: 80,
+        render: (_: unknown, record: Equipment) => {
+          if (record.category !== '鱼竿') return '-'
+          const specs = record.specs as Record<string, unknown> | undefined
+          return specs?.action || '-'
+        },
+      },
+      {
+        key: 'power',
+        title: '调性',
+        width: 80,
+        render: (_: unknown, record: Equipment) => {
+          if (record.category !== '鱼竿') return '-'
+          const specs = record.specs as Record<string, unknown> | undefined
+          return specs?.power || '-'
+        },
+      },
+      {
+        key: 'sections',
+        title: '节数',
+        width: 80,
+        render: (_: unknown, record: Equipment) => {
+          if (record.category !== '鱼竿') return '-'
+          const specs = record.specs as Record<string, unknown> | undefined
+          return specs?.sections ? `${specs.sections}节` : '-'
+        },
+      },
+      {
         key: 'specs',
         title: '规格信息',
         width: 250,
