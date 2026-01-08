@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Card,
   Tag,
@@ -13,6 +13,7 @@ import {
   Empty,
   Modal,
   Form,
+  Collapse,
 } from 'antd'
 import {
   PlusOutlined,
@@ -20,6 +21,12 @@ import {
   DeleteOutlined,
   HolderOutlined,
   InfoCircleOutlined,
+  AimOutlined,
+  SettingOutlined,
+  DashOutlined,
+  AppstoreOutlined,
+  ExpandAltOutlined,
+  ShrinkOutlined,
 } from '@ant-design/icons'
 import { configApi } from '@/api/services/config'
 
@@ -34,13 +41,35 @@ interface OptionItem {
 }
 
 /**
+ * 分类定义
+ */
+type CategoryKey = 'rod' | 'reel' | 'line' | 'general'
+
+const CATEGORIES: { key: CategoryKey; name: string; icon: React.ReactNode }[] = [
+  { key: 'rod', name: '鱼竿设置', icon: <AimOutlined /> },
+  { key: 'reel', name: '渔轮设置', icon: <SettingOutlined /> },
+  { key: 'line', name: '鱼线设置', icon: <DashOutlined /> },
+  { key: 'general', name: '通用设置', icon: <AppstoreOutlined /> },
+]
+
+/**
  * 预定义的装备选项组配置
  */
-const OPTION_GROUPS = [
+interface OptionGroupDef {
+  key: string
+  name: string
+  description: string
+  defaultValue: OptionItem[]
+  color: string
+  category: CategoryKey
+}
+
+const OPTION_GROUPS: OptionGroupDef[] = [
   {
     key: 'equipment.rod.power_options',
     name: '鱼竿调性 (Power)',
     description: '鱼竿硬度等级，从超软到超硬',
+    category: 'rod',
     defaultValue: [
       { value: 'UL', note: '超轻调，适合微物钓法' },
       { value: 'L', note: '轻调，适合小型鱼类' },
@@ -56,6 +85,7 @@ const OPTION_GROUPS = [
     key: 'equipment.rod.action_options',
     name: '鱼竿动作 (Action)',
     description: '鱼竿弯曲恢复速度',
+    category: 'rod',
     defaultValue: [
       { value: 'Fast', note: '快调，恢复迅速' },
       { value: 'Medium', note: '中调，平衡性好' },
@@ -67,6 +97,7 @@ const OPTION_GROUPS = [
     key: 'equipment.rod.action_options_cn',
     name: '鱼竿动作 (中文)',
     description: '鱼竿调性的中文表述',
+    category: 'rod',
     defaultValue: [
       { value: '慢调', note: '弯曲幅度大，适合溜鱼' },
       { value: '中调', note: '平衡型，适用范围广' },
@@ -79,6 +110,7 @@ const OPTION_GROUPS = [
     key: 'equipment.user_level_options',
     name: '用户级别',
     description: '装备适合的用户水平',
+    category: 'general',
     defaultValue: [
       { value: '新手', note: '入门级用户' },
       { value: '进阶', note: '有一定经验的用户' },
@@ -90,6 +122,7 @@ const OPTION_GROUPS = [
     key: 'equipment.category_options',
     name: '装备类别',
     description: '装备的分类',
+    category: 'general',
     defaultValue: [
       { value: '鱼竿', note: '钓鱼主要工具' },
       { value: '渔轮', note: '收放线装置' },
@@ -102,6 +135,7 @@ const OPTION_GROUPS = [
     key: 'equipment.reel.type_options',
     name: '渔轮类型',
     description: '渔轮的类型分类',
+    category: 'reel',
     defaultValue: [
       { value: 'spinning', note: '纺车轮，适合新手' },
       { value: 'baitcasting', note: '水滴轮，精准抛投' },
@@ -113,6 +147,7 @@ const OPTION_GROUPS = [
     key: 'equipment.line.type_options',
     name: '鱼线类型',
     description: '鱼线的材质分类',
+    category: 'line',
     defaultValue: [
       { value: 'PE', note: '编织线，强度高' },
       { value: '尼龙', note: '尼龙线，延展性好' },
@@ -159,6 +194,25 @@ const EquipmentOptions = () => {
   const [currentGroupKey, setCurrentGroupKey] = useState<string>('')
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [form] = Form.useForm()
+
+  // Collapse 展开状态
+  const [activeKeys, setActiveKeys] = useState<string[]>(CATEGORIES.map((c) => c.key))
+  const allKeys = CATEGORIES.map((c) => c.key)
+  const isAllExpanded = activeKeys.length === allKeys.length
+
+  // 按分类分组选项
+  const groupedByCategory = useMemo(() => {
+    const result: Record<CategoryKey, OptionGroupDef[]> = {
+      rod: [],
+      reel: [],
+      line: [],
+      general: [],
+    }
+    OPTION_GROUPS.forEach((group) => {
+      result[group.category].push(group)
+    })
+    return result
+  }, [])
 
   useEffect(() => {
     loadAllOptions()
@@ -316,6 +370,15 @@ const EquipmentOptions = () => {
     saveOptions(groupKey, group.defaultValue)
   }
 
+  // 全部展开/收起
+  const handleToggleAll = () => {
+    if (isAllExpanded) {
+      setActiveKeys([])
+    } else {
+      setActiveKeys(allKeys)
+    }
+  }
+
   if (initializing) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 0' }}>
@@ -327,116 +390,143 @@ const EquipmentOptions = () => {
   return (
     <div>
       <Card>
-        <div style={{ marginBottom: 24 }}>
-          <Title level={4} style={{ marginBottom: 8 }}>
-            装备属性选项管理
-          </Title>
-          <Text type="secondary">
-            管理装备相关的属性选项，如调性、动作、用户级别等。修改后即时生效。鼠标悬停在选项上可查看备注。
-          </Text>
+        <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <Title level={4} style={{ marginBottom: 8 }}>
+              装备属性选项管理
+            </Title>
+            <Text type="secondary">
+              管理装备相关的属性选项，如调性、动作、用户级别等。修改后即时生效。鼠标悬停在选项上可查看备注。
+            </Text>
+          </div>
+          <Button
+            icon={isAllExpanded ? <ShrinkOutlined /> : <ExpandAltOutlined />}
+            onClick={handleToggleAll}
+          >
+            {isAllExpanded ? '全部收起' : '全部展开'}
+          </Button>
         </div>
 
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          {OPTION_GROUPS.map((group) => {
-            const state = groupStates[group.key]
-            if (!state) return null
+        <Collapse
+          activeKey={activeKeys}
+          onChange={(keys) => setActiveKeys(keys as string[])}
+          style={{ backgroundColor: 'transparent', border: 'none' }}
+          items={CATEGORIES.map((category) => ({
+            key: category.key,
+            label: (
+              <Space>
+                {category.icon}
+                <Text strong>{category.name}</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  ({groupedByCategory[category.key].length} 项)
+                </Text>
+              </Space>
+            ),
+            children: (
+              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                {groupedByCategory[category.key].map((group) => {
+                  const state = groupStates[group.key]
+                  if (!state) return null
 
-            return (
-              <Card
-                key={group.key}
-                size="small"
-                title={
-                  <Space>
-                    <Text strong>{group.name}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      ({group.key})
-                    </Text>
-                  </Space>
-                }
-                extra={
-                  <Space>
-                    <Button
+                  return (
+                    <Card
+                      key={group.key}
                       size="small"
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => openAddModal(group.key)}
+                      title={
+                        <Space>
+                          <Text strong>{group.name}</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            ({group.key})
+                          </Text>
+                        </Space>
+                      }
+                      extra={
+                        <Space>
+                          <Button
+                            size="small"
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            onClick={() => openAddModal(group.key)}
+                          >
+                            添加
+                          </Button>
+                          <Popconfirm
+                            title="确定恢复默认值？"
+                            description="当前设置将被覆盖"
+                            onConfirm={() => handleResetToDefault(group.key)}
+                            okText="确定"
+                            cancelText="取消"
+                          >
+                            <Button size="small" type="link">
+                              恢复默认
+                            </Button>
+                          </Popconfirm>
+                        </Space>
+                      }
                     >
-                      添加
-                    </Button>
-                    <Popconfirm
-                      title="确定恢复默认值？"
-                      description="当前设置将被覆盖"
-                      onConfirm={() => handleResetToDefault(group.key)}
-                      okText="确定"
-                      cancelText="取消"
-                    >
-                      <Button size="small" type="link">
-                        恢复默认
-                      </Button>
-                    </Popconfirm>
-                  </Space>
-                }
-              >
-                <div style={{ marginBottom: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    {group.description}
-                  </Text>
-                </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {group.description}
+                        </Text>
+                      </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                  {state.options.length === 0 ? (
-                    <Empty
-                      description="暂无选项"
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      style={{ margin: '8px 0' }}
-                    />
-                  ) : (
-                    state.options.map((option, index) => (
-                      <Tooltip
-                        key={index}
-                        title={option.note || '暂无备注'}
-                        placement="top"
-                      >
-                        <Tag
-                          color={group.color}
-                          style={{ cursor: 'pointer', userSelect: 'none' }}
-                        >
-                          <Space size={4}>
-                            <HolderOutlined style={{ cursor: 'grab', opacity: 0.5 }} />
-                            <span>{option.value}</span>
-                            {option.note && (
-                              <InfoCircleOutlined
-                                style={{ fontSize: 10, opacity: 0.6 }}
-                              />
-                            )}
-                            <EditOutlined
-                              style={{ fontSize: 10, opacity: 0.6 }}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openEditModal(group.key, index)
-                              }}
-                            />
-                            <Popconfirm
-                              title="确定删除此选项？"
-                              onConfirm={() => handleDeleteOption(group.key, index)}
-                              okText="确定"
-                              cancelText="取消"
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                        {state.options.length === 0 ? (
+                          <Empty
+                            description="暂无选项"
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            style={{ margin: '8px 0' }}
+                          />
+                        ) : (
+                          state.options.map((option, index) => (
+                            <Tooltip
+                              key={index}
+                              title={option.note || '暂无备注'}
+                              placement="top"
                             >
-                              <DeleteOutlined
-                                style={{ fontSize: 10, opacity: 0.6, color: '#ff4d4f' }}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </Popconfirm>
-                          </Space>
-                        </Tag>
-                      </Tooltip>
-                    ))
-                  )}
-                </div>
-              </Card>
-            )
-          })}
-        </Space>
+                              <Tag
+                                color={group.color}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                <Space size={4}>
+                                  <HolderOutlined style={{ cursor: 'grab', opacity: 0.5 }} />
+                                  <span>{option.value}</span>
+                                  {option.note && (
+                                    <InfoCircleOutlined
+                                      style={{ fontSize: 10, opacity: 0.6 }}
+                                    />
+                                  )}
+                                  <EditOutlined
+                                    style={{ fontSize: 10, opacity: 0.6 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openEditModal(group.key, index)
+                                    }}
+                                  />
+                                  <Popconfirm
+                                    title="确定删除此选项？"
+                                    onConfirm={() => handleDeleteOption(group.key, index)}
+                                    okText="确定"
+                                    cancelText="取消"
+                                  >
+                                    <DeleteOutlined
+                                      style={{ fontSize: 10, opacity: 0.6, color: '#ff4d4f' }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  </Popconfirm>
+                                </Space>
+                              </Tag>
+                            </Tooltip>
+                          ))
+                        )}
+                      </div>
+                    </Card>
+                  )
+                })}
+              </Space>
+            ),
+          }))}
+        />
       </Card>
 
       {/* 添加/编辑弹窗 */}
