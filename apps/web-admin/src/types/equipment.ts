@@ -226,12 +226,21 @@ export interface EquipmentSearchFilters {
   rod_lure_weight_min?: number
   rod_lure_weight_max?: number
   sections?: number
+  // 鱼竿扩展
+  rod_weight_min?: number
+  rod_weight_max?: number
+  guide_type?: string
+  handle_type?: string
   // 渔轮专属
   reel_type?: string
   max_drag_min?: number
   max_drag_max?: number
   reel_weight_min?: number
   reel_weight_max?: number
+  // 渔轮扩展
+  gear_ratio?: string
+  bearings_min?: number
+  bearings_max?: number
   // 鱼线专属
   line_type?: string
   diameter_min?: number
@@ -244,4 +253,11 @@ export interface EquipmentSearchFilters {
   lure_weight_max?: number
   diving_depth_min?: number
   diving_depth_max?: number
+  // 拟饵扩展
+  lure_type?: string
+  lure_length_min?: number
+  lure_length_max?: number
+  // 排序
+  sort_by?: 'name' | 'price_min' | 'price_max' | 'created_at' | 'updated_at'
+  sort_order?: 'asc' | 'desc'
 }

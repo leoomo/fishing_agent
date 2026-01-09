@@ -70,12 +70,19 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       delete newFilters.rod_lure_weight_min
       delete newFilters.rod_lure_weight_max
       delete newFilters.sections
+      delete newFilters.rod_weight_min
+      delete newFilters.rod_weight_max
+      delete newFilters.guide_type
+      delete newFilters.handle_type
       // 清除渔轮专属
       delete newFilters.reel_type
       delete newFilters.max_drag_min
       delete newFilters.max_drag_max
       delete newFilters.reel_weight_min
       delete newFilters.reel_weight_max
+      delete newFilters.gear_ratio
+      delete newFilters.bearings_min
+      delete newFilters.bearings_max
       // 清除鱼线专属
       delete newFilters.line_type
       delete newFilters.diameter_min
@@ -88,6 +95,9 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       delete newFilters.lure_weight_max
       delete newFilters.diving_depth_min
       delete newFilters.diving_depth_max
+      delete newFilters.lure_type
+      delete newFilters.lure_length_min
+      delete newFilters.lure_length_max
     }
     onChange(newFilters)
   }
@@ -242,6 +252,60 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             : `0-${filters.diving_depth_max}m`
       tags.push({ key: 'diving_depth', label: '潜深', value: depthLabel })
     }
+    // 鱼竿扩展
+    if (filters.rod_weight_min !== undefined || filters.rod_weight_max !== undefined) {
+      const weightLabel =
+        filters.rod_weight_min !== undefined && filters.rod_weight_max !== undefined
+          ? `${filters.rod_weight_min}-${filters.rod_weight_max}g`
+          : filters.rod_weight_min !== undefined
+            ? `${filters.rod_weight_min}g+`
+            : `0-${filters.rod_weight_max}g`
+      tags.push({ key: 'rod_weight', label: '竿自重', value: weightLabel })
+    }
+    if (filters.guide_type) {
+      tags.push({ key: 'guide_type', label: '导环类型', value: filters.guide_type })
+    }
+    if (filters.handle_type) {
+      tags.push({ key: 'handle_type', label: '握把类型', value: filters.handle_type })
+    }
+    // 渔轮扩展
+    if (filters.gear_ratio) {
+      tags.push({ key: 'gear_ratio', label: '齿比', value: filters.gear_ratio })
+    }
+    if (filters.bearings_min !== undefined || filters.bearings_max !== undefined) {
+      const bearingsLabel =
+        filters.bearings_min !== undefined && filters.bearings_max !== undefined
+          ? `${filters.bearings_min}-${filters.bearings_max}个`
+          : filters.bearings_min !== undefined
+            ? `${filters.bearings_min}个+`
+            : `0-${filters.bearings_max}个`
+      tags.push({ key: 'bearings', label: '轴承数', value: bearingsLabel })
+    }
+    // 拟饵扩展
+    if (filters.lure_type) {
+      tags.push({ key: 'lure_type', label: '拟饵类型', value: filters.lure_type })
+    }
+    if (filters.lure_length_min !== undefined || filters.lure_length_max !== undefined) {
+      const lengthLabel =
+        filters.lure_length_min !== undefined && filters.lure_length_max !== undefined
+          ? `${filters.lure_length_min}-${filters.lure_length_max}cm`
+          : filters.lure_length_min !== undefined
+            ? `${filters.lure_length_min}cm+`
+            : `0-${filters.lure_length_max}cm`
+      tags.push({ key: 'lure_length', label: '拟饵长度', value: lengthLabel })
+    }
+    // 排序
+    if (filters.sort_by) {
+      const sortLabels: Record<string, string> = {
+        name: '名称',
+        price_min: '最低价',
+        price_max: '最高价',
+        created_at: '创建时间',
+        updated_at: '更新时间',
+      }
+      const orderLabel = filters.sort_order === 'asc' ? '升序' : '降序'
+      tags.push({ key: 'sort', label: '排序', value: `${sortLabels[filters.sort_by] || filters.sort_by} ${orderLabel}` })
+    }
 
     return tags
   }, [filters, brands])
@@ -261,6 +325,11 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       lure_weight: ['lure_weight_min', 'lure_weight_max'],
       diving_depth: ['diving_depth_min', 'diving_depth_max'],
       created_at: ['created_after', 'created_before'],
+      // 新增扩展
+      rod_weight: ['rod_weight_min', 'rod_weight_max'],
+      bearings: ['bearings_min', 'bearings_max'],
+      lure_length: ['lure_length_min', 'lure_length_max'],
+      sort: ['sort_by', 'sort_order'],
     }
 
     if (rangeKeys[key]) {
@@ -471,6 +540,32 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                       style={{ width: 240 }}
                     />
                   </Col>
+                  <Col>
+                    <span style={{ marginRight: 8 }}>排序:</span>
+                    <Select
+                      placeholder="排序字段"
+                      style={{ width: 120 }}
+                      allowClear
+                      value={filters.sort_by}
+                      onChange={(value) => handleChange('sort_by', value)}
+                      options={[
+                        { label: '名称', value: 'name' },
+                        { label: '最低价', value: 'price_min' },
+                        { label: '最高价', value: 'price_max' },
+                        { label: '创建时间', value: 'created_at' },
+                        { label: '更新时间', value: 'updated_at' },
+                      ]}
+                    />
+                    <Select
+                      style={{ width: 80, marginLeft: 4 }}
+                      value={filters.sort_order || 'desc'}
+                      onChange={(value) => handleChange('sort_order', value)}
+                      options={[
+                        { label: '降序', value: 'desc' },
+                        { label: '升序', value: 'asc' },
+                      ]}
+                    />
+                  </Col>
                 </Row>
 
                 {/* 鱼竿专属筛选 */}
@@ -566,6 +661,62 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                         />
                         <span style={{ marginLeft: 4 }}>g</span>
                       </Col>
+                      <Col>
+                        <span style={{ marginRight: 8 }}>竿自重:</span>
+                        <InputNumber
+                          placeholder="最小"
+                          style={{ width: 80 }}
+                          min={0}
+                          step={10}
+                          value={filters.rod_weight_min}
+                          onChange={(value) => handleChange('rod_weight_min', value)}
+                        />
+                        <span style={{ margin: '0 8px' }}>~</span>
+                        <InputNumber
+                          placeholder="最大"
+                          style={{ width: 80 }}
+                          min={0}
+                          step={10}
+                          value={filters.rod_weight_max}
+                          onChange={(value) => handleChange('rod_weight_max', value)}
+                        />
+                        <span style={{ marginLeft: 4 }}>g</span>
+                      </Col>
+                    </Row>
+                    <Row gutter={[16, 16]} align="middle" style={{ marginTop: 12 }}>
+                      <Col>
+                        <span style={{ marginRight: 8 }}>导环类型:</span>
+                        <Select
+                          placeholder="选择"
+                          style={{ width: 120 }}
+                          allowClear
+                          value={filters.guide_type}
+                          onChange={(value) => handleChange('guide_type', value)}
+                          options={[
+                            { label: 'Fuji', value: 'Fuji' },
+                            { label: 'SiC', value: 'SiC' },
+                            { label: '钛合金', value: '钛合金' },
+                            { label: '不锈钢', value: '不锈钢' },
+                          ]}
+                        />
+                      </Col>
+                      <Col>
+                        <span style={{ marginRight: 8 }}>握把类型:</span>
+                        <Select
+                          placeholder="选择"
+                          style={{ width: 120 }}
+                          allowClear
+                          value={filters.handle_type}
+                          onChange={(value) => handleChange('handle_type', value)}
+                          options={[
+                            { label: 'EVA', value: 'EVA' },
+                            { label: '软木', value: '软木' },
+                            { label: '碳布', value: '碳布' },
+                            { label: '直柄', value: '直柄' },
+                            { label: '枪柄', value: '枪柄' },
+                          ]}
+                        />
+                      </Col>
                     </Row>
                   </div>
                 )}
@@ -636,6 +787,49 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                           onChange={(value) => handleChange('reel_weight_max', value)}
                         />
                         <span style={{ marginLeft: 4 }}>g</span>
+                      </Col>
+                    </Row>
+                    <Row gutter={[16, 16]} align="middle" style={{ marginTop: 12 }}>
+                      <Col>
+                        <span style={{ marginRight: 8 }}>齿比:</span>
+                        <Select
+                          placeholder="选择"
+                          style={{ width: 120 }}
+                          allowClear
+                          value={filters.gear_ratio}
+                          onChange={(value) => handleChange('gear_ratio', value)}
+                          options={[
+                            { label: '4.7:1', value: '4.7:1' },
+                            { label: '5.2:1', value: '5.2:1' },
+                            { label: '5.5:1', value: '5.5:1' },
+                            { label: '6.2:1', value: '6.2:1' },
+                            { label: '6.4:1', value: '6.4:1' },
+                            { label: '7.1:1', value: '7.1:1' },
+                            { label: '7.3:1', value: '7.3:1' },
+                            { label: '8.1:1', value: '8.1:1' },
+                          ]}
+                        />
+                      </Col>
+                      <Col>
+                        <span style={{ marginRight: 8 }}>轴承数:</span>
+                        <InputNumber
+                          placeholder="最小"
+                          style={{ width: 70 }}
+                          min={0}
+                          max={20}
+                          value={filters.bearings_min}
+                          onChange={(value) => handleChange('bearings_min', value)}
+                        />
+                        <span style={{ margin: '0 8px' }}>~</span>
+                        <InputNumber
+                          placeholder="最大"
+                          style={{ width: 70 }}
+                          min={0}
+                          max={20}
+                          value={filters.bearings_max}
+                          onChange={(value) => handleChange('bearings_max', value)}
+                        />
+                        <span style={{ marginLeft: 4 }}>个</span>
                       </Col>
                     </Row>
                   </div>
@@ -772,6 +966,51 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                           onChange={(value) => handleChange('diving_depth_max', value)}
                         />
                         <span style={{ marginLeft: 4 }}>m</span>
+                      </Col>
+                    </Row>
+                    <Row gutter={[16, 16]} align="middle" style={{ marginTop: 12 }}>
+                      <Col>
+                        <span style={{ marginRight: 8 }}>拟饵类型:</span>
+                        <Select
+                          placeholder="选择"
+                          style={{ width: 140 }}
+                          allowClear
+                          value={filters.lure_type}
+                          onChange={(value) => handleChange('lure_type', value)}
+                          options={[
+                            { label: 'Crankbait', value: 'crankbait' },
+                            { label: 'Jerkbait', value: 'jerkbait' },
+                            { label: 'Topwater', value: 'topwater' },
+                            { label: 'Spinnerbait', value: 'spinnerbait' },
+                            { label: 'Jig', value: 'jig' },
+                            { label: 'Swimbait', value: 'swimbait' },
+                            { label: 'Worm', value: 'worm' },
+                            { label: 'Creature', value: 'creature' },
+                            { label: 'Spoon', value: 'spoon' },
+                            { label: 'Blade', value: 'blade' },
+                          ]}
+                        />
+                      </Col>
+                      <Col>
+                        <span style={{ marginRight: 8 }}>长度:</span>
+                        <InputNumber
+                          placeholder="最小"
+                          style={{ width: 80 }}
+                          min={0}
+                          step={0.5}
+                          value={filters.lure_length_min}
+                          onChange={(value) => handleChange('lure_length_min', value)}
+                        />
+                        <span style={{ margin: '0 8px' }}>~</span>
+                        <InputNumber
+                          placeholder="最大"
+                          style={{ width: 80 }}
+                          min={0}
+                          step={0.5}
+                          value={filters.lure_length_max}
+                          onChange={(value) => handleChange('lure_length_max', value)}
+                        />
+                        <span style={{ marginLeft: 4 }}>cm</span>
                       </Col>
                     </Row>
                   </div>

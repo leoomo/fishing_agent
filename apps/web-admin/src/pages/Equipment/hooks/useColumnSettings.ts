@@ -25,7 +25,7 @@ export const useColumnSettings = (): UseColumnSettingsReturn => {
   const [visibleColumns, setVisibleColumnsState] = useState<string[]>(getDefaultVisibleColumns())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [configId, setConfigId] = useState<number | null>(null)
+  const [configExists, setConfigExists] = useState(false)
 
   // 加载列配置
   useEffect(() => {
@@ -38,7 +38,7 @@ export const useColumnSettings = (): UseColumnSettingsReturn => {
             ? config.config_value
             : JSON.parse(config.config_value)
           setVisibleColumnsState(validateColumns(columns as string[]))
-          setConfigId(config.id)
+          setConfigExists(true)
         }
       } catch {
         // 配置不存在，使用默认值
@@ -63,20 +63,20 @@ export const useColumnSettings = (): UseColumnSettingsReturn => {
         const validColumns = validateColumns(columns)
         const configValue = JSON.stringify(validColumns)
 
-        if (configId) {
+        if (configExists) {
           // 更新现有配置（使用 config key）
           await configApi.update(COLUMN_CONFIG_KEY, {
             config_value: configValue,
           })
         } else {
           // 创建新配置
-          const newConfig = await configApi.create({
+          await configApi.create({
             config_key: COLUMN_CONFIG_KEY,
             config_value: configValue,
             config_type: 'system',
             description: '装备列表显示列配置',
           })
-          setConfigId(newConfig.id)
+          setConfigExists(true)
         }
 
         setVisibleColumnsState(validColumns)
@@ -89,7 +89,7 @@ export const useColumnSettings = (): UseColumnSettingsReturn => {
         setSaving(false)
       }
     },
-    [configId]
+    [configExists]
   )
 
   // 重置为默认配置
