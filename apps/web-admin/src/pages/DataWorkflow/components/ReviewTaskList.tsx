@@ -536,73 +536,108 @@ const ReviewTaskList: React.FC<ReviewTaskListProps> = ({
               <Descriptions.Item label="图片数量">{detailTask.images_count} 张</Descriptions.Item>
             </Descriptions>
 
-            {/* 双栏布局 */}
-            <Row gutter={16}>
-              {/* 左侧：OCR 识别原文 */}
-              <Col span={12}>
-                <Card
-                  title="OCR 识别原文"
-                  size="small"
-                  style={{ height: 500 }}
-                  styles={{ body: { height: 440, overflow: 'auto' } }}
-                >
-                  {detailTask.ocr_text ? (
-                    <div className="markdown-content">
-                      <ReactMarkdown>{detailTask.ocr_text}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <Text type="secondary">暂无 OCR 文本</Text>
-                  )}
-                </Card>
-              </Col>
+            {/* 根据来源类型动态布局 */}
+            {detailTask.source_type === 'excel_import' ? (
+              // Excel 导入：单栏全宽布局（无 OCR 原文和一键提取）
+              <Card
+                title={
+                  <Space>
+                    <span>装备信息</span>
+                    {hasChanges && <Tag color="orange">有未保存的修改</Tag>}
+                  </Space>
+                }
+                size="small"
+                style={{ marginBottom: 16 }}
+                styles={{ body: { maxHeight: 500, overflow: 'auto' } }}
+                extra={
+                  hasChanges && (
+                    <Button
+                      icon={<SaveOutlined />}
+                      onClick={handleSave}
+                      loading={saving}
+                      size="small"
+                    >
+                      保存
+                    </Button>
+                  )
+                }
+              >
+                <EquipmentEditForm
+                  items={editedItems}
+                  onChange={handleItemsChange}
+                  onReset={handleReset}
+                  disabled={false}
+                />
+              </Card>
+            ) : (
+              // OCR/爬虫导入：双栏布局
+              <Row gutter={16}>
+                {/* 左侧：OCR 识别原文 */}
+                <Col span={12}>
+                  <Card
+                    title="OCR 识别原文"
+                    size="small"
+                    style={{ height: 500 }}
+                    styles={{ body: { height: 440, overflow: 'auto' } }}
+                  >
+                    {detailTask.ocr_text ? (
+                      <div className="markdown-content">
+                        <ReactMarkdown>{detailTask.ocr_text}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <Text type="secondary">暂无 OCR 文本</Text>
+                    )}
+                  </Card>
+                </Col>
 
-              {/* 右侧：提取的装备信息 */}
-              <Col span={12}>
-                <Card
-                  title={
-                    <Space>
-                      <span>提取的装备信息</span>
-                      {hasChanges && <Tag color="orange">有未保存的修改</Tag>}
-                    </Space>
-                  }
-                  size="small"
-                  style={{ height: 500 }}
-                  styles={{ body: { height: 440, overflow: 'auto' } }}
-                  extra={
-                    <Space>
-                      <Button
-                        type="primary"
-                        icon={<ThunderboltOutlined />}
-                        onClick={handleExtract}
-                        loading={extracting}
-                        size="small"
-                      >
-                        {editedItems.length > 0 ? '重新提取' : '一键提取'}
-                      </Button>
-                      {hasChanges && (
+                {/* 右侧：提取的装备信息 */}
+                <Col span={12}>
+                  <Card
+                    title={
+                      <Space>
+                        <span>提取的装备信息</span>
+                        {hasChanges && <Tag color="orange">有未保存的修改</Tag>}
+                      </Space>
+                    }
+                    size="small"
+                    style={{ height: 500 }}
+                    styles={{ body: { height: 440, overflow: 'auto' } }}
+                    extra={
+                      <Space>
                         <Button
-                          icon={<SaveOutlined />}
-                          onClick={handleSave}
-                          loading={saving}
+                          type="primary"
+                          icon={<ThunderboltOutlined />}
+                          onClick={handleExtract}
+                          loading={extracting}
                           size="small"
                         >
-                          保存
+                          {editedItems.length > 0 ? '重新提取' : '一键提取'}
                         </Button>
-                      )}
-                    </Space>
-                  }
-                >
-                  <Spin spinning={extracting} tip="正在提取装备信息...">
-                    <EquipmentEditForm
-                      items={editedItems}
-                      onChange={handleItemsChange}
-                      onReset={handleReset}
-                      disabled={false}
-                    />
-                  </Spin>
-                </Card>
-              </Col>
-            </Row>
+                        {hasChanges && (
+                          <Button
+                            icon={<SaveOutlined />}
+                            onClick={handleSave}
+                            loading={saving}
+                            size="small"
+                          >
+                            保存
+                          </Button>
+                        )}
+                      </Space>
+                    }
+                  >
+                    <Spin spinning={extracting} tip="正在提取装备信息...">
+                      <EquipmentEditForm
+                        items={editedItems}
+                        onChange={handleItemsChange}
+                        onReset={handleReset}
+                        disabled={false}
+                      />
+                    </Spin>
+                  </Card>
+                </Col>
+              </Row>
+            )}
 
             {/* 审核信息 */}
             {detailTask.reviewed_at && (
