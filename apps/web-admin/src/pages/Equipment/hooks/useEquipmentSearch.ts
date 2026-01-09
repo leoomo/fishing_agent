@@ -41,12 +41,21 @@ const URL_PARAM_KEYS: (keyof EquipmentSearchFilters)[] = [
   'rod_lure_weight_min',
   'rod_lure_weight_max',
   'sections',
+  // 鱼竿扩展
+  'rod_weight_min',
+  'rod_weight_max',
+  'guide_type',
+  'handle_type',
   // 渔轮专属
   'reel_type',
   'max_drag_min',
   'max_drag_max',
   'reel_weight_min',
   'reel_weight_max',
+  // 渔轮扩展
+  'gear_ratio',
+  'bearings_min',
+  'bearings_max',
   // 鱼线专属
   'line_type',
   'diameter_min',
@@ -59,6 +68,13 @@ const URL_PARAM_KEYS: (keyof EquipmentSearchFilters)[] = [
   'lure_weight_max',
   'diving_depth_min',
   'diving_depth_max',
+  // 拟饵扩展
+  'lure_type',
+  'lure_length_min',
+  'lure_length_max',
+  // 排序
+  'sort_by',
+  'sort_order',
 ]
 
 export function useEquipmentSearch(
@@ -72,11 +88,13 @@ export function useEquipmentSearch(
   const FLOAT_PARAMS: (keyof EquipmentSearchFilters)[] = [
     'price_min', 'price_max', 'length_min', 'length_max',
     'rod_lure_weight_min', 'rod_lure_weight_max',
+    'rod_weight_min', 'rod_weight_max',
     'max_drag_min', 'max_drag_max', 'reel_weight_min', 'reel_weight_max',
     'diameter_min', 'diameter_max', 'strength_min', 'strength_max',
     'lure_weight_min', 'lure_weight_max', 'diving_depth_min', 'diving_depth_max',
+    'lure_length_min', 'lure_length_max',
   ]
-  const INT_PARAMS: (keyof EquipmentSearchFilters)[] = ['brand_id', 'sections']
+  const INT_PARAMS: (keyof EquipmentSearchFilters)[] = ['brand_id', 'sections', 'bearings_min', 'bearings_max']
 
   // 从 URL 解析初始筛选条件
   const parseFiltersFromURL = useCallback((): EquipmentSearchFilters => {

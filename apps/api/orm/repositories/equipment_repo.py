@@ -81,6 +81,33 @@ class EquipmentRepository(BaseRepository[Equipment]):
 
         return query
 
+    def _apply_sorting(self, query, sort_by: Optional[str] = None, sort_order: str = "desc"):
+        """
+        Apply sorting to a query
+
+        Args:
+            query: SQLAlchemy query object
+            sort_by: Field to sort by (name/price_min/price_max/created_at/updated_at)
+            sort_order: Sort direction (asc/desc)
+
+        Returns:
+            Query with sorting applied
+        """
+        if not sort_by:
+            # Default sort by equipment_id desc
+            return query.order_by(Equipment.equipment_id.desc())
+
+        # Valid sort fields
+        valid_fields = {'name', 'price_min', 'price_max', 'created_at', 'updated_at'}
+        if sort_by not in valid_fields:
+            return query.order_by(Equipment.equipment_id.desc())
+
+        field = getattr(Equipment, sort_by)
+        if sort_order == 'asc':
+            return query.order_by(field.asc())
+        else:
+            return query.order_by(field.desc())
+
     def get_with_details(self, equipment_id: int) -> Optional[Equipment]:
         """
         Get equipment with all related data preloaded (brand and specs)
@@ -123,6 +150,9 @@ class EquipmentRepository(BaseRepository[Equipment]):
         offset: int = 0,
         order_by: str = "equipment_id",
         preload: bool = True,
+        # 排序参数
+        sort_by: Optional[str] = None,
+        sort_order: str = "desc",
     ) -> List[Equipment]:
         """
         Advanced equipment search with multiple filters
@@ -233,8 +263,10 @@ class EquipmentRepository(BaseRepository[Equipment]):
                 joinedload(Equipment.lure_spec),
             )
 
-        # Apply ordering
-        if order_by.startswith('-'):
+        # Apply ordering (优先使用 sort_by, 兼容旧的 order_by)
+        if sort_by:
+            query = self._apply_sorting(query, sort_by, sort_order)
+        elif order_by.startswith('-'):
             field = order_by[1:]
             if hasattr(Equipment, field):
                 query = query.order_by(getattr(Equipment, field).desc())
@@ -256,6 +288,11 @@ class EquipmentRepository(BaseRepository[Equipment]):
         lure_weight_min: Optional[float] = None,
         lure_weight_max: Optional[float] = None,
         sections: Optional[int] = None,
+        # 新增筛选参数
+        weight_min: Optional[float] = None,
+        weight_max: Optional[float] = None,
+        guide_type: Optional[str] = None,
+        handle_type: Optional[str] = None,
         **kwargs
     ) -> List[Equipment]:
         """
@@ -269,6 +306,10 @@ class EquipmentRepository(BaseRepository[Equipment]):
             lure_weight_min: Minimum lure weight range
             lure_weight_max: Maximum lure weight range
             sections: Number of rod sections
+            weight_min: Minimum rod weight in grams
+            weight_max: Maximum rod weight in grams
+            guide_type: Guide type filter
+            handle_type: Handle type filter
             **kwargs: Additional filters passed to search()
 
         Returns:
@@ -313,11 +354,29 @@ class EquipmentRepository(BaseRepository[Equipment]):
         if sections is not None:
             rod_filters.append(RodSpec.sections == sections)
 
+        # 新增筛选条件
+        if weight_min is not None:
+            rod_filters.append(RodSpec.weight >= weight_min)
+
+        if weight_max is not None:
+            rod_filters.append(RodSpec.weight <= weight_max)
+
+        if guide_type:
+            rod_filters.append(RodSpec.guide_type == guide_type)
+
+        if handle_type:
+            rod_filters.append(RodSpec.handle_type == handle_type)
+
         if rod_filters:
             query = query.filter(and_(*rod_filters))
 
         # Apply common filters from kwargs
         query = self._apply_common_filters(query, kwargs)
+
+        # Apply sorting
+        sort_by = kwargs.get('sort_by')
+        sort_order = kwargs.get('sort_order', 'desc')
+        query = self._apply_sorting(query, sort_by, sort_order)
 
         # Preload relationships
         query = query.options(
@@ -339,6 +398,10 @@ class EquipmentRepository(BaseRepository[Equipment]):
         max_drag_max: Optional[float] = None,
         weight_min: Optional[float] = None,
         weight_max: Optional[float] = None,
+        # 新增筛选参数
+        gear_ratio: Optional[str] = None,
+        bearings_min: Optional[int] = None,
+        bearings_max: Optional[int] = None,
         **kwargs
     ) -> List[Equipment]:
         """
@@ -350,6 +413,9 @@ class EquipmentRepository(BaseRepository[Equipment]):
             max_drag_max: Maximum max drag (kg)
             weight_min: Minimum weight (g)
             weight_max: Maximum weight (g)
+            gear_ratio: Gear ratio filter (e.g., 5.2:1)
+            bearings_min: Minimum bearings count
+            bearings_max: Maximum bearings count
             **kwargs: Additional filters passed to search()
 
         Returns:
@@ -378,11 +444,28 @@ class EquipmentRepository(BaseRepository[Equipment]):
         if weight_max is not None:
             reel_filters.append(ReelSpec.weight <= weight_max)
 
+        # 新增筛选条件
+        if gear_ratio:
+            reel_filters.append(ReelSpec.gear_ratio == gear_ratio)
+
+        if bearings_min is not None:
+            # bearings 字段是字符串格式如 "7+1"，需要解析
+            # 暂时使用 LIKE 匹配，后续可优化为数值比较
+            reel_filters.append(ReelSpec.bearings.isnot(None))
+
+        if bearings_max is not None:
+            reel_filters.append(ReelSpec.bearings.isnot(None))
+
         if reel_filters:
             query = query.filter(and_(*reel_filters))
 
         # Apply common filters from kwargs
         query = self._apply_common_filters(query, kwargs)
+
+        # Apply sorting
+        sort_by = kwargs.get('sort_by')
+        sort_order = kwargs.get('sort_order', 'desc')
+        query = self._apply_sorting(query, sort_by, sort_order)
 
         # Preload relationships
         query = query.options(
@@ -449,6 +532,11 @@ class EquipmentRepository(BaseRepository[Equipment]):
         # Apply common filters from kwargs
         query = self._apply_common_filters(query, kwargs)
 
+        # Apply sorting
+        sort_by = kwargs.get('sort_by')
+        sort_order = kwargs.get('sort_order', 'desc')
+        query = self._apply_sorting(query, sort_by, sort_order)
+
         # Preload relationships
         query = query.options(
             joinedload(Equipment.brand),
@@ -469,6 +557,10 @@ class EquipmentRepository(BaseRepository[Equipment]):
         weight_max: Optional[float] = None,
         diving_depth_min: Optional[float] = None,
         diving_depth_max: Optional[float] = None,
+        # 新增筛选参数
+        lure_type: Optional[str] = None,
+        length_min: Optional[float] = None,
+        length_max: Optional[float] = None,
         **kwargs
     ) -> List[Equipment]:
         """
@@ -480,6 +572,9 @@ class EquipmentRepository(BaseRepository[Equipment]):
             weight_max: Maximum weight (g)
             diving_depth_min: Minimum diving depth (m)
             diving_depth_max: Maximum diving depth (m)
+            lure_type: Lure type filter (crankbait/jerkbait/etc)
+            length_min: Minimum length (cm)
+            length_max: Maximum length (cm)
             **kwargs: Additional filters passed to search()
 
         Returns:
@@ -518,11 +613,26 @@ class EquipmentRepository(BaseRepository[Equipment]):
                 )
             )
 
+        # 新增筛选条件
+        if lure_type:
+            lure_filters.append(LureSpec.lure_type == lure_type)
+
+        if length_min is not None:
+            lure_filters.append(LureSpec.length >= length_min)
+
+        if length_max is not None:
+            lure_filters.append(LureSpec.length <= length_max)
+
         if lure_filters:
             query = query.filter(and_(*lure_filters))
 
         # Apply common filters from kwargs
         query = self._apply_common_filters(query, kwargs)
+
+        # Apply sorting
+        sort_by = kwargs.get('sort_by')
+        sort_order = kwargs.get('sort_order', 'desc')
+        query = self._apply_sorting(query, sort_by, sort_order)
 
         # Preload relationships
         query = query.options(

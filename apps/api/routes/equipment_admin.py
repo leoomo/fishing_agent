@@ -175,6 +175,22 @@ async def list_equipment(
     lure_weight_max: Optional[float] = Query(None, description="拟饵重量最大值（拟饵专属）"),
     diving_depth_min: Optional[float] = Query(None, description="潜深最小值（拟饵专属）"),
     diving_depth_max: Optional[float] = Query(None, description="潜深最大值（拟饵专属）"),
+    # 新增：鱼竿扩展筛选
+    rod_weight_min: Optional[float] = Query(None, description="竿自重最小值（鱼竿专属，克）"),
+    rod_weight_max: Optional[float] = Query(None, description="竿自重最大值（鱼竿专属，克）"),
+    guide_type: Optional[str] = Query(None, description="导环类型过滤（鱼竿专属）"),
+    handle_type: Optional[str] = Query(None, description="握把类型过滤（鱼竿专属）"),
+    # 新增：渔轮扩展筛选
+    gear_ratio: Optional[str] = Query(None, description="齿比过滤（渔轮专属，如5.2:1）"),
+    bearings_min: Optional[int] = Query(None, description="轴承数最小值（渔轮专属）"),
+    bearings_max: Optional[int] = Query(None, description="轴承数最大值（渔轮专属）"),
+    # 新增：拟饵扩展筛选
+    lure_type: Optional[str] = Query(None, description="拟饵类型过滤（拟饵专属）"),
+    lure_length_min: Optional[float] = Query(None, description="拟饵长度最小值（拟饵专属，cm）"),
+    lure_length_max: Optional[float] = Query(None, description="拟饵长度最大值（拟饵专属，cm）"),
+    # 排序参数
+    sort_by: Optional[str] = Query(None, description="排序字段: name/price_min/price_max/created_at/updated_at"),
+    sort_order: Optional[str] = Query("desc", description="排序方向: asc/desc"),
 ):
     """
     查询装备列表（分页 + 多条件筛选）
@@ -188,10 +204,10 @@ async def list_equipment(
             repo = EquipmentRepository(session)
 
             # 检查是否有各类别专属筛选参数
-            has_rod_filters = any([power, action, length_min, length_max, rod_lure_weight_min, rod_lure_weight_max, sections])
-            has_reel_filters = any([reel_type, max_drag_min, max_drag_max, reel_weight_min, reel_weight_max])
+            has_rod_filters = any([power, action, length_min, length_max, rod_lure_weight_min, rod_lure_weight_max, sections, rod_weight_min, rod_weight_max, guide_type, handle_type])
+            has_reel_filters = any([reel_type, max_drag_min, max_drag_max, reel_weight_min, reel_weight_max, gear_ratio, bearings_min, bearings_max])
             has_line_filters = any([line_type, diameter_min, diameter_max, strength_min, strength_max])
-            has_lure_filters = any([lure_category, lure_weight_min, lure_weight_max, diving_depth_min, diving_depth_max])
+            has_lure_filters = any([lure_category, lure_weight_min, lure_weight_max, diving_depth_min, diving_depth_max, lure_type, lure_length_min, lure_length_max])
 
             # 通用查询参数
             common_kwargs = {
@@ -207,7 +223,9 @@ async def list_equipment(
                 'created_before': created_before,
                 'limit': page_size,
                 'offset': (page - 1) * page_size,
-                'preload': True
+                'preload': True,
+                'sort_by': sort_by,
+                'sort_order': sort_order,
             }
 
             # 根据类别专属筛选选择查询方法
@@ -220,6 +238,10 @@ async def list_equipment(
                     lure_weight_min=rod_lure_weight_min,
                     lure_weight_max=rod_lure_weight_max,
                     sections=sections,
+                    weight_min=rod_weight_min,
+                    weight_max=rod_weight_max,
+                    guide_type=guide_type,
+                    handle_type=handle_type,
                     **common_kwargs
                 )
             elif has_reel_filters and (category == '渔轮' or category is None):
@@ -229,6 +251,9 @@ async def list_equipment(
                     max_drag_max=max_drag_max,
                     weight_min=reel_weight_min,
                     weight_max=reel_weight_max,
+                    gear_ratio=gear_ratio,
+                    bearings_min=bearings_min,
+                    bearings_max=bearings_max,
                     **common_kwargs
                 )
             elif has_line_filters and (category == '鱼线' or category is None):
@@ -247,6 +272,9 @@ async def list_equipment(
                     weight_max=lure_weight_max,
                     diving_depth_min=diving_depth_min,
                     diving_depth_max=diving_depth_max,
+                    lure_type=lure_type,
+                    length_min=lure_length_min,
+                    length_max=lure_length_max,
                     **common_kwargs
                 )
             else:
