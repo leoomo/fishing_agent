@@ -138,6 +138,7 @@ class RodSpec(Base):
     tip_diameter = Column(Float, comment="Tip diameter in mm")
     butt_diameter = Column(Float, comment="Butt diameter in mm")
     handle_length = Column(Float, comment="Handle length in cm")
+    carbon_content = Column(Float, comment="Carbon content percentage (0-100)")
     craft_description = Column(Text, comment="Craft and build description")
 
     # Relationships
@@ -166,6 +167,7 @@ class RodSpec(Base):
             'tip_diameter': self.tip_diameter,
             'butt_diameter': self.butt_diameter,
             'handle_length': self.handle_length,
+            'carbon_content': self.carbon_content,
             'craft_description': self.craft_description,
         }
 

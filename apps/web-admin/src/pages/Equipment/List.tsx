@@ -164,6 +164,16 @@ const EquipmentList = () => {
             : '-',
       },
       {
+        key: 'length',
+        title: '竿长',
+        width: 80,
+        render: (_: unknown, record: Equipment) => {
+          if (record.category !== '鱼竿') return '-'
+          const specs = record.specs as Record<string, unknown> | undefined
+          return specs?.length ? `${specs.length}m` : '-'
+        },
+      },
+      {
         key: 'action',
         title: '动作',
         width: 80,
@@ -194,48 +204,26 @@ const EquipmentList = () => {
         },
       },
       {
-        key: 'specs',
-        title: '规格信息',
-        width: 250,
+        key: 'weight',
+        title: '自重',
+        width: 80,
         render: (_: unknown, record: Equipment) => {
+          if (record.category !== '鱼竿') return '-'
           const specs = record.specs as Record<string, unknown> | undefined
-          if (!specs) return '-'
-
-          switch (record.category) {
-            case '鱼竿':
-              const rodSpecs = []
-              if (specs.length) rodSpecs.push(`${specs.length}m`)
-              if (specs.power) rodSpecs.push(specs.power)
-              if (specs.weight) rodSpecs.push(`${specs.weight}g`)
-              if (specs.lure_weight_min && specs.lure_weight_max) {
-                rodSpecs.push(`${specs.lure_weight_min}-${specs.lure_weight_max}g饵`)
-              }
-              return rodSpecs.join(' | ') || '-'
-
-            case '渔轮':
-              const reelSpecs = []
-              if (specs.gear_ratio) reelSpecs.push(`齿比${specs.gear_ratio}`)
-              if (specs.bearings) reelSpecs.push(`${specs.bearings}+1BB`)
-              if (specs.weight) reelSpecs.push(`${specs.weight}g`)
-              return reelSpecs.join(' | ') || '-'
-
-            case '鱼线':
-              const lineSpecs = []
-              if (specs.diameter) lineSpecs.push(`${specs.diameter}mm`)
-              if (specs.strength) lineSpecs.push(`${specs.strength}kg`)
-              if (specs.type) lineSpecs.push(specs.type)
-              return lineSpecs.join(' | ') || '-'
-
-            case '拟饵':
-              const lureSpecs = []
-              if (specs.weight) lureSpecs.push(`${specs.weight}g`)
-              if (specs.type) lureSpecs.push(specs.type)
-              if (specs.diving_depth) lureSpecs.push(`${specs.diving_depth}m`)
-              return lureSpecs.join(' | ') || '-'
-
-            default:
-              return '-'
+          return specs?.weight ? `${specs.weight}g` : '-'
+        },
+      },
+      {
+        key: 'lure_weight',
+        title: '饵重范围',
+        width: 120,
+        render: (_: unknown, record: Equipment) => {
+          if (record.category !== '鱼竿') return '-'
+          const specs = record.specs as Record<string, unknown> | undefined
+          if (specs?.lure_weight_min && specs?.lure_weight_max) {
+            return `${specs.lure_weight_min}-${specs.lure_weight_max}g`
           }
+          return '-'
         },
       },
       {

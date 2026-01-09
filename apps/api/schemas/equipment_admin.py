@@ -29,6 +29,7 @@ class RodSpecsBase(BaseModel):
     tip_diameter: Optional[float] = Field(None, ge=0, description="竿稍直径（mm）")
     butt_diameter: Optional[float] = Field(None, ge=0, description="竿柄直径（mm）")
     handle_length: Optional[float] = Field(None, ge=0, description="握把长度（cm）")
+    carbon_content: Optional[float] = Field(None, ge=0, le=100, description="含碳量（%）")
     craft_description: Optional[str] = Field(None, max_length=500, description="工艺描述")
 
 

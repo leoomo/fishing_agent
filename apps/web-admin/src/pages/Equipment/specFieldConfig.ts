@@ -167,6 +167,16 @@ export const ROD_SPEC_FIELDS: SpecFieldDef[] = [
     group: 'advanced',
   },
   {
+    name: 'carbon_content',
+    label: '含碳量',
+    type: 'number',
+    min: 0,
+    max: 100,
+    step: 1,
+    addonAfter: '%',
+    group: 'advanced',
+  },
+  {
     name: 'handle_length',
     label: '握把长度',
     type: 'number',
