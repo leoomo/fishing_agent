@@ -2,11 +2,18 @@
 分布式 Worker API 路由
 
 提供远程 Worker 领取任务、汇报结果、心跳保活的接口
+
+优化版本:
+- Worker 状态持久化到数据库
+- 动态心跳间隔
+- 任务优先级队列
 """
 
+import hashlib
 import json
 import logging
 import secrets
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional, List
 
@@ -15,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from packages.scraper.database import get_crawler_db
 from packages.scraper.models import CrawlerTask, TaskStatus, CrawlerLog, LogLevel
+from packages.scraper.models.node import CrawlerNode, NodeStatus, NodeTaskAssignment
 from apps.api.schemas.crawler import (
     PendingEquipmentSubmit,
     PendingEquipmentSubmitResponse,
@@ -23,6 +31,41 @@ from apps.api.schemas.crawler import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ========== 工具函数 ==========
+
+def hash_secret(secret: str) -> str:
+    """哈希密钥"""
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+def verify_secret(secret: str, secret_hash: str) -> bool:
+    """验证密钥"""
+    return hash_secret(secret) == secret_hash
+
+
+def calculate_heartbeat_interval(worker_load: float, queue_length: int) -> int:
+    """
+    根据负载动态计算心跳间隔
+
+    Args:
+        worker_load: Worker 负载率 (0.0-1.0)
+        queue_length: 任务队列长度
+
+    Returns:
+        心跳间隔（秒）
+    """
+    if queue_length > 100:
+        return 10  # 队列积压，加快心跳以便快速分配任务
+    elif queue_length > 50:
+        return 15
+    elif worker_load > 0.8:
+        return 60  # 高负载，减少心跳以降低开销
+    elif worker_load > 0.5:
+        return 45
+    else:
+        return 30  # 正常
 
 
 # ========== 数据模型 ==========
@@ -83,19 +126,21 @@ class HeartbeatResponse(BaseModel):
     success: bool
     server_time: str
     commands: List[dict] = Field(default_factory=list, description="服务器下发的命令")
+    next_heartbeat_seconds: int = Field(default=30, description="下次心跳间隔（秒）")
 
 
 # ========== Worker 认证 ==========
 
-# 简单的 API Key 认证（生产环境应使用更安全的方式）
-WORKER_API_KEYS = {}  # worker_id -> api_key 映射，动态注册
+# 内存缓存（可选，用于减少数据库查询）
+_worker_cache: dict = {}
+_cache_ttl = 300  # 缓存有效期（秒）
 
 
 def verify_worker_token(x_worker_token: str = Header(None)) -> str:
     """
-    验证 Worker Token
+    验证 Worker Token - 使用数据库持久化验证
 
-    简化版：只检查 token 格式，生产环境应验证签名
+    Token 格式: node_id:secret
     """
     if not x_worker_token:
         raise HTTPException(
@@ -103,24 +148,58 @@ def verify_worker_token(x_worker_token: str = Header(None)) -> str:
             detail="缺少 X-Worker-Token 头"
         )
 
-    # Token 格式: worker_id:secret
+    # Token 格式: node_id:secret
     if ":" not in x_worker_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的 Token 格式"
         )
 
-    worker_id, secret = x_worker_token.split(":", 1)
+    node_id, secret = x_worker_token.split(":", 1)
 
-    # 验证 (简化版，生产环境应该查数据库或 Redis)
-    if worker_id in WORKER_API_KEYS:
-        if WORKER_API_KEYS[worker_id] != secret:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token 验证失败"
-            )
+    # 检查缓存
+    cache_key = f"{node_id}:{hash_secret(secret)}"
+    if cache_key in _worker_cache:
+        cache_entry = _worker_cache[cache_key]
+        if datetime.utcnow().timestamp() - cache_entry['time'] < _cache_ttl:
+            return node_id
 
-    return worker_id
+    # 从数据库验证
+    db = get_crawler_db()
+    try:
+        with db.session_scope() as session:
+            node = session.query(CrawlerNode).filter(
+                CrawlerNode.node_id == node_id
+            ).first()
+
+            if not node:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Worker 未注册"
+                )
+
+            if not verify_secret(secret, node.node_secret_hash):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token 验证失败"
+                )
+
+            # 更新缓存
+            _worker_cache[cache_key] = {
+                'time': datetime.utcnow().timestamp(),
+                'node_id': node_id
+            }
+
+            return node_id
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Worker token verification failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="认证服务异常"
+        )
 
 
 # ========== API 端点 ==========
@@ -129,56 +208,111 @@ def verify_worker_token(x_worker_token: str = Header(None)) -> str:
     "/register",
     response_model=dict,
     summary="注册 Worker",
-    description="Worker 首次连接时注册，获取认证 Token"
+    description="Worker 首次连接时注册，获取认证 Token（持久化到数据库）"
 )
 async def register_worker(info: WorkerInfo):
     """
-    注册新的 Worker
+    注册新的 Worker - 持久化到数据库
 
     返回用于后续请求的认证 Token
     """
-    # 生成 API Key
-    api_key = secrets.token_urlsafe(32)
-    WORKER_API_KEYS[info.worker_id] = api_key
+    db = get_crawler_db()
 
-    logger.info(
-        f"Worker 注册: id={info.worker_id}, name={info.worker_name}, "
-        f"types={info.supported_types}"
-    )
+    try:
+        with db.session_scope() as session:
+            # 检查是否已注册
+            existing = session.query(CrawlerNode).filter(
+                CrawlerNode.node_id == info.worker_id
+            ).first()
 
-    return {
-        "success": True,
-        "worker_id": info.worker_id,
-        "token": f"{info.worker_id}:{api_key}",
-        "message": "注册成功，请在后续请求中使用 X-Worker-Token 头"
-    }
+            if existing:
+                # 已存在，更新信息并重新生成密钥
+                node_secret = secrets.token_urlsafe(32)
+                existing.node_name = info.worker_name or existing.node_name
+                existing.capabilities = json.dumps(info.supported_types)
+                existing.max_concurrent_tasks = info.max_concurrent
+                existing.ip_address = info.ip_address
+                existing.node_secret_hash = hash_secret(node_secret)
+                existing.status = NodeStatus.ONLINE
+                existing.last_heartbeat = datetime.utcnow()
+
+                session.commit()
+
+                logger.info(f"Worker 重新注册: id={info.worker_id}")
+
+                return {
+                    "success": True,
+                    "worker_id": info.worker_id,
+                    "token": f"{info.worker_id}:{node_secret}",
+                    "message": "重新注册成功，已更新认证密钥"
+                }
+
+            # 新注册
+            node_id = info.worker_id or str(uuid.uuid4())
+            node_secret = secrets.token_urlsafe(32)
+
+            node = CrawlerNode(
+                node_id=node_id,
+                node_name=info.worker_name or f"Worker-{node_id[:8]}",
+                node_secret_hash=hash_secret(node_secret),
+                capabilities=json.dumps(info.supported_types),
+                max_concurrent_tasks=info.max_concurrent,
+                ip_address=info.ip_address,
+                status=NodeStatus.ONLINE,
+                last_heartbeat=datetime.utcnow(),
+            )
+
+            session.add(node)
+            session.commit()
+
+            logger.info(
+                f"Worker 注册: id={node_id}, name={info.worker_name}, "
+                f"types={info.supported_types}"
+            )
+
+            return {
+                "success": True,
+                "worker_id": node_id,
+                "token": f"{node_id}:{node_secret}",
+                "message": "注册成功，请在后续请求中使用 X-Worker-Token 头"
+            }
+
+    except Exception as e:
+        logger.error(f"Worker 注册失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @router.post(
     "/claim",
     response_model=TaskClaimResponse,
     summary="领取任务",
-    description="Worker 主动领取待执行的任务"
+    description="Worker 主动领取待执行的任务（支持优先级队列）"
 )
 async def claim_tasks(
     request: TaskClaimRequest,
     worker_id: str = Depends(verify_worker_token)
 ):
     """
-    领取待执行任务
+    领取待执行任务 - 支持优先级队列
 
     Worker 定期调用此接口获取新任务
+    优先级高的任务优先被领取
     """
     db = get_crawler_db()
 
     try:
         with db.session_scope() as session:
             # 查找已启动等待领取的任务（QUEUED 状态）
+            # 优先级队列: priority DESC, created_at ASC
             query = session.query(CrawlerTask).filter(
                 CrawlerTask.status == TaskStatus.QUEUED,
                 CrawlerTask.task_type.in_(request.supported_types)
             ).order_by(
-                CrawlerTask.created_at.asc()  # 先进先出
+                CrawlerTask.priority.desc(),  # 高优先级优先
+                CrawlerTask.created_at.asc()  # 同优先级先进先出
             ).limit(request.max_tasks)
 
             tasks = query.all()
@@ -366,23 +500,55 @@ async def report_progress(
     "/heartbeat",
     response_model=HeartbeatResponse,
     summary="心跳保活",
-    description="Worker 定期发送心跳，汇报状态"
+    description="Worker 定期发送心跳，汇报状态（支持动态心跳间隔）"
 )
 async def heartbeat(
     request: HeartbeatRequest,
     worker_id: str = Depends(verify_worker_token)
 ):
     """
-    心跳接口
+    心跳接口 - 支持动态心跳间隔
 
     Worker 定期调用，服务器可以下发命令
+    同时更新 Worker 状态到数据库
     """
     commands = []
+    next_heartbeat_seconds = 30
 
-    # 检查是否有需要取消的任务
     db = get_crawler_db()
     try:
         with db.session_scope() as session:
+            # 更新 Worker 状态
+            node = session.query(CrawlerNode).filter(
+                CrawlerNode.node_id == worker_id
+            ).first()
+
+            if node:
+                node.last_heartbeat = datetime.utcnow()
+                node.current_tasks = len(request.current_tasks)
+                node.running_task_ids = json.dumps(request.current_tasks)
+                node.status = NodeStatus.ONLINE
+
+                if request.cpu_usage is not None:
+                    node.cpu_usage = request.cpu_usage
+                if request.memory_usage is not None:
+                    node.memory_usage = request.memory_usage
+
+                # 计算 Worker 负载率
+                worker_load = node.current_tasks / max(node.max_concurrent_tasks, 1)
+
+                # 获取待处理任务队列长度
+                queue_length = session.query(CrawlerTask).filter(
+                    CrawlerTask.status == TaskStatus.QUEUED
+                ).count()
+
+                # 动态计算心跳间隔
+                next_heartbeat_seconds = calculate_heartbeat_interval(
+                    worker_load, queue_length
+                )
+                node.heartbeat_interval = next_heartbeat_seconds
+
+            # 检查是否有需要取消的任务
             for task_id in request.current_tasks:
                 task = session.query(CrawlerTask).filter(
                     CrawlerTask.id == task_id
@@ -397,29 +563,78 @@ async def heartbeat(
                             "task_id": task_id,
                             "reason": "任务已被用户取消"
                         })
+
+            session.commit()
+
     except Exception as e:
         logger.error(f"心跳处理失败: {e}")
 
     return HeartbeatResponse(
         success=True,
         server_time=datetime.utcnow().isoformat(),
-        commands=commands
+        commands=commands,
+        next_heartbeat_seconds=next_heartbeat_seconds
     )
 
 
 @router.get(
     "/status",
     summary="获取 Worker 状态",
-    description="获取所有注册的 Worker 状态"
+    description="获取所有注册的 Worker 状态（从数据库读取）"
 )
 async def get_workers_status():
     """
-    获取所有 Worker 的状态（管理接口）
+    获取所有 Worker 的状态（管理接口）- 从数据库读取
     """
-    return {
-        "registered_workers": list(WORKER_API_KEYS.keys()),
-        "total_count": len(WORKER_API_KEYS)
-    }
+    db = get_crawler_db()
+
+    try:
+        with db.session_scope() as session:
+            # 获取所有 Worker
+            nodes = session.query(CrawlerNode).all()
+
+            # 检查在线状态（超过 5 分钟未心跳视为离线）
+            now = datetime.utcnow()
+            offline_threshold = now - timedelta(minutes=5)
+
+            workers = []
+            online_count = 0
+            total_tasks = 0
+
+            for node in nodes:
+                is_online = (
+                    node.last_heartbeat and
+                    node.last_heartbeat > offline_threshold and
+                    node.status == NodeStatus.ONLINE
+                )
+
+                if is_online:
+                    online_count += 1
+                    total_tasks += node.current_tasks
+
+                workers.append({
+                    'id': node.node_id,
+                    'name': node.node_name,
+                    'status': 'active' if is_online else 'inactive',
+                    'current_task': node.running_task_ids,
+                    'tasks_completed': node.total_completed,
+                    'cpu_usage': node.cpu_usage,
+                    'memory_usage': node.memory_usage,
+                    'disk_usage': node.disk_usage,
+                    'last_heartbeat': node.last_heartbeat.isoformat() if node.last_heartbeat else None,
+                    'worker_version': node.worker_version,
+                })
+
+            return {
+                "workers": workers,
+                "total_count": len(nodes),
+                "online_count": online_count,
+                "total_running_tasks": total_tasks
+            }
+
+    except Exception as e:
+        logger.error(f"获取 Worker 状态失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post(
