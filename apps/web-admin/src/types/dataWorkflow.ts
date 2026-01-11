@@ -30,16 +30,25 @@ export interface WorkflowStats {
 
 export interface WorkerInfo {
   id: string
+  name?: string
   status: 'active' | 'inactive'
-  current_task: number | null
+  current_task: number | string | null  // 可能是单个ID或JSON字符串
   last_heartbeat: string | null
   ocr_provider: string | null
   tasks_completed: number
+  // 新增：系统指标
+  cpu_usage?: number | null
+  memory_usage?: number | null
+  disk_usage?: number | null
+  worker_version?: string | null
 }
 
 export interface WorkerListResponse {
   workers: WorkerInfo[]
   total_active: number
+  total_count?: number
+  online_count?: number
+  total_running_tasks?: number
 }
 
 // ========== OCR 任务 ==========
