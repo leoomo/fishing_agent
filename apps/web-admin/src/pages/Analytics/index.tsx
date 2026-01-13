@@ -15,6 +15,8 @@ import {
   DatePicker,
   Space,
   Descriptions,
+  Tag,
+  Tooltip,
 } from 'antd'
 import {
   BarChartOutlined,
@@ -23,6 +25,8 @@ import {
   FileTextOutlined,
   DownloadOutlined,
   ReloadOutlined,
+  FireOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { analyticsApi } from '@/api/services/analytics'
@@ -32,12 +36,25 @@ import type {
   PriceDistribution,
   BrandStats,
   BusinessReport,
+  UserRetention,
+  QueryHotspot,
 } from '@/types/analytics'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { Dayjs } from 'dayjs'
 
 const { Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
+
+// 独立加载状态类型
+interface LoadingStates {
+  stats: boolean
+  trends: boolean
+  priceDistribution: boolean
+  brandStats: boolean
+  categories: boolean
+  retention: boolean
+  hotspots: boolean
+}
 
 // CSV 导出工具函数
 const exportToCSV = (data: Record<string, unknown>[], filename: string) => {
@@ -73,12 +90,25 @@ const exportToCSV = (data: Record<string, unknown>[], filename: string) => {
 }
 
 const Analytics = () => {
-  const [loading, setLoading] = useState(true)
+  // 独立加载状态
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+    stats: true,
+    trends: true,
+    priceDistribution: true,
+    brandStats: true,
+    categories: true,
+    retention: true,
+    hotspots: true,
+  })
+
   const [stats, setStats] = useState<EquipmentStats | null>(null)
   const [trends, setTrends] = useState<EquipmentTrend[]>([])
   const [priceDistribution, setPriceDistribution] = useState<PriceDistribution[]>([])
   const [brandStats, setBrandStats] = useState<BrandStats[]>([])
+  const [categories, setCategories] = useState<string[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>()
+  const [retention, setRetention] = useState<UserRetention | null>(null)
+  const [hotspots, setHotspots] = useState<QueryHotspot[]>([])
   const [reportLoading, setReportLoading] = useState(false)
   const [reportVisible, setReportVisible] = useState(false)
   const [currentReport, setCurrentReport] = useState<BusinessReport | null>(null)
@@ -90,41 +120,136 @@ const Analytics = () => {
   ])
   const [reportDateRange, setReportDateRange] = useState<[Dayjs, Dayjs] | null>(null)
 
-  const fetchAllData = useCallback(async () => {
-    setLoading(true)
-    try {
-      // 计算月数
-      const months = Math.ceil(trendDateRange[1].diff(trendDateRange[0], 'month', true)) || 12
+  // 更新单个加载状态
+  const setLoading = (key: keyof LoadingStates, value: boolean) => {
+    setLoadingStates(prev => ({ ...prev, [key]: value }))
+  }
 
-      const [statsData, trendsData, priceData, brandData] = await Promise.all([
-        analyticsApi.getEquipmentStats(),
-        analyticsApi.getEquipmentTrends(months),
-        analyticsApi.getPriceDistribution(),
-        analyticsApi.getBrandStats(10),
-      ])
-      setStats(statsData)
-      setTrends(trendsData)
-      setPriceDistribution(priceData)
-      setBrandStats(brandData)
+  // 获取装备统计
+  const fetchStats = useCallback(async () => {
+    setLoading('stats', true)
+    try {
+      const data = await analyticsApi.getEquipmentStats()
+      setStats(data)
     } catch {
-      message.error('加载分析数据失败')
+      message.error('加载装备统计失败')
     } finally {
-      setLoading(false)
+      setLoading('stats', false)
+    }
+  }, [])
+
+  // 获取趋势数据
+  const fetchTrends = useCallback(async () => {
+    setLoading('trends', true)
+    try {
+      const months = Math.ceil(trendDateRange[1].diff(trendDateRange[0], 'month', true)) || 12
+      const data = await analyticsApi.getEquipmentTrends(months)
+      setTrends(data)
+    } catch {
+      message.error('加载趋势数据失败')
+    } finally {
+      setLoading('trends', false)
     }
   }, [trendDateRange])
 
-  useEffect(() => {
-    fetchAllData()
-  }, [fetchAllData])
-
-  const handleCategoryChange = async (category?: string) => {
-    setSelectedCategory(category)
+  // 获取价格分布
+  const fetchPriceDistribution = useCallback(async (category?: string) => {
+    setLoading('priceDistribution', true)
     try {
       const data = await analyticsApi.getPriceDistribution(category)
       setPriceDistribution(data)
     } catch {
       message.error('加载价格分布失败')
+    } finally {
+      setLoading('priceDistribution', false)
     }
+  }, [])
+
+  // 获取品牌统计
+  const fetchBrandStats = useCallback(async () => {
+    setLoading('brandStats', true)
+    try {
+      const data = await analyticsApi.getBrandStats(10)
+      setBrandStats(data)
+    } catch {
+      message.error('加载品牌统计失败')
+    } finally {
+      setLoading('brandStats', false)
+    }
+  }, [])
+
+  // 获取类别列表
+  const fetchCategories = useCallback(async () => {
+    setLoading('categories', true)
+    try {
+      const data = await analyticsApi.getCategories()
+      setCategories(data)
+    } catch {
+      // 静默失败，使用默认类别
+      setCategories(['鱼竿', '渔轮', '鱼线', '拟饵'])
+    } finally {
+      setLoading('categories', false)
+    }
+  }, [])
+
+  // 获取用户留存率
+  const fetchRetention = useCallback(async () => {
+    setLoading('retention', true)
+    try {
+      const data = await analyticsApi.getUserRetention(30)
+      setRetention(data)
+    } catch {
+      // 静默失败
+    } finally {
+      setLoading('retention', false)
+    }
+  }, [])
+
+  // 获取查询热点
+  const fetchHotspots = useCallback(async () => {
+    setLoading('hotspots', true)
+    try {
+      const data = await analyticsApi.getQueryHotspots(10, 7)
+      setHotspots(data)
+    } catch {
+      // 静默失败
+    } finally {
+      setLoading('hotspots', false)
+    }
+  }, [])
+
+  // 刷新所有数据
+  const fetchAllData = useCallback(async () => {
+    await Promise.all([
+      fetchStats(),
+      fetchTrends(),
+      fetchPriceDistribution(selectedCategory),
+      fetchBrandStats(),
+      fetchCategories(),
+      fetchRetention(),
+      fetchHotspots(),
+    ])
+    message.success('数据已刷新')
+  }, [fetchStats, fetchTrends, fetchPriceDistribution, fetchBrandStats, fetchCategories, fetchRetention, fetchHotspots, selectedCategory])
+
+  useEffect(() => {
+    fetchStats()
+    fetchTrends()
+    fetchPriceDistribution()
+    fetchBrandStats()
+    fetchCategories()
+    fetchRetention()
+    fetchHotspots()
+  }, [])
+
+  // 趋势日期变化时重新获取
+  useEffect(() => {
+    fetchTrends()
+  }, [fetchTrends])
+
+  const handleCategoryChange = async (category?: string) => {
+    setSelectedCategory(category)
+    await fetchPriceDistribution(category)
   }
 
   const handleTrendDateChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
@@ -290,7 +415,10 @@ const Analytics = () => {
     },
   ]
 
-  if (loading) {
+  // 判断是否所有核心数据都在加载
+  const isInitialLoading = loadingStates.stats && loadingStates.trends
+
+  if (isInitialLoading) {
     return (
       <div style={{ textAlign: 'center', padding: 100 }}>
         <Spin size="large" />
@@ -300,25 +428,62 @@ const Analytics = () => {
 
   return (
     <div>
-      <Card title="数据分析" style={{ marginBottom: 16 }}>
+      <Card
+        title="数据分析"
+        style={{ marginBottom: 16 }}
+        extra={
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            onClick={fetchAllData}
+            loading={Object.values(loadingStates).some(v => v)}
+          >
+            刷新全部
+          </Button>
+        }
+      >
         <Row gutter={24}>
-          <Col span={6}>
-            <Statistic
-              title="装备总数"
-              value={stats?.total_equipment || 0}
-              prefix={<BarChartOutlined />}
-            />
+          <Col span={5}>
+            <Spin spinning={loadingStates.stats}>
+              <Statistic
+                title="装备总数"
+                value={stats?.total_equipment || 0}
+                prefix={<BarChartOutlined />}
+              />
+            </Spin>
           </Col>
-          <Col span={6}>
-            <Statistic title="品牌总数" value={stats?.total_brands || 0} />
+          <Col span={4}>
+            <Spin spinning={loadingStates.stats}>
+              <Statistic title="品牌总数" value={stats?.total_brands || 0} />
+            </Spin>
           </Col>
-          <Col span={6}>
-            <Statistic
-              title="平均价格"
-              value={stats?.avg_price || 0}
-              prefix="¥"
-              precision={0}
-            />
+          <Col span={4}>
+            <Spin spinning={loadingStates.stats}>
+              <Statistic
+                title="平均价格"
+                value={stats?.avg_price || 0}
+                prefix="¥"
+                precision={0}
+              />
+            </Spin>
+          </Col>
+          <Col span={5}>
+            <Spin spinning={loadingStates.retention}>
+              <Space direction="vertical" size={0}>
+                <Text type="secondary" style={{ fontSize: 12 }}>用户留存率</Text>
+                <Space size={8}>
+                  <Tooltip title="次日留存">
+                    <Tag color="blue">D1: {retention?.retention_1d || 0}%</Tag>
+                  </Tooltip>
+                  <Tooltip title="7日留存">
+                    <Tag color="green">D7: {retention?.retention_7d || 0}%</Tag>
+                  </Tooltip>
+                  <Tooltip title="30日留存">
+                    <Tag color="orange">D30: {retention?.retention_30d || 0}%</Tag>
+                  </Tooltip>
+                </Space>
+              </Space>
+            </Spin>
           </Col>
           <Col span={6}>
             <Space direction="vertical" size="small">
@@ -349,6 +514,21 @@ const Analytics = () => {
             </Space>
           </Col>
         </Row>
+
+        {/* 查询热点展示 */}
+        {hotspots.length > 0 && (
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+            <Space size={8} wrap>
+              <FireOutlined style={{ color: '#ff4d4f' }} />
+              <Text type="secondary">热门搜索：</Text>
+              {hotspots.slice(0, 10).map((item) => (
+                <Tag key={item.keyword} color="processing">
+                  {item.keyword} ({item.count})
+                </Tag>
+              ))}
+            </Space>
+          </div>
+        )}
       </Card>
 
       <Tabs defaultActiveKey="trends">
@@ -369,7 +549,11 @@ const Analytics = () => {
                   value={trendDateRange}
                   onChange={handleTrendDateChange}
                 />
-                <Button icon={<ReloadOutlined />} onClick={fetchAllData}>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={fetchTrends}
+                  loading={loadingStates.trends}
+                >
                   刷新
                 </Button>
                 <Button icon={<DownloadOutlined />} onClick={handleExportTrends}>
@@ -378,7 +562,9 @@ const Analytics = () => {
               </Space>
             }
           >
-            <ReactECharts option={trendChartOption} style={{ height: 400 }} />
+            <Spin spinning={loadingStates.trends}>
+              <ReactECharts option={trendChartOption} style={{ height: 400 }} />
+            </Spin>
           </Card>
         </Tabs.TabPane>
 
@@ -393,9 +579,18 @@ const Analytics = () => {
         >
           <Card
             extra={
-              <Button icon={<DownloadOutlined />} onClick={handleExportPriceDistribution}>
-                导出 CSV
-              </Button>
+              <Space>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => fetchPriceDistribution(selectedCategory)}
+                  loading={loadingStates.priceDistribution}
+                >
+                  刷新
+                </Button>
+                <Button icon={<DownloadOutlined />} onClick={handleExportPriceDistribution}>
+                  导出 CSV
+                </Button>
+              </Space>
             }
           >
             <div style={{ marginBottom: 16 }}>
@@ -405,14 +600,16 @@ const Analytics = () => {
                 allowClear
                 value={selectedCategory}
                 onChange={handleCategoryChange}
+                loading={loadingStates.categories}
               >
-                <Select.Option value="鱼竿">鱼竿</Select.Option>
-                <Select.Option value="渔轮">渔轮</Select.Option>
-                <Select.Option value="鱼线">鱼线</Select.Option>
-                <Select.Option value="拟饵">拟饵</Select.Option>
+                {categories.map((cat) => (
+                  <Select.Option key={cat} value={cat}>{cat}</Select.Option>
+                ))}
               </Select>
             </div>
-            <ReactECharts option={priceChartOption} style={{ height: 400 }} />
+            <Spin spinning={loadingStates.priceDistribution}>
+              <ReactECharts option={priceChartOption} style={{ height: 400 }} />
+            </Spin>
           </Card>
         </Tabs.TabPane>
 
@@ -429,23 +626,36 @@ const Analytics = () => {
             <Col span={12}>
               <Card
                 extra={
-                  <Button icon={<DownloadOutlined />} onClick={handleExportBrands}>
-                    导出 CSV
-                  </Button>
+                  <Space>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={fetchBrandStats}
+                      loading={loadingStates.brandStats}
+                    >
+                      刷新
+                    </Button>
+                    <Button icon={<DownloadOutlined />} onClick={handleExportBrands}>
+                      导出 CSV
+                    </Button>
+                  </Space>
                 }
               >
-                <ReactECharts option={brandChartOption} style={{ height: 400 }} />
+                <Spin spinning={loadingStates.brandStats}>
+                  <ReactECharts option={brandChartOption} style={{ height: 400 }} />
+                </Spin>
               </Card>
             </Col>
             <Col span={12}>
               <Card title="品牌详情">
-                <Table
-                  columns={brandColumns}
-                  dataSource={brandStats}
-                  rowKey="brand_id"
-                  pagination={false}
-                  size="small"
-                />
+                <Spin spinning={loadingStates.brandStats}>
+                  <Table
+                    columns={brandColumns}
+                    dataSource={brandStats}
+                    rowKey="brand_id"
+                    pagination={false}
+                    size="small"
+                  />
+                </Spin>
               </Card>
             </Col>
           </Row>
@@ -462,26 +672,143 @@ const Analytics = () => {
         >
           <Row gutter={16}>
             <Col span={12}>
-              <Card>
-                <ReactECharts option={categoryChartOption} style={{ height: 400 }} />
+              <Card
+                extra={
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={fetchStats}
+                    loading={loadingStates.stats}
+                  >
+                    刷新
+                  </Button>
+                }
+              >
+                <Spin spinning={loadingStates.stats}>
+                  <ReactECharts option={categoryChartOption} style={{ height: 400 }} />
+                </Spin>
               </Card>
             </Col>
             <Col span={12}>
               <Card title="装备类别详情">
-                {stats && (
-                  <Table
-                    dataSource={Object.entries(stats.by_category).map(
-                      ([category, count]) => ({ category, count })
-                    )}
-                    columns={[
-                      { title: '装备类别', dataIndex: 'category' },
-                      { title: '装备数量', dataIndex: 'count' },
-                    ]}
-                    rowKey="category"
-                    pagination={false}
-                    size="small"
-                  />
-                )}
+                <Spin spinning={loadingStates.stats}>
+                  {stats && (
+                    <Table
+                      dataSource={Object.entries(stats.by_category).map(
+                        ([category, count]) => ({ category, count })
+                      )}
+                      columns={[
+                        { title: '装备类别', dataIndex: 'category' },
+                        { title: '装备数量', dataIndex: 'count' },
+                      ]}
+                      rowKey="category"
+                      pagination={false}
+                      size="small"
+                    />
+                  )}
+                </Spin>
+              </Card>
+            </Col>
+          </Row>
+        </Tabs.TabPane>
+
+        <Tabs.TabPane
+          tab={
+            <span>
+              <UserOutlined />
+              用户分析
+            </span>
+          }
+          key="users"
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Card
+                title="用户留存率"
+                extra={
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={fetchRetention}
+                    loading={loadingStates.retention}
+                  >
+                    刷新
+                  </Button>
+                }
+              >
+                <Spin spinning={loadingStates.retention}>
+                  {retention ? (
+                    <Row gutter={16}>
+                      <Col span={8}>
+                        <Statistic
+                          title="次日留存"
+                          value={retention.retention_1d}
+                          suffix="%"
+                          valueStyle={{ color: retention.retention_1d >= 30 ? '#3f8600' : '#cf1322' }}
+                        />
+                      </Col>
+                      <Col span={8}>
+                        <Statistic
+                          title="7日留存"
+                          value={retention.retention_7d}
+                          suffix="%"
+                          valueStyle={{ color: retention.retention_7d >= 15 ? '#3f8600' : '#cf1322' }}
+                        />
+                      </Col>
+                      <Col span={8}>
+                        <Statistic
+                          title="30日留存"
+                          value={retention.retention_30d}
+                          suffix="%"
+                          valueStyle={{ color: retention.retention_30d >= 5 ? '#3f8600' : '#cf1322' }}
+                        />
+                      </Col>
+                    </Row>
+                  ) : (
+                    <Text type="secondary">暂无数据</Text>
+                  )}
+                  {retention && (
+                    <div style={{ marginTop: 16 }}>
+                      <Text type="secondary">
+                        分析周期: {retention.analysis_period_days} 天 | 新用户数: {retention.new_users_count}
+                      </Text>
+                    </div>
+                  )}
+                </Spin>
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card
+                title="查询热点"
+                extra={
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={fetchHotspots}
+                    loading={loadingStates.hotspots}
+                  >
+                    刷新
+                  </Button>
+                }
+              >
+                <Spin spinning={loadingStates.hotspots}>
+                  {hotspots.length > 0 ? (
+                    <Table
+                      dataSource={hotspots}
+                      columns={[
+                        { title: '关键词', dataIndex: 'keyword', width: 150 },
+                        { title: '搜索次数', dataIndex: 'count', width: 100 },
+                        {
+                          title: '分类',
+                          dataIndex: 'category',
+                          render: (cat) => cat && <Tag>{cat}</Tag>,
+                        },
+                      ]}
+                      rowKey="keyword"
+                      pagination={false}
+                      size="small"
+                    />
+                  ) : (
+                    <Text type="secondary">暂无数据</Text>
+                  )}
+                </Spin>
               </Card>
             </Col>
           </Row>

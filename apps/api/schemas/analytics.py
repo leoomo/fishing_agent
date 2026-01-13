@@ -56,6 +56,15 @@ class QueryHotspotResponse(BaseModel):
     category: Optional[str] = None
 
 
+class UserRetentionResponse(BaseModel):
+    """用户留存率响应"""
+    retention_1d: float  # 次日留存率 (%)
+    retention_7d: float  # 7日留存率 (%)
+    retention_30d: float  # 30日留存率 (%)
+    new_users_count: int  # 新用户数
+    analysis_period_days: int  # 分析周期
+
+
 class UserPreferenceResponse(BaseModel):
     """用户偏好响应"""
     category: str
