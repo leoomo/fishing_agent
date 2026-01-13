@@ -580,3 +580,68 @@ async def get_failure_metrics(
     except Exception as e:
         logger.error(f"获取失败指标失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+# ========== 缓存监控端点 ==========
+
+@router.get(
+    "/cache-stats",
+    summary="缓存统计",
+    description="获取天气缓存统计信息（命中率、缓存项数等）"
+)
+async def get_cache_stats(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    获取缓存统计信息
+
+    Returns:
+        缓存统计数据，包括命中率、缓存项数等
+    """
+    try:
+        from packages.agents.fishing.utils.cache import cache
+
+        stats = cache.get_stats()
+
+        return {
+            "status": "success",
+            "weather_cache": stats,
+            "summary": {
+                "hit_rate": f"{stats['hit_rate']}%",
+                "total_requests": stats['hits'] + stats['misses'],
+                "cached_items": stats['valid_items']
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"获取缓存统计失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.post(
+    "/cache-stats/reset",
+    summary="重置缓存统计",
+    description="重置缓存命中率统计计数"
+)
+async def reset_cache_stats(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.MONITOR_READ))
+):
+    """
+    重置缓存统计计数
+
+    Returns:
+        操作结果
+    """
+    try:
+        from packages.agents.fishing.utils.cache import cache
+
+        cache.reset_stats()
+
+        return {
+            "status": "success",
+            "message": "缓存统计已重置"
+        }
+
+    except Exception as e:
+        logger.error(f"重置缓存统计失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"重置失败: {str(e)}")
