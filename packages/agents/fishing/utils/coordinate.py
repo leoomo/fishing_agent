@@ -3,12 +3,15 @@
 坐标工具模块
 
 简化坐标获取逻辑，集成高德地图API和本地缓存，
-移除了过度复杂的匹配器和抽象层。
+支持本地数据库优先查询和API结果回写。
 """
 
 import os
+import time
+import sqlite3
 import requests
 import logging
+from pathlib import Path
 from typing import Optional, Tuple
 from dotenv import load_dotenv
 from .cache import cache
@@ -22,8 +25,17 @@ logger = logging.getLogger(__name__)
 AMAP_API_KEY = os.getenv('AMAP_API_KEY')
 AMAP_GEOCODE_URL = "https://restapi.amap.com/v3/geocode/geo"
 
+# 百度地图API配置（备用）
+BAIDU_MAP_AK = os.getenv('BAIDU_MAP_AK')
+BAIDU_GEOCODE_URL = "https://api.map.baidu.com/geocoding/v3/"
+
 # 缓存配置
 COORDINATE_CACHE_TTL = 86400  # 24小时
+
+# 本地数据库路径
+DATA_DIR = Path(__file__).parent.parent.parent.parent.parent / "shared" / "data"
+TOWN_COORDS_DB = DATA_DIR / "town_coordinates.db"
+ADMIN_DIVISIONS_DB = DATA_DIR / "admin_divisions.db"
 
 # 地理编码优先区域配置
 GEOCODE_PRIORITY_PROVINCE = os.getenv('GEOCODE_PRIORITY_PROVINCE', '浙江省')
@@ -41,6 +53,14 @@ def get_coordinates(location: str) -> Tuple[float, float]:
     """
     获取位置坐标
 
+    查询优先级：
+    1. 内存缓存
+    2. 本地数据库（coordinate_cache -> town_coordinates -> regions）
+    3. 高德地图API
+    4. 百度地图API（备用，如已配置）
+
+    API查询成功后会回写到本地数据库，避免重复调用。
+
     Args:
         location: 位置名称（支持中文地名）
 
@@ -56,22 +76,29 @@ def get_coordinates(location: str) -> Tuple[float, float]:
     location = location.strip()
     cache_key = f"coords:{location}"
 
-    # 1. 检查缓存
+    # 1. 检查内存缓存
     cached_coords = cache.get(cache_key)
     if cached_coords:
-        logger.debug(f"从缓存获取坐标: {location} -> {cached_coords}")
+        logger.debug(f"从内存缓存获取坐标: {location} -> {cached_coords}")
         return cached_coords
 
-    # 2. 调用高德地图API
-    coords = _fetch_coordinates_from_api(location)
-    if not coords:
-        raise ValueError(f"无法获取位置坐标: {location}")
+    # 2. 查询本地数据库
+    coords = _query_local_database(location)
+    if coords:
+        cache.set(cache_key, coords, ttl=COORDINATE_CACHE_TTL)
+        logger.info(f"从本地数据库获取坐标: {location} -> {coords}")
+        return coords
 
-    # 3. 缓存结果
-    cache.set(cache_key, coords, ttl=COORDINATE_CACHE_TTL)
-    logger.info(f"获取坐标成功: {location} -> {coords}")
+    # 3. 调用API（带备用）
+    coords, source = _fetch_coordinates_with_fallback(location)
+    if coords:
+        # 4. 回写到本地数据库
+        _save_to_local_database(location, coords, source)
+        cache.set(cache_key, coords, ttl=COORDINATE_CACHE_TTL)
+        logger.info(f"从{source}获取坐标: {location} -> {coords}")
+        return coords
 
-    return coords
+    raise ValueError(f"无法获取位置坐标: {location}")
 
 
 def _fetch_coordinates_from_api(location: str) -> Optional[Tuple[float, float]]:
@@ -131,6 +158,234 @@ def _fetch_coordinates_from_api(location: str) -> Optional[Tuple[float, float]]:
     except (ValueError, KeyError) as e:
         logger.error(f"解析高德API响应失败: {e}")
         return None
+
+
+def _query_local_database(location: str) -> Optional[Tuple[float, float]]:
+    """
+    从本地数据库查询坐标
+
+    查询顺序：
+    1. coordinate_cache（API查询结果缓存）
+    2. town_coordinates（乡镇坐标）
+    3. regions（行政区划）
+
+    Args:
+        location: 位置名称
+
+    Returns:
+        坐标元组或None
+    """
+    # 1. 优先查询 coordinate_cache（API查询结果缓存）
+    coords = _query_coordinate_cache(location)
+    if coords:
+        return coords
+
+    # 2. 查询 town_coordinates（乡镇坐标）
+    coords = _query_town_coordinates(location)
+    if coords:
+        return coords
+
+    # 3. 查询 regions（行政区划）
+    coords = _query_admin_divisions(location)
+    if coords:
+        return coords
+
+    return None
+
+
+def _query_coordinate_cache(location: str) -> Optional[Tuple[float, float]]:
+    """查询坐标缓存表（存储API查询结果）"""
+    if not ADMIN_DIVISIONS_DB.exists():
+        return None
+
+    try:
+        conn = sqlite3.connect(str(ADMIN_DIVISIONS_DB))
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT longitude, latitude FROM coordinate_cache
+            WHERE place_name = ?
+            LIMIT 1
+        """, (location,))
+        row = cursor.fetchone()
+
+        if row:
+            # 更新查询计数
+            cursor.execute("""
+                UPDATE coordinate_cache SET query_count = query_count + 1, updated_at = ?
+                WHERE place_name = ?
+            """, (time.time(), location))
+            conn.commit()
+
+        conn.close()
+        if row and row[0] and row[1]:
+            logger.debug(f"从coordinate_cache获取坐标: {location}")
+            return (float(row[0]), float(row[1]))
+    except Exception as e:
+        logger.debug(f"查询coordinate_cache失败: {e}")
+
+    return None
+
+
+def _query_town_coordinates(location: str) -> Optional[Tuple[float, float]]:
+    """查询乡镇坐标库"""
+    if not TOWN_COORDS_DB.exists():
+        return None
+
+    try:
+        conn = sqlite3.connect(str(TOWN_COORDS_DB))
+        cursor = conn.cursor()
+
+        # 优先精确匹配 name 字段
+        cursor.execute("""
+            SELECT longitude, latitude FROM town_coordinates
+            WHERE name = ?
+            ORDER BY accuracy_level DESC LIMIT 1
+        """, (location,))
+        row = cursor.fetchone()
+
+        if not row:
+            # 模糊匹配 full_name
+            cursor.execute("""
+                SELECT longitude, latitude FROM town_coordinates
+                WHERE full_name LIKE ?
+                ORDER BY accuracy_level DESC LIMIT 1
+            """, (f"%{location}%",))
+            row = cursor.fetchone()
+
+        conn.close()
+        if row and row[0] and row[1]:
+            logger.debug(f"从town_coordinates获取坐标: {location}")
+            return (float(row[0]), float(row[1]))
+    except Exception as e:
+        logger.debug(f"查询town_coordinates失败: {e}")
+
+    return None
+
+
+def _query_admin_divisions(location: str) -> Optional[Tuple[float, float]]:
+    """查询行政区划库"""
+    if not ADMIN_DIVISIONS_DB.exists():
+        return None
+
+    try:
+        conn = sqlite3.connect(str(ADMIN_DIVISIONS_DB))
+        cursor = conn.cursor()
+
+        # 精确匹配
+        cursor.execute("""
+            SELECT longitude, latitude FROM regions
+            WHERE name = ? AND longitude IS NOT NULL AND latitude IS NOT NULL
+            ORDER BY level ASC LIMIT 1
+        """, (location,))
+        row = cursor.fetchone()
+
+        if not row:
+            # 模糊匹配
+            cursor.execute("""
+                SELECT longitude, latitude FROM regions
+                WHERE name LIKE ? AND longitude IS NOT NULL AND latitude IS NOT NULL
+                ORDER BY level ASC LIMIT 1
+            """, (f"%{location}%",))
+            row = cursor.fetchone()
+
+        conn.close()
+        if row and row[0] and row[1]:
+            logger.debug(f"从regions获取坐标: {location}")
+            return (float(row[0]), float(row[1]))
+    except Exception as e:
+        logger.debug(f"查询admin_divisions失败: {e}")
+
+    return None
+
+
+def _save_to_local_database(location: str, coords: Tuple[float, float], source: str) -> None:
+    """
+    将API查询结果保存到本地数据库
+
+    Args:
+        location: 位置名称
+        coords: 坐标元组 (longitude, latitude)
+        source: 数据来源（如 amap_api, baidu_api）
+    """
+    if not ADMIN_DIVISIONS_DB.exists():
+        return
+
+    try:
+        conn = sqlite3.connect(str(ADMIN_DIVISIONS_DB))
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT OR REPLACE INTO coordinate_cache
+            (place_name, full_address, longitude, latitude, data_source, created_at, updated_at, query_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """, (
+            location,
+            location,
+            coords[0],
+            coords[1],
+            source,
+            time.time(),
+            time.time()
+        ))
+
+        conn.commit()
+        conn.close()
+        logger.info(f"坐标已保存到本地数据库: {location} -> {coords}")
+    except Exception as e:
+        logger.debug(f"保存坐标到本地数据库失败: {e}")
+
+
+def _fetch_coordinates_with_fallback(location: str) -> Tuple[Optional[Tuple[float, float]], str]:
+    """
+    带备用的API查询
+
+    Args:
+        location: 位置名称
+
+    Returns:
+        (坐标元组, 数据来源) 或 (None, "")
+    """
+    # 1. 尝试高德API
+    coords = _fetch_coordinates_from_api(location)
+    if coords:
+        return coords, "amap_api"
+
+    # 2. 尝试百度API（如已配置）
+    if BAIDU_MAP_AK:
+        coords = _fetch_from_baidu(location)
+        if coords:
+            return coords, "baidu_api"
+
+    return None, ""
+
+
+def _fetch_from_baidu(location: str) -> Optional[Tuple[float, float]]:
+    """
+    从百度地图API获取坐标（备用）
+
+    Args:
+        location: 位置名称
+
+    Returns:
+        坐标元组或None
+    """
+    try:
+        params = {
+            'address': location,
+            'ak': BAIDU_MAP_AK,
+            'output': 'json'
+        }
+        response = requests.get(BAIDU_GEOCODE_URL, params=params, timeout=10)
+        data = response.json()
+
+        if data.get('status') == 0 and data.get('result'):
+            loc = data['result']['location']
+            return (loc['lng'], loc['lat'])
+    except Exception as e:
+        logger.error(f"百度API请求失败: {e}")
+
+    return None
 
 
 def validate_coordinates(coords: Tuple[float, float]) -> bool:
