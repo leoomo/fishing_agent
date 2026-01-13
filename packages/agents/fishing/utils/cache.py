@@ -25,6 +25,9 @@ class SimpleCache:
         """
         self._memory_cache: Dict[str, Dict[str, Any]] = {}
         self.cache_dir = None
+        # 缓存命中率统计
+        self._hits: int = 0
+        self._misses: int = 0
 
         if cache_dir:
             self.cache_dir = Path(cache_dir)
@@ -77,11 +80,13 @@ class SimpleCache:
         if key in self._memory_cache:
             cache_item = self._memory_cache[key]
             if cache_item.get('expires_at', time.time() + 1) > time.time():
+                self._hits += 1  # 缓存命中
                 return cache_item['value']
             else:
                 # 过期了，删除
                 del self._memory_cache[key]
 
+        self._misses += 1  # 缓存未命中
         return default
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
@@ -174,12 +179,25 @@ class SimpleCache:
             else:
                 expired_items += 1
 
+        # 计算命中率
+        total_requests = self._hits + self._misses
+        hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0.0
+
         return {
             'total_items': len(self._memory_cache),
             'valid_items': valid_items,
             'expired_items': expired_items,
-            'has_file_cache': self.cache_dir is not None
+            'has_file_cache': self.cache_dir is not None,
+            # 命中率统计
+            'hits': self._hits,
+            'misses': self._misses,
+            'hit_rate': round(hit_rate, 2),
         }
+
+    def reset_stats(self) -> None:
+        """重置命中率统计计数"""
+        self._hits = 0
+        self._misses = 0
 
 
 # 全局缓存实例
