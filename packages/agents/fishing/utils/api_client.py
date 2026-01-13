@@ -171,7 +171,7 @@ class CaiyunWeatherClient(APIClient):
         endpoint = f"/{self.api_key}/{longitude},{latitude}/realtime"
         params = {'alert': 'true'}
 
-        return self.get(endpoint, params, use_cache=True, cache_ttl=600)  # 10分钟缓存
+        return self.get(endpoint, params, use_cache=True, cache_ttl=1800)  # 30分钟缓存
 
     def get_hourly_forecast(self, longitude: float, latitude: float, hours: int = 72) -> Optional[Dict[str, Any]]:
         """
@@ -188,7 +188,7 @@ class CaiyunWeatherClient(APIClient):
         endpoint = f"/{self.api_key}/{longitude},{latitude}/hourly"
         params = {'alert': 'true', 'hourlysteps': str(hours)}
 
-        return self.get(endpoint, params, use_cache=True, cache_ttl=1800)  # 30分钟缓存
+        return self.get(endpoint, params, use_cache=True, cache_ttl=7200)  # 2小时缓存
 
     def get_daily_forecast(self, longitude: float, latitude: float, days: int = 7) -> Optional[Dict[str, Any]]:
         """
@@ -205,7 +205,7 @@ class CaiyunWeatherClient(APIClient):
         endpoint = f"/{self.api_key}/{longitude},{latitude}/daily"
         params = {'alert': 'true', 'dailysteps': str(days)}
 
-        return self.get(endpoint, params, use_cache=True, cache_ttl=3600)  # 1小时缓存
+        return self.get(endpoint, params, use_cache=True, cache_ttl=21600)  # 6小时缓存
 
 
 # 高德地图API客户端
@@ -239,7 +239,7 @@ class AmapGeocodingClient(APIClient):
             'address': address,
             'key': self.api_key,
             'output': 'json'
-        }, use_cache=True, cache_ttl=86400)  # 24小时缓存
+        }, use_cache=True, cache_ttl=604800)  # 7天缓存
 
 
 # 全局客户端实例
