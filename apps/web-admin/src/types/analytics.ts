@@ -47,6 +47,14 @@ export interface QueryHotspot {
   category?: string
 }
 
+export interface UserRetention {
+  retention_1d: number  // 次日留存率 (%)
+  retention_7d: number  // 7日留存率 (%)
+  retention_30d: number  // 30日留存率 (%)
+  new_users_count: number  // 新用户数
+  analysis_period_days: number  // 分析周期
+}
+
 export interface UserPreference {
   category: string
   user_count: number

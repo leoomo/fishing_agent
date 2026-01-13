@@ -7,6 +7,8 @@ import type {
   UserActivity,
   BusinessReport,
   ReportListResponse,
+  UserRetention,
+  QueryHotspot,
 } from '@/types/analytics'
 
 export const analyticsApi = {
@@ -34,9 +36,26 @@ export const analyticsApi = {
     })
   },
 
+  // 获取装备类别列表
+  getCategories: (): Promise<string[]> => {
+    return client.get('/admin/analytics/categories')
+  },
+
   // 用户活跃度统计
   getUserActivity: (days: number = 30): Promise<UserActivity[]> => {
     return client.get('/admin/analytics/users/activity', { params: { days } })
+  },
+
+  // 用户留存率分析
+  getUserRetention: (days: number = 30): Promise<UserRetention> => {
+    return client.get('/admin/analytics/users/retention', { params: { days } })
+  },
+
+  // 查询热点分析
+  getQueryHotspots: (topN: number = 20, days: number = 7): Promise<QueryHotspot[]> => {
+    return client.get('/admin/analytics/query/hotspots', {
+      params: { top_n: topN, days },
+    })
   },
 
   // 生成业务报表
