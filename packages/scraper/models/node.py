@@ -120,6 +120,28 @@ class CrawlerNode(Base, TimestampMixin):
         comment='成功率（百分比）'
     )
 
+    # === 系统指标（心跳上报） ===
+    cpu_usage = Column(
+        Float,
+        nullable=True,
+        comment='CPU使用率（百分比）'
+    )
+    memory_usage = Column(
+        Float,
+        nullable=True,
+        comment='内存使用率（百分比）'
+    )
+    disk_usage = Column(
+        Float,
+        nullable=True,
+        comment='磁盘使用率（百分比）'
+    )
+    running_task_ids = Column(
+        Text,
+        nullable=True,
+        comment='当前运行任务ID列表JSON'
+    )
+
     # === 版本兼容 ===
     worker_version = Column(
         String(50),
@@ -194,6 +216,10 @@ class CrawlerNode(Base, TimestampMixin):
                 'total_failed': self.total_failed,
                 'avg_task_duration': self.avg_task_duration,
                 'success_rate': self.success_rate,
+                'cpu_usage': self.cpu_usage,
+                'memory_usage': self.memory_usage,
+                'disk_usage': self.disk_usage,
+                'running_task_ids': json.loads(self.running_task_ids) if self.running_task_ids else [],
             })
 
         return result
