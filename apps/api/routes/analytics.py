@@ -11,7 +11,9 @@ from apps.api.schemas.analytics import (
     UserBehaviorStatsResponse,
     BusinessReportRequest,
     BusinessReportResponse,
-    ReportListResponse
+    ReportListResponse,
+    UserRetentionResponse,
+    QueryHotspotResponse
 )
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
@@ -137,6 +139,30 @@ async def get_brand_stats(
 # ========== 用户行为分析 ==========
 
 @router.get(
+    "/categories",
+    response_model=List[str],
+    summary="获取装备类别列表",
+    dependencies=[Depends(require_permission(PermissionEnum.ANALYTICS_READ))]
+)
+async def get_categories():
+    """
+    获取所有装备类别列表（用于前端筛选）
+
+    Returns:
+        List[str]: 类别名称列表
+    """
+    try:
+        analytics_service = AnalyticsService()
+        categories = analytics_service.get_categories()
+
+        return categories
+
+    except Exception as e:
+        logger.error(f"获取类别列表失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
     "/users/activity",
     response_model=List[UserActivityResponse],
     summary="用户活跃度统计",
@@ -162,6 +188,66 @@ async def get_user_activity(
 
     except Exception as e:
         logger.error(f"获取用户活跃度失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/users/retention",
+    response_model=UserRetentionResponse,
+    summary="用户留存率分析",
+    dependencies=[Depends(require_permission(PermissionEnum.ANALYTICS_READ))]
+)
+async def get_user_retention(
+    days: int = Query(30, ge=7, le=90, description="分析周期（天）")
+):
+    """
+    获取用户留存率分析
+
+    Args:
+        days: 分析周期（7-90天）
+
+    Returns:
+        UserRetentionResponse: 留存率数据
+    """
+    try:
+        analytics_service = AnalyticsService()
+        retention = analytics_service.get_user_retention(days=days)
+
+        return UserRetentionResponse(**retention)
+
+    except Exception as e:
+        logger.error(f"获取用户留存率失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.get(
+    "/query/hotspots",
+    response_model=List[QueryHotspotResponse],
+    summary="查询热点分析",
+    dependencies=[Depends(require_permission(PermissionEnum.ANALYTICS_READ))]
+)
+async def get_query_hotspots(
+    top_n: int = Query(20, ge=5, le=50, description="返回前 N 个热点"),
+    days: int = Query(7, ge=1, le=30, description="统计天数")
+):
+    """
+    获取查询热点分析
+
+    Args:
+        top_n: 返回前 N 个热点
+        days: 统计天数
+
+    Returns:
+        List[QueryHotspotResponse]: 热点数据
+    """
+    try:
+        analytics_service = AnalyticsService()
+        hotspots = analytics_service.get_query_hotspots(top_n=top_n, days=days)
+
+        return [QueryHotspotResponse(**item) for item in hotspots]
+
+    except Exception as e:
+        logger.error(f"获取查询热点失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
 
 
