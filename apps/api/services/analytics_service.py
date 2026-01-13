@@ -285,36 +285,235 @@ class AnalyticsService:
 
             return result
 
-    def get_user_retention(self) -> Dict:
+    def get_categories(self) -> List[str]:
+        """
+        获取所有装备类别列表
+
+        Returns:
+            list: 类别名称列表
+        """
+        with get_db_session() as session:
+            categories = session.query(
+                Equipment.category
+            ).filter(
+                Equipment.is_active == True,
+                Equipment.category.isnot(None)
+            ).distinct().all()
+
+            return [cat[0] for cat in categories if cat[0]]
+
+    def get_user_retention(self, days: int = 30) -> Dict:
         """
         获取用户留存率分析
+
+        基于 API 日志计算用户留存率：
+        - 找出在分析期间首次活跃的用户（新用户）
+        - 计算这些新用户在 N 天后是否还有活跃行为
+
+        Args:
+            days: 分析周期（天）
 
         Returns:
             dict: 留存率数据
         """
-        # TODO: 实现用户留存率计算
-        # 次日留存、7日留存、30日留存
+        with get_db_session() as session:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
 
-        return {
-            "retention_1d": 0.0,
-            "retention_7d": 0.0,
-            "retention_30d": 0.0
-        }
+            # 获取每个用户的首次活跃日期
+            first_active_subquery = session.query(
+                APILog.user_id,
+                func.min(func.date(APILog.timestamp)).label('first_active_date')
+            ).filter(
+                APILog.user_id.isnot(None),
+                APILog.timestamp >= start_date - timedelta(days=30)  # 扩展范围以获取完整的首次活跃日期
+            ).group_by(
+                APILog.user_id
+            ).subquery()
 
-    def get_query_hotspots(self, top_n: int = 20) -> List[Dict]:
+            # 找出在分析期间首次活跃的新用户
+            new_users = session.query(
+                first_active_subquery.c.user_id,
+                first_active_subquery.c.first_active_date
+            ).filter(
+                first_active_subquery.c.first_active_date >= start_date.date(),
+                first_active_subquery.c.first_active_date <= (end_date - timedelta(days=30)).date()  # 确保有30天观察期
+            ).all()
+
+            if not new_users:
+                return {
+                    "retention_1d": 0.0,
+                    "retention_7d": 0.0,
+                    "retention_30d": 0.0,
+                    "new_users_count": 0,
+                    "analysis_period_days": days
+                }
+
+            # 获取所有用户的活跃日期集合
+            user_active_dates = {}
+            active_logs = session.query(
+                APILog.user_id,
+                func.date(APILog.timestamp).label('active_date')
+            ).filter(
+                APILog.user_id.isnot(None),
+                APILog.timestamp >= start_date
+            ).distinct().all()
+
+            for user_id, active_date in active_logs:
+                if user_id not in user_active_dates:
+                    user_active_dates[user_id] = set()
+                user_active_dates[user_id].add(active_date)
+
+            # 计算留存率
+            retention_1d_count = 0
+            retention_7d_count = 0
+            retention_30d_count = 0
+            total_new_users = len(new_users)
+
+            for user_id, first_active_date in new_users:
+                user_dates = user_active_dates.get(user_id, set())
+
+                # 次日留存
+                day1 = first_active_date + timedelta(days=1)
+                if day1 in user_dates:
+                    retention_1d_count += 1
+
+                # 7日留存
+                day7 = first_active_date + timedelta(days=7)
+                if day7 in user_dates:
+                    retention_7d_count += 1
+
+                # 30日留存
+                day30 = first_active_date + timedelta(days=30)
+                if day30 in user_dates:
+                    retention_30d_count += 1
+
+            return {
+                "retention_1d": round(retention_1d_count / total_new_users * 100, 2) if total_new_users > 0 else 0.0,
+                "retention_7d": round(retention_7d_count / total_new_users * 100, 2) if total_new_users > 0 else 0.0,
+                "retention_30d": round(retention_30d_count / total_new_users * 100, 2) if total_new_users > 0 else 0.0,
+                "new_users_count": total_new_users,
+                "analysis_period_days": days
+            }
+
+    def get_query_hotspots(self, top_n: int = 20, days: int = 7) -> List[Dict]:
         """
         获取查询热点分析
 
+        基于 Agent 执行日志提取用户查询的热门关键词
+
         Args:
             top_n: 返回前 N 个热点
+            days: 统计天数
 
         Returns:
             list: 热点数据
         """
-        # TODO: 实现基于 LLM 日志或 API 日志的查询热点分析
-        # 需要提取用户查询关键词
+        import re
+        from collections import Counter
 
-        return []
+        with get_db_session() as session:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+
+            # 从 AgentExecutionLog 获取用户输入
+            logs = session.query(
+                AgentExecutionLog.input_text
+            ).filter(
+                AgentExecutionLog.timestamp >= start_date,
+                AgentExecutionLog.input_text.isnot(None)
+            ).all()
+
+            if not logs:
+                return []
+
+            # 提取关键词
+            keyword_counter = Counter()
+
+            # 定义钓鱼相关的关键词模式
+            fishing_keywords = [
+                # 鱼种
+                '鲈鱼', '鲤鱼', '鲫鱼', '草鱼', '鳜鱼', '翘嘴', '黑鱼', '鲶鱼', '罗非',
+                '鳊鱼', '青鱼', '鲢鱼', '鳙鱼', '鲑鱼', '鳟鱼', '马口', '军鱼',
+                # 装备类型
+                '鱼竿', '路亚竿', '台钓竿', '矶钓竿', '海竿', '筏竿',
+                '渔轮', '纺车轮', '水滴轮', '鼓轮',
+                '鱼线', 'PE线', '尼龙线', '碳线', '碳素线',
+                '拟饵', '软饵', '硬饵', '铅头钩', 'VIB', '米诺', '波爬', '铅笔',
+                # 钓法
+                '路亚', '台钓', '矶钓', '海钓', '筏钓', '飞蝇',
+                # 品牌
+                '达瓦', '禧玛诺', '阿布', '美国纯钓', '狼王',
+                # 场景
+                '野钓', '黑坑', '水库', '江河', '湖泊', '海边',
+                # 其他
+                '推荐', '入门', '新手', '高端', '性价比', '预算'
+            ]
+
+            for (input_text,) in logs:
+                if not input_text:
+                    continue
+
+                # input_text 是纯文本，直接作为用户消息
+                user_message = str(input_text) if input_text else ''
+
+                # 匹配关键词
+                for keyword in fishing_keywords:
+                    if keyword in user_message:
+                        keyword_counter[keyword] += 1
+
+                # 提取中文词汇（简单分词）
+                chinese_words = re.findall(r'[\u4e00-\u9fa5]{2,4}', user_message)
+                for word in chinese_words:
+                    if word not in fishing_keywords and len(word) >= 2:
+                        keyword_counter[word] += 1
+
+            # 过滤低频词并返回 Top N
+            result = []
+            for keyword, count in keyword_counter.most_common(top_n):
+                if count >= 2:  # 至少出现2次
+                    result.append({
+                        "keyword": keyword,
+                        "count": count,
+                        "category": self._categorize_keyword(keyword)
+                    })
+
+            return result
+
+    def _categorize_keyword(self, keyword: str) -> str:
+        """
+        对关键词进行分类
+
+        Args:
+            keyword: 关键词
+
+        Returns:
+            str: 分类名称
+        """
+        fish_keywords = ['鲈鱼', '鲤鱼', '鲫鱼', '草鱼', '鳜鱼', '翘嘴', '黑鱼', '鲶鱼', '罗非', '鳊鱼', '青鱼', '鲢鱼', '鳙鱼', '马口', '军鱼']
+        rod_keywords = ['鱼竿', '路亚竿', '台钓竿', '矶钓竿', '海竿', '筏竿']
+        reel_keywords = ['渔轮', '纺车轮', '水滴轮', '鼓轮']
+        line_keywords = ['鱼线', 'PE线', '尼龙线', '碳线', '碳素线']
+        lure_keywords = ['拟饵', '软饵', '硬饵', '铅头钩', 'VIB', '米诺', '波爬', '铅笔']
+        method_keywords = ['路亚', '台钓', '矶钓', '海钓', '筏钓', '飞蝇']
+        scene_keywords = ['野钓', '黑坑', '水库', '江河', '湖泊', '海边']
+
+        if keyword in fish_keywords:
+            return '鱼种'
+        elif keyword in rod_keywords:
+            return '鱼竿'
+        elif keyword in reel_keywords:
+            return '渔轮'
+        elif keyword in line_keywords:
+            return '鱼线'
+        elif keyword in lure_keywords:
+            return '拟饵'
+        elif keyword in method_keywords:
+            return '钓法'
+        elif keyword in scene_keywords:
+            return '场景'
+        else:
+            return '其他'
 
     def generate_report(
         self,
@@ -494,12 +693,22 @@ class AnalyticsService:
             dict: 报表列表
         """
         with get_db_session() as session:
-            query = session.query(AnalyticsReport)
+            # 使用 LEFT JOIN 关联查询获取生成人用户名
+            query = session.query(
+                AnalyticsReport,
+                AdminUser.username
+            ).outerjoin(
+                AdminUser,
+                AnalyticsReport.generated_by == AdminUser.id
+            )
 
             if report_type:
                 query = query.filter(AnalyticsReport.report_type == report_type)
 
-            total = query.count()
+            # 计算总数
+            total = session.query(AnalyticsReport).filter(
+                AnalyticsReport.report_type == report_type if report_type else True
+            ).count()
 
             reports = query.order_by(
                 AnalyticsReport.created_at.desc()
@@ -513,10 +722,10 @@ class AnalyticsService:
                         "report_type": r.report_type,
                         "start_date": r.start_date.isoformat(),
                         "end_date": r.end_date.isoformat(),
-                        "report_data": json.loads(r.report_data),  # 转换回 dict
+                        "report_data": json.loads(r.report_data),
                         "generated_at": r.created_at.isoformat(),
-                        "generated_by": "admin"  # TODO: 从关联表获取
+                        "generated_by": username or "系统"
                     }
-                    for r in reports
+                    for r, username in reports
                 ]
             }
