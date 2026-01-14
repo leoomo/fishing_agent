@@ -18,6 +18,10 @@ import type {
   FishSeasonActivityCreate,
   FishSeasonActivityUpdate,
   EquipmentRecommendation,
+  FetchProgressResponse,
+  FetchStartRequest,
+  FetchRetryRequest,
+  FetchActionResponse,
 } from '@/types/fish'
 
 export const fishApi = {
@@ -136,6 +140,43 @@ export const fishApi = {
    */
   getEquipmentRecommendation: (speciesId: number): Promise<EquipmentRecommendation> => {
     return client.get(`/admin/content/fish-species/${speciesId}/equipment`)
+  },
+
+  // ========== 网络采集 ==========
+
+  /**
+   * 获取采集进度
+   */
+  getFetchProgress: (): Promise<FetchProgressResponse> => {
+    return client.get('/admin/content/fish-species/fetch/progress')
+  },
+
+  /**
+   * 开始采集
+   */
+  startFetch: (data: FetchStartRequest): Promise<FetchActionResponse> => {
+    return client.post('/admin/content/fish-species/fetch/start', data)
+  },
+
+  /**
+   * 暂停采集
+   */
+  pauseFetch: (): Promise<FetchActionResponse> => {
+    return client.post('/admin/content/fish-species/fetch/pause')
+  },
+
+  /**
+   * 重试失败项
+   */
+  retryFetch: (data: FetchRetryRequest): Promise<FetchActionResponse> => {
+    return client.post('/admin/content/fish-species/fetch/retry', data)
+  },
+
+  /**
+   * 重置采集进度
+   */
+  resetFetch: (): Promise<FetchActionResponse> => {
+    return client.post('/admin/content/fish-species/fetch/reset')
   },
 }
 

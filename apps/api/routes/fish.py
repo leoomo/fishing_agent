@@ -17,6 +17,12 @@ from apps.api.schemas.fish import (
     CategoryStats,
     CategoryStatsResponse,
     EquipmentRecommendation,
+    FetchActionResponse,
+    FetchProgressResponse,
+    FetchProgressStats,
+    FetchProgressItem,
+    FetchRetryRequest,
+    FetchStartRequest,
     FishKnowledgeCreate,
     FishKnowledgeResponse,
     FishKnowledgeUpdate,
@@ -821,3 +827,105 @@ async def init_fish_data(
             created_count=created_count,
             message=f"成功创建 {created_count} 条鱼种数据",
         )
+
+
+# ========== Fish Fetch Endpoints ==========
+
+
+@router.get(
+    "/fish-species/fetch/progress",
+    response_model=FetchProgressResponse,
+    summary="获取采集进度",
+)
+async def get_fetch_progress(
+    current_user=Depends(get_current_user),
+):
+    """获取鱼类知识采集进度"""
+    from apps.api.services.fish_fetcher import get_fish_fetcher_service
+
+    service = get_fish_fetcher_service()
+    progress = service.get_progress()
+
+    return FetchProgressResponse(
+        is_running=progress["is_running"],
+        stats=FetchProgressStats(**progress["stats"]),
+        items=[FetchProgressItem(**item) for item in progress["items"]],
+    )
+
+
+@router.post(
+    "/fish-species/fetch/start",
+    response_model=FetchActionResponse,
+    summary="开始采集",
+)
+async def start_fetch(
+    data: FetchStartRequest,
+    current_user=Depends(require_permission("content:create")),
+):
+    """开始或继续采集鱼类知识"""
+    from apps.api.services.fish_fetcher import get_fish_fetcher_service
+
+    service = get_fish_fetcher_service()
+    result = service.start_fetch(use_llm=data.use_llm)
+
+    logger.info(f"采集任务启动: use_llm={data.use_llm}, user={current_user.username}")
+
+    return FetchActionResponse(**result)
+
+
+@router.post(
+    "/fish-species/fetch/pause",
+    response_model=FetchActionResponse,
+    summary="暂停采集",
+)
+async def pause_fetch(
+    current_user=Depends(require_permission("content:create")),
+):
+    """暂停采集任务"""
+    from apps.api.services.fish_fetcher import get_fish_fetcher_service
+
+    service = get_fish_fetcher_service()
+    result = service.pause_fetch()
+
+    logger.info(f"采集任务暂停: user={current_user.username}")
+
+    return FetchActionResponse(**result)
+
+
+@router.post(
+    "/fish-species/fetch/retry",
+    response_model=FetchActionResponse,
+    summary="重试失败项",
+)
+async def retry_fetch(
+    data: FetchRetryRequest,
+    current_user=Depends(require_permission("content:create")),
+):
+    """重试失败的采集项"""
+    from apps.api.services.fish_fetcher import get_fish_fetcher_service
+
+    service = get_fish_fetcher_service()
+    result = service.retry_failed(names=data.names)
+
+    logger.info(f"重试失败项: names={data.names}, user={current_user.username}")
+
+    return FetchActionResponse(**result)
+
+
+@router.post(
+    "/fish-species/fetch/reset",
+    response_model=FetchActionResponse,
+    summary="重置采集进度",
+)
+async def reset_fetch(
+    current_user=Depends(require_permission("content:delete")),
+):
+    """重置所有采集进度"""
+    from apps.api.services.fish_fetcher import get_fish_fetcher_service
+
+    service = get_fish_fetcher_service()
+    result = service.reset_all()
+
+    logger.info(f"采集进度重置: user={current_user.username}")
+
+    return FetchActionResponse(**result)

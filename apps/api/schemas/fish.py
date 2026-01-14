@@ -241,3 +241,66 @@ class InitDataResponse(BaseModel):
 
     created_count: int
     message: str
+
+
+# ========== Fish Fetch Schemas ==========
+
+
+class FetchStatusEnum(str, Enum):
+    """采集状态枚举"""
+
+    PENDING = "pending"
+    FETCHING = "fetching"
+    ENRICHING = "enriching"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class FetchProgressItem(BaseModel):
+    """采集进度项"""
+
+    name: str = Field(..., description="鱼种名称")
+    status: str = Field(..., description="采集状态")
+    species_id: Optional[int] = Field(None, description="关联的鱼种ID")
+    error: Optional[str] = Field(None, description="错误信息")
+    updated_at: Optional[str] = Field(None, description="更新时间")
+
+
+class FetchProgressStats(BaseModel):
+    """采集进度统计"""
+
+    total: int = Field(0, description="总数")
+    pending: int = Field(0, description="等待中")
+    fetching: int = Field(0, description="采集中")
+    enriching: int = Field(0, description="增强中")
+    completed: int = Field(0, description="已完成")
+    failed: int = Field(0, description="失败")
+    skipped: int = Field(0, description="已跳过")
+
+
+class FetchProgressResponse(BaseModel):
+    """采集进度响应"""
+
+    is_running: bool = Field(..., description="是否正在运行")
+    stats: FetchProgressStats = Field(..., description="统计信息")
+    items: List[FetchProgressItem] = Field(..., description="进度列表")
+
+
+class FetchStartRequest(BaseModel):
+    """开始采集请求"""
+
+    use_llm: bool = Field(True, description="是否使用LLM增强")
+
+
+class FetchRetryRequest(BaseModel):
+    """重试采集请求"""
+
+    names: Optional[List[str]] = Field(None, description="要重试的鱼种名称列表，为空则重试所有失败项")
+
+
+class FetchActionResponse(BaseModel):
+    """采集操作响应"""
+
+    success: bool = Field(..., description="是否成功")
+    message: str = Field(..., description="消息")
