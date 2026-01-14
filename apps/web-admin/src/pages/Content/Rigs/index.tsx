@@ -48,6 +48,8 @@ const RigList: React.FC = () => {
   })
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingRigId, setEditingRigId] = useState<number | null>(null)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
+  const [batchDeleting, setBatchDeleting] = useState(false)
 
   // Load featured rigs
   const loadFeatured = useCallback(async () => {
@@ -127,6 +129,24 @@ const RigList: React.FC = () => {
     }
   }
 
+  const handleBatchDelete = async () => {
+    setBatchDeleting(true)
+    try {
+      // 逐个删除选中的钓组
+      for (const rigId of selectedRowKeys) {
+        await rigApi.delete(rigId)
+      }
+      message.success(`成功删除 ${selectedRowKeys.length} 条记录`)
+      setSelectedRowKeys([])
+      loadRigs()
+      loadFeatured()
+    } catch {
+      message.error('批量删除失败')
+    } finally {
+      setBatchDeleting(false)
+    }
+  }
+
   const handleDrawerClose = () => {
     setDrawerOpen(false)
     setEditingRigId(null)
@@ -137,6 +157,27 @@ const RigList: React.FC = () => {
     loadFeatured()
   }
 
+  // 解析并格式化目标鱼种
+  const formatTargetSpecies = (species: string | undefined): React.ReactNode => {
+    if (!species) return '-'
+    try {
+      const arr = JSON.parse(species)
+      if (Array.isArray(arr) && arr.length > 0) {
+        return (
+          <Space size={4} wrap>
+            {arr.slice(0, 3).map((s, i) => (
+              <Tag key={i} style={{ borderRadius: 4, margin: 0, fontSize: 12 }}>{s}</Tag>
+            ))}
+            {arr.length > 3 && <Text type="secondary">+{arr.length - 3}</Text>}
+          </Space>
+        )
+      }
+    } catch {
+      // 如果不是 JSON，直接显示
+    }
+    return <span>{species}</span>
+  }
+
   // Table columns
   const columns: ColumnsType<RigListItem> = [
     {
@@ -144,11 +185,13 @@ const RigList: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       render: (name, record) => (
-        <Space>
-          <Text strong style={{ cursor: 'pointer' }} onClick={() => handleEdit(record)}>
-            {name}
-          </Text>
-        </Space>
+        <Text
+          strong
+          style={{ cursor: 'pointer', color: '#1890ff' }}
+          onClick={() => handleEdit(record)}
+        >
+          {name}
+        </Text>
       ),
     },
     {
@@ -183,9 +226,8 @@ const RigList: React.FC = () => {
       title: '目标鱼种',
       dataIndex: 'target_species',
       key: 'target_species',
-      width: 150,
-      ellipsis: true,
-      render: (species) => species || '-',
+      width: 200,
+      render: (species) => formatTargetSpecies(species),
     },
     {
       title: '组件',
@@ -194,7 +236,16 @@ const RigList: React.FC = () => {
       width: 70,
       align: 'center',
       render: (count) => (
-        <Text type="secondary">{count}</Text>
+        <Tag
+          style={{
+            borderRadius: 8,
+            border: 'none',
+            background: count > 0 ? '#e6f7ff' : '#f0f0f0',
+            color: count > 0 ? '#1890ff' : '#999',
+          }}
+        >
+          {count}
+        </Tag>
       ),
     },
     {
@@ -204,7 +255,16 @@ const RigList: React.FC = () => {
       width: 70,
       align: 'center',
       render: (count) => (
-        <Text type="secondary">{count}</Text>
+        <Tag
+          style={{
+            borderRadius: 8,
+            border: 'none',
+            background: count > 0 ? '#f6ffed' : '#f0f0f0',
+            color: count > 0 ? '#52c41a' : '#999',
+          }}
+        >
+          {count}
+        </Tag>
       ),
     },
     {
@@ -342,31 +402,49 @@ const RigList: React.FC = () => {
           gap: 12,
           marginBottom: 20,
           flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}
       >
-        <Input.Search
-          placeholder="搜索钓组名称..."
-          allowClear
-          onSearch={handleSearch}
-          style={{ width: 240 }}
-          prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-        />
-        <Select
-          placeholder="全部分类"
-          style={{ width: 140 }}
-          options={categoryOptions}
-          value={filters.category || ''}
-          onChange={(v) => handleCategoryChange((v || undefined) as RigCategory | undefined)}
-          allowClear
-        />
-        <Select
-          placeholder="全部难度"
-          style={{ width: 120 }}
-          options={difficultyOptions}
-          value={filters.difficulty || ''}
-          onChange={(v) => handleDifficultyChange((v || undefined) as RigDifficulty | undefined)}
-          allowClear
-        />
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <Input.Search
+            placeholder="搜索钓组名称..."
+            allowClear
+            onSearch={handleSearch}
+            style={{ width: 240 }}
+            prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+          />
+          <Select
+            placeholder="全部分类"
+            style={{ width: 140 }}
+            options={categoryOptions}
+            value={filters.category || ''}
+            onChange={(v) => handleCategoryChange((v || undefined) as RigCategory | undefined)}
+            allowClear
+          />
+          <Select
+            placeholder="全部难度"
+            style={{ width: 120 }}
+            options={difficultyOptions}
+            value={filters.difficulty || ''}
+            onChange={(v) => handleDifficultyChange((v || undefined) as RigDifficulty | undefined)}
+            allowClear
+          />
+        </div>
+        {selectedRowKeys.length > 0 && (
+          <Popconfirm
+            title={`确定删除选中的 ${selectedRowKeys.length} 条记录？`}
+            description="关联的组件和规格将一并删除"
+            onConfirm={handleBatchDelete}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Button danger loading={batchDeleting} icon={<DeleteOutlined />}>
+              批量删除 ({selectedRowKeys.length})
+            </Button>
+          </Popconfirm>
+        )}
       </div>
 
       {/* Table */}
@@ -383,6 +461,10 @@ const RigList: React.FC = () => {
           dataSource={rigs}
           rowKey="rig_id"
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys as number[]),
+          }}
           pagination={{
             current: filters.page,
             pageSize: filters.page_size,

@@ -2,11 +2,61 @@
  * Rig Card Component - Jobs-style minimalist design
  */
 
-import { Card, Tag, Typography } from 'antd'
+import { Card, Tag, Typography, Space } from 'antd'
+import { AppstoreOutlined, SettingOutlined } from '@ant-design/icons'
 import type { RigListItem } from '@/types/rig'
 import { RIG_CATEGORY_CONFIG, RIG_DIFFICULTY_CONFIG } from '@/types/rig'
 
-const { Text, Paragraph } = Typography
+const { Text } = Typography
+
+// 分类渐变背景配置
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  bottom: 'linear-gradient(135deg, #ff9a56 0%, #ff6b35 100%)',  // 橙色-底钓
+  float: 'linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)',   // 蓝色-浮漂
+  lure: 'linear-gradient(135deg, #55efc4 0%, #00b894 100%)',    // 绿色-路亚
+  fly: 'linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)',     // 紫色-飞蝇
+  surf: 'linear-gradient(135deg, #81ecec 0%, #00cec9 100%)',    // 青色-海钓
+}
+
+// 解析并格式化目标鱼种
+const formatTargetSpecies = (species: string | undefined): React.ReactNode => {
+  if (!species) return null
+  try {
+    const arr = JSON.parse(species)
+    if (Array.isArray(arr) && arr.length > 0) {
+      return (
+        <Space size={4} wrap style={{ marginTop: 8 }}>
+          {arr.slice(0, 2).map((s, i) => (
+            <Tag
+              key={i}
+              style={{
+                borderRadius: 4,
+                margin: 0,
+                fontSize: 11,
+                background: '#f5f5f5',
+                border: 'none',
+                color: '#666',
+              }}
+            >
+              {s}
+            </Tag>
+          ))}
+          {arr.length > 2 && (
+            <Text type="secondary" style={{ fontSize: 11 }}>+{arr.length - 2}</Text>
+          )}
+        </Space>
+      )
+    }
+  } catch {
+    // 如果不是 JSON，直接显示
+    return (
+      <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
+        {species}
+      </Text>
+    )
+  }
+  return null
+}
 
 interface RigCardProps {
   rig: RigListItem
@@ -41,11 +91,13 @@ const RigCard: React.FC<RigCardProps> = ({ rig, onClick }) => {
       }}
       className="rig-card"
     >
-      {/* Image area */}
+      {/* Image area with gradient background */}
       <div
         style={{
-          height: 160,
-          background: `linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%)`,
+          height: 140,
+          background: rig.diagram_url
+            ? `linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%)`
+            : CATEGORY_GRADIENTS[rig.category] || 'linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -63,12 +115,13 @@ const RigCard: React.FC<RigCardProps> = ({ rig, onClick }) => {
             }}
           />
         ) : (
-          <span style={{ fontSize: 48, opacity: 0.6 }}>{categoryConfig.icon}</span>
+          <span style={{ fontSize: 56, opacity: 0.9, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>
+            {categoryConfig.icon}
+          </span>
         )}
 
         {/* Category badge */}
         <Tag
-          color={categoryConfig.color}
           style={{
             position: 'absolute',
             top: 12,
@@ -77,6 +130,9 @@ const RigCard: React.FC<RigCardProps> = ({ rig, onClick }) => {
             borderRadius: 12,
             border: 'none',
             fontWeight: 500,
+            background: 'rgba(255,255,255,0.95)',
+            color: '#333',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           }}
         >
           {categoryConfig.icon} {categoryConfig.label}
@@ -84,19 +140,19 @@ const RigCard: React.FC<RigCardProps> = ({ rig, onClick }) => {
       </div>
 
       {/* Content area */}
-      <div style={{ padding: '16px 20px' }}>
+      <div style={{ padding: '14px 16px' }}>
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
-            marginBottom: 8,
+            marginBottom: 4,
           }}
         >
           <Text
             strong
             style={{
-              fontSize: 16,
+              fontSize: 15,
               color: '#1a1a1a',
               lineHeight: 1.4,
             }}
@@ -109,27 +165,17 @@ const RigCard: React.FC<RigCardProps> = ({ rig, onClick }) => {
               marginLeft: 8,
               borderRadius: 8,
               border: 'none',
+              fontSize: 11,
             }}
           >
             {difficultyConfig.label}
           </Tag>
         </div>
 
-        {rig.target_species && (
-          <Paragraph
-            type="secondary"
-            style={{
-              margin: 0,
-              fontSize: 13,
-              lineHeight: 1.5,
-            }}
-            ellipsis={{ rows: 1 }}
-          >
-            目标鱼种: {rig.target_species}
-          </Paragraph>
-        )}
+        {/* Target species as tags */}
+        {formatTargetSpecies(rig.target_species)}
 
-        {/* Stats */}
+        {/* Stats with icons */}
         <div
           style={{
             display: 'flex',
@@ -139,12 +185,18 @@ const RigCard: React.FC<RigCardProps> = ({ rig, onClick }) => {
             borderTop: '1px solid #f0f0f0',
           }}
         >
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {rig.component_count} 个组件
-          </Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {rig.spec_count} 项规格
-          </Text>
+          <Space size={4}>
+            <AppstoreOutlined style={{ color: '#1890ff', fontSize: 12 }} />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {rig.component_count} 组件
+            </Text>
+          </Space>
+          <Space size={4}>
+            <SettingOutlined style={{ color: '#52c41a', fontSize: 12 }} />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {rig.spec_count} 规格
+            </Text>
+          </Space>
         </div>
       </div>
 
