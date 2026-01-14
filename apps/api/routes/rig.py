@@ -279,6 +279,91 @@ async def get_featured_rigs(
         return [rig_to_response(rig) for rig in rigs]
 
 
+# ========== 采集管理 ==========
+# 注意：这些路由必须在 /rigs/{rig_id} 之前定义，否则会被动态路由匹配
+
+@router.get(
+    "/rigs/fetch/progress",
+    summary="获取钓组采集进度",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_READ))]
+)
+async def get_fetch_progress(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_READ))
+):
+    """获取钓组知识采集进度"""
+    from apps.api.services.rig_fetcher import get_rig_fetcher_service
+    service = get_rig_fetcher_service()
+    return service.get_progress()
+
+
+@router.post(
+    "/rigs/fetch/start",
+    summary="开始钓组采集",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_CREATE))]
+)
+async def start_fetch(
+    use_llm: bool = True,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_CREATE))
+):
+    """开始或继续钓组知识采集"""
+    from apps.api.services.rig_fetcher import get_rig_fetcher_service
+    service = get_rig_fetcher_service()
+    result = service.start_fetch(use_llm=use_llm)
+    logger.info(f"钓组采集启动: user={current_user.username}, use_llm={use_llm}")
+    return result
+
+
+@router.post(
+    "/rigs/fetch/pause",
+    summary="暂停钓组采集",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_CREATE))]
+)
+async def pause_fetch(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_CREATE))
+):
+    """暂停钓组知识采集"""
+    from apps.api.services.rig_fetcher import get_rig_fetcher_service
+    service = get_rig_fetcher_service()
+    result = service.pause_fetch()
+    logger.info(f"钓组采集暂停: user={current_user.username}")
+    return result
+
+
+@router.post(
+    "/rigs/fetch/retry",
+    summary="重试失败的钓组采集",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_CREATE))]
+)
+async def retry_failed(
+    names: Optional[List[str]] = None,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_CREATE))
+):
+    """重试失败的钓组采集项目"""
+    from apps.api.services.rig_fetcher import get_rig_fetcher_service
+    service = get_rig_fetcher_service()
+    result = service.retry_failed(names)
+    logger.info(f"钓组采集重试: user={current_user.username}, names={names}")
+    return result
+
+
+@router.post(
+    "/rigs/fetch/reset",
+    summary="重置钓组采集进度",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_DELETE))]
+)
+async def reset_progress(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_DELETE))
+):
+    """重置所有钓组采集进度"""
+    from apps.api.services.rig_fetcher import get_rig_fetcher_service
+    service = get_rig_fetcher_service()
+    result = service.reset_all()
+    logger.info(f"钓组采集重置: user={current_user.username}")
+    return result
+
+
+# ========== 钓组详情（动态路由，必须放在静态路由之后） ==========
+
 @router.get(
     "/rigs/{rig_id}",
     response_model=RigResponse,

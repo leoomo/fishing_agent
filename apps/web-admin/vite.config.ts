@@ -14,7 +14,7 @@ export default defineConfig({
     proxy: {
       // API 请求代理
       '/api': {
-        target: 'http://localhost:8765',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         ws: true,
         // WebSocket 需要配置超时

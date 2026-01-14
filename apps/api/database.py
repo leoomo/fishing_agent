@@ -380,6 +380,23 @@ class LureDatabase:
             )
         """)
 
+        # ========== 钓组采集进度表 ==========
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS rig_fetch_progress (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name_cn TEXT NOT NULL UNIQUE,
+                name_en TEXT,
+                wiki_page TEXT,
+                category TEXT,
+                status TEXT DEFAULT 'pending',
+                rig_id INTEGER,
+                wiki_data TEXT,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # ========== 创建索引 ==========
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipment_brand ON equipment(brand_id)")
@@ -401,6 +418,7 @@ class LureDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_fish_season_activity ON fish_season_activity(species_id, season)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rig_components ON rig_components(rig_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_fish_fetch_progress_status ON fish_fetch_progress(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rig_fetch_progress_status ON rig_fetch_progress(status)")
 
         conn.commit()
 

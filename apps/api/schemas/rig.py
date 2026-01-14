@@ -187,3 +187,44 @@ class RigOptionsResponse(BaseModel):
     categories: List[OptionItem]
     difficulties: List[OptionItem]
     component_types: List[OptionItem]
+
+
+# ========== Fetch Progress Schemas ==========
+
+class RigFetchProgressItem(BaseModel):
+    """钓组采集进度项"""
+    name_cn: str
+    name_en: Optional[str] = None
+    status: str
+    rig_id: Optional[int] = None
+    error: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class RigFetchProgressStats(BaseModel):
+    """钓组采集统计"""
+    total: int = 0
+    pending: int = 0
+    fetching: int = 0
+    enriching: int = 0
+    completed: int = 0
+    failed: int = 0
+    skipped: int = 0
+
+
+class RigFetchProgressResponse(BaseModel):
+    """钓组采集进度响应"""
+    is_running: bool = False
+    stats: RigFetchProgressStats
+    items: List[RigFetchProgressItem]
+
+
+class RigFetchActionResponse(BaseModel):
+    """钓组采集操作响应"""
+    success: bool
+    message: str
+
+
+class RigFetchRetryRequest(BaseModel):
+    """钓组采集重试请求"""
+    names: Optional[List[str]] = Field(None, description="要重试的钓组名称列表，为空则重试所有失败项")
