@@ -187,9 +187,9 @@ const router = createBrowserRouter(
             </Suspense>
           ),
         },
-        // Data Workflow
+        // Data Workflow (under Equipment Management)
         {
-          path: 'data-workflow',
+          path: 'equipment/workflow',
           element: (
             <Suspense fallback={<PageLoading />}>
               <DataWorkflow />

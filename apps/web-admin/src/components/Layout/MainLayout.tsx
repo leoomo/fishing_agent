@@ -10,6 +10,7 @@ import {
   SettingOutlined,
   LogoutOutlined,
   NodeIndexOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons'
 import { useDispatch } from 'react-redux'
 import { logout } from '@/store/slices/authSlice'
@@ -26,9 +27,13 @@ const MainLayout = () => {
 
   const menuItems = [
     {
-      key: '/equipment',
+      key: 'equipment-menu',
       icon: <DatabaseOutlined />,
       label: '装备管理',
+      children: [
+        { key: '/equipment', icon: <UnorderedListOutlined />, label: '装备列表' },
+        { key: '/equipment/workflow', icon: <NodeIndexOutlined />, label: '数据工作流' },
+      ],
     },
     {
       key: '/users',
@@ -46,11 +51,6 @@ const MainLayout = () => {
         { key: '/content/lure-types', label: '拟饵类型' },
         { key: '/content/accessories', label: '钓鱼配件' },
       ],
-    },
-    {
-      key: '/data-workflow',
-      icon: <NodeIndexOutlined />,
-      label: '数据工作流',
     },
     {
       key: '/monitor',
