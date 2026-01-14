@@ -14,6 +14,7 @@ from apps.api.auth.dependencies import get_current_user, require_permission
 from apps.api.models.fish import FishSpecies, FishKnowledge, FishSeasonActivity, ActivityLevel
 from apps.api.orm import get_db_session
 from apps.api.schemas.fish import (
+    BatchDeleteRequest,
     CategoryStats,
     CategoryStatsResponse,
     EquipmentRecommendation,
@@ -526,6 +527,25 @@ async def delete_fish_species(
         session.commit()
 
         logger.info(f"鱼种删除成功: species_id={species_id}, name={name}, user={current_user.username}")
+
+
+@router.post(
+    "/fish-species/batch-delete",
+    summary="批量删除鱼种",
+    status_code=204,
+)
+async def batch_delete_fish_species(
+    data: BatchDeleteRequest,
+    current_user=Depends(require_permission("content:delete")),
+):
+    """批量删除鱼种及其关联数据"""
+    with get_db_session() as session:
+        deleted = session.query(FishSpecies).filter(
+            FishSpecies.species_id.in_(data.ids)
+        ).delete(synchronize_session=False)
+        session.commit()
+
+        logger.info(f"批量删除鱼种: count={deleted}, ids={data.ids}, user={current_user.username}")
 
 
 # ========== Knowledge Management ==========

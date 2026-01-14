@@ -63,6 +63,8 @@ const FishList: React.FC = () => {
   const [editingSpeciesId, setEditingSpeciesId] = useState<number | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<FishCategory | null>(null)
   const [fetchModalOpen, setFetchModalOpen] = useState(false)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
+  const [batchDeleting, setBatchDeleting] = useState(false)
 
   // Load category stats
   const loadStats = useCallback(async () => {
@@ -152,6 +154,21 @@ const FishList: React.FC = () => {
       loadStats()
     } catch {
       message.error('删除失败')
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    setBatchDeleting(true)
+    try {
+      await fishApi.batchDelete(selectedRowKeys)
+      message.success(`成功删除 ${selectedRowKeys.length} 条记录`)
+      setSelectedRowKeys([])
+      loadFishes()
+      loadStats()
+    } catch {
+      message.error('批量删除失败')
+    } finally {
+      setBatchDeleting(false)
     }
   }
 
@@ -421,31 +438,49 @@ const FishList: React.FC = () => {
           gap: 12,
           marginBottom: 20,
           flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}
       >
-        <Input.Search
-          placeholder="搜索鱼种名称..."
-          allowClear
-          onSearch={handleSearch}
-          style={{ width: 240 }}
-          prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-        />
-        <Select
-          placeholder="全部分类"
-          style={{ width: 140 }}
-          options={categoryOptions}
-          value={filters.category || ''}
-          onChange={(v) => handleCategoryChange((v || undefined) as FishCategory | undefined)}
-          allowClear
-        />
-        <Select
-          placeholder="全部环境"
-          style={{ width: 120 }}
-          options={habitatOptions}
-          value={filters.habitat || ''}
-          onChange={(v) => handleHabitatChange(v || undefined)}
-          allowClear
-        />
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <Input.Search
+            placeholder="搜索鱼种名称..."
+            allowClear
+            onSearch={handleSearch}
+            style={{ width: 240 }}
+            prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+          />
+          <Select
+            placeholder="全部分类"
+            style={{ width: 140 }}
+            options={categoryOptions}
+            value={filters.category || ''}
+            onChange={(v) => handleCategoryChange((v || undefined) as FishCategory | undefined)}
+            allowClear
+          />
+          <Select
+            placeholder="全部环境"
+            style={{ width: 120 }}
+            options={habitatOptions}
+            value={filters.habitat || ''}
+            onChange={(v) => handleHabitatChange(v || undefined)}
+            allowClear
+          />
+        </div>
+        {selectedRowKeys.length > 0 && (
+          <Popconfirm
+            title={`确定删除选中的 ${selectedRowKeys.length} 条记录？`}
+            description="删除后将同时删除关联的知识和季节活动"
+            onConfirm={handleBatchDelete}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Button danger loading={batchDeleting} icon={<DeleteOutlined />}>
+              批量删除 ({selectedRowKeys.length})
+            </Button>
+          </Popconfirm>
+        )}
       </div>
 
       {/* Table */}
@@ -462,6 +497,10 @@ const FishList: React.FC = () => {
           dataSource={fishes}
           rowKey="species_id"
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys as number[]),
+          }}
           pagination={{
             current: filters.page,
             pageSize: filters.page_size,
