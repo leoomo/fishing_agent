@@ -30,6 +30,7 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   DatabaseOutlined,
+  CloudDownloadOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import { fishApi } from '@/api/services/fish'
@@ -42,6 +43,7 @@ import type {
 import { FISH_CATEGORY_CONFIG, FISH_CATEGORY_OPTIONS } from '@/types/fish'
 import FishCard from './FishCard'
 import FishDrawer from './FishDrawer'
+import FetchModal from './FetchModal'
 
 const { Title, Text } = Typography
 
@@ -60,6 +62,7 @@ const FishList: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingSpeciesId, setEditingSpeciesId] = useState<number | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<FishCategory | null>(null)
+  const [fetchModalOpen, setFetchModalOpen] = useState(false)
 
   // Load category stats
   const loadStats = useCallback(async () => {
@@ -334,6 +337,12 @@ const FishList: React.FC = () => {
           </Text>
         </div>
         <Space>
+          <Button
+            icon={<CloudDownloadOutlined />}
+            onClick={() => setFetchModalOpen(true)}
+          >
+            网络采集
+          </Button>
           {isEmpty && (
             <Button icon={<DatabaseOutlined />} onClick={handleInitData} loading={initLoading}>
               初始化数据
@@ -470,6 +479,16 @@ const FishList: React.FC = () => {
         speciesId={editingSpeciesId}
         onClose={handleDrawerClose}
         onSuccess={handleDrawerSuccess}
+      />
+
+      {/* Fetch Modal */}
+      <FetchModal
+        open={fetchModalOpen}
+        onClose={() => setFetchModalOpen(false)}
+        onComplete={() => {
+          loadFishes()
+          loadStats()
+        }}
       />
     </div>
   )

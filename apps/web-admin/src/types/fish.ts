@@ -252,3 +252,54 @@ export interface FishInitDataResponse {
   created_count: number
   message: string
 }
+
+// ========== 采集相关类型 ==========
+
+export type FetchStatus = 'pending' | 'fetching' | 'enriching' | 'completed' | 'failed' | 'skipped'
+
+export interface FetchProgressItem {
+  name: string
+  status: FetchStatus
+  species_id?: number
+  error?: string
+  updated_at?: string
+}
+
+export interface FetchProgressStats {
+  total: number
+  pending: number
+  fetching: number
+  enriching: number
+  completed: number
+  failed: number
+  skipped: number
+}
+
+export interface FetchProgressResponse {
+  is_running: boolean
+  stats: FetchProgressStats
+  items: FetchProgressItem[]
+}
+
+export interface FetchStartRequest {
+  use_llm: boolean
+}
+
+export interface FetchRetryRequest {
+  names?: string[]
+}
+
+export interface FetchActionResponse {
+  success: boolean
+  message: string
+}
+
+// 采集状态配置
+export const FETCH_STATUS_CONFIG: Record<FetchStatus, { label: string; color: string; icon: string }> = {
+  pending: { label: '等待中', color: '#8c8c8c', icon: '○' },
+  fetching: { label: '采集中', color: '#1890ff', icon: '⟳' },
+  enriching: { label: 'LLM增强中', color: '#722ed1', icon: '⟳' },
+  completed: { label: '已完成', color: '#52c41a', icon: '✓' },
+  failed: { label: '失败', color: '#ff4d4f', icon: '✗' },
+  skipped: { label: '已跳过', color: '#faad14', icon: '⊘' },
+}
