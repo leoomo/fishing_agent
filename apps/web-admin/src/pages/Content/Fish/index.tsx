@@ -44,6 +44,7 @@ import { FISH_CATEGORY_CONFIG, FISH_CATEGORY_OPTIONS } from '@/types/fish'
 import FishCard from './FishCard'
 import FishDrawer from './FishDrawer'
 import FetchModal from './FetchModal'
+import FishDetailModal from './FishDetailModal'
 
 const { Title, Text } = Typography
 
@@ -65,6 +66,8 @@ const FishList: React.FC = () => {
   const [fetchModalOpen, setFetchModalOpen] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchDeleting, setBatchDeleting] = useState(false)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [viewingSpeciesId, setViewingSpeciesId] = useState<number | null>(null)
 
   // Load category stats
   const loadStats = useCallback(async () => {
@@ -141,8 +144,19 @@ const FishList: React.FC = () => {
     setDrawerOpen(true)
   }
 
+  const handleView = (fish: FishSpeciesListItem) => {
+    setViewingSpeciesId(fish.species_id)
+    setDetailModalOpen(true)
+  }
+
   const handleEdit = (fish: FishSpeciesListItem) => {
     setEditingSpeciesId(fish.species_id)
+    setDrawerOpen(true)
+  }
+
+  const handleEditFromDetail = () => {
+    setDetailModalOpen(false)
+    setEditingSpeciesId(viewingSpeciesId)
     setDrawerOpen(true)
   }
 
@@ -204,7 +218,11 @@ const FishList: React.FC = () => {
       key: 'name_cn',
       render: (name, record) => (
         <div>
-          <Text strong style={{ cursor: 'pointer' }} onClick={() => handleEdit(record)}>
+          <Text
+            strong
+            style={{ cursor: 'pointer', color: '#1890ff' }}
+            onClick={() => handleView(record)}
+          >
             {name}
           </Text>
           {record.name_en && (
@@ -528,6 +546,14 @@ const FishList: React.FC = () => {
           loadFishes()
           loadStats()
         }}
+      />
+
+      {/* Detail Modal */}
+      <FishDetailModal
+        open={detailModalOpen}
+        speciesId={viewingSpeciesId}
+        onClose={() => setDetailModalOpen(false)}
+        onEdit={handleEditFromDetail}
       />
     </div>
   )
