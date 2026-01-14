@@ -152,22 +152,20 @@ class LLMEnricher:
     """LLM 增强服务 - 生成钓鱼相关知识"""
 
     def __init__(self):
-        self.api_key = os.getenv("DASHSCOPE_API_KEY")
-        self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        # 使用通用 LLM 服务，自动记录统计
+        from apps.api.services.llm_service import LLMService
+        self.llm = LLMService(
+            provider="qwen",
+            model="qwen-plus",
+            caller="fish_fetcher"
+        )
 
     def enrich_fish_knowledge(self, name_cn: str, fishbase_data: Optional[Dict] = None) -> Dict[str, Any]:
         """使用 LLM 增强鱼类钓鱼知识"""
-        if not self.api_key:
-            logger.warning("未配置 DASHSCOPE_API_KEY，跳过 LLM 增强")
-            return self._get_default_knowledge(name_cn)
-
-        try:
-            import requests
-
-            # 构建提示词
-            context = ""
-            if fishbase_data:
-                context = f"""
+        # 构建提示词
+        context = ""
+        if fishbase_data:
+            context = f"""
 FishBase 数据参考：
 - 学名: {fishbase_data.get('Genus', '')} {fishbase_data.get('Species', '')}
 - 英文名: {fishbase_data.get('FBname', '')}
@@ -175,7 +173,7 @@ FishBase 数据参考：
 - 最大体重: {fishbase_data.get('Weight', '')} g
 """
 
-            prompt = f"""你是一位专业的钓鱼专家。请为"{name_cn}"生成详细的钓鱼知识，返回 JSON 格式。
+        prompt = f"""你是一位专业的钓鱼专家。请为"{name_cn}"生成详细的钓鱼知识，返回 JSON 格式。
 
 {context}
 
@@ -209,23 +207,18 @@ FishBase 数据参考：
 
 只返回 JSON，不要其他内容。"""
 
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "qwen-plus",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.7
-                },
+        try:
+            response = self.llm.chat(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
                 timeout=60
             )
-            response.raise_for_status()
-            result = response.json()
 
-            content = result["choices"][0]["message"]["content"]
+            if not response.success:
+                logger.warning(f"LLM 调用失败: {name_cn}, 错误: {response.error}")
+                return self._get_default_knowledge(name_cn)
+
+            content = response.content
             # 清理可能的 markdown 代码块标记
             content = content.strip()
             if content.startswith("```json"):
