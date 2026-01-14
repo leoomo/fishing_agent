@@ -304,3 +304,12 @@ class FetchActionResponse(BaseModel):
 
     success: bool = Field(..., description="是否成功")
     message: str = Field(..., description="消息")
+
+
+# ========== Batch Operations ==========
+
+
+class BatchDeleteRequest(BaseModel):
+    """批量删除请求"""
+
+    ids: List[int] = Field(..., min_length=1, description="要删除的鱼种ID列表")

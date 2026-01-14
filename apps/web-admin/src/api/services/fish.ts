@@ -70,6 +70,13 @@ export const fishApi = {
   },
 
   /**
+   * 批量删除鱼种
+   */
+  batchDelete: (ids: number[]): Promise<void> => {
+    return client.post('/admin/content/fish-species/batch-delete', { ids })
+  },
+
+  /**
    * 初始化默认数据
    */
   initData: (): Promise<FishInitDataResponse> => {
