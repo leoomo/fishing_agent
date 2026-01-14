@@ -9,15 +9,6 @@ import { RIG_CATEGORY_CONFIG, RIG_DIFFICULTY_CONFIG } from '@/types/rig'
 
 const { Text } = Typography
 
-// 分类渐变背景配置
-const CATEGORY_GRADIENTS: Record<string, string> = {
-  bottom: 'linear-gradient(135deg, #ff9a56 0%, #ff6b35 100%)',  // 橙色-底钓
-  float: 'linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)',   // 蓝色-浮漂
-  lure: 'linear-gradient(135deg, #55efc4 0%, #00b894 100%)',    // 绿色-路亚
-  fly: 'linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%)',     // 紫色-飞蝇
-  surf: 'linear-gradient(135deg, #81ecec 0%, #00cec9 100%)',    // 青色-海钓
-}
-
 // 解析并格式化目标鱼种
 const formatTargetSpecies = (species: string | undefined): React.ReactNode => {
   if (!species) return null
@@ -91,13 +82,11 @@ const RigCard: React.FC<RigCardProps> = ({ rig, onClick }) => {
       }}
       className="rig-card"
     >
-      {/* Image area with gradient background */}
+      {/* Image area with simple background */}
       <div
         style={{
           height: 140,
-          background: rig.diagram_url
-            ? `linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%)`
-            : CATEGORY_GRADIENTS[rig.category] || 'linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%)',
+          background: '#f5f7fa',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
