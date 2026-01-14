@@ -32,6 +32,7 @@ import type { RigListItem, RigCategory, RigDifficulty } from '@/types/rig'
 import { RIG_CATEGORY_CONFIG, RIG_DIFFICULTY_CONFIG } from '@/types/rig'
 import RigCard from './RigCard'
 import RigDrawer from './RigDrawer'
+import RigDetailModal from './RigDetailModal'
 
 const { Title, Text } = Typography
 
@@ -50,6 +51,8 @@ const RigList: React.FC = () => {
   const [editingRigId, setEditingRigId] = useState<number | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchDeleting, setBatchDeleting] = useState(false)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [viewingRigId, setViewingRigId] = useState<number | null>(null)
 
   // Load featured rigs
   const loadFeatured = useCallback(async () => {
@@ -113,9 +116,22 @@ const RigList: React.FC = () => {
     setDrawerOpen(true)
   }
 
+  const handleView = (rig: RigListItem) => {
+    setViewingRigId(rig.rig_id)
+    setDetailModalOpen(true)
+  }
+
   const handleEdit = (rig: RigListItem) => {
     setEditingRigId(rig.rig_id)
     setDrawerOpen(true)
+  }
+
+  const handleDetailEdit = () => {
+    setDetailModalOpen(false)
+    if (viewingRigId) {
+      setEditingRigId(viewingRigId)
+      setDrawerOpen(true)
+    }
   }
 
   const handleDelete = async (rigId: number) => {
@@ -188,7 +204,7 @@ const RigList: React.FC = () => {
         <Text
           strong
           style={{ cursor: 'pointer', color: '#1890ff' }}
-          onClick={() => handleEdit(record)}
+          onClick={() => handleView(record)}
         >
           {name}
         </Text>
@@ -370,7 +386,7 @@ const RigList: React.FC = () => {
             <Row gutter={[20, 20]}>
               {featuredRigs.map(rig => (
                 <Col xs={24} sm={12} md={8} lg={6} key={rig.rig_id}>
-                  <RigCard rig={rig} onClick={handleEdit} />
+                  <RigCard rig={rig} onClick={handleView} />
                 </Col>
               ))}
             </Row>
@@ -482,6 +498,14 @@ const RigList: React.FC = () => {
         rigId={editingRigId}
         onClose={handleDrawerClose}
         onSuccess={handleDrawerSuccess}
+      />
+
+      {/* Detail Modal */}
+      <RigDetailModal
+        open={detailModalOpen}
+        rigId={viewingRigId}
+        onClose={() => setDetailModalOpen(false)}
+        onEdit={handleDetailEdit}
       />
     </div>
   )
