@@ -5,9 +5,9 @@
 """
 
 import logging
-from typing import Optional
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from apps.api.auth.dependencies import get_current_user, require_permission
 from apps.api.models import LureType
@@ -436,6 +436,50 @@ async def delete_lure_type(
         )
 
 
+@router.post(
+    "/lure-types/batch-delete",
+    summary="批量删除拟饵类型",
+)
+async def batch_delete_lure_types(
+    ids: List[int] = Body(..., embed=True, description="要删除的拟饵类型ID列表"),
+    current_user=Depends(require_permission("content:delete")),
+):
+    """批量删除拟饵类型"""
+    if not ids:
+        raise HTTPException(status_code=400, detail="请选择要删除的拟饵类型")
+
+    with get_db_session() as session:
+        # 查询要删除的记录
+        lure_types = (
+            session.query(LureType)
+            .filter(LureType.lure_type_id.in_(ids))
+            .all()
+        )
+
+        if not lure_types:
+            raise HTTPException(status_code=404, detail="未找到要删除的拟饵类型")
+
+        deleted_count = len(lure_types)
+        deleted_names = [lt.name for lt in lure_types]
+
+        # 删除记录
+        for lure_type in lure_types:
+            session.delete(lure_type)
+
+        session.commit()
+
+        logger.info(
+            f"批量删除拟饵类型成功: count={deleted_count}, "
+            f"names={deleted_names}, user={current_user.username}"
+        )
+
+        return {
+            "success": True,
+            "deleted_count": deleted_count,
+            "message": f"成功删除 {deleted_count} 条拟饵类型",
+        }
+
+
 # ========== Init Data Endpoint ==========
 
 
@@ -475,3 +519,49 @@ async def init_lure_types(
             created_count=created_count,
             message=f"成功创建 {created_count} 条拟饵类型数据",
         )
+
+
+# ========== Wikipedia Crawl Endpoints ==========
+
+
+@router.get(
+    "/lure-types/crawl/progress",
+    summary="获取网页采集进度",
+)
+async def get_crawl_progress(
+    current_user=Depends(get_current_user),
+):
+    """获取维基百科网页采集进度"""
+    from apps.api.services.lure_type_fetcher import get_wikipedia_crawler_service
+
+    service = get_wikipedia_crawler_service()
+    return service.get_progress()
+
+
+@router.post(
+    "/lure-types/crawl/start",
+    summary="开始网页采集",
+)
+async def start_crawl(
+    current_user=Depends(require_permission("content:create")),
+):
+    """开始从维基百科采集拟饵类型数据"""
+    from apps.api.services.lure_type_fetcher import get_wikipedia_crawler_service
+
+    service = get_wikipedia_crawler_service()
+    return service.start_crawl()
+
+
+@router.post(
+    "/lure-types/crawl/stop",
+    summary="停止网页采集",
+)
+async def stop_crawl(
+    current_user=Depends(require_permission("content:create")),
+):
+    """停止维基百科网页采集任务"""
+    from apps.api.services.lure_type_fetcher import get_wikipedia_crawler_service
+
+    service = get_wikipedia_crawler_service()
+    return service.stop_crawl()
+

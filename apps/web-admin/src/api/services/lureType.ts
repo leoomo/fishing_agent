@@ -11,6 +11,7 @@ import type {
   LureTypeUpdateRequest,
   CategoryStatsResponse,
   InitDataResponse,
+  CrawlProgressResponse,
 } from '@/types/lureType'
 
 export const lureTypeApi = {
@@ -57,10 +58,38 @@ export const lureTypeApi = {
   },
 
   /**
+   * 批量删除拟饵类型
+   */
+  batchDelete: (ids: number[]): Promise<{ success: boolean; deleted_count: number; message: string }> => {
+    return client.post('/admin/content/lure-types/batch-delete', { ids })
+  },
+
+  /**
    * 初始化默认数据
    */
   initData: (): Promise<InitDataResponse> => {
     return client.post('/admin/content/lure-types/init')
+  },
+
+  /**
+   * 获取网页采集进度
+   */
+  getCrawlProgress: (): Promise<CrawlProgressResponse> => {
+    return client.get('/admin/content/lure-types/crawl/progress')
+  },
+
+  /**
+   * 开始网页采集
+   */
+  startCrawl: (): Promise<{ success: boolean; message: string }> => {
+    return client.post('/admin/content/lure-types/crawl/start')
+  },
+
+  /**
+   * 停止网页采集
+   */
+  stopCrawl: (): Promise<{ success: boolean; message: string }> => {
+    return client.post('/admin/content/lure-types/crawl/stop')
   },
 }
 
