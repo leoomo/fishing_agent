@@ -122,11 +122,14 @@ const AgentAnalytics = () => {
       title: '成功率',
       dataIndex: 'success_rate',
       width: 120,
-      render: (rate: number) => (
-        <span style={{ color: rate >= 95 ? '#52c41a' : rate >= 80 ? '#faad14' : '#ff4d4f' }}>
-          {rate.toFixed(1)}%
-        </span>
-      ),
+      render: (rate: number) => {
+        const pct = rate * 100
+        return (
+          <span style={{ color: pct >= 95 ? '#52c41a' : pct >= 80 ? '#faad14' : '#ff4d4f' }}>
+            {pct.toFixed(1)}%
+          </span>
+        )
+      },
       sorter: (a, b) => a.success_rate - b.success_rate,
     },
     {
@@ -204,7 +207,7 @@ const AgentAnalytics = () => {
             name: '成功率',
             type: 'line',
             yAxisIndex: 1,
-            data: agentTrends.trends.map((t) => t.success_rate),
+            data: agentTrends.trends.map((t) => t.success_rate * 100),
             smooth: true,
             itemStyle: { color: '#52c41a' },
           },
@@ -286,7 +289,7 @@ const AgentAnalytics = () => {
       yAxis: { type: 'value', show: false, min: 0, max: 100 },
       series: [{
         type: 'line',
-        data: trendData.map(t => t.success_rate),
+        data: trendData.map(t => t.success_rate * 100),
         smooth: true,
         symbol: 'none',
         lineStyle: { width: 2, color: '#52c41a' },
@@ -305,7 +308,7 @@ const AgentAnalytics = () => {
     const exportColumns = [
       { title: 'Agent 类型', dataIndex: 'agent_type' },
       { title: '执行次数', dataIndex: 'total_executions' },
-      { title: '成功率 (%)', dataIndex: 'success_rate', render: (v: unknown) => Number(v).toFixed(1) },
+      { title: '成功率 (%)', dataIndex: 'success_rate', render: (v: unknown) => (Number(v) * 100).toFixed(1) },
       { title: '平均延时 (ms)', dataIndex: 'avg_latency_ms', render: (v: unknown) => Number(v).toFixed(0) },
       { title: 'Token 数', dataIndex: 'total_tokens' },
       { title: '成本 (CNY)', dataIndex: 'total_cost', render: (v: unknown) => Number(v).toFixed(4) },
@@ -397,7 +400,8 @@ const AgentAnalytics = () => {
           <Row gutter={16}>
             {agentStats.agents.map((agent) => {
               const successRateTrendOption = getSuccessRateTrendOption(agent.agent_type)
-              const rateColor = agent.success_rate >= 95 ? '#52c41a' : agent.success_rate >= 80 ? '#faad14' : '#ff4d4f'
+              const pct = agent.success_rate * 100
+              const rateColor = pct >= 95 ? '#52c41a' : pct >= 80 ? '#faad14' : '#ff4d4f'
 
               return (
                 <Col span={12} key={agent.agent_type}>
@@ -406,7 +410,7 @@ const AgentAnalytics = () => {
                       {agent.agent_type}
                     </Tag>
                     <div style={{ fontSize: 36, fontWeight: 'bold', color: rateColor }}>
-                      {agent.success_rate.toFixed(1)}%
+                      {pct.toFixed(1)}%
                     </div>
                     <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
                       成功率 ({agent.total_executions} 次执行)
