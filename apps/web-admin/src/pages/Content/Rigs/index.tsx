@@ -18,6 +18,7 @@ import {
   message,
   Spin,
   Empty,
+  Progress,
 } from 'antd'
 import {
   PlusOutlined,
@@ -25,10 +26,13 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  GlobalOutlined,
+  PauseCircleOutlined,
+  SyncOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import { rigApi, type RigListParams } from '@/api/services/rig'
-import type { RigListItem, RigCategory, RigDifficulty } from '@/types/rig'
+import type { RigListItem, RigCategory, RigDifficulty, RigFetchProgress } from '@/types/rig'
 import { RIG_CATEGORY_CONFIG, RIG_DIFFICULTY_CONFIG } from '@/types/rig'
 import RigCard from './RigCard'
 import RigDrawer from './RigDrawer'
@@ -53,6 +57,9 @@ const RigList: React.FC = () => {
   const [batchDeleting, setBatchDeleting] = useState(false)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [viewingRigId, setViewingRigId] = useState<number | null>(null)
+  // Fetch state
+  const [fetchProgress, setFetchProgress] = useState<RigFetchProgress | null>(null)
+  const [fetchLoading, setFetchLoading] = useState(false)
 
   // Load featured rigs
   const loadFeatured = useCallback(async () => {
@@ -81,6 +88,18 @@ const RigList: React.FC = () => {
     }
   }, [filters])
 
+  // Load fetch progress
+  const loadFetchProgress = useCallback(async () => {
+    try {
+      const data = await rigApi.getFetchProgress()
+      setFetchProgress(data)
+      return data
+    } catch {
+      // Ignore error
+      return null
+    }
+  }, [])
+
   useEffect(() => {
     loadFeatured()
   }, [loadFeatured])
@@ -88,6 +107,25 @@ const RigList: React.FC = () => {
   useEffect(() => {
     loadRigs()
   }, [loadRigs])
+
+  // Load fetch progress on mount and poll when running
+  useEffect(() => {
+    loadFetchProgress()
+  }, [loadFetchProgress])
+
+  useEffect(() => {
+    if (fetchProgress?.is_running) {
+      const timer = setInterval(async () => {
+        const data = await loadFetchProgress()
+        if (data && !data.is_running) {
+          // Fetch finished, reload data
+          loadRigs()
+          loadFeatured()
+        }
+      }, 2000)
+      return () => clearInterval(timer)
+    }
+  }, [fetchProgress?.is_running, loadFetchProgress, loadRigs, loadFeatured])
 
   // Handle filter changes
   const handleSearch = (keyword: string) => {
@@ -171,6 +209,33 @@ const RigList: React.FC = () => {
   const handleDrawerSuccess = () => {
     loadRigs()
     loadFeatured()
+  }
+
+  // Fetch handlers
+  const handleStartFetch = async () => {
+    setFetchLoading(true)
+    try {
+      const result = await rigApi.startFetch()
+      message.success(result.message)
+      loadFetchProgress()
+    } catch (err: any) {
+      message.error(err.message || '启动采集失败')
+    } finally {
+      setFetchLoading(false)
+    }
+  }
+
+  const handleStopFetch = async () => {
+    setFetchLoading(true)
+    try {
+      const result = await rigApi.pauseFetch()
+      message.success(result.message)
+      loadFetchProgress()
+    } catch (err: any) {
+      message.error(err.message || '停止采集失败')
+    } finally {
+      setFetchLoading(false)
+    }
   }
 
   // 解析并格式化目标鱼种
@@ -352,9 +417,34 @@ const RigList: React.FC = () => {
             管理各类钓组的组件配件和规格参数
           </Text>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          新建钓组
-        </Button>
+        <Space>
+          {/* Fetch Button - 网络采集 */}
+          {fetchProgress?.is_running ? (
+            <Button
+              icon={<PauseCircleOutlined />}
+              onClick={handleStopFetch}
+              loading={fetchLoading}
+            >
+              停止采集
+              {fetchProgress.stats.total > 0 && (
+                <span style={{ marginLeft: 8, color: '#52c41a' }}>
+                  ({fetchProgress.stats.completed}/{fetchProgress.stats.total})
+                </span>
+              )}
+            </Button>
+          ) : (
+            <Button
+              icon={<GlobalOutlined />}
+              onClick={handleStartFetch}
+              loading={fetchLoading}
+            >
+              网络采集
+            </Button>
+          )}
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            新建钓组
+          </Button>
+        </Space>
       </div>
 
       {/* Featured Cards */}
@@ -410,6 +500,38 @@ const RigList: React.FC = () => {
           )}
         </Spin>
       </div>
+
+      {/* Fetch Progress */}
+      {fetchProgress?.is_running && (
+        <div
+          style={{
+            background: '#e6f7ff',
+            border: '1px solid #91d5ff',
+            borderRadius: 8,
+            padding: '12px 16px',
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Space>
+              <SyncOutlined spin style={{ color: '#1890ff' }} />
+              <Text strong>正在从维基百科采集钓组数据...</Text>
+            </Space>
+            {fetchProgress.stats.total > 0 && (
+              <Text type="secondary">
+                {fetchProgress.stats.completed} / {fetchProgress.stats.total}
+              </Text>
+            )}
+          </div>
+          {fetchProgress.stats.total > 0 && (
+            <Progress
+              percent={Math.round((fetchProgress.stats.completed / fetchProgress.stats.total) * 100)}
+              status="active"
+              strokeColor="#1890ff"
+            />
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div
