@@ -22,6 +22,7 @@ import {
   message,
   Spin,
   Empty,
+  Progress,
 } from 'antd'
 import {
   PlusOutlined,
@@ -30,6 +31,9 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   DatabaseOutlined,
+  PauseCircleOutlined,
+  SyncOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import { lureTypeApi } from '@/api/services/lureType'
@@ -38,10 +42,12 @@ import type {
   LureCategory,
   CategoryStats,
   LureTypeListParams,
+  CrawlProgressResponse,
 } from '@/types/lureType'
 import { LURE_CATEGORY_CONFIG, LURE_CATEGORY_OPTIONS } from '@/types/lureType'
 import LureTypeCard from './LureTypeCard'
 import LureTypeDrawer from './LureTypeDrawer'
+import LureTypeDetailModal from './LureTypeDetailModal'
 
 const { Title, Text } = Typography
 
@@ -60,6 +66,14 @@ const LureTypeList: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingLureTypeId, setEditingLureTypeId] = useState<number | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<LureCategory | null>(null)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [viewingLureTypeId, setViewingLureTypeId] = useState<number | null>(null)
+  // Crawl state
+  const [crawlProgress, setCrawlProgress] = useState<CrawlProgressResponse | null>(null)
+  const [crawlLoading, setCrawlLoading] = useState(false)
+  // Batch delete state
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [batchDeleteLoading, setBatchDeleteLoading] = useState(false)
 
   // Load category stats
   const loadStats = useCallback(async () => {
@@ -89,6 +103,18 @@ const LureTypeList: React.FC = () => {
     }
   }, [filters])
 
+  // Load crawl progress
+  const loadCrawlProgress = useCallback(async () => {
+    try {
+      const data = await lureTypeApi.getCrawlProgress()
+      setCrawlProgress(data)
+      return data
+    } catch {
+      // Ignore error
+      return null
+    }
+  }, [])
+
   useEffect(() => {
     loadStats()
   }, [loadStats])
@@ -96,6 +122,25 @@ const LureTypeList: React.FC = () => {
   useEffect(() => {
     loadLureTypes()
   }, [loadLureTypes])
+
+  // Load crawl progress on mount and poll when running
+  useEffect(() => {
+    loadCrawlProgress()
+  }, [loadCrawlProgress])
+
+  useEffect(() => {
+    if (crawlProgress?.is_running) {
+      const timer = setInterval(async () => {
+        const data = await loadCrawlProgress()
+        if (data && !data.is_running) {
+          // Crawl finished, reload data
+          loadLureTypes()
+          loadStats()
+        }
+      }, 2000)
+      return () => clearInterval(timer)
+    }
+  }, [crawlProgress?.is_running, loadCrawlProgress, loadLureTypes, loadStats])
 
   // Handle filter changes
   const handleSearch = (keyword: string) => {
@@ -132,9 +177,22 @@ const LureTypeList: React.FC = () => {
     setDrawerOpen(true)
   }
 
+  const handleView = (lureType: LureTypeListItem) => {
+    setViewingLureTypeId(lureType.lure_type_id)
+    setDetailModalOpen(true)
+  }
+
   const handleEdit = (lureType: LureTypeListItem) => {
     setEditingLureTypeId(lureType.lure_type_id)
     setDrawerOpen(true)
+  }
+
+  const handleDetailEdit = () => {
+    setDetailModalOpen(false)
+    if (viewingLureTypeId) {
+      setEditingLureTypeId(viewingLureTypeId)
+      setDrawerOpen(true)
+    }
   }
 
   const handleDelete = async (lureTypeId: number) => {
@@ -145,6 +203,26 @@ const LureTypeList: React.FC = () => {
       loadStats()
     } catch {
       message.error('删除失败')
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请选择要删除的拟饵类型')
+      return
+    }
+
+    setBatchDeleteLoading(true)
+    try {
+      const result = await lureTypeApi.batchDelete(selectedRowKeys as number[])
+      message.success(result.message)
+      setSelectedRowKeys([])
+      loadLureTypes()
+      loadStats()
+    } catch (err: any) {
+      message.error(err.message || '批量删除失败')
+    } finally {
+      setBatchDeleteLoading(false)
     }
   }
 
@@ -172,6 +250,33 @@ const LureTypeList: React.FC = () => {
     loadStats()
   }
 
+  // Crawl handlers
+  const handleStartCrawl = async () => {
+    setCrawlLoading(true)
+    try {
+      const result = await lureTypeApi.startCrawl()
+      message.success(result.message)
+      loadCrawlProgress()
+    } catch (err: any) {
+      message.error(err.message || '启动采集失败')
+    } finally {
+      setCrawlLoading(false)
+    }
+  }
+
+  const handleStopCrawl = async () => {
+    setCrawlLoading(true)
+    try {
+      const result = await lureTypeApi.stopCrawl()
+      message.success(result.message)
+      loadCrawlProgress()
+    } catch (err: any) {
+      message.error(err.message || '停止采集失败')
+    } finally {
+      setCrawlLoading(false)
+    }
+  }
+
   // Table columns
   const columns: ColumnsType<LureTypeListItem> = [
     {
@@ -179,9 +284,20 @@ const LureTypeList: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       render: (name, record) => (
-        <Text strong style={{ cursor: 'pointer' }} onClick={() => handleEdit(record)}>
-          {name}
-        </Text>
+        <div>
+          <Text
+            strong
+            style={{ cursor: 'pointer', color: '#1890ff' }}
+            onClick={() => handleView(record)}
+          >
+            {name}
+          </Text>
+          {record.name_en && (
+            <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
+              {record.name_en}
+            </Text>
+          )}
+        </div>
       ),
     },
     {
@@ -293,6 +409,30 @@ const LureTypeList: React.FC = () => {
           </Text>
         </div>
         <Space>
+          {/* Crawl Button - 网页采集 */}
+          {!isEmpty && crawlProgress?.is_running && (
+            <Button
+              icon={<PauseCircleOutlined />}
+              onClick={handleStopCrawl}
+              loading={crawlLoading}
+            >
+              停止采集
+              {crawlProgress.total_count > 0 && (
+                <span style={{ marginLeft: 8, color: '#52c41a' }}>
+                  ({crawlProgress.translated_count}/{crawlProgress.total_count})
+                </span>
+              )}
+            </Button>
+          )}
+          {!isEmpty && !crawlProgress?.is_running && (
+            <Button
+              icon={<GlobalOutlined />}
+              onClick={handleStartCrawl}
+              loading={crawlLoading}
+            >
+              网络采集
+            </Button>
+          )}
           {isEmpty && (
             <Button
               icon={<DatabaseOutlined />}
@@ -378,6 +518,7 @@ const LureTypeList: React.FC = () => {
           gap: 12,
           marginBottom: 20,
           flexWrap: 'wrap',
+          alignItems: 'center',
         }}
       >
         <Input.Search
@@ -395,7 +536,57 @@ const LureTypeList: React.FC = () => {
           onChange={v => handleCategoryChange((v || undefined) as LureCategory | undefined)}
           allowClear
         />
+        {selectedRowKeys.length > 0 && (
+          <Popconfirm
+            title={`确定删除选中的 ${selectedRowKeys.length} 条拟饵类型？`}
+            description="删除后无法恢复"
+            onConfirm={handleBatchDelete}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              loading={batchDeleteLoading}
+            >
+              批量删除 ({selectedRowKeys.length})
+            </Button>
+          </Popconfirm>
+        )}
       </div>
+
+      {/* Crawl Progress */}
+      {crawlProgress?.is_running && (
+        <div
+          style={{
+            background: '#e6f7ff',
+            border: '1px solid #91d5ff',
+            borderRadius: 8,
+            padding: '12px 16px',
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Space>
+              <SyncOutlined spin style={{ color: '#1890ff' }} />
+              <Text strong>{crawlProgress.message || '正在从维基百科采集数据...'}</Text>
+            </Space>
+            {crawlProgress.total_count > 0 && (
+              <Text type="secondary">
+                {crawlProgress.translated_count} / {crawlProgress.total_count}
+              </Text>
+            )}
+          </div>
+          {crawlProgress.total_count > 0 && (
+            <Progress
+              percent={Math.round((crawlProgress.translated_count / crawlProgress.total_count) * 100)}
+              status="active"
+              strokeColor="#1890ff"
+            />
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div
@@ -411,6 +602,10 @@ const LureTypeList: React.FC = () => {
           dataSource={lureTypes}
           rowKey="lure_type_id"
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys),
+          }}
           pagination={{
             current: filters.page,
             pageSize: filters.page_size,
@@ -428,6 +623,14 @@ const LureTypeList: React.FC = () => {
         lureTypeId={editingLureTypeId}
         onClose={handleDrawerClose}
         onSuccess={handleDrawerSuccess}
+      />
+
+      {/* Detail Modal */}
+      <LureTypeDetailModal
+        open={detailModalOpen}
+        lureTypeId={viewingLureTypeId}
+        onClose={() => setDetailModalOpen(false)}
+        onEdit={handleDetailEdit}
       />
     </div>
   )

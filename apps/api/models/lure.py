@@ -15,10 +15,11 @@ class LureType(Base, TimestampMixin):
 
     lure_type_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False, unique=True, index=True, comment="Lure type name")
+    name_en = Column(String(100), comment="English name")
     category = Column(String(50), index=True, comment="Lure category (hard/soft)")
     description = Column(Text, comment="Lure type description")
     action_description = Column(Text, comment="How the lure moves/acts")
-    best_conditions = Column(Text, comment="Best fishing conditions")
+    best_conditions = Column(Text, comment="Best fishing conditions / Extended info JSON")
     target_species = Column(String(200), comment="Target fish species")
     typical_weight_min = Column(Float, comment="Typical minimum weight in grams")
     typical_weight_max = Column(Float, comment="Typical maximum weight in grams")
@@ -35,6 +36,7 @@ class LureType(Base, TimestampMixin):
         return {
             'lure_type_id': self.lure_type_id,
             'name': self.name,
+            'name_en': self.name_en,
             'category': self.category,
             'description': self.description,
             'action_description': self.action_description,

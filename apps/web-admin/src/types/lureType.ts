@@ -58,9 +58,23 @@ export const LURE_CATEGORY_OPTIONS = Object.entries(LURE_CATEGORY_CONFIG).map(
 
 // ========== 拟饵类型接口 ==========
 
+// 扩展信息接口（存储在 best_conditions JSON 中）
+export interface LureTypeExtendedInfo {
+  usage_tips?: string[]
+  pros?: string[]
+  cons?: string[]
+  recommended_rod_power?: string[]
+  recommended_line?: string
+  retrieve_techniques?: string[]
+  best_seasons?: string[]
+  best_water_conditions?: string
+  color_selection?: string
+}
+
 export interface LureType {
   lure_type_id: number
   name: string
+  name_en?: string
   category: LureCategory
   description?: string
   action_description?: string
@@ -76,6 +90,7 @@ export interface LureType {
 export interface LureTypeListItem {
   lure_type_id: number
   name: string
+  name_en?: string
   category: LureCategory
   target_species?: string
   typical_weight_min?: number
@@ -143,4 +158,41 @@ export interface CategoryStatsResponse {
 export interface InitDataResponse {
   created_count: number
   message: string
+}
+
+// ========== LLM增强进度 ==========
+
+export interface EnrichProgressItem {
+  lure_type_id: number
+  name: string
+  status: 'pending' | 'enriching' | 'completed' | 'failed' | 'skipped'
+  error?: string
+  updated_at?: string
+}
+
+export interface EnrichProgressStats {
+  total: number
+  pending: number
+  enriching: number
+  completed: number
+  failed: number
+  skipped: number
+}
+
+export interface EnrichProgressResponse {
+  is_running: boolean
+  stats: EnrichProgressStats
+  items: EnrichProgressItem[]
+}
+
+// ========== 网页采集进度 ==========
+
+export interface CrawlProgressResponse {
+  is_running: boolean
+  status: 'idle' | 'crawling' | 'translating' | 'completed' | 'failed'
+  message: string
+  crawled_count: number
+  translated_count: number
+  total_count: number
+  error?: string | null
 }

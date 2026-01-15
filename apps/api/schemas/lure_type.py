@@ -28,10 +28,11 @@ class LureTypeCreate(BaseModel):
     """创建拟饵类型请求"""
 
     name: str = Field(..., min_length=1, max_length=100, description="拟饵名称")
+    name_en: Optional[str] = Field(None, max_length=100, description="英文名")
     category: LureCategoryEnum = Field(..., description="拟饵分类")
     description: Optional[str] = Field(None, description="详细描述")
     action_description: Optional[str] = Field(None, description="动作描述")
-    best_conditions: Optional[str] = Field(None, description="最佳使用条件")
+    best_conditions: Optional[str] = Field(None, description="最佳使用条件/扩展信息JSON")
     target_species: Optional[str] = Field(None, max_length=200, description="目标鱼种")
     typical_weight_min: Optional[float] = Field(
         None, ge=0, description="典型最小重量(克)"
@@ -46,10 +47,11 @@ class LureTypeUpdate(BaseModel):
     """更新拟饵类型请求"""
 
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="拟饵名称")
+    name_en: Optional[str] = Field(None, max_length=100, description="英文名")
     category: Optional[LureCategoryEnum] = Field(None, description="拟饵分类")
     description: Optional[str] = Field(None, description="详细描述")
-    action_description: Optional[str] = Field(None, description="动作描述")
-    best_conditions: Optional[str] = Field(None, description="最佳使用条件")
+    action_description: Optional[str] = Field(None, description="动作���述")
+    best_conditions: Optional[str] = Field(None, description="最佳使用条件/扩展信息JSON")
     target_species: Optional[str] = Field(None, max_length=200, description="目标鱼种")
     typical_weight_min: Optional[float] = Field(
         None, ge=0, description="典型最小重量(克)"
@@ -68,6 +70,7 @@ class LureTypeResponse(BaseModel):
 
     lure_type_id: int
     name: str
+    name_en: Optional[str] = None
     category: str
     description: Optional[str] = None
     action_description: Optional[str] = None
@@ -87,6 +90,7 @@ class LureTypeListItem(BaseModel):
 
     lure_type_id: int
     name: str
+    name_en: Optional[str] = None
     category: str
     target_species: Optional[str] = None
     typical_weight_min: Optional[float] = None
