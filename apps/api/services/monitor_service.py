@@ -115,24 +115,26 @@ class MonitorService:
             # 总调用数
             total_calls = query.count()
 
-            # 平均响应时间
+            # 平均响应时间（排除监控API）
             avg_response_time = session.query(
                 func.avg(APILog.response_time)
             ).filter(
-                APILog.timestamp >= start_date
+                APILog.timestamp >= start_date,
+                ~APILog.endpoint.like('%/admin/monitor/%')
             ).scalar() or 0
 
             # 错误率
             error_count = query.filter(APILog.status_code >= 400).count()
             error_rate = (error_count / total_calls * 100) if total_calls > 0 else 0
 
-            # Top 端点
+            # Top 端点（排除监控API）
             top_endpoints_raw = session.query(
                 APILog.endpoint,
                 func.count(APILog.id).label('count'),
                 func.avg(APILog.response_time).label('avg_time')
             ).filter(
-                APILog.timestamp >= start_date
+                APILog.timestamp >= start_date,
+                ~APILog.endpoint.like('%/admin/monitor/%')
             ).group_by(
                 APILog.endpoint
             ).order_by(
@@ -153,24 +155,26 @@ class MonitorService:
             for ep in top_endpoints:
                 requests_by_endpoint[ep["endpoint"]] = ep["count"]
 
-            # 按状态码统计
+            # 按状态码统计（排除监控API）
             status_stats = session.query(
                 APILog.status_code,
                 func.count(APILog.id).label('count')
             ).filter(
-                APILog.timestamp >= start_date
+                APILog.timestamp >= start_date,
+                ~APILog.endpoint.like('%/admin/monitor/%')
             ).group_by(
                 APILog.status_code
             ).all()
 
             requests_by_status = {str(status): count for status, count in status_stats}
 
-            # 按日期统计
+            # 按日期统计（排除监控API）
             daily_stats = session.query(
                 func.date(APILog.timestamp).label('date'),
                 func.count(APILog.id).label('count')
             ).filter(
-                APILog.timestamp >= start_date
+                APILog.timestamp >= start_date,
+                ~APILog.endpoint.like('%/admin/monitor/%')
             ).group_by(
                 func.date(APILog.timestamp)
             ).order_by('date').all()
@@ -506,7 +510,7 @@ class MonitorService:
                 agents.append({
                     "agent_type": row.agent_type,
                     "total_executions": exec_count,
-                    "success_rate": round(success_rate, 2),
+                    "success_rate": round(success_rate, 2) / 100,  # 转换为小数 (0-1)
                     "avg_latency_ms": round(row.avg_latency, 2) if row.avg_latency else 0,
                     "total_tokens": int(tokens),
                     "total_cost": round(float(cost), 4),
@@ -572,7 +576,7 @@ class MonitorService:
                     "tool_name": row.tool_name,
                     "category": row.tool_category or "other",
                     "call_count": call_count,
-                    "success_rate": round(success_rate, 2),
+                    "success_rate": round(success_rate, 2) / 100,  # 转换为小数 (0-1)
                     "avg_latency_ms": round(row.avg_latency, 2) if row.avg_latency else 0,
                 })
 
@@ -784,7 +788,7 @@ class MonitorService:
                     "executions": stats["executions"],
                     "tokens": stats["tokens"],
                     "cost": round(stats["cost"], 4),
-                    "success_rate": round(success_rate, 2)
+                    "success_rate": round(success_rate, 2) / 100  # 转换为小数 (0-1)
                 })
 
             return {

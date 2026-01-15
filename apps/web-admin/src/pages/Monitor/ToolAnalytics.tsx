@@ -95,7 +95,7 @@ const ToolAnalytics = () => {
       { title: '工具名称', dataIndex: 'tool_name' },
       { title: '类别', dataIndex: 'category' },
       { title: '调用次数', dataIndex: 'call_count' },
-      { title: '成功率 (%)', dataIndex: 'success_rate', render: (v: unknown) => Number(v).toFixed(1) },
+      { title: '成功率 (%)', dataIndex: 'success_rate', render: (v: unknown) => (Number(v) * 100).toFixed(1) },
       { title: '平均延时 (ms)', dataIndex: 'avg_latency_ms', render: (v: unknown) => Number(v).toFixed(0) },
     ]
 
@@ -143,11 +143,14 @@ const ToolAnalytics = () => {
       title: '成功率',
       dataIndex: 'success_rate',
       width: 120,
-      render: (rate: number) => (
-        <span style={{ color: rate >= 95 ? '#52c41a' : rate >= 80 ? '#faad14' : '#ff4d4f' }}>
-          {rate.toFixed(1)}%
-        </span>
-      ),
+      render: (rate: number) => {
+        const pct = rate * 100
+        return (
+          <span style={{ color: pct >= 95 ? '#52c41a' : pct >= 80 ? '#faad14' : '#ff4d4f' }}>
+            {pct.toFixed(1)}%
+          </span>
+        )
+      },
       sorter: (a, b) => a.success_rate - b.success_rate,
     },
     {
@@ -279,17 +282,20 @@ const ToolAnalytics = () => {
             data: toolStats.tools
               .slice(0, 10)
               .sort((a, b) => a.success_rate - b.success_rate)
-              .map((t) => ({
-                value: t.success_rate,
-                itemStyle: {
-                  color:
-                    t.success_rate >= 95
-                      ? '#52c41a'
-                      : t.success_rate >= 80
-                      ? '#faad14'
-                      : '#ff4d4f',
-                },
-              })),
+              .map((t) => {
+                const pct = t.success_rate * 100
+                return {
+                  value: pct,
+                  itemStyle: {
+                    color:
+                      pct >= 95
+                        ? '#52c41a'
+                        : pct >= 80
+                        ? '#faad14'
+                        : '#ff4d4f',
+                  },
+                }
+              }),
             label: {
               show: true,
               position: 'right',
@@ -304,7 +310,7 @@ const ToolAnalytics = () => {
   const totalCalls = toolStats?.tools.reduce((sum, t) => sum + t.call_count, 0) || 0
   const avgSuccessRate =
     toolStats && toolStats.tools.length > 0
-      ? toolStats.tools.reduce((sum, t) => sum + t.success_rate, 0) / toolStats.tools.length
+      ? (toolStats.tools.reduce((sum, t) => sum + t.success_rate, 0) / toolStats.tools.length) * 100
       : 0
   const avgLatency =
     toolStats && toolStats.tools.length > 0
