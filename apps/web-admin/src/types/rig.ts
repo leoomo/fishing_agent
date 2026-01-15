@@ -254,3 +254,33 @@ export const getComponentTypeConfig = (type: string): OptionItem => {
   return COMPONENT_TYPE_OPTIONS.find(opt => opt.value === type)
     || { value: type, label: type, color: 'default' }
 }
+
+// ========== Fetch Progress Types ==========
+
+// Fetch progress item
+export interface RigFetchProgressItem {
+  name_cn: string
+  name_en: string
+  status: 'pending' | 'fetching' | 'enriching' | 'completed' | 'failed' | 'skipped'
+  rig_id?: number
+  error?: string | null
+  updated_at?: string
+}
+
+// Fetch progress stats
+export interface RigFetchStats {
+  total: number
+  pending: number
+  fetching: number
+  enriching: number
+  completed: number
+  failed: number
+  skipped: number
+}
+
+// Fetch progress response
+export interface RigFetchProgress {
+  is_running: boolean
+  stats: RigFetchStats
+  items: RigFetchProgressItem[]
+}

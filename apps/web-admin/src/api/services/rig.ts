@@ -19,6 +19,7 @@ import type {
   LureTypeSimple,
   RigCategory,
   RigDifficulty,
+  RigFetchProgress,
 } from '@/types/rig'
 
 export interface RigListParams {
@@ -167,5 +168,35 @@ export const rigApi = {
    */
   getAllLureTypes: (): Promise<LureTypeSimple[]> => {
     return client.get('/admin/content/lure-types/simple')
+  },
+
+  // ========== Fetch Management ==========
+
+  /**
+   * Get fetch progress
+   */
+  getFetchProgress: (): Promise<RigFetchProgress> => {
+    return client.get('/admin/content/rigs/fetch/progress')
+  },
+
+  /**
+   * Start fetch
+   */
+  startFetch: (useLlm = true): Promise<{ message: string }> => {
+    return client.post(`/admin/content/rigs/fetch/start?use_llm=${useLlm}`)
+  },
+
+  /**
+   * Pause fetch
+   */
+  pauseFetch: (): Promise<{ message: string }> => {
+    return client.post('/admin/content/rigs/fetch/pause')
+  },
+
+  /**
+   * Reset fetch progress
+   */
+  resetProgress: (): Promise<{ message: string }> => {
+    return client.post('/admin/content/rigs/fetch/reset')
   },
 }
