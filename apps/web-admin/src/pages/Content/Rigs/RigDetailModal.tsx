@@ -42,6 +42,30 @@ interface RigDetailModalProps {
   onEdit: () => void
 }
 
+// best_conditions JSON 结构
+interface RigExtendedInfo {
+  assembly_steps?: string[]
+  usage_tips?: string[]
+  pros?: string[]
+  cons?: string[]
+  recommended_lures?: string[]
+  name_en?: string
+}
+
+// 解析 best_conditions JSON
+const parseExtendedInfo = (bestConditions: string | undefined): RigExtendedInfo | null => {
+  if (!bestConditions) return null
+  try {
+    const parsed = JSON.parse(bestConditions)
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as RigExtendedInfo
+    }
+  } catch {
+    // 不是 JSON，返回 null
+  }
+  return null
+}
+
 // 解析并格式化目标鱼种
 const formatTargetSpecies = (species: string | undefined): React.ReactNode => {
   if (!species) return null
@@ -188,6 +212,100 @@ const RigDetailModal: React.FC<RigDetailModalProps> = ({
   // 构建折叠面板项
   const collapseItems = []
 
+  // 解析扩展信息
+  const extendedInfo = parseExtendedInfo(rig?.best_conditions)
+
+  // 组装步骤
+  if (extendedInfo?.assembly_steps && extendedInfo.assembly_steps.length > 0) {
+    collapseItems.push({
+      key: 'assembly',
+      label: (
+        <Space>
+          <span>组装步骤</span>
+          <Tag
+            style={{
+              borderRadius: 8,
+              background: '#fff7e6',
+              color: '#fa8c16',
+              border: 'none',
+            }}
+          >
+            {extendedInfo.assembly_steps.length} 步
+          </Tag>
+        </Space>
+      ),
+      children: (
+        <ol style={{ margin: 0, paddingLeft: 20 }}>
+          {extendedInfo.assembly_steps.map((step, i) => (
+            <li key={i} style={{ marginBottom: 8, color: '#333' }}>{step}</li>
+          ))}
+        </ol>
+      ),
+    })
+  }
+
+  // 使用技巧
+  if (extendedInfo?.usage_tips && extendedInfo.usage_tips.length > 0) {
+    collapseItems.push({
+      key: 'tips',
+      label: (
+        <Space>
+          <span>使用技巧</span>
+          <Tag
+            style={{
+              borderRadius: 8,
+              background: '#e6f7ff',
+              color: '#1890ff',
+              border: 'none',
+            }}
+          >
+            {extendedInfo.usage_tips.length} 条
+          </Tag>
+        </Space>
+      ),
+      children: (
+        <ul style={{ margin: 0, paddingLeft: 20 }}>
+          {extendedInfo.usage_tips.map((tip, i) => (
+            <li key={i} style={{ marginBottom: 8, color: '#333' }}>{tip}</li>
+          ))}
+        </ul>
+      ),
+    })
+  }
+
+  // 优缺点
+  if ((extendedInfo?.pros && extendedInfo.pros.length > 0) ||
+      (extendedInfo?.cons && extendedInfo.cons.length > 0)) {
+    collapseItems.push({
+      key: 'pros_cons',
+      label: '优缺点',
+      children: (
+        <div style={{ display: 'flex', gap: 24 }}>
+          {extendedInfo?.pros && extendedInfo.pros.length > 0 && (
+            <div style={{ flex: 1 }}>
+              <Text strong style={{ color: '#52c41a', display: 'block', marginBottom: 8 }}>优点</Text>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                {extendedInfo.pros.map((pro, i) => (
+                  <li key={i} style={{ marginBottom: 4, color: '#333' }}>{pro}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {extendedInfo?.cons && extendedInfo.cons.length > 0 && (
+            <div style={{ flex: 1 }}>
+              <Text strong style={{ color: '#ff4d4f', display: 'block', marginBottom: 8 }}>缺点</Text>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                {extendedInfo.cons.map((con, i) => (
+                  <li key={i} style={{ marginBottom: 4, color: '#333' }}>{con}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ),
+    })
+  }
+
   if (rig?.components && rig.components.length > 0) {
     collapseItems.push({
       key: 'components',
@@ -251,6 +369,10 @@ const RigDetailModal: React.FC<RigDetailModalProps> = ({
   const categoryConfig = rig ? RIG_CATEGORY_CONFIG[rig.category] : null
   const difficultyConfig = rig ? RIG_DIFFICULTY_CONFIG[rig.difficulty] : null
 
+  // 获取英文名
+  const extendedInfoForName = parseExtendedInfo(rig?.best_conditions)
+  const nameEn = extendedInfoForName?.name_en
+
   return (
     <Modal
       title={null}
@@ -290,6 +412,11 @@ const RigDetailModal: React.FC<RigDetailModalProps> = ({
               <Title level={3} style={{ margin: 0 }}>
                 {rig.name}
               </Title>
+              {nameEn && (
+                <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 14 }}>
+                  {nameEn}
+                </Text>
+              )}
               <Space style={{ marginTop: 12 }}>
                 {categoryConfig && (
                   <Tag
@@ -326,15 +453,12 @@ const RigDetailModal: React.FC<RigDetailModalProps> = ({
             </Text>
             <Descriptions
               size="small"
-              column={2}
+              column={1}
               labelStyle={{ color: '#666', width: 80 }}
               contentStyle={{ fontWeight: 500 }}
             >
               <Descriptions.Item label="目标鱼种">
                 {formatTargetSpecies(rig.target_species) || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="最佳条件">
-                {rig.best_conditions || '-'}
               </Descriptions.Item>
             </Descriptions>
             {rig.description && (
