@@ -20,6 +20,7 @@
 ### 🎣 [核心接口](./endpoints/)
 - **[钓鱼API](./endpoints/fishing-api.md)** - 智能钓鱼推荐
 - **[聊天API](./endpoints/chat-api.md)** - 对话会话管理 ⭐v5.0.2
+- **[内容管理API](./endpoints/content-api.md)** - 文章管理和网络采集 ⭐v5.1.0
 - **[用户装备API](./endpoints/user-equipment-api.md)** - 用户装备管理 ⭐v5.0.2
 - **[装备API](./endpoints/equipment-api.md)** - 装备库管理
 - **[用户管理](./endpoints/user-management.md)** - 用户和认证
@@ -96,11 +97,14 @@ curl -X POST "https://api.fishing-agent.com/api/v1/fishing/chat" \
 - **装备管理**: 钓鱼装备查询、添加、管理
 - **用户服务**: 用户认证、个人信息管理
 - **数据分析**: 个人数据和统计信息
+- **内容管理**: 文章CRUD、发布归档 ⭐v5.1.0
 
 ### 高级功能API
 - **OCR识别**: 图片文字识别和数据提取
 - **装备导入**: 批量装备信息导入
 - **爬虫管理**: 爬虫任务控制
+- **文章采集**: 维基百科采集 + LLM翻译增强 ⭐v5.1.0
+- **向量搜索**: 基于ChromaDB的语义搜索 ⭐v5.1.0
 - **系统配置**: 系统参数和配置管理
 
 ### 管理功能API
@@ -275,6 +279,7 @@ X-RateLimit-Reset: 1640995200
 - [v1.0.0](./changelog/v1.0.0.md) - 初始版本
 - [v1.1.0](./changelog/v1.1.0.md) - 添加装备管理API
 - [v1.2.0](./changelog/v1.2.0.md) - 微信小程序集成
+- [v5.1.0](./changelog/v5.1.0.md) - 内容管理系统、文章网络采集、向量搜索 ⭐新增
 
 ## 🎯 适用场景
 
@@ -292,7 +297,7 @@ X-RateLimit-Reset: 1640995200
 
 ---
 
-**API版本**: v1.0  
-**文档版本**: v5.0.2  
-**最后更新**: 2024-12-20  
+**API版本**: v1.0
+**文档版本**: v5.1.0
+**最后更新**: 2025-01-16
 **维护团队**: 智能钓鱼助手API团队

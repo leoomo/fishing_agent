@@ -1,6 +1,6 @@
-# 环境配置指南 v5.0.2
+# 环境配置指南 v5.1.0
 
-本指南将帮助您快速搭建智能钓鱼助手 v5.0.2 项目的开发环境。
+本指南将帮助您快速搭建智能钓鱼助手 v5.1.0 项目的开发环境。
 
 ## 📋 目录
 
@@ -116,9 +116,12 @@ OLLAMA_BASE_URL=http://localhost:11434          # 本地Ollama地址
 OLLAMA_MODEL=deepseek-ocr                        # OCR模型
 SILICONFLOW_API_KEY=your-siliconflow-api-key    # 云端OCR密钥
 
+# === 向量数据库配置（v5.1.0 内容管理需要） ===
+CHROMA_PERSIST_DIR=shared/data/chroma          # ChromaDB持久化目录
+VECTOR_EMBEDDING_MODEL=text-embedding-v3       # DashScope Embedding模型
+
 # === 其他配置 ===
 LOG_LEVEL=INFO
-VECTOR_EMBEDDING_MODEL=text-embedding-v3
 VECTOR_AUTO_INDEX=true
 ```
 
@@ -196,6 +199,23 @@ fishing_agent_app/
 - 装备数据：`shared/data/equipment.db`
 - 待审核装备：`shared/data/pending_equipment.db`
 - 系统配置：`shared/data/system.db`
+
+### 向量数据库配置（v5.1.0 新增）
+
+内容管理系统使用 ChromaDB 进行语义搜索：
+
+```bash
+# 配置向量数据库目录
+CHROMA_PERSIST_DIR=shared/data/chroma
+
+# 配置 Embedding 模型（需要 DASHSCOPE_API_KEY）
+VECTOR_EMBEDDING_MODEL=text-embedding-v3
+```
+
+ChromaDB 会自动创建并持久化向量索引，用于：
+- 文章语义搜索
+- 相似文章推荐
+- 内容去重检测
 
 ## 🚀 运行项目
 
@@ -590,7 +610,14 @@ volumes:
 
 ## 版本更新说明
 
-### v5.0.2 新增功能
+### v5.1.0 新增功能
+
+- ✨ 内容管理系统（文章管理 + 富文本编辑）
+- ✨ 文章网络采集（维基百科数据源 + LLM翻译增强）
+- ✨ 向量搜索（ChromaDB + DashScope Embedding）
+- ✨ 语义搜索和相似文章推荐
+
+### v5.0.2 功能
 
 - ✨ 微信小程序支持
 - ✨ 装备导入 Agent（文本压缩 + 批量提取）
@@ -600,11 +627,11 @@ volumes:
 
 ### 升级指南
 
-从 v5.0.1 升级：
+从 v5.0.2 升级到 v5.1.0：
 
 1. 拉取最新代码
    ```bash
-   git pull origin v5.0.2
+   git pull origin v5.1.0
    ```
 
 2. 更新依赖
@@ -612,21 +639,25 @@ volumes:
    uv sync
    ```
 
-3. 更新环境变量（添加微信小程序配置）
+3. 更新环境变量（添加向量数据库配置）
    ```bash
    # 添加到 .env
-   WECHAT_APPID=xxx
-   WECHAT_SECRET=xxx
-   OCR_PROVIDER=ollama
+   CHROMA_PERSIST_DIR=shared/data/chroma
+   VECTOR_EMBEDDING_MODEL=text-embedding-v3
    ```
 
-4. 运行数据库迁移（如需要）
+4. 创建数据目录
+   ```bash
+   mkdir -p shared/data/chroma
+   ```
+
+5. 运行数据库迁移（如需要）
    ```bash
    uv run alembic upgrade head
    ```
 
 ---
 
-**指南版本**: v5.0.2  
-**适用系统版本**: v5.0.2+  
-**更新时间**: 2024-12-20
+**指南版本**: v5.1.0
+**适用系统版本**: v5.1.0+
+**更新时间**: 2025-01-16

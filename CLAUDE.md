@@ -1,6 +1,6 @@
 <!-- OPENSPEC:START -->
 <!-- OPENSPEC:END -->
--禁止自动执行git命令
+-禁止自动执行git命令,除非我明确指令
 # 智能钓鱼助手 v5.1.0
 
 模块化 Agent 架构 + JWT认证系统 + React管理前端，基于 LangChain 1.0+ 和 7 因子科学评分系统。
@@ -11,6 +11,7 @@
 ### 🆕 新增功能 (v5.1.0)
 - **鱼百科管理** - 鱼种知识库、季节活动规律、装备推荐查询
 - **内容管理系统** - 富文本编辑器、自动保存草稿、语义搜索、向量检索（ChromaDB）
+- **文章网络采集** - 从维基百科采集钓鱼知识，LLM翻译增强，草稿审核流程
 - **Excel批量导入** - 批量导入装备数据到待审核队列、模板生成系统
 - **向量搜索** - 基于ChromaDB的语义搜索和DashScope Embedding
 - **配件管理** - 钩子、铅坠、转环、前导线等配件完整管理
@@ -73,6 +74,7 @@ apps/                           # 应用层
 │   ├── schemas/                # 请求/响应模型
 │   ├── services/               # 业务服务层
 │   │   ├── vector_store.py     # 🆕 向量存储服务
+│   │   ├── article_fetcher.py  # 🆕 文章网络采集服务
 │   │   ├── excel_import_service.py  # 🆕 Excel导入服务
 │   │   └── analytics_service.py # 🔄 数据分析服务（优化）
 │   ├── models/                 # ⭐ 数据库模型 (v5.2.0 迁移)
@@ -133,6 +135,9 @@ from apps.api.database import LureDatabase, get_db
 # 🆕 向量搜索服务
 from apps.api.services.vector_store import ArticleVectorStore
 
+# 🆕 文章网络采集服务
+from apps.api.services.article_fetcher import ArticleFetcherService, get_article_fetcher_service
+
 # 🆕 Excel导入服务
 from apps.api.services.excel_import_service import ExcelImportService
 
@@ -190,6 +195,14 @@ POST   /api/v1/articles/{id}/publish     # 发布文章
 POST   /api/v1/articles/{id}/archive     # 归档文章
 GET    /api/v1/articles/search           # 语义搜索
 GET    /api/v1/articles/{id}/similar     # 相似文章
+
+# 🆕 文章网络采集API
+GET    /api/v1/articles/fetch/sources    # 获取可用数据源
+GET    /api/v1/articles/fetch/progress   # 获取采集进度
+POST   /api/v1/articles/fetch/start      # 开始采集
+POST   /api/v1/articles/fetch/pause      # 暂停采集
+POST   /api/v1/articles/fetch/retry      # 重试失败项
+POST   /api/v1/articles/fetch/reset      # 重置进度
 
 # 🆕 配件管理API
 GET    /api/v1/accessory          # 配件列表
@@ -342,7 +355,7 @@ mkdir -p packages/agents/xxx/{core,tools,utils}
 - **apps/api/models**: 数据库模型（v5.2.0 从 lure 迁移，新增 fish/article/accessory/rig 模型）
 - **apps/api/orm**: ORM 层和仓储模式（v5.2.0 从 lure 迁移）
 - **apps/api/database**: 数据库访问层（v5.2.0 从 lure 迁移）
-- **apps/api/services**: 业务服务层（新增 vector_store/excel_import_service/analytics_service）
+- **apps/api/services**: 业务服务层（新增 vector_store/article_fetcher/excel_import_service/analytics_service）
 - **agents/fishing**: 钓鱼助手Agent，使用统一监控组件
 - **agents/fishing/tools/lure**: 路亚工具（兼容层，重导出 apps.api，新增 diff_analyzer/specs_extractor）
 - **agents/equipment_import**: 装备导入Agent，使用统一监控组件，支持Excel导入

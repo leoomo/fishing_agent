@@ -1,6 +1,6 @@
 # 智能钓鱼助手 - 系统架构设计
 
-**版本**: v5.0.2 | **架构**: 模块化Agent包 + JWT认证 + 多端支持
+**版本**: v5.1.0 | **架构**: 模块化Agent包 + JWT认证 + 多端支持
 
 ## 🎯 核心特性
 
@@ -9,6 +9,7 @@
 - **7因子科学评分**: 温度、天气、风力、气压、湿度、季节、月相
 - **JWT认证系统**: RBAC权限管理 + 微信小程序支持
 - **智能处理系统**: OCR多提供商 + 图片合并 + 装备导入
+- **内容管理系统**: 文章管理 + 网络采集 + LLM翻译增强 + 向量搜索
 - **多端支持**: CLI、API、React Web、微信小程序
 
 ## 🏗️ 架构哲学
@@ -44,7 +45,7 @@
 
 ## 📦 模块组织
 
-### 核心目录结构 (v5.0.2)
+### 核心目录结构 (v5.1.0)
 ```
 packages/                      # 模块化包目录
 ├── agents/                   # Agent统一目录 (v5.1.0 重构)
@@ -56,23 +57,34 @@ packages/                      # 模块化包目录
 │   │   │   ├── user_equipment/ # 用户装备管理
 │   │   │   └── lure/          # 路亚工具
 │   │   └── middleware/       # 动态Prompt中间件
-│   └── equipment_import/     # 装备导入Agent包 ⭐ v5.0.2
+│   └── equipment_import/     # 装备导入Agent包
 ├── data_processing/          # 数据处理包
 │   ├── image/                # 图片处理
 │   ├── ocr/                  # OCR多提供商
 │   └── dedup/                # 去重工具
 └── scraper/                  # 爬虫框架包 (分布式Master-Worker)
-    ├── master/               # Master节点服务 ⭐v5.1.0
-    ├── worker/               # Worker节点 ⭐v5.1.0
+    ├── master/               # Master节点服务
+    ├── worker/               # Worker节点
+    ├── spiders/              # 具体爬虫实现
     └── rpa/                  # RPA自动化 (Playwright)
 
 apps/                          # 应用层
 ├── cli/                      # CLI应用
 ├── api/                      # FastAPI后端
+│   ├── routes/               # API路由
+│   ├── services/             # 业务服务层 ⭐ v5.1.0 新增
+│   │   ├── article_fetcher.py  # 文章网络采集服务
+│   │   ├── rig_fetcher.py      # 钓组网络采集服务
+│   │   ├── vector_store.py     # 向量存储服务
+│   │   └── analytics_service.py # 数据分析服务
+│   ├── models/               # 数据库模型
+│   └── schemas/              # 请求/响应模型
 └── web-admin/                # React管理前端
 
-fishing_agent_app/            # 微信小程序 ⭐ v5.0.2新增
+fishing_agent_app/            # 微信小程序
 shared/                        # 共享资源
+├── config/                   # 全局配置
+└── data/                     # 数据库文件
 ```
 
 ### 模块职责
@@ -80,7 +92,8 @@ shared/                        # 共享资源
 - **agents/equipment_import**: 装备导入功能，支持文本压缩
 - **agents/agent_component**: 统一监控组件 (MonitoringCallback)
 - **data_processing**: 图片处理、OCR、去重，独立可用
-- **scraper**: 分布式爬虫框架 (Master-Worker架构，77个文件)
+- **scraper**: 分布式爬虫框架 (Master-Worker架构)
+- **apps/api/services**: 业务服务层，包含网络采集、向量存储等服务 ⭐ v5.1.0
 - **apps**: 各端应用实现，调用Agent包处理业务逻辑
 - **fishing_agent_app**: 微信小程序，面向终端用户的移动端应用
 
@@ -114,6 +127,16 @@ ocr_processor = OCRMergeProcessor(provider="siliconflow")
 # 爬虫功能 (分布式Master-Worker)
 from packages.scraper import BaseSpider, WorkflowManager
 from packages.scraper.worker import CrawlerWorker
+
+# 内容采集服务 (v5.1.0 新增)
+from apps.api.services.article_fetcher import ArticleFetcherService
+fetcher = ArticleFetcherService(db_path="shared/data/equipment.db")
+fetcher.start_fetch(source_id="wikipedia", use_llm=True)
+
+# 向量搜索服务 (v5.1.0 新增)
+from apps.api.services.vector_store import ArticleVectorStore
+vector_store = ArticleVectorStore()
+results = vector_store.search("钓鱼技巧", limit=10)
 ```
 
 ## 🔧 核心组件
@@ -167,6 +190,28 @@ class TextCompressor:
         # 3. 重建压缩文本
         compressed = self._rebuild_text(core_info)
         return CompressionResult(compressed_text=compressed)
+```
+
+### 文章网络采集服务 ⭐ v5.1.0
+```python
+# 维基百科文章采集 + LLM翻译增强
+class ArticleFetcherService:
+    def start_fetch(self, source_id: str = "wikipedia", use_llm: bool = True):
+        """
+        采集流程：
+        1. 从预设的维基百科钓鱼文章列表获取URL
+        2. 调用Wikipedia REST API获取英文内容
+        3. 使用LLM(Qwen Plus)翻译为中文
+        4. 生成摘要、标签、分类
+        5. 保存为草稿文章待审核
+        """
+        pass
+
+# 支持的操作
+fetcher.start_fetch()    # 开始采集
+fetcher.pause_fetch()    # 暂停采集
+fetcher.retry_failed()   # 重试失败项
+fetcher.get_progress()   # 获取进度
 ```
 
 ### 模块化包模式
@@ -292,12 +337,12 @@ def get_all_tools():
 
 ## 🏗️ 架构优势
 
-### v5.0.2 架构优势
+### v5.1.0 架构优势
 - **多端支持**: CLI、API、React Web、微信小程序四端完整
 - **模块化包架构**: 4个独立包，支持独立发布和复用
 - **基础设施分离**: data_processing、scraper等包独立，提高复用性
 - **全栈应用架构**: 前后端分离，各端独立开发
-- **微信小程序集成**: 完整的小程序开发支持和API
+- **内容管理系统**: 文章管理、网络采集、LLM翻译增强、向量搜索 ⭐ 新增
 - **智能处理系统**: OCR、图片合并、装备导入等AI功能
 - **LangGraph兼容**: 原生支持LangGraph Studio
 
@@ -307,6 +352,7 @@ v3.1.1: 模块化包架构 + 动态Prompt中间件
 v4.0.0: 爬虫监控模块 + RPA自动化
 v5.0.0: React管理前端 + JWT认证 + 数据分析配置
 v5.0.2: 微信小程序 + 装备导入Agent + OCR多提供商
+v5.1.0: 内容管理系统 + 网络采集 + LLM翻译增强 + 向量搜索 ⭐ 当前
 ```
 
 ## 📊 性能指标
@@ -355,7 +401,7 @@ v5.0.2: 微信小程序 + 装备导入Agent + OCR多提供商
 
 ---
 
-**文档版本**: v5.0.2  
-**最后更新**: 2024-12-20  
-**当前分支**: feature/miniprogram-dev  
+**文档版本**: v5.1.0
+**最后更新**: 2025-01-16
+**当前分支**: feature/article-optimization
 **维护者**: 智能钓鱼助手开发团队

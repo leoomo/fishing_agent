@@ -1,6 +1,6 @@
-# 基础功能指南 v5.0.2
+# 基础功能指南 v5.1.0
 
-本指南将帮助您深入了解和使用智能钓鱼助手 v5.0.2 的各种核心功能。
+本指南将帮助您深入了解和使用智能钓鱼助手 v5.1.0 的各种核心功能。
 
 ## 📋 目录
 
@@ -9,6 +9,7 @@
 - [路亚装备管理](#路亚装备管理)
 - [装备信息提取与导入](#装备信息提取与导入)
 - [图片处理与OCR识别](#图片处理与ocr识别)
+- [内容管理与文章采集](#内容管理与文章采集)
 - [微信小程序使用](#微信小程序使用)
 - [API 使用示例](#api-使用示例)
 - [高级功能](#高级功能)
@@ -201,6 +202,88 @@ merged_results = processor.process()
 # 自动识别装备表格、参数列表等
 # 支持批量处理多张相关图片
 ```
+
+## 📝 内容管理与文章采集
+
+### v5.1.0 新增功能
+
+内容管理系统支持文章的完整生命周期管理，包括创建、编辑、网络采集、发布和归档。
+
+### 文章网络采集
+
+系统支持从维基百科自动采集钓鱼相关文章，并使用 LLM 进行翻译和内容增强：
+
+1. **Web 管理界面操作**
+   - 进入"内容管理" → "文章列表"页面
+   - 点击"网络采集"按钮打开采集面板
+   - 点击"开始采集"启动后台采集任务
+   - 实时查看采集进度和状态
+
+2. **采集流程**
+   ```
+   维基百科文章 → 获取英文内容 → LLM翻译为中文 →
+   生成摘要和标签 → 自动分类 → 保存为草稿
+   ```
+
+3. **API 调用方式**
+   ```python
+   import requests
+
+   headers = {"Authorization": f"Bearer {token}"}
+
+   # 开始采集
+   response = requests.post(
+       "http://localhost:8000/api/v1/admin/articles/fetch/start",
+       headers=headers,
+       json={"source_id": "wikipedia", "use_llm": True}
+   )
+
+   # 查看采集进度
+   response = requests.get(
+       "http://localhost:8000/api/v1/admin/articles/fetch/progress",
+       headers=headers
+   )
+   print(response.json())
+   # {
+   #   "is_running": true,
+   #   "stats": {"total": 30, "completed": 5, "pending": 25, ...},
+   #   "items": [...]
+   # }
+   ```
+
+4. **采集的文章内容**
+   - 30+ 预设的钓鱼相关维基百科词条
+   - 包括钓鱼技巧、装备介绍、鱼种知识等
+   - 自动翻译为中文并增强内容质量
+   - 进入草稿状态待人工审核
+
+### 语义搜索功能
+
+基于向量数据库的语义搜索功能：
+
+```python
+# 搜索相关文章
+response = requests.get(
+    "http://localhost:8000/api/v1/admin/articles/search",
+    headers=headers,
+    params={"q": "飞蝇钓技巧", "limit": 10}
+)
+
+# 获取相似文章
+response = requests.get(
+    f"http://localhost:8000/api/v1/admin/articles/{article_id}/similar",
+    headers=headers
+)
+```
+
+### 文章管理
+
+完整的文章 CRUD 操作：
+
+- **创建文章**：支持草稿自动保存
+- **编辑文章**：富文本编辑器，Markdown 支持
+- **发布文章**：草稿 → 发布状态转换
+- **归档文章**：归档已发布的文章
 
 ## 📱 微信小程序使用
 
@@ -418,6 +501,6 @@ A:
 
 ---
 
-**指南版本**: v5.0.2  
-**适用系统版本**: v5.0.2+  
-**更新时间**: 2024-12-20
+**指南版本**: v5.1.0
+**适用系统版本**: v5.1.0+
+**更新时间**: 2025-01-16
