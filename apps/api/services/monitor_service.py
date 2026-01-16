@@ -224,25 +224,30 @@ class MonitorService:
             # 总调用数
             total_calls = query.count()
 
+            # 构建基础过滤条件（用于所有聚合查询）
+            base_filters = [LLMLog.timestamp >= start_date]
+            if end_date:
+                base_filters.append(LLMLog.timestamp <= end_date)
+
             # 总 Token 数
             total_tokens = session.query(
                 func.sum(LLMLog.total_tokens)
             ).filter(
-                LLMLog.timestamp >= start_date
+                *base_filters
             ).scalar() or 0
 
             # 总成本
             total_cost = session.query(
                 func.sum(LLMLog.cost)
             ).filter(
-                LLMLog.timestamp >= start_date
+                *base_filters
             ).scalar() or 0
 
             # 平均响应时间
             avg_response_time = session.query(
                 func.avg(LLMLog.response_time)
             ).filter(
-                LLMLog.timestamp >= start_date
+                *base_filters
             ).scalar() or 0
 
             # 成功率
@@ -257,7 +262,7 @@ class MonitorService:
                 func.sum(LLMLog.cost).label('cost'),
                 func.avg(LLMLog.response_time).label('avg_latency')
             ).filter(
-                LLMLog.timestamp >= start_date
+                *base_filters
             ).group_by(
                 LLMLog.model_provider
             ).all()
@@ -280,7 +285,7 @@ class MonitorService:
                 func.count(LLMLog.id).label('calls'),
                 func.sum(LLMLog.total_tokens).label('tokens')
             ).filter(
-                LLMLog.timestamp >= start_date
+                *base_filters
             ).group_by(
                 func.date(LLMLog.timestamp)
             ).order_by('date').all()
