@@ -12,6 +12,10 @@ import type {
   ArticleSearchResponse,
   ArticleType,
   ArticleStatus,
+  ArticleFetchSource,
+  ArticleFetchProgress,
+  ArticleFetchStartRequest,
+  ArticleFetchRetryRequest,
 } from '@/types/article'
 
 export interface ArticleListParams {
@@ -91,5 +95,49 @@ export const articleApi = {
     return client.get(`/admin/articles/${id}/similar`, {
       params: { limit: limit || 5 },
     })
+  },
+
+  // ========== Fetch APIs ==========
+
+  /**
+   * Get available fetch sources
+   */
+  getFetchSources: (): Promise<ArticleFetchSource[]> => {
+    return client.get('/admin/articles/fetch/sources')
+  },
+
+  /**
+   * Get fetch progress
+   */
+  getFetchProgress: (): Promise<ArticleFetchProgress> => {
+    return client.get('/admin/articles/fetch/progress')
+  },
+
+  /**
+   * Start fetching articles
+   */
+  startFetch: (data?: ArticleFetchStartRequest): Promise<{ message: string }> => {
+    return client.post('/admin/articles/fetch/start', data || {})
+  },
+
+  /**
+   * Pause fetching
+   */
+  pauseFetch: (): Promise<{ message: string }> => {
+    return client.post('/admin/articles/fetch/pause')
+  },
+
+  /**
+   * Retry failed items
+   */
+  retryFailed: (data?: ArticleFetchRetryRequest): Promise<{ message: string }> => {
+    return client.post('/admin/articles/fetch/retry', data || {})
+  },
+
+  /**
+   * Reset fetch progress
+   */
+  resetProgress: (): Promise<{ message: string }> => {
+    return client.post('/admin/articles/fetch/reset')
   },
 }

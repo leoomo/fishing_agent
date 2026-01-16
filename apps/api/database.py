@@ -397,6 +397,23 @@ class LureDatabase:
             )
         """)
 
+        # ========== 文章采集进度表 ==========
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS article_fetch_progress (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_type TEXT NOT NULL,
+                source_name TEXT NOT NULL,
+                source_url TEXT NOT NULL UNIQUE,
+                title TEXT,
+                status TEXT DEFAULT 'pending',
+                article_id INTEGER,
+                error_message TEXT,
+                raw_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # ========== 创建索引 ==========
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipment_brand ON equipment(brand_id)")
@@ -419,6 +436,8 @@ class LureDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rig_components ON rig_components(rig_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_fish_fetch_progress_status ON fish_fetch_progress(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_rig_fetch_progress_status ON rig_fetch_progress(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_article_fetch_progress_status ON article_fetch_progress(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_article_fetch_progress_source ON article_fetch_progress(source_type)")
 
         conn.commit()
 
