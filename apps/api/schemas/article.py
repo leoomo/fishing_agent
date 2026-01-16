@@ -131,3 +131,54 @@ class ArticleSearchResponse(BaseModel):
     query: str
     results: List[ArticleSearchResult]
     total: int
+
+
+# ========== Fetch Schemas ==========
+
+class ArticleFetchSource(BaseModel):
+    """Available fetch source"""
+    id: str
+    name: str
+    description: str
+    total_items: int
+    enabled: bool
+
+
+class ArticleFetchProgressItem(BaseModel):
+    """Single fetch progress item"""
+    source_url: str
+    title: Optional[str] = None
+    source_type: str
+    status: str
+    article_id: Optional[int] = None
+    error: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ArticleFetchProgressStats(BaseModel):
+    """Fetch progress statistics"""
+    total: int = 0
+    pending: int = 0
+    fetching: int = 0
+    enriching: int = 0
+    completed: int = 0
+    failed: int = 0
+    skipped: int = 0
+
+
+class ArticleFetchProgress(BaseModel):
+    """Complete fetch progress response"""
+    is_running: bool
+    stats: ArticleFetchProgressStats
+    items: List[ArticleFetchProgressItem]
+
+
+class ArticleFetchStartRequest(BaseModel):
+    """Request to start fetching"""
+    source_id: str = Field(default="wikipedia", description="数据源ID")
+    use_llm: bool = Field(default=True, description="是否使用LLM增强")
+
+
+class ArticleFetchRetryRequest(BaseModel):
+    """Request to retry failed items"""
+    urls: Optional[List[str]] = Field(None, description="指定重试的URL列表，为空则重试所有失败项")

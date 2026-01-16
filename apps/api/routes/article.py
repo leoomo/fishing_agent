@@ -32,6 +32,12 @@ from apps.api.schemas.article import (
     ArticleStatusEnum,
     ArticleSearchResponse,
     ArticleSearchResult,
+    ArticleFetchSource,
+    ArticleFetchProgress,
+    ArticleFetchProgressItem,
+    ArticleFetchProgressStats,
+    ArticleFetchStartRequest,
+    ArticleFetchRetryRequest,
 )
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
@@ -547,4 +553,188 @@ async def get_similar_articles(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取相似文章失败: {str(e)}"
+        )
+
+
+# ========== Fetch Endpoints (网络采集) ==========
+
+@router.get(
+    "/articles/fetch/sources",
+    response_model=list[ArticleFetchSource],
+    summary="获取可用数据源",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_CREATE))]
+)
+async def get_fetch_sources():
+    """Get available fetch sources"""
+    from apps.api.services.article_fetcher import get_article_fetcher_service
+
+    try:
+        service = get_article_fetcher_service()
+        sources = service.get_sources()
+        return [ArticleFetchSource(**s) for s in sources]
+    except Exception as e:
+        logger.error(f"Failed to get fetch sources: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据源失败: {str(e)}"
+        )
+
+
+@router.get(
+    "/articles/fetch/progress",
+    response_model=ArticleFetchProgress,
+    summary="获取采集进度",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_READ))]
+)
+async def get_fetch_progress():
+    """Get current fetch progress"""
+    from apps.api.services.article_fetcher import get_article_fetcher_service
+
+    try:
+        service = get_article_fetcher_service()
+        progress = service.get_progress()
+        return ArticleFetchProgress(
+            is_running=progress["is_running"],
+            stats=ArticleFetchProgressStats(**progress["stats"]),
+            items=[ArticleFetchProgressItem(**item) for item in progress["items"]]
+        )
+    except Exception as e:
+        logger.error(f"Failed to get fetch progress: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取采集进度失败: {str(e)}"
+        )
+
+
+@router.post(
+    "/articles/fetch/start",
+    summary="开始采集",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_CREATE))]
+)
+async def start_fetch(
+    data: ArticleFetchStartRequest = ArticleFetchStartRequest(),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_CREATE))
+):
+    """Start fetching articles from external sources"""
+    from apps.api.services.article_fetcher import get_article_fetcher_service
+
+    try:
+        service = get_article_fetcher_service()
+        result = service.start_fetch(source_id=data.source_id, use_llm=data.use_llm)
+
+        if result["success"]:
+            logger.info(f"Article fetch started by user={current_user.username}")
+            return {"message": result["message"]}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["message"]
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start fetch: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"启动采集失败: {str(e)}"
+        )
+
+
+@router.post(
+    "/articles/fetch/pause",
+    summary="暂停采集",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_CREATE))]
+)
+async def pause_fetch(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_CREATE))
+):
+    """Pause the current fetch task"""
+    from apps.api.services.article_fetcher import get_article_fetcher_service
+
+    try:
+        service = get_article_fetcher_service()
+        result = service.pause_fetch()
+
+        if result["success"]:
+            logger.info(f"Article fetch paused by user={current_user.username}")
+            return {"message": result["message"]}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["message"]
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to pause fetch: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"暂停采集失败: {str(e)}"
+        )
+
+
+@router.post(
+    "/articles/fetch/retry",
+    summary="重试失败项",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_CREATE))]
+)
+async def retry_failed(
+    data: ArticleFetchRetryRequest = ArticleFetchRetryRequest(),
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_CREATE))
+):
+    """Retry failed fetch items"""
+    from apps.api.services.article_fetcher import get_article_fetcher_service
+
+    try:
+        service = get_article_fetcher_service()
+        result = service.retry_failed(urls=data.urls)
+
+        if result["success"]:
+            logger.info(f"Article fetch retry by user={current_user.username}")
+            return {"message": result["message"]}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["message"]
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to retry fetch: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"重试采集失败: {str(e)}"
+        )
+
+
+@router.post(
+    "/articles/fetch/reset",
+    summary="重置进度",
+    dependencies=[Depends(require_permission(PermissionEnum.CONTENT_DELETE))]
+)
+async def reset_progress(
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.CONTENT_DELETE))
+):
+    """Reset all fetch progress"""
+    from apps.api.services.article_fetcher import get_article_fetcher_service
+
+    try:
+        service = get_article_fetcher_service()
+        result = service.reset_progress()
+
+        if result["success"]:
+            logger.info(f"Article fetch progress reset by user={current_user.username}")
+            return {"message": result["message"]}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["message"]
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to reset fetch progress: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"重置进度失败: {str(e)}"
         )

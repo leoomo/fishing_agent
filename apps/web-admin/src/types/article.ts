@@ -135,3 +135,80 @@ export const ARTICLE_STATUS_CONFIG: Record<ArticleStatus, {
     color: 'default',
   },
 }
+
+// ========== Fetch Types ==========
+
+export type FetchStatus = 'pending' | 'fetching' | 'enriching' | 'completed' | 'failed' | 'skipped'
+
+export interface ArticleFetchSource {
+  id: string
+  name: string
+  description: string
+  total_items: number
+  enabled: boolean
+}
+
+export interface ArticleFetchProgressItem {
+  source_url: string
+  title?: string
+  source_type: string
+  status: FetchStatus
+  article_id?: number
+  error?: string
+  updated_at?: string
+}
+
+export interface ArticleFetchProgressStats {
+  total: number
+  pending: number
+  fetching: number
+  enriching: number
+  completed: number
+  failed: number
+  skipped: number
+}
+
+export interface ArticleFetchProgress {
+  is_running: boolean
+  stats: ArticleFetchProgressStats
+  items: ArticleFetchProgressItem[]
+}
+
+export interface ArticleFetchStartRequest {
+  source_id?: string
+  use_llm?: boolean
+}
+
+export interface ArticleFetchRetryRequest {
+  urls?: string[]
+}
+
+export const FETCH_STATUS_CONFIG: Record<FetchStatus, {
+  label: string
+  color: string
+}> = {
+  pending: {
+    label: '待采集',
+    color: 'default',
+  },
+  fetching: {
+    label: '采集中',
+    color: 'processing',
+  },
+  enriching: {
+    label: 'LLM增强中',
+    color: 'processing',
+  },
+  completed: {
+    label: '已完成',
+    color: 'success',
+  },
+  failed: {
+    label: '失败',
+    color: 'error',
+  },
+  skipped: {
+    label: '已跳过',
+    color: 'warning',
+  },
+}
