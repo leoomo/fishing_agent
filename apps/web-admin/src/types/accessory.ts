@@ -128,6 +128,10 @@ export interface AccessoryListItem {
   price_min?: number
   price_max?: number
   user_level?: UserLevel
+  // 扩展字段用于表格展示
+  description?: string
+  target_species?: string
+  image_url?: string
 }
 
 export interface AccessoryListResponse {
@@ -225,4 +229,37 @@ export interface AccessoryOptionsResponse {
 export interface AccessoryInitDataResponse {
   created_count: number
   message: string
+}
+
+// ========== 批量删除 ==========
+
+export interface AccessoryBatchDeleteResponse {
+  deleted_count: number
+  message: string
+}
+
+// ========== 导入导出 ==========
+
+export interface AccessoryImportPreviewItem {
+  row_number: number
+  name: string
+  category: string
+  is_valid: boolean
+  errors: string[]
+  data: Record<string, unknown>
+}
+
+export interface AccessoryImportPreviewResponse {
+  total_rows: number
+  valid_rows: number
+  invalid_rows: number
+  items: AccessoryImportPreviewItem[]
+}
+
+export interface AccessoryImportResult {
+  success: boolean
+  message: string
+  imported_count: number
+  failed_count: number
+  errors: Array<{ row: number; message: string }>
 }
