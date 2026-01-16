@@ -271,6 +271,26 @@ async def update_article(
 
             logger.debug(f"Article updated: id={article.id}, user={current_user.username}")
 
+            # Sync to vector store if article is published
+            if article.status == ArticleStatus.PUBLISHED:
+                try:
+                    from apps.api.services.vector_store import get_vector_store
+                    vector_store = get_vector_store()
+                    content = f"{article.title}\n{article.summary or ''}\n{article.content}"
+                    vector_store.upsert(
+                        article_id=article.id,
+                        content=content,
+                        metadata={
+                            "article_type": article.article_type.value if article.article_type else "",
+                            "status": article.status.value if article.status else "",
+                            "title": article.title,
+                            "tags": article.tags or ""
+                        }
+                    )
+                    logger.debug(f"Article synced to vector store: id={article.id}")
+                except Exception as ve:
+                    logger.warning(f"Failed to sync article to vector store: {ve}")
+
             return article_to_response(article)
 
     except HTTPException:
@@ -308,6 +328,15 @@ async def delete_article(
             session.commit()
 
             logger.info(f"Article deleted: id={article_id}, user={current_user.username}")
+
+            # Remove from vector store
+            try:
+                from apps.api.services.vector_store import get_vector_store
+                vector_store = get_vector_store()
+                vector_store.delete(article_id)
+                logger.info(f"Article removed from vector store: id={article_id}")
+            except Exception as ve:
+                logger.warning(f"Failed to remove article from vector store: {ve}")
 
     except HTTPException:
         raise
@@ -375,8 +404,24 @@ async def publish_article(
 
             logger.info(f"Article published: id={article.id}, user={current_user.username}")
 
-            # TODO: Sync to vector store after publishing
-            # vector_store.upsert(article.id, article.content, {...})
+            # Sync to vector store after publishing
+            try:
+                from apps.api.services.vector_store import get_vector_store
+                vector_store = get_vector_store()
+                content = f"{article.title}\n{article.summary or ''}\n{article.content}"
+                vector_store.upsert(
+                    article_id=article.id,
+                    content=content,
+                    metadata={
+                        "article_type": article.article_type.value if article.article_type else "",
+                        "status": article.status.value if article.status else "",
+                        "title": article.title,
+                        "tags": article.tags or ""
+                    }
+                )
+                logger.info(f"Article synced to vector store: id={article.id}")
+            except Exception as ve:
+                logger.warning(f"Failed to sync article to vector store: {ve}")
 
             return article_to_response(article)
 
@@ -417,8 +462,14 @@ async def archive_article(
 
             logger.info(f"Article archived: id={article.id}, user={current_user.username}")
 
-            # TODO: Remove from vector store
-            # vector_store.delete(article.id)
+            # Remove from vector store
+            try:
+                from apps.api.services.vector_store import get_vector_store
+                vector_store = get_vector_store()
+                vector_store.delete(article.id)
+                logger.info(f"Article removed from vector store: id={article.id}")
+            except Exception as ve:
+                logger.warning(f"Failed to remove article from vector store: {ve}")
 
             return article_to_response(article)
 

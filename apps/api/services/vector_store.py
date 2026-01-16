@@ -10,6 +10,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
+import numpy as np
 import chromadb
 from chromadb.config import Settings
 
@@ -31,11 +32,24 @@ class DashScopeEmbeddingFunction:
         if not self.api_key:
             logger.warning("DASHSCOPE_API_KEY not set, vector search will be disabled")
 
-    def __call__(self, input: List[str]) -> List[List[float]]:
+    def name(self) -> str:
+        """Return the name of the embedding function (required by ChromaDB)"""
+        return "dashscope_text_embedding_v2"
+
+    def embed_query(self, input: str) -> np.ndarray:
+        """Embed a single query text (required by ChromaDB for search)"""
+        results = self([input])
+        return results[0] if len(results) > 0 else np.zeros(1536, dtype=np.float32)
+
+    def embed_documents(self, input: List[str]) -> List[np.ndarray]:
+        """Embed multiple documents (required by ChromaDB for upsert)"""
+        return self(input)
+
+    def __call__(self, input: List[str]) -> List[np.ndarray]:
         """Generate embeddings for input texts"""
         if not self.api_key:
             # Return zero vectors if API key not set
-            return [[0.0] * 1536 for _ in input]
+            return [np.zeros(1536, dtype=np.float32) for _ in input]
 
         try:
             import dashscope
@@ -55,17 +69,17 @@ class DashScopeEmbeddingFunction:
 
                 if response.status_code == 200:
                     for item in response.output['embeddings']:
-                        embeddings.append(item['embedding'])
+                        embeddings.append(np.array(item['embedding'], dtype=np.float32))
                 else:
                     logger.error(f"DashScope embedding failed: {response.message}")
                     # Return zero vectors on error
-                    embeddings.extend([[0.0] * 1536 for _ in batch])
+                    embeddings.extend([np.zeros(1536, dtype=np.float32) for _ in batch])
 
             return embeddings
 
         except Exception as e:
             logger.error(f"Failed to generate embeddings: {e}")
-            return [[0.0] * 1536 for _ in input]
+            return [np.zeros(1536, dtype=np.float32) for _ in input]
 
 
 class ArticleVectorStore:
@@ -107,10 +121,9 @@ class ArticleVectorStore:
             )
         )
 
-        # Get or create collection
+        # Get or create collection (embeddings generated manually for ChromaDB 1.3.5 compatibility)
         self.collection = self.client.get_or_create_collection(
             name="articles",
-            embedding_function=self.embedding_fn,
             metadata={"description": "Fishing articles for semantic search"}
         )
 
@@ -154,9 +167,13 @@ class ArticleVectorStore:
                 if "tags" in metadata:
                     meta["tags"] = str(metadata["tags"])[:200]
 
+            # Generate embedding manually (ChromaDB 1.3.5 compatibility)
+            embedding = self.embedding_fn([content])[0].tolist()
+
             self.collection.upsert(
                 ids=[doc_id],
                 documents=[content],
+                embeddings=[embedding],
                 metadatas=[meta]
             )
 
@@ -214,9 +231,12 @@ class ArticleVectorStore:
             if article_type:
                 where["article_type"] = article_type
 
-            # Query collection
+            # Generate query embedding manually (ChromaDB 1.3.5 compatibility)
+            query_embedding = self.embedding_fn([query])[0].tolist()
+
+            # Query collection with pre-computed embedding
             results = self.collection.query(
-                query_texts=[query],
+                query_embeddings=[query_embedding],
                 n_results=n_results,
                 where=where if where else None,
                 include=["metadatas", "documents", "distances"]
