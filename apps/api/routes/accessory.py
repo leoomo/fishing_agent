@@ -6,19 +6,25 @@
 """
 
 import logging
-from typing import Optional
+from io import BytesIO
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 
 from apps.api.auth.dependencies import get_current_user, require_permission
 from apps.api.models import Accessory
 from apps.api.orm import get_db_session
 from apps.api.schemas.accessory import (
+    AccessoryBatchDeleteResponse,
     AccessoryCategoryEnum,
     AccessoryCategoryStats,
     AccessoryCategoryStatsResponse,
     AccessoryCreate,
+    AccessoryImportPreviewResponse,
+    AccessoryImportPreviewItem,
+    AccessoryImportResult,
     AccessoryInitDataResponse,
     AccessoryListItem,
     AccessoryListResponse,
@@ -531,6 +537,493 @@ async def delete_accessory(
             f"配件删除成功: accessory_id={accessory_id}, "
             f"name={name}, user={current_user.username}"
         )
+
+
+@router.post(
+    "/accessories/batch-delete",
+    response_model=AccessoryBatchDeleteResponse,
+    summary="批量删除配件",
+)
+async def batch_delete_accessories(
+    ids: List[int] = Body(..., embed=True, description="要删除的配件ID列表"),
+    current_user=Depends(require_permission("content:delete")),
+):
+    """批量删除配件"""
+    if not ids:
+        raise HTTPException(status_code=400, detail="请选择要删除的配件")
+
+    with get_db_session() as session:
+        # 查询要删除的记录
+        accessories = (
+            session.query(Accessory)
+            .filter(Accessory.accessory_id.in_(ids))
+            .all()
+        )
+
+        if not accessories:
+            raise HTTPException(status_code=404, detail="未找到要删除的配件")
+
+        deleted_count = len(accessories)
+        names = [a.name for a in accessories]
+
+        for accessory in accessories:
+            session.delete(accessory)
+
+        session.commit()
+
+        logger.info(
+            f"配件批量删除成功: count={deleted_count}, "
+            f"names={names}, user={current_user.username}"
+        )
+
+        return AccessoryBatchDeleteResponse(
+            deleted_count=deleted_count,
+            message=f"成功删除 {deleted_count} 个配件",
+        )
+
+
+# ========== Import/Export Endpoints ==========
+
+
+@router.get(
+    "/accessories/export/template",
+    summary="下载导入模板",
+)
+async def download_import_template(
+    current_user=Depends(get_current_user),
+):
+    """下载配件导入Excel模板"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "配件导入模板"
+
+        # 样式定义
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        required_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin'),
+        )
+
+        # 定义列
+        columns = [
+            ("name", "配件名称*", True),
+            ("category", "分类*", True),
+            ("description", "描述", False),
+            ("features", "特点", False),
+            ("size", "规格尺寸", False),
+            ("weight", "重量(g)", False),
+            ("material", "材质", False),
+            ("color", "颜色", False),
+            ("quantity_per_pack", "每包数量", False),
+            ("target_species", "目标鱼种", False),
+            ("applicable_rigs", "适用钓组", False),
+            ("best_conditions", "最佳条件", False),
+            ("brand", "品牌", False),
+            ("price_min", "最低价格", False),
+            ("price_max", "最高价格", False),
+            ("user_level", "用户等级", False),
+            ("image_url", "图片URL", False),
+        ]
+
+        # 写入表头
+        for col_idx, (_, label, required) in enumerate(columns, 1):
+            cell = ws.cell(row=1, column=col_idx, value=label)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+            cell.border = border
+            ws.column_dimensions[cell.column_letter].width = 15
+
+        # 写入说明行
+        descriptions = [
+            "必填，唯一名称",
+            "必填: hook/sinker/swivel/leader/float/snap/other",
+            "详细描述",
+            "主要特点",
+            "如: #1/0, 3.5g",
+            "数字",
+            "如: 碳钢, 钨合金",
+            "如: 银色",
+            "数字",
+            "如: 黑鲈、鳜鱼",
+            "如: Texas钓组",
+            "使用条件说明",
+            "品牌名称",
+            "数字",
+            "数字",
+            "beginner/intermediate/advanced",
+            "图片链接",
+        ]
+        for col_idx, desc in enumerate(descriptions, 1):
+            cell = ws.cell(row=2, column=col_idx, value=desc)
+            cell.font = Font(italic=True, color="808080", size=9)
+            cell.alignment = Alignment(horizontal='center')
+            if columns[col_idx - 1][2]:
+                cell.fill = required_fill
+
+        # 写入示例数据
+        example_data = [
+            "曲柄钩",
+            "hook",
+            "路亚软饵专用钩",
+            "防挂底、软饵专用",
+            "#1/0 - #5/0",
+            "",
+            "碳钢",
+            "",
+            "10",
+            "黑鲈、鳜鱼",
+            "Texas钓组、Carolina钓组",
+            "",
+            "",
+            "5",
+            "15",
+            "beginner",
+            "",
+        ]
+        for col_idx, value in enumerate(example_data, 1):
+            cell = ws.cell(row=3, column=col_idx, value=value)
+            cell.border = border
+
+        # 保存到内存
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": "attachment; filename=accessory_import_template.xlsx"
+            },
+        )
+    except ImportError:
+        raise HTTPException(status_code=500, detail="未安装 openpyxl，无法生成模板")
+
+
+@router.post(
+    "/accessories/import/preview",
+    response_model=AccessoryImportPreviewResponse,
+    summary="预览导入数据",
+)
+async def preview_import(
+    file: UploadFile = File(...),
+    current_user=Depends(require_permission("content:create")),
+):
+    """预览Excel文件中的配件数据"""
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="请上传 Excel 文件 (.xlsx, .xls)")
+
+    try:
+        from openpyxl import load_workbook
+
+        content = await file.read()
+        wb = load_workbook(BytesIO(content))
+        ws = wb.active
+
+        items = []
+        valid_count = 0
+        invalid_count = 0
+
+        # 获取表头（第一行）
+        headers = [cell.value for cell in ws[1]]
+        header_map = {
+            "配件名称*": "name",
+            "分类*": "category",
+            "描述": "description",
+            "特点": "features",
+            "规格尺寸": "size",
+            "重量(g)": "weight",
+            "材质": "material",
+            "颜色": "color",
+            "每包数量": "quantity_per_pack",
+            "目标鱼种": "target_species",
+            "适用钓组": "applicable_rigs",
+            "最佳条件": "best_conditions",
+            "品牌": "brand",
+            "最低价格": "price_min",
+            "最高价格": "price_max",
+            "用户等级": "user_level",
+            "图片URL": "image_url",
+        }
+
+        # 跳过表头和说明行，从第3行开始读取数据
+        for row_idx, row in enumerate(ws.iter_rows(min_row=3, values_only=True), start=3):
+            # 跳过空行
+            if not any(row):
+                continue
+
+            data = {}
+            for col_idx, value in enumerate(row):
+                if col_idx < len(headers) and headers[col_idx] in header_map:
+                    field = header_map[headers[col_idx]]
+                    data[field] = value
+
+            errors = []
+
+            # 验证必填字段
+            name = data.get("name")
+            category = data.get("category")
+
+            if not name:
+                errors.append("配件名称为必填项")
+            if not category:
+                errors.append("分类为必填项")
+            elif category not in ["hook", "sinker", "swivel", "leader", "float", "snap", "other"]:
+                errors.append(f"无效的分类: {category}")
+
+            # 验证用户等级
+            user_level = data.get("user_level")
+            if user_level and user_level not in ["beginner", "intermediate", "advanced"]:
+                errors.append(f"无效的用户等级: {user_level}")
+
+            is_valid = len(errors) == 0
+            if is_valid:
+                valid_count += 1
+            else:
+                invalid_count += 1
+
+            items.append(AccessoryImportPreviewItem(
+                row_number=row_idx,
+                name=str(name) if name else "",
+                category=str(category) if category else "",
+                is_valid=is_valid,
+                errors=errors,
+                data=data,
+            ))
+
+        return AccessoryImportPreviewResponse(
+            total_rows=len(items),
+            valid_rows=valid_count,
+            invalid_rows=invalid_count,
+            items=items,
+        )
+    except ImportError:
+        raise HTTPException(status_code=500, detail="未安装 openpyxl，无法处理 Excel 文件")
+    except Exception as e:
+        logger.error(f"预览导入数据失败: {e}")
+        raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}")
+
+
+@router.post(
+    "/accessories/import/execute",
+    response_model=AccessoryImportResult,
+    summary="执行导入",
+)
+async def execute_import(
+    file: UploadFile = File(...),
+    current_user=Depends(require_permission("content:create")),
+):
+    """执行配件数据导入"""
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="请上传 Excel 文件 (.xlsx, .xls)")
+
+    try:
+        from openpyxl import load_workbook
+
+        content = await file.read()
+        wb = load_workbook(BytesIO(content))
+        ws = wb.active
+
+        # 获取表头
+        headers = [cell.value for cell in ws[1]]
+        header_map = {
+            "配件名称*": "name",
+            "分类*": "category",
+            "描述": "description",
+            "特点": "features",
+            "规格尺寸": "size",
+            "重量(g)": "weight",
+            "材质": "material",
+            "颜色": "color",
+            "每包数量": "quantity_per_pack",
+            "目标鱼种": "target_species",
+            "适用钓组": "applicable_rigs",
+            "最佳条件": "best_conditions",
+            "品牌": "brand",
+            "最低价格": "price_min",
+            "最高价格": "price_max",
+            "用户等级": "user_level",
+            "图片URL": "image_url",
+        }
+
+        imported_count = 0
+        failed_count = 0
+        errors = []
+
+        with get_db_session() as session:
+            for row_idx, row in enumerate(ws.iter_rows(min_row=3, values_only=True), start=3):
+                # 跳过空行
+                if not any(row):
+                    continue
+
+                data = {}
+                for col_idx, value in enumerate(row):
+                    if col_idx < len(headers) and headers[col_idx] in header_map:
+                        field = header_map[headers[col_idx]]
+                        data[field] = value
+
+                # 验证必填字段
+                name = data.get("name")
+                category = data.get("category")
+
+                if not name or not category:
+                    failed_count += 1
+                    errors.append({"row": row_idx, "message": "缺少必填字段"})
+                    continue
+
+                if category not in ["hook", "sinker", "swivel", "leader", "float", "snap", "other"]:
+                    failed_count += 1
+                    errors.append({"row": row_idx, "message": f"无效的分类: {category}"})
+                    continue
+
+                # 检查名称是否已存在
+                existing = session.query(Accessory).filter(Accessory.name == name).first()
+                if existing:
+                    failed_count += 1
+                    errors.append({"row": row_idx, "message": f"配件 '{name}' 已存在"})
+                    continue
+
+                # 创建配件
+                try:
+                    accessory = Accessory(
+                        name=str(name),
+                        category=str(category),
+                        description=str(data.get("description")) if data.get("description") else None,
+                        features=str(data.get("features")) if data.get("features") else None,
+                        size=str(data.get("size")) if data.get("size") else None,
+                        weight=float(data.get("weight")) if data.get("weight") else None,
+                        material=str(data.get("material")) if data.get("material") else None,
+                        color=str(data.get("color")) if data.get("color") else None,
+                        quantity_per_pack=int(data.get("quantity_per_pack")) if data.get("quantity_per_pack") else None,
+                        target_species=str(data.get("target_species")) if data.get("target_species") else None,
+                        applicable_rigs=str(data.get("applicable_rigs")) if data.get("applicable_rigs") else None,
+                        best_conditions=str(data.get("best_conditions")) if data.get("best_conditions") else None,
+                        brand=str(data.get("brand")) if data.get("brand") else None,
+                        price_min=float(data.get("price_min")) if data.get("price_min") else None,
+                        price_max=float(data.get("price_max")) if data.get("price_max") else None,
+                        user_level=str(data.get("user_level")) if data.get("user_level") else "beginner",
+                        image_url=str(data.get("image_url")) if data.get("image_url") else None,
+                    )
+                    session.add(accessory)
+                    imported_count += 1
+                except Exception as e:
+                    failed_count += 1
+                    errors.append({"row": row_idx, "message": str(e)})
+
+            session.commit()
+
+        logger.info(
+            f"配件导入完成: imported={imported_count}, failed={failed_count}, "
+            f"user={current_user.username}"
+        )
+
+        return AccessoryImportResult(
+            success=imported_count > 0,
+            message=f"成功导入 {imported_count} 条，失败 {failed_count} 条",
+            imported_count=imported_count,
+            failed_count=failed_count,
+            errors=errors[:10],  # 只返回前10个错误
+        )
+    except ImportError:
+        raise HTTPException(status_code=500, detail="未安装 openpyxl，无法处理 Excel 文件")
+    except Exception as e:
+        logger.error(f"导入失败: {e}")
+        raise HTTPException(status_code=400, detail=f"导入失败: {str(e)}")
+
+
+@router.get(
+    "/accessories/export",
+    summary="导出配件数据",
+)
+async def export_accessories(
+    current_user=Depends(get_current_user),
+):
+    """导出所有配件数据为Excel文件"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+        with get_db_session() as session:
+            accessories = session.query(Accessory).order_by(Accessory.category, Accessory.name).all()
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "配件数据"
+
+        # 样式定义
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin'),
+        )
+
+        # 定义列
+        columns = [
+            ("accessory_id", "ID"),
+            ("name", "配件名称"),
+            ("category", "分类"),
+            ("description", "描述"),
+            ("features", "特点"),
+            ("size", "规格尺寸"),
+            ("weight", "重量(g)"),
+            ("material", "材质"),
+            ("color", "颜色"),
+            ("quantity_per_pack", "每包数量"),
+            ("target_species", "目标鱼种"),
+            ("applicable_rigs", "适用钓组"),
+            ("best_conditions", "最佳条件"),
+            ("brand", "品牌"),
+            ("price_min", "最低价格"),
+            ("price_max", "最高价格"),
+            ("user_level", "用户等级"),
+            ("image_url", "图片URL"),
+        ]
+
+        # 写入表头
+        for col_idx, (_, label) in enumerate(columns, 1):
+            cell = ws.cell(row=1, column=col_idx, value=label)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+            cell.border = border
+            ws.column_dimensions[cell.column_letter].width = 15
+
+        # 写入数据
+        for row_idx, accessory in enumerate(accessories, 2):
+            for col_idx, (field, _) in enumerate(columns, 1):
+                value = getattr(accessory, field, None)
+                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = border
+
+        # 保存到内存
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename=accessories_export.xlsx"
+            },
+        )
+    except ImportError:
+        raise HTTPException(status_code=500, detail="未安装 openpyxl，无法生成导出文件")
+    except Exception as e:
+        logger.error(f"导出失败: {e}")
+        raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
 
 
 # ========== Init Data Endpoint ==========

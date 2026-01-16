@@ -151,6 +151,10 @@ class AccessoryListItem(BaseModel):
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     user_level: Optional[str] = None
+    # 扩展字段用于表格展示
+    description: Optional[str] = None
+    target_species: Optional[str] = None
+    image_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -204,3 +208,53 @@ class AccessoryOptionsResponse(BaseModel):
     categories: List[dict]  # category options with label, value, icon, color
     user_levels: List[dict]  # user level options
     materials: List[str]  # common materials
+
+
+# ========== Batch Delete ==========
+
+
+class AccessoryBatchDeleteResponse(BaseModel):
+    """批量删除响应"""
+
+    deleted_count: int
+    message: str
+
+
+# ========== Import/Export ==========
+
+
+class AccessoryImportPreviewItem(BaseModel):
+    """导入预览项"""
+
+    row_number: int
+    name: str
+    category: str
+    is_valid: bool
+    errors: List[str] = []
+    data: dict = {}
+
+
+class AccessoryImportPreviewResponse(BaseModel):
+    """导入预览响应"""
+
+    total_rows: int
+    valid_rows: int
+    invalid_rows: int
+    items: List[AccessoryImportPreviewItem]
+
+
+class AccessoryImportResult(BaseModel):
+    """导入结果"""
+
+    success: bool
+    message: str
+    imported_count: int
+    failed_count: int
+    errors: List[dict] = []
+
+
+class AccessoryExportResponse(BaseModel):
+    """导出响应（文件流，此处定义元信息）"""
+
+    filename: str
+    content_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
