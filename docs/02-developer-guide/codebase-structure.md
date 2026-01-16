@@ -1,4 +1,4 @@
-# 代码结构指南 v5.0.2
+# 代码结构指南 v5.1.0
 
 深入了解智能钓鱼助手的项目架构、模块设计和代码组织。
 
@@ -17,10 +17,11 @@
 
 ### 核心架构
 ```
-智能钓鱼助手 v5.0.2
+智能钓鱼助手 v5.1.0
 ├── 模块化包架构 (4个独立包)
 ├── 多端应用支持 (CLI/API/Web/小程序)
 ├── 智能处理系统 (OCR/图片合并/装备导入)
+├── 内容管理系统 (文章管理/网络采集/LLM翻译/向量搜索) ⭐ v5.1.0
 └── 现代技术栈 (LangChain 1.0+ / FastAPI / React 19)
 ```
 
@@ -217,11 +218,12 @@ apps/                              # 应用层
 │   │   ├── __init__.py
 │   │   ├── cors.py                # CORS中间件
 │   │   └── auth.py                # 认证中间件
-│   ├── routes/                    # API路由 (17个模块)
+│   ├── routes/                    # API路由 (18个模块)
 │   │   ├── __init__.py
 │   │   ├── fishing.py             # 钓鱼相关API
 │   │   ├── chat.py                # 聊天API ⭐v5.0.2
 │   │   ├── auth.py                # 认证API ⭐v3.1.1
+│   │   ├── article.py             # 内容管理API ⭐v5.1.0 (含网络采集)
 │   │   ├── user_equipment.py      # 用户装备API ⭐v5.0.2
 │   │   ├── equipment_admin.py     # 装备管理API ⭐v5.0.2
 │   │   ├── equipment_batch.py     # 批量操作API ⭐v5.0.2
@@ -247,6 +249,9 @@ apps/                              # 应用层
 │   │   ├── fishing_service.py     # 钓鱼服务
 │   │   ├── equipment_service.py   # 装备服务
 │   │   ├── analytics_service.py   # 分析服务
+│   │   ├── article_fetcher.py     # 文章网络采集服务 ⭐v5.1.0
+│   │   ├── rig_fetcher.py         # 钓组网络采集服务 ⭐v5.1.0
+│   │   ├── vector_store.py        # 向量存储服务 ⭐v5.1.0
 │   │   ├── ocr/                   # OCR服务
 │   │   ├── config_service.py      # 配置服务
 │   │   ├── crawler_service.py     # 爬虫服务
@@ -286,14 +291,17 @@ apps/                              # 应用层
     │   │   └── Forms/              # 表单组件
     │   ├── pages/                  # 页面组件
     │   │   ├── Dashboard/          # 仪表板
+    │   │   ├── Content/            # 内容管理 ⭐v5.1.0
+    │   │   │   └── Articles/       # 文章管理 (列表/编辑/网络采集)
     │   │   ├── Equipment/          # 装备管理
     │   │   ├── Analytics/          # 数据分析
     │   │   ├── Config/             # 配置管理
     │   │   └── Crawler/            # 爬虫管理
-    │   ├── services/               # API服务
-    │   │   ├── api.ts              # API客户端
-    │   │   ├── auth.ts             # 认证服务
-    │   │   └── equipment.ts        # 装备服务
+    │   ├── api/                     # API服务
+    │   │   └── services/           # API服务模块
+    │   │       ├── article.ts      # 文章服务 ⭐v5.1.0 (含网络采集API)
+    │   │       ├── auth.ts         # 认证服务
+    │   │       └── equipment.ts    # 装备服务
     │   ├── utils/                  # 工具函数
     │   │   ├── constants.ts        # 常量定义
     │   │   └── helpers.ts          # 辅助函数
@@ -351,6 +359,37 @@ class BatchMergeProcessor:
         images = self._get_image_list()
         merge_groups = self._detect_merge_groups(images)
         return [self._merge_group(group) for group in merge_groups]
+```
+
+### 文章网络采集服务 ⭐ v5.1.0
+```python
+# apps/api/services/article_fetcher.py
+class ArticleFetcherService:
+    """
+    从维基百科采集钓鱼相关文章，使用LLM翻译和增强内容。
+
+    采集流程：
+    1. 从预设的维基百科钓鱼文章列表获取URL
+    2. 调用Wikipedia REST API获取英文内容
+    3. 使用LLM(Qwen Plus)翻译为中文
+    4. 生成摘要、标签、分类
+    5. 保存为草稿文章待审核
+    """
+    def start_fetch(self, source_id: str = "wikipedia", use_llm: bool = True):
+        # 启动后台采集线程
+        pass
+
+    def pause_fetch(self):
+        # 暂停采集
+        pass
+
+    def retry_failed(self, urls: Optional[List[str]] = None):
+        # 重试失败项
+        pass
+
+    def get_progress(self) -> Dict[str, Any]:
+        # 获取采集进度统计
+        pass
 ```
 
 ## 🔄 开发模式
@@ -504,6 +543,16 @@ from packages.scraper.spider import BaseSpider, CrawlItem
 from packages.scraper.spiders import TaobaoSpider, JDSpider, ForumSpider
 from packages.scraper.rpa import TaobaoRPA
 from packages.scraper.workflow import WorkflowManager
+
+# 文章网络采集服务 (v5.1.0 新增)
+from apps.api.services.article_fetcher import ArticleFetcherService
+fetcher = ArticleFetcherService(db_path="shared/data/equipment.db")
+fetcher.start_fetch(source_id="wikipedia", use_llm=True)
+
+# 向量搜索服务 (v5.1.0 新增)
+from apps.api.services.vector_store import ArticleVectorStore
+vector_store = ArticleVectorStore()
+results = vector_store.search("钓鱼技巧", limit=10)
 ```
 
 ## 📝 代码约定
@@ -537,6 +586,6 @@ from packages.scraper.workflow import WorkflowManager
 
 ---
 
-**指南版本**: v5.0.2  
-**适用系统版本**: v5.0.2+  
-**更新时间**: 2024-12-20
+**指南版本**: v5.1.0
+**适用系统版本**: v5.1.0+
+**更新时间**: 2025-01-16

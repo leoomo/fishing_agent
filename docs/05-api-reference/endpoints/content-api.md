@@ -357,6 +357,143 @@ GET /api/v1/articles/{id}/similar
 }
 ```
 
+### 文章网络采集
+
+从外部数据源（如维基百科）采集钓鱼相关文章，使用LLM翻译增强内容质量，采集的文章进入草稿状态待审核。
+
+#### 获取可用数据源
+
+```http
+GET /api/v1/articles/fetch/sources
+```
+
+**响应示例:**
+```json
+[
+  {
+    "id": "wikipedia",
+    "name": "Wikipedia (钓鱼词条)",
+    "description": "从维基百科获取钓鱼相关知识文章",
+    "total_items": 30,
+    "enabled": true
+  }
+]
+```
+
+#### 获取采集进度
+
+```http
+GET /api/v1/articles/fetch/progress
+```
+
+**响应示例:**
+```json
+{
+  "is_running": true,
+  "stats": {
+    "total": 30,
+    "pending": 25,
+    "fetching": 0,
+    "enriching": 1,
+    "completed": 3,
+    "failed": 1,
+    "skipped": 0
+  },
+  "items": [
+    {
+      "source_url": "https://en.wikipedia.org/wiki/Fishing",
+      "title": "钓鱼概述",
+      "source_type": "wikipedia",
+      "status": "completed",
+      "article_id": 4,
+      "error": null,
+      "updated_at": "2025-01-16T10:30:00"
+    }
+  ]
+}
+```
+
+#### 开始采集
+
+```http
+POST /api/v1/articles/fetch/start
+```
+
+**请求体:**
+```json
+{
+  "source_id": "wikipedia",
+  "use_llm": true
+}
+```
+
+**参数说明:**
+- `source_id`: 数据源ID（默认: "wikipedia"）
+- `use_llm`: 是否使用LLM翻译增强（默认: true）
+
+**响应示例:**
+```json
+{
+  "message": "采集任务已启动"
+}
+```
+
+#### 暂停采集
+
+```http
+POST /api/v1/articles/fetch/pause
+```
+
+**响应示例:**
+```json
+{
+  "message": "正在暂停采集..."
+}
+```
+
+#### 重试失败项
+
+```http
+POST /api/v1/articles/fetch/retry
+```
+
+**请求体:**
+```json
+{
+  "urls": ["https://en.wikipedia.org/wiki/Fishing"]
+}
+```
+
+**参数说明:**
+- `urls`: 指定重试的URL列表，为空则重试所有失败项
+
+**响应示例:**
+```json
+{
+  "message": "已重置失败项目"
+}
+```
+
+#### 重置进度
+
+```http
+POST /api/v1/articles/fetch/reset
+```
+
+**响应示例:**
+```json
+{
+  "message": "已重置所有进度"
+}
+```
+
+**采集流程说明:**
+1. 系统从维基百科获取预设的30条钓鱼相关词条
+2. 使用Qwen Plus模型将英文内容翻译为中文
+3. LLM自动生成文章标题、摘要和标签
+4. 采集的文章以草稿状态保存，需人工审核后发布
+5. 原文链接保存在文章扩展信息中
+
 ---
 
 ## 配件管理API
