@@ -20,7 +20,12 @@ from apps.api.schemas.equipment_admin import (
     EquipmentListResponse,
     BrandCreate,
     BrandUpdate,
-    BrandResponse
+    BrandResponse,
+    BatchDeleteRequest,
+    BatchDeleteResponse,
+    BatchUpdateRequest,
+    BatchUpdateResponse,
+    EquipmentStatsResponse
 )
 from apps.api.auth.dependencies import require_permission, CurrentUser
 from apps.api.auth.permissions import PermissionEnum
@@ -455,6 +460,237 @@ async def list_equipment(
             detail=f"查询失败: {str(e)}"
         )
 
+
+# ========== 批量操作端点（必须放在 /equipment/{equipment_id} 之前） ==========
+
+@router.get(
+    "/equipment/stats",
+    response_model=EquipmentStatsResponse,
+    summary="获取装备统计",
+    dependencies=[Depends(require_permission(PermissionEnum.EQUIPMENT_READ))]
+)
+async def get_equipment_stats():
+    """
+    获取装备分类统计
+
+    Returns:
+        EquipmentStatsResponse: 统计数据
+    """
+    try:
+        from sqlalchemy import func
+        from apps.api.models.equipment import Equipment
+        from apps.api.models.brand import Brand
+
+        with get_db_session() as session:
+            # 总数统计
+            total = session.query(func.count(Equipment.equipment_id)).scalar()
+            active_count = session.query(func.count(Equipment.equipment_id)).filter(
+                Equipment.is_active == True
+            ).scalar()
+            inactive_count = total - active_count
+
+            # 按类别统计（只统计启用的）
+            category_stats = session.query(
+                Equipment.category,
+                func.count(Equipment.equipment_id).label('count')
+            ).filter(
+                Equipment.is_active == True
+            ).group_by(Equipment.category).all()
+
+            by_category = {cat: count for cat, count in category_stats}
+
+            # 按品牌统计（前10）
+            brand_stats = session.query(
+                Brand.brand_id,
+                Brand.name_cn,
+                func.count(Equipment.equipment_id).label('count')
+            ).join(
+                Equipment, Equipment.brand_id == Brand.brand_id
+            ).filter(
+                Equipment.is_active == True
+            ).group_by(
+                Brand.brand_id, Brand.name_cn
+            ).order_by(
+                func.count(Equipment.equipment_id).desc()
+            ).limit(10).all()
+
+            by_brand = [
+                {'brand_id': bid, 'name': name, 'count': count}
+                for bid, name, count in brand_stats
+            ]
+
+            # 按用户水平统计
+            level_stats = session.query(
+                Equipment.user_level,
+                func.count(Equipment.equipment_id).label('count')
+            ).filter(
+                Equipment.is_active == True
+            ).group_by(Equipment.user_level).all()
+
+            by_user_level = {level or '未设置': count for level, count in level_stats}
+
+            return EquipmentStatsResponse(
+                total=total,
+                active_count=active_count,
+                inactive_count=inactive_count,
+                by_category=by_category,
+                by_brand=by_brand,
+                by_user_level=by_user_level
+            )
+
+    except Exception as e:
+        logger.error(f"获取装备统计失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取统计失败: {str(e)}"
+        )
+
+
+@router.post(
+    "/equipment/batch-delete",
+    response_model=BatchDeleteResponse,
+    summary="批量删除装备",
+    dependencies=[Depends(require_permission(PermissionEnum.EQUIPMENT_DELETE))]
+)
+async def batch_delete_equipment(
+    request: BatchDeleteRequest,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.EQUIPMENT_DELETE))
+):
+    """
+    批量删除装备（软删除：设置 is_active=False）
+
+    Args:
+        request: 包含要删除的装备ID列表
+
+    Returns:
+        BatchDeleteResponse: 删除结果
+    """
+    try:
+        from apps.api.models.equipment import Equipment
+
+        with get_db_session() as session:
+            # 查询要删除的装备
+            equipment_list = session.query(Equipment).filter(
+                Equipment.equipment_id.in_(request.ids),
+                Equipment.is_active == True  # 只删除启用的装备
+            ).all()
+
+            deleted_count = 0
+            for equipment in equipment_list:
+                equipment.is_active = False
+                deleted_count += 1
+
+            session.commit()
+
+            logger.info(
+                f"批量删除装备成功: deleted_count={deleted_count}, "
+                f"requested_count={len(request.ids)}, user={current_user.username}"
+            )
+
+            return BatchDeleteResponse(
+                deleted_count=deleted_count,
+                message=f"成功删除 {deleted_count} 个装备"
+            )
+
+    except Exception as e:
+        logger.error(f"批量删除装备失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"批量删除失败: {str(e)}"
+        )
+
+
+@router.post(
+    "/equipment/batch-update",
+    response_model=BatchUpdateResponse,
+    summary="批量更新装备",
+    dependencies=[Depends(require_permission(PermissionEnum.EQUIPMENT_UPDATE))]
+)
+async def batch_update_equipment(
+    request: BatchUpdateRequest,
+    current_user: CurrentUser = Depends(require_permission(PermissionEnum.EQUIPMENT_UPDATE))
+):
+    """
+    批量更新装备的指定字段
+
+    支持更新的字段：
+    - brand_id: 品牌ID
+    - user_level: 适用水平（入门/新手/进阶/高手）
+    - is_active: 启用/禁用状态
+
+    Args:
+        request: 包含要更新的装备ID列表和更新字段
+
+    Returns:
+        BatchUpdateResponse: 更新结果
+    """
+    try:
+        from apps.api.models.equipment import Equipment
+
+        # 只允许更新指定字段
+        allowed_fields = {'brand_id', 'user_level', 'is_active'}
+        invalid_fields = set(request.updates.keys()) - allowed_fields
+        if invalid_fields:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"不支持批量更新的字段: {', '.join(invalid_fields)}"
+            )
+
+        # 验证 user_level 值
+        if 'user_level' in request.updates:
+            valid_levels = {'入门', '新手', '进阶', '高手'}
+            if request.updates['user_level'] not in valid_levels:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"无效的用户水平: {request.updates['user_level']}"
+                )
+
+        # 验证 brand_id 存在
+        if 'brand_id' in request.updates:
+            with get_db_session() as session:
+                brand_repo_instance = BrandRepository(session)
+                brand = brand_repo_instance.get(request.updates['brand_id'])
+                if not brand:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"品牌不存在: brand_id={request.updates['brand_id']}"
+                    )
+
+        with get_db_session() as session:
+            # 查询要更新的装备
+            equipment_list = session.query(Equipment).filter(
+                Equipment.equipment_id.in_(request.ids)
+            ).all()
+
+            updated_count = 0
+            for equipment in equipment_list:
+                for field, value in request.updates.items():
+                    setattr(equipment, field, value)
+                updated_count += 1
+
+            session.commit()
+
+            logger.info(
+                f"批量更新装备成功: updated_count={updated_count}, "
+                f"fields={list(request.updates.keys())}, user={current_user.username}"
+            )
+
+            return BatchUpdateResponse(
+                updated_count=updated_count,
+                message=f"成功更新 {updated_count} 个装备"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"批量更新装备失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"批量更新失败: {str(e)}"
+        )
+
+
+# ========== 装备详情端点 ==========
 
 @router.get(
     "/equipment/{equipment_id}",

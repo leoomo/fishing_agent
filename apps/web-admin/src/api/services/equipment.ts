@@ -84,6 +84,39 @@ export interface TextParseResponse {
   row_count: number
 }
 
+// 批量操作相关类型
+export interface BatchDeleteRequest {
+  ids: number[]
+}
+
+export interface BatchDeleteResponse {
+  deleted_count: number
+  message: string
+}
+
+export interface BatchUpdateRequest {
+  ids: number[]
+  updates: {
+    brand_id?: number
+    user_level?: string
+    is_active?: boolean
+  }
+}
+
+export interface BatchUpdateResponse {
+  updated_count: number
+  message: string
+}
+
+export interface EquipmentStatsResponse {
+  total: number
+  active_count: number
+  inactive_count: number
+  by_category: Record<string, number>
+  by_brand: Array<{ brand_id: number; name: string; count: number }>
+  by_user_level: Record<string, number>
+}
+
 export const equipmentApi = {
   // 查询装备列表
   list: (params: {
@@ -196,5 +229,20 @@ export const equipmentApi = {
   // 解析规格表文本
   parseText: (data: TextParseRequest): Promise<TextParseResponse> => {
     return client.post('/admin/equipment/parse-text', data)
+  },
+
+  // 批量删除装备
+  batchDelete: (ids: number[]): Promise<BatchDeleteResponse> => {
+    return client.post('/admin/equipment/batch-delete', { ids })
+  },
+
+  // 批量更新装备
+  batchUpdate: (data: BatchUpdateRequest): Promise<BatchUpdateResponse> => {
+    return client.post('/admin/equipment/batch-update', data)
+  },
+
+  // 获取装备统计
+  getStats: (): Promise<EquipmentStatsResponse> => {
+    return client.get('/admin/equipment/stats')
   },
 }

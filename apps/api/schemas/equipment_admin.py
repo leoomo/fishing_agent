@@ -201,3 +201,38 @@ class BrandResponse(BaseModel):
     equipment_count: Optional[int] = None  # 可选的装备数量
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ========== 批量操作 Schema ==========
+
+class BatchDeleteRequest(BaseModel):
+    """批量删除请求"""
+    ids: List[int] = Field(..., min_length=1, max_length=100, description="要删除的装备ID列表")
+
+
+class BatchDeleteResponse(BaseModel):
+    """批量删除响应"""
+    deleted_count: int = Field(..., description="成功删除的数量")
+    message: str = Field(..., description="操作结果消息")
+
+
+class BatchUpdateRequest(BaseModel):
+    """批量更新请求"""
+    ids: List[int] = Field(..., min_length=1, max_length=100, description="要更新的装备ID列表")
+    updates: dict = Field(..., description="要更新的字段和值")
+
+
+class BatchUpdateResponse(BaseModel):
+    """批量更新响应"""
+    updated_count: int = Field(..., description="成功更新的数量")
+    message: str = Field(..., description="操作结果消息")
+
+
+class EquipmentStatsResponse(BaseModel):
+    """装备统计响应"""
+    total: int = Field(..., description="装备总数")
+    active_count: int = Field(..., description="启用装备数")
+    inactive_count: int = Field(..., description="禁用装备数")
+    by_category: dict = Field(..., description="按类别统计")
+    by_brand: List[dict] = Field(..., description="按品牌统计（前10）")
+    by_user_level: dict = Field(..., description="按用户水平统计")

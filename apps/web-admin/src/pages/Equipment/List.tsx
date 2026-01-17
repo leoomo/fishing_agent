@@ -1,13 +1,24 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { Table, Button, Space, App, Tag } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ExportOutlined, AppstoreAddOutlined, SettingOutlined } from '@ant-design/icons'
+import { Table, Button, Space, App, Tag, Card, Row, Col, Statistic, Dropdown } from 'antd'
+import type { MenuProps } from 'antd'
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  ExportOutlined,
+  AppstoreAddOutlined,
+  SettingOutlined,
+  DownOutlined,
+} from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { equipmentApi } from '@/api/services/equipment'
+import type { EquipmentStatsResponse } from '@/api/services/equipment'
 import type { Equipment, Brand } from '@/types/equipment'
 import { useEquipmentSearch } from './hooks/useEquipmentSearch'
 import { useColumnSettings } from './hooks/useColumnSettings'
 import AdvancedSearch from './components/AdvancedSearch'
 import ColumnSettingsModal from './components/ColumnSettingsModal'
+import BatchEditModal from './components/BatchEditModal'
 
 const EquipmentList = () => {
   const navigate = useNavigate()
@@ -17,6 +28,15 @@ const EquipmentList = () => {
   const [total, setTotal] = useState(0)
   const [brands, setBrands] = useState<Brand[]>([])
   const [columnModalOpen, setColumnModalOpen] = useState(false)
+
+  // 批量操作状态
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [batchEditModalOpen, setBatchEditModalOpen] = useState(false)
+  const [batchLoading, setBatchLoading] = useState(false)
+
+  // 统计数据
+  const [stats, setStats] = useState<EquipmentStatsResponse | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
 
   // 列配置 Hook
   const { visibleColumns, saving: columnSaving, saveColumns } = useColumnSettings()
@@ -43,6 +63,19 @@ const EquipmentList = () => {
     }
   }, [])
 
+  // 加载统计数据
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true)
+    try {
+      const response = await equipmentApi.getStats()
+      setStats(response)
+    } catch {
+      // 统计加载失败不影响主功能
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [])
+
   // 加载装备数据
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -60,7 +93,8 @@ const EquipmentList = () => {
   // 初始化加载
   useEffect(() => {
     loadBrands()
-  }, [loadBrands])
+    loadStats()
+  }, [loadBrands, loadStats])
 
   // 使用 ref 跟踪上一次的参数，避免不必要的重新请求
   const prevParamsRef = useRef<string>('')
@@ -108,6 +142,89 @@ const EquipmentList = () => {
     } catch {
       message.error('导出失败')
     }
+  }
+
+  // 批量删除
+  const handleBatchDelete = useCallback(() => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先选择要删除的装备')
+      return
+    }
+
+    modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedRowKeys.length} 个装备吗？`,
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchLoading(true)
+        try {
+          const response = await equipmentApi.batchDelete(selectedRowKeys as number[])
+          message.success(response.message)
+          setSelectedRowKeys([])
+          fetchData()
+          loadStats()
+        } catch {
+          message.error('批量删除失败')
+        } finally {
+          setBatchLoading(false)
+        }
+      },
+    })
+  }, [selectedRowKeys, modal, message, fetchData, loadStats])
+
+  // 批量编辑
+  const handleBatchEdit = useCallback(
+    async (updates: { brand_id?: number; user_level?: string; is_active?: boolean }) => {
+      setBatchLoading(true)
+      try {
+        const response = await equipmentApi.batchUpdate({
+          ids: selectedRowKeys as number[],
+          updates,
+        })
+        message.success(response.message)
+        setBatchEditModalOpen(false)
+        setSelectedRowKeys([])
+        fetchData()
+        loadStats()
+      } catch {
+        message.error('批量更新失败')
+      } finally {
+        setBatchLoading(false)
+      }
+    },
+    [selectedRowKeys, message, fetchData, loadStats]
+  )
+
+  // 行选择配置
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (newSelectedRowKeys: React.Key[]) => {
+      setSelectedRowKeys(newSelectedRowKeys)
+    },
+  }
+
+  // 批量操作下拉菜单
+  const batchMenuItems: MenuProps['items'] = [
+    {
+      key: 'edit',
+      label: '批量编辑',
+      icon: <EditOutlined />,
+      onClick: () => setBatchEditModalOpen(true),
+    },
+    {
+      key: 'delete',
+      label: '批量删除',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: handleBatchDelete,
+    },
+  ]
+
+  // 点击统计卡片快速筛选
+  const handleCategoryClick = (category: string) => {
+    setFilters({ ...filters, category })
   }
 
   // 所有列定义（带 key）
@@ -302,6 +419,86 @@ const EquipmentList = () => {
 
   return (
     <div>
+      {/* 统计卡片 */}
+      {stats && (
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={4}>
+            <Card size="small" loading={statsLoading}>
+              <Statistic title="装备总数" value={stats.total} />
+            </Card>
+          </Col>
+          <Col span={4}>
+            <Card
+              size="small"
+              loading={statsLoading}
+              hoverable
+              onClick={() => handleCategoryClick('鱼竿')}
+              style={{ cursor: 'pointer' }}
+            >
+              <Statistic
+                title="鱼竿"
+                value={stats.by_category['鱼竿'] || 0}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col span={4}>
+            <Card
+              size="small"
+              loading={statsLoading}
+              hoverable
+              onClick={() => handleCategoryClick('渔轮')}
+              style={{ cursor: 'pointer' }}
+            >
+              <Statistic
+                title="渔轮"
+                value={stats.by_category['渔轮'] || 0}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Card>
+          </Col>
+          <Col span={4}>
+            <Card
+              size="small"
+              loading={statsLoading}
+              hoverable
+              onClick={() => handleCategoryClick('鱼线')}
+              style={{ cursor: 'pointer' }}
+            >
+              <Statistic
+                title="鱼线"
+                value={stats.by_category['鱼线'] || 0}
+                valueStyle={{ color: '#fa8c16' }}
+              />
+            </Card>
+          </Col>
+          <Col span={4}>
+            <Card
+              size="small"
+              loading={statsLoading}
+              hoverable
+              onClick={() => handleCategoryClick('拟饵')}
+              style={{ cursor: 'pointer' }}
+            >
+              <Statistic
+                title="拟饵"
+                value={stats.by_category['拟饵'] || 0}
+                valueStyle={{ color: '#722ed1' }}
+              />
+            </Card>
+          </Col>
+          <Col span={4}>
+            <Card size="small" loading={statsLoading}>
+              <Statistic
+                title="已禁用"
+                value={stats.inactive_count}
+                valueStyle={{ color: '#ff4d4f' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      )}
+
       {/* 高级搜索组件 + 列设置按钮 */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1 }}>
@@ -321,8 +518,31 @@ const EquipmentList = () => {
         />
       </div>
 
-      {/* 操作按钮 */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+      {/* 操作按钮栏 */}
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        {/* 批量操作区域 */}
+        <Space>
+          {selectedRowKeys.length > 0 && (
+            <>
+              <span style={{ marginRight: 8 }}>已选择 {selectedRowKeys.length} 项</span>
+              <Dropdown menu={{ items: batchMenuItems }} disabled={batchLoading}>
+                <Button loading={batchLoading}>
+                  批量操作 <DownOutlined />
+                </Button>
+              </Dropdown>
+              <Button onClick={() => setSelectedRowKeys([])}>取消选择</Button>
+            </>
+          )}
+        </Space>
+
+        {/* 右侧操作按钮 */}
         <Space>
           <Button icon={<ExportOutlined />} onClick={handleExport}>
             导出
@@ -348,6 +568,7 @@ const EquipmentList = () => {
         dataSource={data}
         loading={loading}
         rowKey="equipment_id"
+        rowSelection={rowSelection}
         pagination={{
           current: page,
           pageSize,
@@ -372,6 +593,16 @@ const EquipmentList = () => {
         saving={columnSaving}
         onOk={handleColumnSave}
         onCancel={() => setColumnModalOpen(false)}
+      />
+
+      {/* 批量编辑弹窗 */}
+      <BatchEditModal
+        open={batchEditModalOpen}
+        selectedCount={selectedRowKeys.length}
+        brands={brands}
+        loading={batchLoading}
+        onOk={handleBatchEdit}
+        onCancel={() => setBatchEditModalOpen(false)}
       />
     </div>
   )
