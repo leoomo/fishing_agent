@@ -5,7 +5,7 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [5.1.0] - 2025-01-02
+## [5.1.0] - 2026-01-17
 
 ### 新增
 - 🐟 **鱼百科管理系统** - 鱼种知识库、季节活动规律、装备推荐查询

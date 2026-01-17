@@ -233,13 +233,16 @@ from packages.scraper import BaseSpider, CrawlItem
 
 ## 🎯 开发路线图
 
-### 当前版本 v5.0.2
+### 当前版本 v5.1.0
 - [x] 微信小程序支持
 - [x] 装备导入Agent
 - [x] OCR多提供商
 - [x] 智能图片合并
+- [x] 内容管理系统（文章管理 + 网络采集 + LLM翻译增强）
+- [x] 向量搜索（ChromaDB + DashScope Embedding）
+- [x] 语义搜索和相似文章推荐
 
-### 计划功能 v5.1.0
+### 计划功能 v5.2.0
 - [ ] 多语言支持
 - [ ] 实时协作功能
 - [ ] 高级数据分析
@@ -266,6 +269,6 @@ from packages.scraper import BaseSpider, CrawlItem
 
 ---
 
-**指南版本**: v5.0.2  
-**适用系统版本**: v5.0.2+  
-**更新时间**: 2024-12-20
+**指南版本**: v5.1.0
+**适用系统版本**: v5.1.0+
+**更新时间**: 2026-01-17
