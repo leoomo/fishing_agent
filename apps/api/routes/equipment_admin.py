@@ -194,7 +194,7 @@ async def list_equipment(
     lure_length_min: Optional[float] = Query(None, description="拟饵长度最小值（拟饵专属，cm）"),
     lure_length_max: Optional[float] = Query(None, description="拟饵长度最大值（拟饵专属，cm）"),
     # 排序参数
-    sort_by: Optional[str] = Query(None, description="排序字段: name/price_min/price_max/created_at/updated_at"),
+    sort_by: Optional[str] = Query(None, description="排序字段: name/price_min/price_max/created_at/updated_at/category/brand_name/length/weight/action/power/sections"),
     sort_order: Optional[str] = Query("desc", description="排序方向: asc/desc"),
 ):
     """

@@ -550,8 +550,15 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                       onChange={(value) => handleChange('sort_by', value)}
                       options={[
                         { label: '名称', value: 'name' },
+                        { label: '类别', value: 'category' },
+                        { label: '品牌', value: 'brand_name' },
                         { label: '最低价', value: 'price_min' },
                         { label: '最高价', value: 'price_max' },
+                        { label: '竿长', value: 'length' },
+                        { label: '自重', value: 'weight' },
+                        { label: '动作', value: 'action' },
+                        { label: '调性', value: 'power' },
+                        { label: '节数', value: 'sections' },
                         { label: '创建时间', value: 'created_at' },
                         { label: '更新时间', value: 'updated_at' },
                       ]}

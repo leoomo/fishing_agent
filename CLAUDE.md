@@ -17,6 +17,7 @@
 - **配件管理** - 钩子、铅坠、转环、前导线等配件完整管理
 - **拟饵类型** - 硬饵、软饵、金属饵、飞蝇分类体系
 - **钓组配置** - 德州钓组、卡罗莱纳钓组、倒吊钓组等模板
+- **装备管理增强排序** - 支持12个字段排序（名称/类别/品牌/价格/竿长/自重/动作/调性/节数/创建时间/更新时间），表格列头点击排序 + 高级筛选面板排序
 
 ### 核心功能
 - JWT认证系统 (RBAC权限管理 + Token安全) + 模块化Agent包 + 7因子评分 (温度/天气/风力/气压/湿度/季节/月相)
@@ -238,7 +239,7 @@ GET  /api/v1/user-equipment/recommendations    # 装备推荐
 POST /api/v1/user-equipment/recommend          # 获取推荐
 
 # 装备管理API
-GET  /api/v1/equipment/equipment       # 装备列表
+GET  /api/v1/equipment/equipment       # 装备列表（支持12字段排序：name/category/brand_name/price_min/price_max/length/weight/action/power/sections/created_at/updated_at）
 POST /api/v1/equipment/batch            # 批量添加
 PUT  /api/v1/equipment/equipment/{id}   # 更新装备
 DELETE /api/v1/equipment/equipment/{id} # 删除装备

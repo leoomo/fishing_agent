@@ -235,12 +235,14 @@ const EquipmentList = () => {
         title: '名称',
         dataIndex: 'name',
         width: 200,
+        sorter: true,
       },
       {
         key: 'category',
         title: '类别',
         dataIndex: 'category',
         width: 100,
+        sorter: true,
         render: (cat: string) => (
           <Tag
             color={
@@ -264,6 +266,7 @@ const EquipmentList = () => {
         title: '品牌',
         dataIndex: 'brand_name',
         width: 120,
+        sorter: true,
       },
       {
         key: 'model',
@@ -275,6 +278,7 @@ const EquipmentList = () => {
         key: 'price',
         title: '价格范围',
         width: 150,
+        sorter: true,
         render: (_: unknown, record: Equipment) =>
           record.price_min && record.price_max
             ? `¥${record.price_min} - ¥${record.price_max}`
@@ -284,6 +288,7 @@ const EquipmentList = () => {
         key: 'length',
         title: '竿长',
         width: 80,
+        sorter: true,
         render: (_: unknown, record: Equipment) => {
           if (record.category !== '鱼竿') return '-'
           const specs = record.specs as Record<string, unknown> | undefined
@@ -294,6 +299,7 @@ const EquipmentList = () => {
         key: 'action',
         title: '动作',
         width: 80,
+        sorter: true,
         render: (_: unknown, record: Equipment) => {
           if (record.category !== '鱼竿') return '-'
           const specs = record.specs as Record<string, unknown> | undefined
@@ -304,6 +310,7 @@ const EquipmentList = () => {
         key: 'power',
         title: '调性',
         width: 80,
+        sorter: true,
         render: (_: unknown, record: Equipment) => {
           if (record.category !== '鱼竿') return '-'
           const specs = record.specs as Record<string, unknown> | undefined
@@ -314,6 +321,7 @@ const EquipmentList = () => {
         key: 'sections',
         title: '节数',
         width: 80,
+        sorter: true,
         render: (_: unknown, record: Equipment) => {
           if (record.category !== '鱼竿') return '-'
           const specs = record.specs as Record<string, unknown> | undefined
@@ -324,6 +332,7 @@ const EquipmentList = () => {
         key: 'weight',
         title: '自重',
         width: 80,
+        sorter: true,
         render: (_: unknown, record: Equipment) => {
           if (record.category !== '鱼竿') return '-'
           const specs = record.specs as Record<string, unknown> | undefined
@@ -569,6 +578,27 @@ const EquipmentList = () => {
         loading={loading}
         rowKey="equipment_id"
         rowSelection={rowSelection}
+        onChange={(pagination, filters, sorter) => {
+          // Handle sorting
+          if (sorter && !Array.isArray(sorter) && sorter.field && sorter.order) {
+            const sortField = sorter.field as string
+            const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc'
+            // Map 'price' to 'price_min' for backend
+            const backendSortField = sortField === 'price' ? 'price_min' : sortField
+            setFilters({
+              ...filters,
+              sort_by: backendSortField as any,
+              sort_order: sortOrder
+            })
+          } else if (sorter && !Array.isArray(sorter) && !sorter.order) {
+            // Clear sorting when user clicks to remove sort
+            setFilters({
+              ...filters,
+              sort_by: undefined,
+              sort_order: undefined
+            })
+          }
+        }}
         pagination={{
           current: page,
           pageSize,

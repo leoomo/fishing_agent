@@ -258,6 +258,6 @@ export interface EquipmentSearchFilters {
   lure_length_min?: number
   lure_length_max?: number
   // 排序
-  sort_by?: 'name' | 'price_min' | 'price_max' | 'created_at' | 'updated_at'
+  sort_by?: 'name' | 'price_min' | 'price_max' | 'created_at' | 'updated_at' | 'category' | 'brand_name' | 'length' | 'weight' | 'action' | 'power' | 'sections'
   sort_order?: 'asc' | 'desc'
 }

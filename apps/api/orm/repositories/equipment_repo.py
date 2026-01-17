@@ -87,7 +87,7 @@ class EquipmentRepository(BaseRepository[Equipment]):
 
         Args:
             query: SQLAlchemy query object
-            sort_by: Field to sort by (name/price_min/price_max/created_at/updated_at)
+            sort_by: Field to sort by (name/price_min/price_max/created_at/updated_at/category/brand_name/length/weight/action/power/sections)
             sort_order: Sort direction (asc/desc)
 
         Returns:
@@ -98,15 +98,32 @@ class EquipmentRepository(BaseRepository[Equipment]):
             return query.order_by(Equipment.equipment_id.desc())
 
         # Valid sort fields
-        valid_fields = {'name', 'price_min', 'price_max', 'created_at', 'updated_at'}
+        valid_fields = {
+            'name', 'price_min', 'price_max', 'created_at', 'updated_at',
+            'category', 'brand_name', 'length', 'weight', 'action', 'power', 'sections'
+        }
         if sort_by not in valid_fields:
             return query.order_by(Equipment.equipment_id.desc())
 
-        field = getattr(Equipment, sort_by)
-        if sort_order == 'asc':
-            return query.order_by(field.asc())
+        # Handle fields that require JOIN
+        if sort_by == 'brand_name':
+            from ...models.brand import Brand
+            # Check if Brand is already joined
+            query = query.outerjoin(Brand, Equipment.brand_id == Brand.brand_id)
+            field = Brand.name_cn
+        elif sort_by in ['length', 'weight', 'action', 'power', 'sections']:
+            # Rod spec fields - use outerjoin to avoid filtering out equipment without specs
+            query = query.outerjoin(RodSpec, Equipment.equipment_id == RodSpec.equipment_id)
+            field = getattr(RodSpec, sort_by)
         else:
-            return query.order_by(field.desc())
+            # Direct Equipment fields
+            field = getattr(Equipment, sort_by)
+
+        # Apply sorting with nulls last
+        if sort_order == 'asc':
+            return query.order_by(field.asc().nullslast())
+        else:
+            return query.order_by(field.desc().nullslast())
 
     def get_with_details(self, equipment_id: int) -> Optional[Equipment]:
         """
