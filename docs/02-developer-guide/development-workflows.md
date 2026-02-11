@@ -1,4 +1,4 @@
-# 开发工作流指南 v5.0.2
+# 开发工作流指南 v5.1.0
 
 指导日常开发工作，确保代码质量和团队协作效率。
 
@@ -57,7 +57,7 @@ cd apps/web-admin && npm run dev
 ```
 fishing-agent/
 ├── packages/                   # 模块化包开发
-│   ├── agents/                 # Agent统一目录
+│   ├── agents/                 # Agent统一目录 (v5.1.0 重构)
 │   │   ├── agent_component/    # 共享组件
 │   │   │   └── monitoring/     # 统一监控回调
 │   │   ├── fishing/            # 钓鱼Agent包 ⭐ 核心业务
@@ -76,23 +76,22 @@ fishing-agent/
 
 ### 关键开发文件
 ```python
-# 核心包入口
-packages/agents/fishing/__init__.py         # 钓鱼Agent包入口
+# 核心包入口 (v5.1.0 新路径)
+packages/agents/fishing/__init__.py           # 钓鱼Agent包入口
 packages/agents/agent_component/__init__.py # 共享组件入口
 packages/agents/equipment_import/__init__.py # 装备导入Agent包入口
-packages/data_processing/__init__.py        # 数据处理包入口
-packages/scraper/__init__.py                # 爬虫包入口
+packages/data_processing/__init__.py         # 数据处理包入口
+packages/scraper/__init__.py                 # 爬虫包入口
 
 # 应用层入口
-apps/cli/main.py                            # CLI应用入口
-apps/api/main.py                            # API服务入口
-apps/web-admin/src/App.tsx                  # React前端入口
-fishing_agent_app/app.js                    # 微信小程序入口
+apps/cli/main.py                             # CLI应用入口
+apps/api/main.py                             # FastAPI后端
+apps/web-admin/src/App.tsx                   # React前端
+fishing_agent_app/app.js                    # 微信小程序 ⭐ v5.0.2
 
-# 配置文件
+# 项目配置
 pyproject.toml                              # 项目配置
 langgraph.json                              # LangGraph配置
-.env                                         # 环境变量
 ```
 
 ## 🛠️ 功能开发流程
@@ -507,7 +506,7 @@ console.log('Debug:', data);
 
 ### 内部文档
 - [系统架构设计](../03-architecture/system-design.md)
-- [API参考文档](../05-api-reference/)
+- [API参考](../05-api-reference/)
 - [部署运维指南](../04-operations/deployment-guide.md)
 
 ### 外部资源

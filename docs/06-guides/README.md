@@ -28,6 +28,16 @@
 - 批量导入工具
 - 装备数据管理
 
+### 🔄 [装备排序](./equipment-sorting.md)
+- 装备排序功能详解
+- 12字段排序实现
+- 高级筛选面板使用
+
+### 🔄 [装备排序总结](./equipment-sorting-summary.md)
+- 排序功能实现总结
+- 技术实现细节
+- 性能优化经验
+
 ### 🚀 [性能优化](./performance-optimization.md)
 - 系统性能调优
 - 数据库优化策略

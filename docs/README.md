@@ -1,6 +1,6 @@
 # 智能钓鱼助手 v5.1.0 - 文档中心
 
-> 模块化 Agent 架构 + JWT认证系统 + React管理前端，基于 LangChain 1.0+ 和 7 因子科学评分系统
+> 模块化 Agent 架构 + JWT认证系统 + React管理前端 + 微信小程序，基于 LangChain 1.0+ 和 7 因子科学评分系统
 
 ## 📚 文档导航
 
@@ -9,13 +9,11 @@
 
 - **[快速开始](./01-user-guide/getting-started.md)** - 5分钟快速上手
 - **[基础功能](./01-user-guide/basic-features.md)** - 核心功能概览
-- **[装备管理](./01-user-guide/equipment-management.md)** - 钓鱼装备使用指南
-- **[钓鱼推荐](./01-user-guide/fishing-recommendations.md)** - 智能推荐系统使用
 - **[故障排除](./01-user-guide/troubleshooting.md)** - 常见问题解决
 - **[常见问题](./01-user-guide/faq.md)** - FAQ解答
 
 ### 💻 [开发者指南](./02-developer-guide/) - 面向项目开发者
-适合想要参与项目开发或二次开发的开发者
+适合想要参与项目开发、进行二次开发或集成API的开发者
 
 - **[环境配置](./02-developer-guide/environment-setup.md)** - 开发环境搭建
 - **[代码结构](./02-developer-guide/codebase-structure.md)** - 项目架构和组件说明
@@ -51,9 +49,7 @@
 - **[认证授权](./05-api-reference/authentication.md)** - JWT认证和权限管理
 - **[API端点](./05-api-reference/endpoints/)** - 详细的接口文档
   - **[钓鱼API](./05-api-reference/endpoints/fishing-api.md)** - 钓鱼推荐相关接口
-  - **[装备API](./05-api-reference/endpoints/equipment-api.md)** - 装备管理接口
-  - **[用户管理](./05-api-reference/endpoints/user-management.md)** - 用户和认证接口
-  - **[数据分析](./05-api-reference/endpoints/analytics-api.md)** - 统计分析接口
+  - **[内容管理API](./05-api-reference/endpoints/content-api.md)** - 文章、鱼百科、配件、拟饵、钓组管理 ⭐ v5.1.0
   - **[管理接口](./05-api-reference/endpoints/admin-api.md)** - 管理员专用接口
 - **[数据结构](./05-api-reference/data-schemas.md)** - 请求/响应数据格式
 - **[错误处理](./05-api-reference/error-handling.md)** - 错误码和异常处理
@@ -66,6 +62,8 @@
 - **[爬虫开发](./06-guides/crawler-development.md)** - 网络爬虫开发和扩展
 - **[小程序集成](./06-guides/miniprogram-integration.md)** - 微信小程序集成
 - **[装备导入](./06-guides/equipment-import.md)** - 装备数据导入工作流
+- **[装备排序](./06-guides/equipment-sorting.md)** - 装备排序功能详解
+- **[装备排序总结](./06-guides/equipment-sorting-summary.md)** - 排序功能实现总结
 - **[性能优化](./06-guides/performance-optimization.md)** - 系统性能优化技术
 - **[迁移指南](./06-guides/migration-guides/)** - 版本升级和数据迁移
 
@@ -84,28 +82,70 @@
 
 ## 🔍 核心特性概览
 
-- **🧩 模块化Agent架构**: 4个独立包，完全自包含
-- **🔄 动态Prompt中间件**: 智能选择提示词，Token效率提升50%+
-- **🎯 7因子科学评分**: 温度、天气、风力、气压、湿度、季节、月相
-- **🔐 JWT认证系统**: RBAC权限管理 + 微信小程序支持
-- **🤖 智能处理系统**: OCR多提供商 + 图片合并 + 装备导入
-- **🌐 多端支持**: CLI、API、React管理前端、微信小程序
+### 🆕 v5.1.0 新增功能
+
+- **🐟 鱼百科管理** - 鱼种知识库、季节活动规律、装备推荐查询
+- **📚 内容管理系统** - 富文本编辑器、自动保存草稿、语义搜索、向量检索（ChromaDB）
+- **📊 Excel批量导入** - 批量导入装备数据到待审核队列、模板生成系统
+- **🔍 向量搜索** - 基于ChromaDB的语义搜索和DashScope Embedding
+- **🎯 配件管理** - 钩子、铅坠、转环、前导线等配件完整管理
+- **🪝 拟饵类型** - 硬饵、软饵、金属饵、飞蝇分类体系
+- **🔧 钓组配置** - 德州钓组、卡罗莱纳钓组、倒吊钓组等模板
+- **🔄 装备管理增强排序** - 支持12个字段排序（名称/类别/品牌/价格/竿长/自重/动作/调性/节数/创建时间/更新时间）
+
+### 核心功能
+
+- **🧩 模块化Agent架构** - 4个独立包，完全自包含
+  - `packages/agents/fishing` - 钓鱼助手 Agent
+  - `packages/agents/equipment_import` - 装备导入 Agent
+  - `packages/agents/agent_component` - 统一监控组件
+  - `packages/data_processing` - 图片处理和OCR
+  - `packages/scraper` - 分布式爬虫框架
+- **🔄 动态Prompt中间件** - 智能选择提示词，Token效率提升50%+
+- **🎯 7因子科学评分** - 温度、天气、风力、气压、湿度、季节、月相
+- **🔐 JWT认证系统** - RBAC权限管理 + 微信小程序支持
+- **🤖 智能处理系统** - OCR多提供商 + 图片合并 + 装备导入
+- **🌐 多端支持** - CLI、API、React管理前端、微信小程序
 
 ## 📝 文档规范
 
 本文档遵循以下组织原则：
-- **受众导向**: 按用户角色组织，便于快速定位
-- **层次清晰**: 最多3层目录结构，避免深层嵌套
-- **命名一致**: 使用英文文件名，中文内容描述
-- **导航友好**: 每个目录都有README.md作为入口
-- **交叉引用**: 相关文档间建立清晰的引用关系
+- **受众导向**：按用户角色组织，便于快速定位
+- **层次清晰**：最多3层目录结构，避免深层嵌套
+- **命名一致**：使用英文文件名，中文内容描述
+- **导航友好**：每个目录都有README.md作为入口
+- **交叉引用**：相关文档间建立清晰的引用关系
+- **版本同步**：所有文档版本号与项目版本保持一致
 
 ## 🔗 相关资源
 
-- **项目主页**: [智能钓鱼助手 GitHub](https://github.com/your-org/fishing-agent)
-- **问题反馈**: [GitHub Issues](https://github.com/your-org/fishing-agent/issues)
-- **更新日志**: [CHANGELOG.md](../CHANGELOG.md)
-- **许可证**: [LICENSE](../LICENSE)
+- **项目主页**：[智能钓鱼助手 GitHub](https://github.com/your-org/fishing-agent)
+- **问题反馈**：[GitHub Issues](https://github.com/your-org/fishing-agent/issues)
+- **更新日志**：[CHANGELOG.md](../CHANGELOG.md)
+- **许可证**：[LICENSE](../LICENSE)
+
+## 📦 技术栈概览
+
+### 后端技术
+- **Python 3.11+** - 主要开发语言
+- **LangChain 1.0+** - AI Agent框架
+- **FastAPI** - 高性能Web框架
+- **SQLAlchemy** - ORM数据访问
+- **uv** - 现代Python包管理器
+
+### 前端技术
+- **React 19.2.0** - 用户界面框架
+- **TypeScript** - 类型安全的JavaScript
+- **Ant Design 5.22.0** - 企业级UI组件库
+- **Vite** - 快速构建工具
+
+### AI和数据
+- **通义千问** - 阿里云LLM服务
+- **智谱AI** - GLM-4.6模型
+- **Ollama** - 本地OCR模型
+- **SiliconFlow** - 云端OCR服务
+- **彩云天气** - 气象数据API
+- **高德地图** - 地理位置服务
 
 ---
 
