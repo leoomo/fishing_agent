@@ -103,6 +103,22 @@ results = spider.crawl("target_url")
 - **React Admin Panel**: http://localhost:5173
 - **API Docs**: http://localhost:8000/docs
 
+## Screenshots
+
+### Monitoring Dashboard
+<img src="docs/assets/screenshots/monitoring-dashboard.png" width="48%"> <img src="docs/assets/screenshots/monitoring-charts.png" width="48%">
+
+### Data Workflow
+<img src="docs/assets/screenshots/workflow-tabs.png" width="48%"> <img src="docs/assets/screenshots/workflow-import.png" width="48%">
+
+### Equipment & OCR
+<img src="docs/assets/screenshots/equipment-review.png" width="48%"> <img src="docs/assets/screenshots/ocr-worker.png" width="48%">
+
+### Rig Configuration & Real-time Updates
+<img src="docs/assets/screenshots/rig-management.png" width="48%"> <img src="docs/assets/screenshots/realtime-progress.png" width="48%">
+
+> WeChat Mini Program screenshots coming soon.
+
 ## Tech Stack
 
 ### Backend

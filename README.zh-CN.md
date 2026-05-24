@@ -30,6 +30,22 @@
 - **🔍 多提供商OCR** - 支持Ollama本地OCR和SiliconFlow云端OCR，灵活配置
 - **📦 装备导入Agent** - 支持文本压缩中间件和批量装备信息提取
 
+## 📸 项目截图
+
+### 监控面板
+<img src="docs/assets/screenshots/monitoring-dashboard.png" width="48%"> <img src="docs/assets/screenshots/monitoring-charts.png" width="48%">
+
+### 数据工作流
+<img src="docs/assets/screenshots/workflow-tabs.png" width="48%"> <img src="docs/assets/screenshots/workflow-import.png" width="48%">
+
+### 装备管理与 OCR
+<img src="docs/assets/screenshots/equipment-review.png" width="48%"> <img src="docs/assets/screenshots/ocr-worker.png" width="48%">
+
+### 钓组配置与实时更新
+<img src="docs/assets/screenshots/rig-management.png" width="48%"> <img src="docs/assets/screenshots/realtime-progress.png" width="48%">
+
+> 微信小程序截图即将添加。
+
 ## 🚀 快速开始
 
 ### 环境要求
