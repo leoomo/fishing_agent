@@ -117,7 +117,8 @@ results = spider.crawl("target_url")
 ### Rig Configuration & Real-time Updates
 <img src="docs/assets/screenshots/rig-management.png" width="48%"> <img src="docs/assets/screenshots/realtime-progress.png" width="48%">
 
-> WeChat Mini Program screenshots coming soon.
+### WeChat Mini Program
+<img src="docs/assets/screenshots/miniprogram-login.png" width="30%"> <img src="docs/assets/screenshots/miniprogram-home.png" width="30%"> <img src="docs/assets/screenshots/miniprogram-chat.png" width="30%">
 
 ## Tech Stack
 

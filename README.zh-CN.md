@@ -44,7 +44,8 @@
 ### 钓组配置与实时更新
 <img src="docs/assets/screenshots/rig-management.png" width="48%"> <img src="docs/assets/screenshots/realtime-progress.png" width="48%">
 
-> 微信小程序截图即将添加。
+### 微信小程序
+<img src="docs/assets/screenshots/miniprogram-login.png" width="30%"> <img src="docs/assets/screenshots/miniprogram-home.png" width="30%"> <img src="docs/assets/screenshots/miniprogram-chat.png" width="30%">
 
 ## 🚀 快速开始
 
