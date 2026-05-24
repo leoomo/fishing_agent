@@ -1,3 +1,5 @@
+[English](README.md) | [中文](README.zh-CN.md)
+
 # Fishing Agent - Intelligent Fishing Assistant v5.1.0
 
 An intelligent fishing assistant built on LangChain 1.0+, providing fishing time recommendations, weather analysis, and lure equipment management.
